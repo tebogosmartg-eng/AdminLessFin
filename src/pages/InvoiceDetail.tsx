@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../integrations/supabase/client';
-import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from '../components/ui/table';
 import { Skeleton } from '../components/ui/skeleton';
 import { Button } from '../components/ui/button';
@@ -13,6 +13,7 @@ import InvoicePaymentForm from '../components/InvoicePaymentForm';
 import { useAuth } from '../contexts/AuthContext';
 import SendInvoiceDialog from '../components/SendInvoiceDialog';
 import { formatCurrency } from '../lib/utils';
+import JournalEntryDetail from '../components/JournalEntryDetail';
 
 type InvoiceDetailData = {
   id: string;
@@ -42,6 +43,7 @@ const InvoiceDetail = () => {
   const queryClient = useQueryClient();
   const [isPaymentFormOpen, setIsPaymentFormOpen] = useState(false);
   const [isSendDialogOpen, setIsSendDialogOpen] = useState(false);
+  const [selectedEntryId, setSelectedEntryId] = useState<string | null>(null);
 
   const fetchInvoiceDetail = async () => {
     const { data, error } = await supabase
@@ -70,6 +72,20 @@ const InvoiceDetail = () => {
   const { data: invoice, isLoading } = useQuery({
     queryKey: ['invoice_detail', id],
     queryFn: fetchInvoiceDetail,
+    enabled: !!id,
+  });
+
+  const { data: relatedEntries, isLoading: isLoadingRelatedEntries } = useQuery({
+    queryKey: ['related_journal_entries', id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('journal_entries')
+        .select('id, entry_date, description')
+        .eq('invoice_id', id!)
+        .order('entry_date', { ascending: true });
+      if (error) throw error;
+      return data;
+    },
     enabled: !!id,
   });
 
@@ -172,6 +188,34 @@ const InvoiceDetail = () => {
             </Table>
           </CardContent>
         </Card>
+
+        <Card className="mt-6 print:hidden">
+          <CardHeader>
+            <CardTitle>Transaction History</CardTitle>
+            <CardDescription>All journal entries related to this invoice.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {isLoadingRelatedEntries ? (
+              <Skeleton className="h-24 w-full" />
+            ) : relatedEntries && relatedEntries.length > 0 ? (
+              <ul className="space-y-2">
+                {relatedEntries.map(entry => (
+                  <li key={entry.id} className="flex justify-between items-center text-sm">
+                    <div>
+                      <p className="font-medium">{entry.description}</p>
+                      <p className="text-xs text-muted-foreground">{new Date(entry.entry_date).toLocaleDateString()}</p>
+                    </div>
+                    <Button variant="outline" size="sm" onClick={() => setSelectedEntryId(entry.id)}>
+                      View Details
+                    </Button>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="text-sm text-muted-foreground">No related transactions found.</p>
+            )}
+          </CardContent>
+        </Card>
       </div>
       <SendInvoiceDialog
         isOpen={isSendDialogOpen}
@@ -190,6 +234,11 @@ const InvoiceDetail = () => {
           totalAmount: totalAmount,
           customerName: invoice.customers?.[0]?.name || 'Customer'
         }}
+      />
+      <JournalEntryDetail
+        isOpen={!!selectedEntryId}
+        setIsOpen={() => setSelectedEntryId(null)}
+        entryId={selectedEntryId}
       />
     </>
   );

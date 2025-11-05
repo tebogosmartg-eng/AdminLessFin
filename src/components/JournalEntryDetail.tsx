@@ -19,6 +19,7 @@ import { Skeleton } from './ui/skeleton';
 import { Button } from './ui/button';
 import { Paperclip } from 'lucide-react';
 import { formatCurrency } from '../lib/utils';
+import { Link } from 'react-router-dom';
 
 type JournalEntryDetailProps = {
   entryId: string | null;
@@ -33,6 +34,7 @@ type EntryDetail = {
   attachment_url: string | null;
   vendors: { name: string }[] | null;
   customers: { name: string }[] | null;
+  invoices: { id: string; invoice_number: string }[] | null;
   journal_entry_items: {
     type: 'debit' | 'credit';
     amount: number;
@@ -53,6 +55,7 @@ const JournalEntryDetail = ({ entryId, isOpen, setIsOpen }: JournalEntryDetailPr
         attachment_url,
         vendors ( name ),
         customers ( name ),
+        invoices ( id, invoice_number ),
         journal_entry_items (
           type,
           amount,
@@ -65,10 +68,10 @@ const JournalEntryDetail = ({ entryId, isOpen, setIsOpen }: JournalEntryDetailPr
       .single();
     
     if (error) throw new Error(error.message);
-    return data;
+    return data as EntryDetail;
   };
 
-  const { data: entry, isLoading } = useQuery<EntryDetail>({
+  const { data: entry, isLoading } = useQuery({
     queryKey: ['journal_entry_detail', entryId],
     queryFn: () => fetchEntryDetail(entryId!),
     enabled: !!entryId,
@@ -101,6 +104,16 @@ const JournalEntryDetail = ({ entryId, isOpen, setIsOpen }: JournalEntryDetailPr
                 <span className="font-semibold text-gray-800 dark:text-gray-200">Customer:</span>
                 <p className="text-gray-600 dark:text-gray-400">{entry.customers?.[0]?.name || 'N/A'}</p>
               </div>
+              {entry.invoices && entry.invoices.length > 0 && (
+                <div>
+                  <span className="font-semibold text-gray-800 dark:text-gray-200">Related Invoice:</span>
+                  <p>
+                    <Link to={`/invoices/${entry.invoices[0].id}`} className="text-blue-500 hover:underline" onClick={() => setIsOpen(false)}>
+                      #{entry.invoices[0].invoice_number}
+                    </Link>
+                  </p>
+                </div>
+              )}
             </div>
             
             {entry.attachment_url && (
