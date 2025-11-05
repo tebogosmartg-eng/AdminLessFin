@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
@@ -11,6 +11,7 @@ import { Badge } from '../components/ui/badge';
 import { showError, showSuccess } from '../utils/toast';
 import InvoicePaymentForm from '../components/InvoicePaymentForm';
 import { useAuth } from '../contexts/AuthContext';
+import SendInvoiceDialog from '../components/SendInvoiceDialog';
 
 type InvoiceDetailData = {
   id: string;
@@ -37,9 +38,9 @@ type InvoiceDetailData = {
 const InvoiceDetail = () => {
   const { id } = useParams();
   const { profile } = useAuth();
-  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [isPaymentFormOpen, setIsPaymentFormOpen] = useState(false);
+  const [isSendDialogOpen, setIsSendDialogOpen] = useState(false);
 
   const fetchInvoiceDetail = async () => {
     const { data, error } = await supabase
@@ -71,20 +72,15 @@ const InvoiceDetail = () => {
     enabled: !!id,
   });
 
-  const updateStatusMutation = useMutation({
-    mutationFn: async (status: 'sent' | 'void') => {
-      if (status === 'void') {
-        const { error } = await supabase.rpc('void_invoice', { p_invoice_id: id! });
-        if (error) throw error;
-      } else {
-        const { error } = await supabase.from('invoices').update({ status }).eq('id', id!);
-        if (error) throw error;
-      }
+  const voidMutation = useMutation({
+    mutationFn: async () => {
+      const { error } = await supabase.rpc('void_invoice', { p_invoice_id: id! });
+      if (error) throw error;
     },
-    onSuccess: (_, status) => {
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['invoice_detail', id] });
       queryClient.invalidateQueries({ queryKey: ['invoices'] });
-      showSuccess(`Invoice marked as ${status}.`);
+      showSuccess('Invoice voided successfully.');
     },
     onError: (error: any) => showError(error.message),
   });
@@ -111,8 +107,8 @@ const InvoiceDetail = () => {
           </div>
           <div className="flex gap-2 print:hidden">
             {invoice.status === 'draft' && (
-              <Button onClick={() => updateStatusMutation.mutate('sent')} disabled={updateStatusMutation.isPending}>
-                <Send className="mr-2 h-4 w-4" /> Mark as Sent
+              <Button onClick={() => setIsSendDialogOpen(true)}>
+                <Send className="mr-2 h-4 w-4" /> Send Invoice
               </Button>
             )}
             {invoice.status === 'sent' && (
@@ -120,7 +116,7 @@ const InvoiceDetail = () => {
                 <Button onClick={() => setIsPaymentFormOpen(true)}>
                   <HandCoins className="mr-2 h-4 w-4" /> Receive Payment
                 </Button>
-                <Button variant="destructive" onClick={() => updateStatusMutation.mutate('void')} disabled={updateStatusMutation.isPending}>
+                <Button variant="destructive" onClick={() => voidMutation.mutate()} disabled={voidMutation.isPending}>
                   <Ban className="mr-2 h-4 w-4" /> Void
                 </Button>
               </>
@@ -177,6 +173,15 @@ const InvoiceDetail = () => {
           </CardContent>
         </Card>
       </div>
+      <SendInvoiceDialog
+        isOpen={isSendDialogOpen}
+        setIsOpen={setIsSendDialogOpen}
+        invoice={{
+          id: invoice.id,
+          invoice_number: invoice.invoice_number,
+          customer_email: invoice.customers?.[0]?.email || null,
+        }}
+      />
       <InvoicePaymentForm 
         isOpen={isPaymentFormOpen}
         setIsOpen={setIsPaymentFormOpen}
