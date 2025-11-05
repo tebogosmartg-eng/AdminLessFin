@@ -11,7 +11,7 @@ import {
   TableRow,
 } from '../components/ui/table';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
-import { PlusCircle, MoreHorizontal, Paperclip } from 'lucide-react';
+import { PlusCircle, MoreHorizontal, Paperclip, Calendar as CalendarIcon } from 'lucide-react';
 import JournalEntryForm from '../components/JournalEntryForm';
 import JournalEntryDetail from '../components/JournalEntryDetail';
 import {
@@ -21,6 +21,11 @@ import {
   DropdownMenuTrigger,
 } from "../components/ui/dropdown-menu";
 import { showError, showSuccess } from '../utils/toast';
+import { DateRange } from 'react-day-picker';
+import { Popover, PopoverContent, PopoverTrigger } from '../components/ui/popover';
+import { Calendar } from '../components/ui/calendar';
+import { format } from 'date-fns';
+import { cn } from '../lib/utils';
 
 type JournalEntry = {
   id: string;
@@ -37,10 +42,11 @@ const JournalEntries = () => {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [selectedEntryIdForDetail, setSelectedEntryIdForDetail] = useState<string | null>(null);
   const [selectedEntryIdForEdit, setSelectedEntryIdForEdit] = useState<string | undefined>(undefined);
+  const [date, setDate] = useState<DateRange | undefined>({ from: undefined, to: undefined });
   const queryClient = useQueryClient();
 
   const fetchJournalEntries = async () => {
-    const { data, error } = await supabase
+    let query = supabase
       .from('journal_entries')
       .select(`
         id,
@@ -53,12 +59,21 @@ const JournalEntries = () => {
         )
       `)
       .order('entry_date', { ascending: false });
+
+    if (date?.from) {
+      query = query.gte('entry_date', format(date.from, 'yyyy-MM-dd'));
+    }
+    if (date?.to) {
+      query = query.lte('entry_date', format(date.to, 'yyyy-MM-dd'));
+    }
+
+    const { data, error } = await query;
     if (error) throw new Error(error.message);
     return data;
   };
 
   const { data: entries, isLoading } = useQuery<JournalEntry[]>({
-    queryKey: ['journal_entries'],
+    queryKey: ['journal_entries', date],
     queryFn: fetchJournalEntries,
   });
 
@@ -102,7 +117,41 @@ const JournalEntries = () => {
     <>
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle>Journal Entries</CardTitle>
+          <div className="flex items-center gap-4">
+            <CardTitle>Journal Entries</CardTitle>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button
+                  id="date"
+                  variant={"outline"}
+                  className={cn("w-[260px] justify-start text-left font-normal", !date && "text-muted-foreground")}
+                >
+                  <CalendarIcon className="mr-2 h-4 w-4" />
+                  {date?.from ? (
+                    date.to ? (
+                      <>
+                        {format(date.from, "LLL dd, y")} - {format(date.to, "LLL dd, y")}
+                      </>
+                    ) : (
+                      format(date.from, "LLL dd, y")
+                    )
+                  ) : (
+                    <span>Pick a date range</span>
+                  )}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start">
+                <Calendar
+                  initialFocus
+                  mode="range"
+                  defaultMonth={date?.from}
+                  selected={date}
+                  onSelect={setDate}
+                  numberOfMonths={2}
+                />
+              </PopoverContent>
+            </Popover>
+          </div>
           <Button onClick={handleAddNew}>
             <PlusCircle className="mr-2 h-4 w-4" />
             New Journal Entry
@@ -151,7 +200,7 @@ const JournalEntries = () => {
                 ))
               ) : (
                 <TableRow>
-                  <TableCell colSpan={4} className="text-center">No journal entries found. Create one to get started.</TableCell>
+                  <TableCell colSpan={4} className="text-center">No journal entries found for the selected period.</TableCell>
                 </TableRow>
               )}
             </TableBody>
