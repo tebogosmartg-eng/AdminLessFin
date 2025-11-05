@@ -13,6 +13,7 @@ import JournalEntries from "./pages/JournalEntries";
 import Reports from "./pages/Reports";
 import Settings from "./pages/Settings";
 import GeneralLedger from "./pages/GeneralLedger";
+import Budgets from "./pages/Budgets";
 
 const queryClient = new QueryClient();
 
@@ -30,6 +31,7 @@ const App = () => (
               <Route path="/chart-of-accounts" element={<ChartOfAccounts />} />
               <Route path="/journal-entries" element={<JournalEntries />} />
               <Route path="/general-ledger" element={<GeneralLedger />} />
+              <Route path="/budgets" element={<Budgets />} />
               <Route path="/reports" element={<Reports />} />
               <Route path="/settings" element={<Settings />} />
             </Route>
