@@ -28,10 +28,11 @@ export type Product = {
   description: string | null;
   price: number | null;
   type: 'service' | 'inventory';
+  quantity_on_hand: number;
   income_account_id: string | null;
-  expense_account_id: string | null;
+  cogs_account_id: string | null;
   income_account?: { name: string };
-  expense_account?: { name: string };
+  cogs_account?: { name: string };
 };
 
 const Products = () => {
@@ -45,7 +46,7 @@ const Products = () => {
       .select(`
         *,
         income_account:income_account_id ( name ),
-        expense_account:expense_account_id ( name )
+        cogs_account:cogs_account_id ( name )
       `)
       .order('name', { ascending: true });
     if (error) throw new Error(error.message);
@@ -108,23 +109,25 @@ const Products = () => {
               <TableRow>
                 <TableHead>Name</TableHead>
                 <TableHead>Type</TableHead>
+                <TableHead>Qty on Hand</TableHead>
                 <TableHead className="text-right">Price</TableHead>
                 <TableHead>Income Account</TableHead>
-                <TableHead>Expense Account</TableHead>
+                <TableHead>COGS Account</TableHead>
                 <TableHead className="w-[50px]"></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {isLoading ? (
-                <TableRow><TableCell colSpan={6} className="text-center">Loading items...</TableCell></TableRow>
+                <TableRow><TableCell colSpan={7} className="text-center">Loading items...</TableCell></TableRow>
               ) : products && products.length > 0 ? (
                 products.map((product) => (
                   <TableRow key={product.id}>
                     <TableCell className="font-medium">{product.name}</TableCell>
                     <TableCell className="capitalize">{product.type}</TableCell>
+                    <TableCell>{product.type === 'inventory' ? product.quantity_on_hand : 'N/A'}</TableCell>
                     <TableCell className="text-right font-mono">{product.price ? formatCurrency(product.price) : ''}</TableCell>
                     <TableCell>{product.income_account?.name || 'N/A'}</TableCell>
-                    <TableCell>{product.expense_account?.name || 'N/A'}</TableCell>
+                    <TableCell>{product.cogs_account?.name || 'N/A'}</TableCell>
                     <TableCell>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
@@ -139,7 +142,7 @@ const Products = () => {
                   </TableRow>
                 ))
               ) : (
-                <TableRow><TableCell colSpan={6} className="text-center">No items found. Add one to get started.</TableCell></TableRow>
+                <TableRow><TableCell colSpan={7} className="text-center">No items found. Add one to get started.</TableCell></TableRow>
               )}
             </TableBody>
           </Table>

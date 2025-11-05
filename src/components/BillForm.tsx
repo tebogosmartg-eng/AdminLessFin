@@ -96,8 +96,8 @@ const BillForm = ({ isOpen, setIsOpen }: BillFormProps) => {
     if (product) {
       form.setValue(`items.${index}.description`, product.description || product.name);
       form.setValue(`items.${index}.amount`, product.price || 0);
-      if (product.expense_account_id) {
-        form.setValue(`items.${index}.expense_account_id`, product.expense_account_id);
+      if (product.cogs_account_id) {
+        form.setValue(`items.${index}.expense_account_id`, product.cogs_account_id);
       }
     }
   };

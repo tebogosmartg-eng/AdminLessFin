@@ -41,7 +41,7 @@ const productSchema = z.object({
   price: z.coerce.number().min(0, 'Price cannot be negative.'),
   type: z.enum(['service', 'inventory']),
   income_account_id: z.string().optional(),
-  expense_account_id: z.string().optional(),
+  cogs_account_id: z.string().optional(),
 });
 
 type ProductFormValues = z.infer<typeof productSchema>;
@@ -63,7 +63,7 @@ const ProductForm = ({ isOpen, setIsOpen, product }: ProductFormProps) => {
       price: 0,
       type: 'service',
       income_account_id: '',
-      expense_account_id: '',
+      cogs_account_id: '',
     },
   });
 
@@ -75,7 +75,7 @@ const ProductForm = ({ isOpen, setIsOpen, product }: ProductFormProps) => {
         price: product.price || 0,
         type: product.type,
         income_account_id: product.income_account_id || '',
-        expense_account_id: product.expense_account_id || '',
+        cogs_account_id: product.cogs_account_id || '',
       });
     } else {
       form.reset({
@@ -84,7 +84,7 @@ const ProductForm = ({ isOpen, setIsOpen, product }: ProductFormProps) => {
         price: 0,
         type: 'service',
         income_account_id: '',
-        expense_account_id: '',
+        cogs_account_id: '',
       });
     }
   }, [product, form, isOpen]);
@@ -101,7 +101,7 @@ const ProductForm = ({ isOpen, setIsOpen, product }: ProductFormProps) => {
         ...values,
         user_id: user.id,
         income_account_id: values.income_account_id || null,
-        expense_account_id: values.expense_account_id || null,
+        cogs_account_id: values.cogs_account_id || null,
       };
 
       const { error } = product
@@ -201,12 +201,12 @@ const ProductForm = ({ isOpen, setIsOpen, product }: ProductFormProps) => {
             />
             <FormField
               control={form.control}
-              name="expense_account_id"
+              name="cogs_account_id"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Expense Account (for Bills)</FormLabel>
+                  <FormLabel>COGS Account (for Inventory Sales)</FormLabel>
                   <Select onValueChange={field.onChange} value={field.value}>
-                    <FormControl><SelectTrigger><SelectValue placeholder="Select an expense account" /></SelectTrigger></FormControl>
+                    <FormControl><SelectTrigger><SelectValue placeholder="Select a COGS account" /></SelectTrigger></FormControl>
                     <SelectContent>{expenseAccounts?.map(acc => <SelectItem key={acc.id} value={acc.id}>{acc.name}</SelectItem>)}</SelectContent>
                   </Select>
                   <FormMessage />
