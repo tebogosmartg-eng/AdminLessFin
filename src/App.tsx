@@ -29,6 +29,7 @@ import InvoiceDetail from "./pages/InvoiceDetail";
 import Employees from "./pages/Employees";
 import PayrollRuns from "./pages/PayrollRuns";
 import PayrollRunDetail from "./pages/PayrollRunDetail";
+import PayrollReports from "./pages/PayrollReports";
 
 const queryClient = new QueryClient();
 
@@ -64,6 +65,7 @@ const App = () => (
               <Route path="/employees" element={<Employees />} />
               <Route path="/payroll-runs" element={<PayrollRuns />} />
               <Route path="/payroll-runs/:id" element={<PayrollRunDetail />} />
+              <Route path="/payroll-reports" element={<PayrollReports />} />
             </Route>
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
