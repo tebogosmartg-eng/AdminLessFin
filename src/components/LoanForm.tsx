@@ -12,7 +12,7 @@ import { Input } from './ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { showError, showSuccess } from '../utils/toast';
 import { Vendor } from '../pages/Vendors';
-import { X } from 'lucide-react';
+import { Account } from '../pages/ChartOfAccounts';
 
 const loanSchema = z.object({
   lender_id: z.string().min(1, 'Lender is required.'),
@@ -21,6 +21,8 @@ const loanSchema = z.object({
   term_months: z.coerce.number().int().min(1, 'Term must be at least 1 month.'),
   repayment_frequency: z.enum(['monthly', 'quarterly', 'annually']),
   start_date: z.string().min(1, 'Start date is required.'),
+  deposit_account_id: z.string().min(1, 'Deposit account is required.'),
+  liability_account_id: z.string().min(1, 'Liability account is required.'),
 });
 
 type LoanFormValues = z.infer<typeof loanSchema>;
@@ -36,47 +38,82 @@ const LoanForm = ({ isOpen, setIsOpen, loanId }: LoanFormProps) => {
   const queryClient = useQueryClient();
   const isEditing = !!loanId;
   const [attachmentFile, setAttachmentFile] = useState<File | null>(null);
-  const [existingAttachmentUrl, setExistingAttachmentUrl] = useState<string | null>(null);
-  const [removeAttachment, setRemoveAttachment] = useState(false);
 
   const form = useForm<LoanFormValues>({
     resolver: zodResolver(loanSchema),
     defaultValues: {
       repayment_frequency: 'monthly',
+      start_date: new Date().toISOString().split('T')[0],
     },
   });
 
-  // Fetching logic for editing would go here in a real scenario
-
   useEffect(() => {
     if (!isOpen) {
-      form.reset();
+      form.reset({
+        repayment_frequency: 'monthly',
+        start_date: new Date().toISOString().split('T')[0],
+      });
       setAttachmentFile(null);
-      setExistingAttachmentUrl(null);
-      setRemoveAttachment(false);
     }
   }, [isOpen, form]);
 
   const { data: vendors } = useQuery<Vendor[]>({ queryKey: ['vendors'] });
+  const { data: accounts } = useQuery<Account[]>({ queryKey: ['accounts'] });
+  const assetAccounts = accounts?.filter(a => a.type === 'Asset');
+  const liabilityAccounts = accounts?.filter(a => a.type === 'Liability');
 
   const mutation = useMutation({
     mutationFn: async (values: LoanFormValues) => {
       if (!user) throw new Error('User not authenticated');
 
-      const { data: loan, error } = await supabase
+      // 1. Insert loan record
+      const { data: loan, error: loanError } = await supabase
         .from('loans')
-        .insert({ ...values, user_id: user.id })
+        .insert({
+          user_id: user.id,
+          lender_id: values.lender_id,
+          principal_amount: values.principal_amount,
+          interest_rate: values.interest_rate,
+          term_months: values.term_months,
+          repayment_frequency: values.repayment_frequency,
+          start_date: values.start_date,
+        })
         .select('id')
         .single();
-      
-      if (error) throw error;
+      if (loanError) throw loanError;
 
+      // 2. Create journal entry for loan proceeds
+      const lenderName = vendors?.find(v => v.id === values.lender_id)?.name || 'Lender';
+      const { data: entry, error: entryError } = await supabase
+        .from('journal_entries')
+        .insert({
+          user_id: user.id,
+          entry_date: values.start_date,
+          description: `Loan received from ${lenderName}`,
+          vendor_id: values.lender_id,
+        })
+        .select('id')
+        .single();
+      if (entryError) throw entryError;
+
+      const journalItems = [
+        { journal_entry_id: entry.id, account_id: values.deposit_account_id, type: 'debit', amount: values.principal_amount },
+        { journal_entry_id: entry.id, account_id: values.liability_account_id, type: 'credit', amount: values.principal_amount },
+      ];
+      const { error: itemsError } = await supabase.from('journal_entry_items').insert(journalItems);
+      if (itemsError) throw itemsError;
+
+      // 3. Generate amortization schedule
+      const { error: rpcError } = await supabase.rpc('generate_amortization_schedule', { p_loan_id: loan.id });
+      if (rpcError) throw rpcError;
+
+      // 4. Handle file upload
       if (attachmentFile) {
         const fileExt = attachmentFile.name.split('.').pop();
         const fileName = `agreement.${fileExt}`;
         const filePath = `${user.id}/loans/${loan.id}/${fileName}`;
         
-        const { error: uploadError } = await supabase.storage.from('attachments').upload(filePath, attachmentFile);
+        const { error: uploadError } = await supabase.storage.from('attachments').upload(filePath, attachmentFile, { upsert: true });
         if (uploadError) throw new Error(`Storage Error: ${uploadError.message}`);
         
         const { data: urlData } = supabase.storage.from('attachments').getPublicUrl(filePath);
@@ -87,6 +124,7 @@ const LoanForm = ({ isOpen, setIsOpen, loanId }: LoanFormProps) => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['loans'] });
+      queryClient.invalidateQueries({ queryKey: ['journal_entries'] });
       showSuccess(`Loan ${isEditing ? 'updated' : 'created'} successfully.`);
       setIsOpen(false);
     },
@@ -106,28 +144,38 @@ const LoanForm = ({ isOpen, setIsOpen, loanId }: LoanFormProps) => {
         </DialogHeader>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-            <FormField control={form.control} name="lender_id" render={({ field }) => (
-              <FormItem><FormLabel>Lender</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select a lender" /></SelectTrigger></FormControl><SelectContent>{vendors?.map(v => <SelectItem key={v.id} value={v.id}>{v.name}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem>
-            )} />
-            <div className="grid grid-cols-2 gap-4">
+            <fieldset className="grid grid-cols-2 gap-4 border p-4 rounded-md">
+              <legend className="text-sm font-medium px-1 -mb-2">Loan Terms</legend>
+              <FormField control={form.control} name="lender_id" render={({ field }) => (
+                <FormItem className="col-span-2"><FormLabel>Lender</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select a lender" /></SelectTrigger></FormControl><SelectContent>{vendors?.map(v => <SelectItem key={v.id} value={v.id}>{v.name}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem>
+              )} />
               <FormField control={form.control} name="principal_amount" render={({ field }) => (
                 <FormItem><FormLabel>Principal Amount</FormLabel><FormControl><Input type="number" step="0.01" {...field} /></FormControl><FormMessage /></FormItem>
               )} />
               <FormField control={form.control} name="interest_rate" render={({ field }) => (
                 <FormItem><FormLabel>Interest Rate (%)</FormLabel><FormControl><Input type="number" step="0.01" {...field} /></FormControl><FormMessage /></FormItem>
               )} />
-            </div>
-            <div className="grid grid-cols-2 gap-4">
               <FormField control={form.control} name="term_months" render={({ field }) => (
                 <FormItem><FormLabel>Term (Months)</FormLabel><FormControl><Input type="number" {...field} /></FormControl><FormMessage /></FormItem>
               )} />
               <FormField control={form.control} name="start_date" render={({ field }) => (
                 <FormItem><FormLabel>Start Date</FormLabel><FormControl><Input type="date" {...field} /></FormControl><FormMessage /></FormItem>
               )} />
-            </div>
-            <FormField control={form.control} name="repayment_frequency" render={({ field }) => (
-              <FormItem><FormLabel>Repayment Frequency</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl><SelectContent><SelectItem value="monthly">Monthly</SelectItem><SelectItem value="quarterly">Quarterly</SelectItem><SelectItem value="annually">Annually</SelectItem></SelectContent></Select><FormMessage /></FormItem>
-            )} />
+              <FormField control={form.control} name="repayment_frequency" render={({ field }) => (
+                <FormItem className="col-span-2"><FormLabel>Repayment Frequency</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl><SelectContent><SelectItem value="monthly">Monthly</SelectItem><SelectItem value="quarterly">Quarterly</SelectItem><SelectItem value="annually">Annually</SelectItem></SelectContent></Select><FormMessage /></FormItem>
+              )} />
+            </fieldset>
+
+            <fieldset className="grid grid-cols-2 gap-4 border p-4 rounded-md">
+              <legend className="text-sm font-medium px-1 -mb-2">Accounting</legend>
+              <FormField control={form.control} name="deposit_account_id" render={({ field }) => (
+                <FormItem><FormLabel>Deposit To</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select asset account" /></SelectTrigger></FormControl><SelectContent>{assetAccounts?.map(a => <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem>
+              )} />
+              <FormField control={form.control} name="liability_account_id" render={({ field }) => (
+                <FormItem><FormLabel>Loan Account</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select liability account" /></SelectTrigger></FormControl><SelectContent>{liabilityAccounts?.map(a => <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem>
+              )} />
+            </fieldset>
+
             <FormItem>
               <FormLabel>Loan Agreement (Optional)</FormLabel>
               <FormControl><Input type="file" onChange={(e) => setAttachmentFile(e.target.files?.[0] || null)} /></FormControl>

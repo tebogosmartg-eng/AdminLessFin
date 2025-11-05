@@ -9,6 +9,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Badge } from '../components/ui/badge';
 import LoanForm from '../components/LoanForm';
 import { formatCurrency } from '../lib/utils';
+import { useNavigate } from 'react-router-dom';
 
 type Loan = {
   id: string;
@@ -22,6 +23,7 @@ type Loan = {
 const Loans = () => {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [selectedLoanId, setSelectedLoanId] = useState<string | undefined>(undefined);
+  const navigate = useNavigate();
 
   const { data: loans, isLoading } = useQuery<Loan[]>({
     queryKey: ['loans'],
@@ -80,6 +82,7 @@ const Loans = () => {
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild><Button variant="ghost" className="h-8 w-8 p-0"><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={() => navigate(`/loans/${loan.id}`)}>View Details</DropdownMenuItem>
                           <DropdownMenuItem disabled>Edit</DropdownMenuItem>
                           {loan.loan_agreement_url && (
                             <DropdownMenuItem asChild>
