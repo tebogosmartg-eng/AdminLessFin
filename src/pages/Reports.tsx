@@ -26,6 +26,17 @@ type AccountActivity = {
   activity: number;
 };
 
+type AgedReceivable = {
+  customer_id: string;
+  customer_name: string;
+  total_due: number;
+  current: number;
+  days_1_30: number;
+  days_31_60: number;
+  days_61_90: number;
+  days_90_plus: number;
+};
+
 const Reports = () => {
   const [date, setDate] = useState<DateRange | undefined>({
     from: startOfMonth(new Date()),
@@ -60,7 +71,16 @@ const Reports = () => {
     enabled: !!fromDate && !!toDate,
   });
 
-  const isLoading = isLoadingPointInTime || isLoadingPeriodActivity;
+  const { data: agedReceivables, isLoading: isLoadingAgedReceivables } = useQuery<AgedReceivable[]>({
+    queryKey: ['aged_receivables'],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc('get_aged_receivables');
+      if (error) throw new Error(error.message);
+      return data;
+    },
+  });
+
+  const isLoading = isLoadingPointInTime || isLoadingPeriodActivity || isLoadingAgedReceivables;
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount);
@@ -130,7 +150,7 @@ const Reports = () => {
 
       {isLoading ? (
         <div className="space-y-6">
-          {[...Array(3)].map((_, i) => (
+          {[...Array(4)].map((_, i) => (
             <Card key={i}><CardHeader><Skeleton className="h-8 w-1/2" /></CardHeader><CardContent><Skeleton className="h-40 w-full" /></CardContent></Card>
           ))}
         </div>
@@ -208,6 +228,56 @@ const Reports = () => {
                   </Table>
                 </div>
               </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Aged Receivables Summary</CardTitle>
+              <CardDescription>Outstanding customer balances by aging period as of today.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {agedReceivables && agedReceivables.length > 0 ? (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Customer</TableHead>
+                      <TableHead className="text-right">Current</TableHead>
+                      <TableHead className="text-right">1-30 Days</TableHead>
+                      <TableHead className="text-right">31-60 Days</TableHead>
+                      <TableHead className="text-right">61-90 Days</TableHead>
+                      <TableHead className="text-right">90+ Days</TableHead>
+                      <TableHead className="text-right">Total</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {agedReceivables?.map(row => (
+                      <TableRow key={row.customer_id}>
+                        <TableCell>{row.customer_name}</TableCell>
+                        <TableCell className="text-right font-mono">{formatCurrency(row.current)}</TableCell>
+                        <TableCell className="text-right font-mono">{formatCurrency(row.days_1_30)}</TableCell>
+                        <TableCell className="text-right font-mono">{formatCurrency(row.days_31_60)}</TableCell>
+                        <TableCell className="text-right font-mono">{formatCurrency(row.days_61_90)}</TableCell>
+                        <TableCell className="text-right font-mono">{formatCurrency(row.days_90_plus)}</TableCell>
+                        <TableCell className="text-right font-mono font-bold">{formatCurrency(row.total_due)}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                  <TableFooter>
+                    <TableRow className="text-lg font-bold bg-gray-100 dark:bg-gray-700">
+                      <TableCell>Totals</TableCell>
+                      <TableCell className="text-right font-mono">{formatCurrency(agedReceivables?.reduce((sum, r) => sum + r.current, 0) || 0)}</TableCell>
+                      <TableCell className="text-right font-mono">{formatCurrency(agedReceivables?.reduce((sum, r) => sum + r.days_1_30, 0) || 0)}</TableCell>
+                      <TableCell className="text-right font-mono">{formatCurrency(agedReceivables?.reduce((sum, r) => sum + r.days_31_60, 0) || 0)}</TableCell>
+                      <TableCell className="text-right font-mono">{formatCurrency(agedReceivables?.reduce((sum, r) => sum + r.days_61_90, 0) || 0)}</TableCell>
+                      <TableCell className="text-right font-mono">{formatCurrency(agedReceivables?.reduce((sum, r) => sum + r.days_90_plus, 0) || 0)}</TableCell>
+                      <TableCell className="text-right font-mono">{formatCurrency(agedReceivables?.reduce((sum, r) => sum + r.total_due, 0) || 0)}</TableCell>
+                    </TableRow>
+                  </TableFooter>
+                </Table>
+              ) : (
+                <p className="text-center text-muted-foreground py-4">No outstanding receivables found.</p>
+              )}
             </CardContent>
           </Card>
         </>
