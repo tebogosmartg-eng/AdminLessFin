@@ -1,29 +1,38 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { Input } from '../components/ui/input';
 import { Account } from './ChartOfAccounts';
-import Papa from 'papaparse';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/table';
+import { Checkbox } from '../components/ui/checkbox';
+import { Button } from '../components/ui/button';
+import { Skeleton } from '../components/ui/skeleton';
+import { format } from 'date-fns';
+import { cn } from '../lib/utils';
+
+type Transaction = {
+  id: string;
+  entry_date: string;
+  description: string | null;
+  type: 'debit' | 'credit';
+  amount: number;
+};
 
 const Reconciliation = () => {
   const [selectedAccountId, setSelectedAccountId] = useState<string | null>(null);
   const [statementEndDate, setStatementEndDate] = useState('');
   const [statementEndBalance, setStatementEndBalance] = useState('');
-  const [bankTransactions, setBankTransactions] = useState<any[]>([]);
+  const [clearedItemIds, setClearedItemIds] = useState<Set<string>>(new Set());
+
+  const isSetupComplete = !!selectedAccountId && !!statementEndDate && !!statementEndBalance;
 
   const { data: bankAccounts } = useQuery<Account[]>({
     queryKey: ['bank_accounts'],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('chart_of_accounts')
-        .select('*')
-        .in('type', ['Asset'])
-        .order('name');
+      const { data, error } = await supabase.from('chart_of_accounts').select('*').eq('type', 'Asset').order('name');
       if (error) throw new Error(error.message);
-      // A simple filter for accounts that are likely bank/cash accounts
       return data.filter(acc => 
         acc.name.toLowerCase().includes('bank') || 
         acc.name.toLowerCase().includes('checking') || 
@@ -32,18 +41,112 @@ const Reconciliation = () => {
     },
   });
 
-  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (file) {
-      Papa.parse(file, {
-        header: true,
-        skipEmptyLines: true,
-        complete: (results) => {
-          setBankTransactions(results.data as any[]);
-        },
+  const { data: transactions, isLoading: isLoadingTransactions } = useQuery<Transaction[]>({
+    queryKey: ['reconciliation_transactions', selectedAccountId, statementEndDate],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('journal_entry_items')
+        .select(`
+          id,
+          amount,
+          type,
+          journal_entries (
+            entry_date,
+            description
+          )
+        `)
+        .eq('account_id', selectedAccountId!)
+        .lte('journal_entries.entry_date', statementEndDate);
+
+      if (error) throw new Error(error.message);
+      
+      return data.map(item => ({
+        id: item.id,
+        amount: item.amount,
+        type: item.type,
+        entry_date: (item.journal_entries as any).entry_date,
+        description: (item.journal_entries as any).description,
+      }));
+    },
+    enabled: isSetupComplete,
+  });
+
+  const { data: bookBalanceData, isLoading: isLoadingBookBalance } = useQuery({
+    queryKey: ['book_balance_as_of', selectedAccountId, statementEndDate],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc('get_balances_as_of_date', {
+        p_end_date: statementEndDate,
       });
-    }
+      if (error) throw new Error(error.message);
+      return data.find((acc: any) => acc.id === selectedAccountId);
+    },
+    enabled: isSetupComplete,
+  });
+
+  const handleClearItem = (itemId: string, isCleared: boolean) => {
+    setClearedItemIds(prev => {
+      const newSet = new Set(prev);
+      if (isCleared) newSet.add(itemId);
+      else newSet.delete(itemId);
+      return newSet;
+    });
   };
+
+  const { payments, deposits, clearedPaymentsTotal, clearedDepositsTotal, difference } = useMemo(() => {
+    if (!transactions || !bookBalanceData) return { payments: [], deposits: [], clearedPaymentsTotal: 0, clearedDepositsTotal: 0, difference: null };
+
+    const isDebitNormal = bankAccounts?.find(acc => acc.id === selectedAccountId)?.type === 'Asset';
+    const payments = transactions.filter(t => (isDebitNormal ? t.type === 'debit' : t.type === 'credit'));
+    const deposits = transactions.filter(t => (isDebitNormal ? t.type === 'credit' : t.type === 'debit'));
+
+    const clearedPaymentsTotal = payments.filter(p => clearedItemIds.has(p.id)).reduce((sum, p) => sum + p.amount, 0);
+    const clearedDepositsTotal = deposits.filter(d => clearedItemIds.has(d.id)).reduce((sum, d) => sum + d.amount, 0);
+
+    const bookBalance = bookBalanceData.balance;
+    const statementBalance = parseFloat(statementEndBalance) || 0;
+
+    const unclearedPayments = payments.filter(p => !clearedItemIds.has(p.id)).reduce((sum, p) => sum + p.amount, 0);
+    const unclearedDeposits = deposits.filter(d => !clearedItemIds.has(d.id)).reduce((sum, d) => sum + d.amount, 0);
+
+    const reconciledBookBalance = bookBalance - unclearedDeposits + unclearedPayments;
+    const difference = statementBalance - reconciledBookBalance;
+
+    return { payments, deposits, clearedPaymentsTotal, clearedDepositsTotal, difference };
+  }, [transactions, clearedItemIds, bookBalanceData, statementEndBalance, selectedAccountId, bankAccounts]);
+
+  const formatCurrency = (amount: number) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount);
+
+  const renderTransactionsTable = (title: string, items: Transaction[]) => (
+    <div>
+      <h3 className="text-lg font-semibold mb-2">{title} - {items.length} transactions</h3>
+      <div className="border rounded-md max-h-96 overflow-y-auto">
+        <Table>
+          <TableHeader className="sticky top-0 bg-gray-50 dark:bg-gray-800">
+            <TableRow>
+              <TableHead className="w-10"><Checkbox onCheckedChange={(checked) => {
+                const allIds = items.map(i => i.id);
+                if (checked) setClearedItemIds(prev => new Set([...prev, ...allIds]));
+                else setClearedItemIds(prev => new Set([...prev].filter(id => !allIds.includes(id))));
+              }} /></TableHead>
+              <TableHead>Date</TableHead>
+              <TableHead>Description</TableHead>
+              <TableHead className="text-right">Amount</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {items.map(item => (
+              <TableRow key={item.id}>
+                <TableCell><Checkbox checked={clearedItemIds.has(item.id)} onCheckedChange={(checked) => handleClearItem(item.id, !!checked)} /></TableCell>
+                <TableCell>{format(new Date(item.entry_date), 'PP')}</TableCell>
+                <TableCell>{item.description}</TableCell>
+                <TableCell className="text-right font-mono">{formatCurrency(item.amount)}</TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </div>
+    </div>
+  );
 
   return (
     <div className="space-y-6">
@@ -54,63 +157,54 @@ const Reconciliation = () => {
           <CardTitle>Setup</CardTitle>
           <CardDescription>Select an account and enter your bank statement details to begin.</CardDescription>
         </CardHeader>
-        <CardContent className="grid md:grid-cols-4 gap-4 items-end">
-          <div className="md:col-span-2">
-            <label htmlFor="account-select" className="text-sm font-medium">Account to Reconcile</label>
-            <Select onValueChange={setSelectedAccountId} value={selectedAccountId || ''}>
-              <SelectTrigger id="account-select">
-                <SelectValue placeholder="Select a bank or cash account..." />
-              </SelectTrigger>
-              <SelectContent>
-                {bankAccounts?.map(acc => <SelectItem key={acc.id} value={acc.id}>{acc.name}</SelectItem>)}
-              </SelectContent>
-            </Select>
-          </div>
-          <div>
-            <label htmlFor="end-date" className="text-sm font-medium">Statement End Date</label>
-            <Input id="end-date" type="date" value={statementEndDate} onChange={e => setStatementEndDate(e.target.value)} />
-          </div>
-          <div>
-            <label htmlFor="end-balance" className="text-sm font-medium">Statement End Balance</label>
-            <Input id="end-balance" type="number" placeholder="0.00" value={statementEndBalance} onChange={e => setStatementEndBalance(e.target.value)} />
-          </div>
+        <CardContent className="grid md:grid-cols-3 gap-4 items-end">
+          <Select onValueChange={v => { setSelectedAccountId(v); setClearedItemIds(new Set()); }} value={selectedAccountId || ''}>
+            <SelectTrigger><SelectValue placeholder="Select a bank or cash account..." /></SelectTrigger>
+            <SelectContent>{bankAccounts?.map(acc => <SelectItem key={acc.id} value={acc.id}>{acc.name}</SelectItem>)}</SelectContent>
+          </Select>
+          <Input type="date" value={statementEndDate} onChange={e => setStatementEndDate(e.target.value)} />
+          <Input type="number" placeholder="Statement End Balance" value={statementEndBalance} onChange={e => setStatementEndBalance(e.target.value)} />
         </CardContent>
       </Card>
 
-      {selectedAccountId && statementEndDate && statementEndBalance && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Upload Bank Statement</CardTitle>
-            <CardDescription>Upload a CSV file from your bank. We'll do our best to parse it.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Input type="file" accept=".csv" onChange={handleFileUpload} />
-          </CardContent>
-        </Card>
-      )}
+      {isSetupComplete && (
+        <>
+          <Card>
+            <CardHeader>
+              <CardTitle>Reconciliation Summary</CardTitle>
+            </CardHeader>
+            <CardContent className="grid grid-cols-3 gap-4 text-center">
+              <div>
+                <p className="text-sm text-muted-foreground">Statement Ending Balance</p>
+                <p className="text-2xl font-bold">{formatCurrency(parseFloat(statementEndBalance) || 0)}</p>
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">Cleared Balance</p>
+                <p className="text-2xl font-bold">{formatCurrency(clearedDepositsTotal - clearedPaymentsTotal)}</p>
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">Difference</p>
+                <p className={cn("text-2xl font-bold", difference !== null && Math.abs(difference) > 0.001 ? 'text-red-600' : 'text-green-600')}>
+                  {isLoadingTransactions || isLoadingBookBalance ? <Skeleton className="h-8 w-32 mx-auto" /> : formatCurrency(difference ?? 0)}
+                </p>
+              </div>
+            </CardContent>
+          </Card>
 
-      {bankTransactions.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Imported Bank Transactions</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  {Object.keys(bankTransactions[0]).map(key => <TableHead key={key}>{key}</TableHead>)}
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {bankTransactions.map((row, index) => (
-                  <TableRow key={index}>
-                    {Object.values(row).map((value: any, i) => <TableCell key={i}>{value}</TableCell>)}
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
+          {isLoadingTransactions ? <Skeleton className="h-64 w-full" /> : (
+            <div className="grid md:grid-cols-2 gap-6">
+              {renderTransactionsTable('Payments and Debits', payments)}
+              {renderTransactionsTable('Deposits and Credits', deposits)}
+            </div>
+          )}
+
+          {difference !== null && Math.abs(difference) < 0.001 && (
+            <div className="text-center pt-4">
+              <Button size="lg">Finish Reconciliation</Button>
+              <p className="text-sm text-muted-foreground mt-2">Once finished, these transactions will be marked as cleared.</p>
+            </div>
+          )}
+        </>
       )}
     </div>
   );
