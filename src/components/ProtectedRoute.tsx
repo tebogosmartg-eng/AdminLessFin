@@ -1,5 +1,6 @@
 import { useAuth } from '@/contexts/AuthContext';
-import { Navigate, Outlet } from 'react-router-dom';
+import { Navigate } from 'react-router-dom';
+import Layout from './Layout';
 
 const ProtectedRoute = () => {
   const { session } = useAuth();
@@ -8,7 +9,7 @@ const ProtectedRoute = () => {
     return <Navigate to="/auth" replace />;
   }
 
-  return <Outlet />;
+  return <Layout />;
 };
 
 export default ProtectedRoute;

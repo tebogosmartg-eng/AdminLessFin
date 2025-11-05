@@ -8,6 +8,7 @@ import NotFound from "./pages/NotFound";
 import AuthPage from "./pages/Auth";
 import { AuthProvider } from "./contexts/AuthContext";
 import ProtectedRoute from "./components/ProtectedRoute";
+import ChartOfAccounts from "./pages/ChartOfAccounts";
 
 const queryClient = new QueryClient();
 
@@ -22,6 +23,7 @@ const App = () => (
             <Route path="/auth" element={<AuthPage />} />
             <Route element={<ProtectedRoute />}>
               <Route path="/" element={<Dashboard />} />
+              <Route path="/chart-of-accounts" element={<ChartOfAccounts />} />
             </Route>
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
