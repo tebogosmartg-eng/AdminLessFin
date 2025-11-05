@@ -1,7 +1,7 @@
 import { NavLink, Outlet } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { Button } from './ui/button';
-import { Book, LayoutDashboard, LogOut, BookText, FileText, Settings, Library, Target, Repeat, User as UserIcon, Building2, Users, TrendingUp, Receipt } from 'lucide-react';
+import { Book, LayoutDashboard, LogOut, BookText, FileText, Settings, Library, Target, Repeat, User as UserIcon, Building2, Users, TrendingUp, Receipt, Banknote } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from './ui/dropdown-menu';
@@ -36,6 +36,10 @@ const Layout = () => {
           <NavLink to="/bills" className={navLinkClasses}>
             <Receipt className="mr-3 h-5 w-5" />
             Bills
+          </NavLink>
+          <NavLink to="/pay-bills" className={navLinkClasses}>
+            <Banknote className="mr-3 h-5 w-5" />
+            Pay Bills
           </NavLink>
           <NavLink to="/chart-of-accounts" className={navLinkClasses}>
             <Book className="mr-3 h-5 w-5" />
