@@ -9,6 +9,15 @@ import IncomeExpenseChart from '../components/IncomeExpenseChart';
 import { Link } from 'react-router-dom';
 import { Button } from '../components/ui/button';
 import QuickActions from '../components/QuickActions';
+import { formatDistanceToNow } from 'date-fns';
+
+type OverdueInvoice = {
+  id: string;
+  invoice_number: string;
+  due_date: string;
+  customer_name: string;
+  total: number;
+};
 
 const Dashboard = () => {
   const { user, profile } = useAuth();
@@ -44,6 +53,15 @@ const Dashboard = () => {
     queryKey: ['vendor_ap_balances'],
     queryFn: async () => {
       const { data, error } = await supabase.rpc('get_vendor_ap_balances');
+      if (error) throw new Error(error.message);
+      return data;
+    }
+  });
+
+  const { data: overdueInvoices, isLoading: isLoadingOverdue } = useQuery<OverdueInvoice[]>({
+    queryKey: ['overdue_invoices'],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc('get_overdue_invoices');
       if (error) throw new Error(error.message);
       return data;
     }
@@ -109,7 +127,7 @@ const Dashboard = () => {
           ))}
         </div>
 
-        <div className="grid gap-4 md:grid-cols-2">
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           <Card>
             <CardHeader>
               <CardTitle>Accounts Receivable</CardTitle>
@@ -151,6 +169,36 @@ const Dashboard = () => {
                   </div>
                   {apBalances && apBalances.length > 0 && <Button asChild variant="link" className="px-0 mt-2 h-auto py-0"><Link to="/pay-bills">View all and pay bills</Link></Button>}
                 </>
+              )}
+            </CardContent>
+          </Card>
+          <Card className="md:col-span-2 lg:col-span-1">
+            <CardHeader>
+              <CardTitle>Overdue Invoices</CardTitle>
+              <CardDescription>Invoices past their due date.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {isLoadingOverdue ? <Skeleton className="h-24 w-full" /> : (
+                overdueInvoices && overdueInvoices.length > 0 ? (
+                  <ul className="space-y-3">
+                    {overdueInvoices.map(invoice => (
+                      <li key={invoice.id}>
+                        <Link to={`/invoices/${invoice.id}`} className="block p-2 -m-2 rounded-md hover:bg-gray-100 dark:hover:bg-gray-800">
+                          <div className="flex justify-between items-center text-sm">
+                            <span className="font-medium">{invoice.customer_name}</span>
+                            <span className="font-mono">{formatCurrency(invoice.total)}</span>
+                          </div>
+                          <div className="flex justify-between items-center text-xs text-muted-foreground">
+                            <span>#{invoice.invoice_number}</span>
+                            <span className="text-red-500">Due {formatDistanceToNow(new Date(invoice.due_date), { addSuffix: true })}</span>
+                          </div>
+                        </Link>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="text-sm text-muted-foreground text-center py-8">No overdue invoices. Great job!</p>
+                )
               )}
             </CardContent>
           </Card>
