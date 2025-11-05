@@ -14,6 +14,7 @@ import Reports from "./pages/Reports";
 import Settings from "./pages/Settings";
 import GeneralLedger from "./pages/GeneralLedger";
 import Budgets from "./pages/Budgets";
+import RecurringEntries from "./pages/RecurringEntries";
 
 const queryClient = new QueryClient();
 
@@ -30,6 +31,7 @@ const App = () => (
               <Route path="/" element={<Dashboard />} />
               <Route path="/chart-of-accounts" element={<ChartOfAccounts />} />
               <Route path="/journal-entries" element={<JournalEntries />} />
+              <Route path="/recurring-entries" element={<RecurringEntries />} />
               <Route path="/general-ledger" element={<GeneralLedger />} />
               <Route path="/budgets" element={<Budgets />} />
               <Route path="/reports" element={<Reports />} />
