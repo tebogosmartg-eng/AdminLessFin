@@ -11,6 +11,7 @@ import AssetForm from '../components/AssetForm';
 import { format } from 'date-fns';
 import { useNavigate } from 'react-router-dom';
 import { Alert, AlertDescription, AlertTitle } from '../components/ui/alert';
+import AssetDisposalForm from '../components/AssetDisposalForm';
 
 type FixedAsset = {
   id: string;
@@ -25,8 +26,9 @@ type FixedAsset = {
 };
 
 const FixedAssets = () => {
-  const [isFormOpen, setIsFormOpen] = useState(false);
-  const [selectedAssetId, setSelectedAssetId] = useState<string | undefined>(undefined);
+  const [isAssetFormOpen, setIsAssetFormOpen] = useState(false);
+  const [isDisposalFormOpen, setIsDisposalFormOpen] = useState(false);
+  const [selectedAsset, setSelectedAsset] = useState<FixedAsset | undefined>(undefined);
   const navigate = useNavigate();
 
   const { data: assets, isLoading } = useQuery<FixedAsset[]>({
@@ -45,8 +47,13 @@ const FixedAssets = () => {
   });
 
   const handleAddNew = () => {
-    setSelectedAssetId(undefined);
-    setIsFormOpen(true);
+    setSelectedAsset(undefined);
+    setIsAssetFormOpen(true);
+  };
+
+  const handleDispose = (asset: FixedAsset) => {
+    setSelectedAsset(asset);
+    setIsDisposalFormOpen(true);
   };
 
   return (
@@ -105,7 +112,7 @@ const FixedAssets = () => {
                         <DropdownMenuContent align="end">
                           <DropdownMenuItem onClick={() => navigate(`/fixed-assets/${asset.id}`)}>View Details</DropdownMenuItem>
                           <DropdownMenuItem disabled>Edit</DropdownMenuItem>
-                          <DropdownMenuItem disabled className="text-red-600">Dispose</DropdownMenuItem>
+                          <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleDispose(asset); }} className="text-red-600" disabled={asset.status === 'disposed'}>Dispose</DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </TableCell>
@@ -119,10 +126,17 @@ const FixedAssets = () => {
         </CardContent>
       </Card>
       <AssetForm
-        isOpen={isFormOpen}
-        setIsOpen={setIsFormOpen}
-        assetId={selectedAssetId}
+        isOpen={isAssetFormOpen}
+        setIsOpen={setIsAssetFormOpen}
+        assetId={selectedAsset?.id}
       />
+      {selectedAsset && (
+        <AssetDisposalForm
+          isOpen={isDisposalFormOpen}
+          setIsOpen={setIsDisposalFormOpen}
+          asset={selectedAsset}
+        />
+      )}
     </>
   );
 };
