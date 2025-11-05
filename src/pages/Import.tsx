@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/card';
@@ -12,6 +12,8 @@ import { showError, showSuccess, showLoading, dismissToast } from '../utils/toas
 import { Account } from './ChartOfAccounts';
 import { Vendor } from './Vendors';
 import { Customer } from './Customers';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
+import { ScrollArea } from '../components/ui/scroll-area';
 
 type CsvRow = {
   Date: string;
@@ -264,6 +266,43 @@ const Import = () => {
           </CardContent>
         </Card>
       </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Data Reference</CardTitle>
+          <CardDescription>Use these exact names in your CSV file to ensure a successful import.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Tabs defaultValue="accounts">
+            <TabsList>
+              <TabsTrigger value="accounts">Accounts</TabsTrigger>
+              <TabsTrigger value="vendors">Vendors</TabsTrigger>
+              <TabsTrigger value="customers">Customers</TabsTrigger>
+            </TabsList>
+            <TabsContent value="accounts">
+              <ScrollArea className="h-72 rounded-md border p-4">
+                <ul className="space-y-1">
+                  {accounts?.map(a => <li key={a.id} className="text-sm">{a.name}</li>)}
+                </ul>
+              </ScrollArea>
+            </TabsContent>
+            <TabsContent value="vendors">
+              <ScrollArea className="h-72 rounded-md border p-4">
+                <ul className="space-y-1">
+                  {vendors?.map(v => <li key={v.id} className="text-sm">{v.name}</li>)}
+                </ul>
+              </ScrollArea>
+            </TabsContent>
+            <TabsContent value="customers">
+              <ScrollArea className="h-72 rounded-md border p-4">
+                <ul className="space-y-1">
+                  {customers?.map(c => <li key={c.id} className="text-sm">{c.name}</li>)}
+                </ul>
+              </ScrollArea>
+            </TabsContent>
+          </Tabs>
+        </CardContent>
+      </Card>
     </div>
   );
 };
