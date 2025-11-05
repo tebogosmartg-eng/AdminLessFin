@@ -4,7 +4,7 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible"
-import { Book, LayoutDashboard, BookText, FileText, Library, Target, Repeat, Building2, Users, TrendingUp, Receipt, Banknote, HandCoins, ChevronRight, Package, Scale, Upload, FileSignature } from 'lucide-react';
+import { Book, LayoutDashboard, BookText, FileText, Library, Target, Repeat, Building2, Users, TrendingUp, Receipt, Banknote, HandCoins, ChevronRight, Package, Scale, Upload, FileSignature, Briefcase } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { Button } from './ui/button';
 
@@ -55,6 +55,10 @@ export const SidebarNav = () => {
     { to: '/vendors', label: 'Vendors', icon: Building2 },
   ];
 
+  const payrollLinks = [
+    { to: '/employees', label: 'Employees', icon: Users },
+  ];
+
   const accountingLinks = [
     { to: '/chart-of-accounts', label: 'Chart of Accounts', icon: Book },
     { to: '/products', label: 'Products & Services', icon: Package },
@@ -88,6 +92,12 @@ export const SidebarNav = () => {
         icon={Receipt} 
         links={expensesLinks} 
         defaultOpen={expensesLinks.some(l => pathname.startsWith(l.to))}
+      />
+      <NavGroup 
+        title="Payroll" 
+        icon={Briefcase} 
+        links={payrollLinks} 
+        defaultOpen={payrollLinks.some(l => pathname.startsWith(l.to))}
       />
       <NavGroup 
         title="Accounting" 
