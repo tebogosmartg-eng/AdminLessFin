@@ -20,12 +20,22 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "../components/ui/dropdown-menu";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '../components/ui/select';
 import { showError, showSuccess } from '../utils/toast';
 import { DateRange } from 'react-day-picker';
 import { Popover, PopoverContent, PopoverTrigger } from '../components/ui/popover';
 import { Calendar } from '../components/ui/calendar';
 import { format } from 'date-fns';
 import { cn } from '../lib/utils';
+import { Account } from './ChartOfAccounts';
+import { Vendor } from './Vendors';
+import { Customer } from './Customers';
 
 type JournalEntry = {
   id: string;
@@ -45,9 +55,50 @@ const JournalEntries = () => {
   const [selectedEntryIdForDetail, setSelectedEntryIdForDetail] = useState<string | null>(null);
   const [selectedEntryIdForEdit, setSelectedEntryIdForEdit] = useState<string | undefined>(undefined);
   const [date, setDate] = useState<DateRange | undefined>({ from: undefined, to: undefined });
+  const [filterAccount, setFilterAccount] = useState('all');
+  const [filterVendor, setFilterVendor] = useState('all');
+  const [filterCustomer, setFilterCustomer] = useState('all');
   const queryClient = useQueryClient();
 
+  const { data: accounts } = useQuery<Account[]>({
+    queryKey: ['accounts'],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('chart_of_accounts').select('*').order('name');
+      if (error) throw error;
+      return data;
+    }
+  });
+
+  const { data: vendors } = useQuery<Vendor[]>({
+    queryKey: ['vendors'],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('vendors').select('*').order('name');
+      if (error) throw error;
+      return data;
+    }
+  });
+
+  const { data: customers } = useQuery<Customer[]>({
+    queryKey: ['customers'],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('customers').select('*').order('name');
+      if (error) throw error;
+      return data;
+    }
+  });
+
   const fetchJournalEntries = async () => {
+    let entryIdsFromAccountFilter: string[] | null = null;
+    if (filterAccount !== 'all') {
+      const { data: items, error: itemsError } = await supabase
+        .from('journal_entry_items')
+        .select('journal_entry_id')
+        .eq('account_id', filterAccount);
+      if (itemsError) throw new Error(itemsError.message);
+      entryIdsFromAccountFilter = items.map(item => item.journal_entry_id);
+      if (entryIdsFromAccountFilter.length === 0) return [];
+    }
+
     let query = supabase
       .from('journal_entries')
       .select(`
@@ -64,11 +115,20 @@ const JournalEntries = () => {
       `)
       .order('entry_date', { ascending: false });
 
+    if (entryIdsFromAccountFilter) {
+      query = query.in('id', entryIdsFromAccountFilter);
+    }
     if (date?.from) {
       query = query.gte('entry_date', format(date.from, 'yyyy-MM-dd'));
     }
     if (date?.to) {
       query = query.lte('entry_date', format(date.to, 'yyyy-MM-dd'));
+    }
+    if (filterVendor !== 'all') {
+      query = query.eq('vendor_id', filterVendor);
+    }
+    if (filterCustomer !== 'all') {
+      query = query.eq('customer_id', filterCustomer);
     }
 
     const { data, error } = await query;
@@ -77,7 +137,7 @@ const JournalEntries = () => {
   };
 
   const { data: entries, isLoading } = useQuery<JournalEntry[]>({
-    queryKey: ['journal_entries', date],
+    queryKey: ['journal_entries', date, filterAccount, filterVendor, filterCustomer],
     queryFn: fetchJournalEntries,
   });
 
@@ -120,9 +180,15 @@ const JournalEntries = () => {
   return (
     <>
       <Card>
-        <CardHeader className="flex flex-row items-center justify-between">
-          <div className="flex items-center gap-4">
+        <CardHeader>
+          <div className="flex flex-row items-center justify-between">
             <CardTitle>Journal Entries</CardTitle>
+            <Button onClick={handleAddNew}>
+              <PlusCircle className="mr-2 h-4 w-4" />
+              New Journal Entry
+            </Button>
+          </div>
+          <div className="flex items-center gap-2 pt-4 border-t -mx-6 px-6">
             <Popover>
               <PopoverTrigger asChild>
                 <Button
@@ -140,7 +206,7 @@ const JournalEntries = () => {
                       format(date.from, "LLL dd, y")
                     )
                   ) : (
-                    <span>Pick a date range</span>
+                    <span>Filter by date...</span>
                   )}
                 </Button>
               </PopoverTrigger>
@@ -155,11 +221,34 @@ const JournalEntries = () => {
                 />
               </PopoverContent>
             </Popover>
+            <Select value={filterAccount} onValueChange={setFilterAccount}>
+              <SelectTrigger className="w-[180px]">
+                <SelectValue placeholder="Filter by account" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Accounts</SelectItem>
+                {accounts?.map(acc => <SelectItem key={acc.id} value={acc.id}>{acc.name}</SelectItem>)}
+              </SelectContent>
+            </Select>
+            <Select value={filterVendor} onValueChange={setFilterVendor}>
+              <SelectTrigger className="w-[180px]">
+                <SelectValue placeholder="Filter by vendor" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Vendors</SelectItem>
+                {vendors?.map(v => <SelectItem key={v.id} value={v.id}>{v.name}</SelectItem>)}
+              </SelectContent>
+            </Select>
+            <Select value={filterCustomer} onValueChange={setFilterCustomer}>
+              <SelectTrigger className="w-[180px]">
+                <SelectValue placeholder="Filter by customer" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Customers</SelectItem>
+                {customers?.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+              </SelectContent>
+            </Select>
           </div>
-          <Button onClick={handleAddNew}>
-            <PlusCircle className="mr-2 h-4 w-4" />
-            New Journal Entry
-          </Button>
         </CardHeader>
         <CardContent>
           <Table>
