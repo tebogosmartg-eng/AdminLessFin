@@ -35,7 +35,7 @@ import { showError, showSuccess } from '../utils/toast';
 import { Account } from '../pages/ChartOfAccounts';
 import { Vendor } from '../pages/Vendors';
 import { Customer } from '../pages/Customers';
-import { Trash2 } from 'lucide-react';
+import { Trash2, X } from 'lucide-react';
 
 const journalEntryItemSchema = z.object({
   account_id: z.string().min(1, "Account is required."),
@@ -72,6 +72,7 @@ const JournalEntryForm = ({ isOpen, setIsOpen, entryId }: JournalEntryFormProps)
   const isEditing = !!entryId;
   const [attachmentFile, setAttachmentFile] = useState<File | null>(null);
   const [existingAttachmentUrl, setExistingAttachmentUrl] = useState<string | null>(null);
+  const [removeAttachment, setRemoveAttachment] = useState(false);
 
   const form = useForm<JournalEntryFormValues>({
     resolver: zodResolver(journalEntrySchema),
@@ -125,6 +126,7 @@ const JournalEntryForm = ({ isOpen, setIsOpen, entryId }: JournalEntryFormProps)
       setExistingAttachmentUrl(null);
     }
     setAttachmentFile(null);
+    setRemoveAttachment(false);
   }, [entryToEdit, isEditing, isOpen, form]);
 
   const { fields, append, remove } = useFieldArray({
@@ -142,6 +144,10 @@ const JournalEntryForm = ({ isOpen, setIsOpen, entryId }: JournalEntryFormProps)
       
       let entryIdToUpdate = entryId;
       let attachmentUrl: string | null = existingAttachmentUrl;
+
+      if (removeAttachment) {
+        attachmentUrl = null;
+      }
 
       if (attachmentFile) {
         const fileExt = attachmentFile.name.split('.').pop();
@@ -255,10 +261,30 @@ const JournalEntryForm = ({ isOpen, setIsOpen, entryId }: JournalEntryFormProps)
 
             <FormItem>
               <FormLabel>Attachment (Optional)</FormLabel>
-              <FormControl><Input type="file" onChange={(e) => setAttachmentFile(e.target.files?.[0] || null)} /></FormControl>
-              {existingAttachmentUrl && !attachmentFile && (
-                <p className="text-sm text-gray-500 mt-1">Current file: <a href={existingAttachmentUrl} target="_blank" rel="noopener noreferrer" className="underline">View</a>. Upload a new file to replace it.</p>
+              {existingAttachmentUrl && !attachmentFile && !removeAttachment && (
+                <div className="flex items-center justify-between p-2 border rounded-md">
+                  <a href={existingAttachmentUrl} target="_blank" rel="noopener noreferrer" className="text-sm underline truncate">
+                    {existingAttachmentUrl.split('/').pop()}
+                  </a>
+                  <Button type="button" variant="ghost" size="icon" className="h-6 w-6" onClick={() => setRemoveAttachment(true)}>
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
               )}
+              {removeAttachment && (
+                <div className="text-sm text-muted-foreground p-2 border rounded-md border-dashed">
+                  Attachment will be removed. <Button type="button" variant="link" className="p-0 h-auto" onClick={() => setRemoveAttachment(false)}>Undo</Button>
+                </div>
+              )}
+              <FormControl>
+                <Input 
+                  type="file" 
+                  onChange={(e) => {
+                    setAttachmentFile(e.target.files?.[0] || null);
+                    setRemoveAttachment(false);
+                  }} 
+                />
+              </FormControl>
             </FormItem>
 
             <DialogFooter>
