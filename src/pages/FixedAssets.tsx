@@ -4,11 +4,13 @@ import { supabase } from '../integrations/supabase/client';
 import { Button } from '../components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/table';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/card';
-import { PlusCircle, MoreHorizontal } from 'lucide-react';
+import { PlusCircle, MoreHorizontal, Terminal } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "../components/ui/dropdown-menu";
 import { formatCurrency } from '../lib/utils';
 import AssetForm from '../components/AssetForm';
 import { format } from 'date-fns';
+import { useNavigate } from 'react-router-dom';
+import { Alert, AlertDescription, AlertTitle } from '../components/ui/alert';
 
 type FixedAsset = {
   id: string;
@@ -16,6 +18,7 @@ type FixedAsset = {
   description: string;
   purchase_date: string;
   purchase_cost: number;
+  accumulated_depreciation: number;
   net_book_value: number;
   status: string;
   asset_categories: { name: string } | null;
@@ -24,6 +27,7 @@ type FixedAsset = {
 const FixedAssets = () => {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [selectedAssetId, setSelectedAssetId] = useState<string | undefined>(undefined);
+  const navigate = useNavigate();
 
   const { data: assets, isLoading } = useQuery<FixedAsset[]>({
     queryKey: ['fixed_assets'],
@@ -47,6 +51,14 @@ const FixedAssets = () => {
 
   return (
     <>
+      <Alert className="mb-4">
+        <Terminal className="h-4 w-4" />
+        <AlertTitle>Automate Your Depreciation!</AlertTitle>
+        <AlertDescription>
+          To have depreciation entries post automatically, you need to set up a schedule. 
+          Go to your Supabase dashboard, find the `run-depreciation` Edge Function, and create a cron job to run it monthly.
+        </AlertDescription>
+      </Alert>
       <Card>
         <CardHeader>
           <div className="flex flex-row items-center justify-between">
@@ -79,7 +91,7 @@ const FixedAssets = () => {
                 <TableRow><TableCell colSpan={8} className="text-center">Loading assets...</TableCell></TableRow>
               ) : assets && assets.length > 0 ? (
                 assets.map((asset) => (
-                  <TableRow key={asset.id}>
+                  <TableRow key={asset.id} className="cursor-pointer" onClick={() => navigate(`/fixed-assets/${asset.id}`)}>
                     <TableCell className="font-mono">{asset.asset_code}</TableCell>
                     <TableCell className="font-medium">{asset.description}</TableCell>
                     <TableCell>{asset.asset_categories?.name || 'N/A'}</TableCell>
@@ -89,9 +101,9 @@ const FixedAssets = () => {
                     <TableCell className="capitalize">{asset.status}</TableCell>
                     <TableCell>
                       <DropdownMenu>
-                        <DropdownMenuTrigger asChild><Button variant="ghost" className="h-8 w-8 p-0"><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger>
+                        <DropdownMenuTrigger asChild><Button variant="ghost" className="h-8 w-8 p-0" onClick={(e) => e.stopPropagation()}><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                          <DropdownMenuItem disabled>View Details</DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => navigate(`/fixed-assets/${asset.id}`)}>View Details</DropdownMenuItem>
                           <DropdownMenuItem disabled>Edit</DropdownMenuItem>
                           <DropdownMenuItem disabled className="text-red-600">Dispose</DropdownMenuItem>
                         </DropdownMenuContent>
