@@ -48,7 +48,7 @@ const journalEntrySchema = z.object({
 }).refine(data => {
   const debits = data.items.filter(i => i.type === 'debit').reduce((sum, i) => sum + i.amount, 0);
   const credits = data.items.filter(i => i.type === 'credit').reduce((sum, i) => sum + i.amount, 0);
-  return Math.abs(debits - credits) < 0.001; // Use a tolerance for float comparison
+  return Math.abs(debits - credits) < 0.001;
 }, {
   message: "Total debits must equal total credits.",
   path: ["items"],
@@ -56,9 +56,17 @@ const journalEntrySchema = z.object({
 
 type JournalEntryFormValues = z.infer<typeof journalEntrySchema>;
 
-const JournalEntryForm = ({ isOpen, setIsOpen }: { isOpen: boolean; setIsOpen: (isOpen: boolean) => void; }) => {
+interface JournalEntryFormProps {
+  isOpen: boolean;
+  setIsOpen: (isOpen: boolean) => void;
+  entryId?: string;
+}
+
+const JournalEntryForm = ({ isOpen, setIsOpen, entryId }: JournalEntryFormProps) => {
   const { user } = useAuth();
   const queryClient = useQueryClient();
+  const isEditing = !!entryId;
+
   const form = useForm<JournalEntryFormValues>({
     resolver: zodResolver(journalEntrySchema),
     defaultValues: {
@@ -70,6 +78,39 @@ const JournalEntryForm = ({ isOpen, setIsOpen }: { isOpen: boolean; setIsOpen: (
       ],
     },
   });
+
+  const { data: entryToEdit } = useQuery({
+    queryKey: ['journal_entry_edit', entryId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('journal_entries')
+        .select('entry_date, description, journal_entry_items(account_id, type, amount)')
+        .eq('id', entryId)
+        .single();
+      if (error) throw new Error(error.message);
+      return data;
+    },
+    enabled: isEditing && isOpen,
+  });
+
+  useEffect(() => {
+    if (isEditing && entryToEdit) {
+      form.reset({
+        entry_date: entryToEdit.entry_date,
+        description: entryToEdit.description || '',
+        items: entryToEdit.journal_entry_items,
+      });
+    } else if (!isEditing) {
+      form.reset({
+        entry_date: new Date().toISOString().split('T')[0],
+        description: '',
+        items: [
+          { account_id: '', type: 'debit', amount: 0 },
+          { account_id: '', type: 'credit', amount: 0 },
+        ],
+      });
+    }
+  }, [entryToEdit, isEditing, isOpen, form]);
 
   const { fields, append, remove } = useFieldArray({
     control: form.control,
@@ -89,36 +130,37 @@ const JournalEntryForm = ({ isOpen, setIsOpen }: { isOpen: boolean; setIsOpen: (
     mutationFn: async (values: JournalEntryFormValues) => {
       if (!user) throw new Error('User not authenticated');
       
-      const { data: entry, error: entryError } = await supabase
-        .from('journal_entries')
-        .insert({
+      if (isEditing) {
+        const { error: updateError } = await supabase.from('journal_entries').update({
+          entry_date: values.entry_date,
+          description: values.description,
+        }).eq('id', entryId);
+        if (updateError) throw updateError;
+
+        const { error: deleteError } = await supabase.from('journal_entry_items').delete().eq('journal_entry_id', entryId);
+        if (deleteError) throw deleteError;
+
+        const itemsToInsert = values.items.map(item => ({ ...item, journal_entry_id: entryId }));
+        const { error: insertError } = await supabase.from('journal_entry_items').insert(itemsToInsert);
+        if (insertError) throw insertError;
+      } else {
+        const { data: entry, error: entryError } = await supabase.from('journal_entries').insert({
           user_id: user.id,
           entry_date: values.entry_date,
           description: values.description,
-        })
-        .select('id')
-        .single();
+        }).select('id').single();
+        if (entryError) throw entryError;
 
-      if (entryError) throw entryError;
-
-      const itemsToInsert = values.items.map(item => ({
-        journal_entry_id: entry.id,
-        account_id: item.account_id,
-        type: item.type,
-        amount: item.amount,
-      }));
-
-      const { error: itemsError } = await supabase
-        .from('journal_entry_items')
-        .insert(itemsToInsert);
-
-      if (itemsError) throw itemsError;
+        const itemsToInsert = values.items.map(item => ({ ...item, journal_entry_id: entry.id }));
+        const { error: itemsError } = await supabase.from('journal_entry_items').insert(itemsToInsert);
+        if (itemsError) throw itemsError;
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['journal_entries'] });
-      showSuccess('Journal entry created successfully.');
+      queryClient.invalidateQueries({ queryKey: ['journal_entry_detail', entryId] });
+      showSuccess(`Journal entry ${isEditing ? 'updated' : 'created'} successfully.`);
       setIsOpen(false);
-      form.reset();
     },
     onError: (error) => {
       showError(`Error: ${error.message}`);
@@ -136,8 +178,8 @@ const JournalEntryForm = ({ isOpen, setIsOpen }: { isOpen: boolean; setIsOpen: (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogContent className="sm:max-w-2xl">
         <DialogHeader>
-          <DialogTitle>New Journal Entry</DialogTitle>
-          <DialogDescription>Record a new financial transaction. Ensure debits equal credits.</DialogDescription>
+          <DialogTitle>{isEditing ? 'Edit Journal Entry' : 'New Journal Entry'}</DialogTitle>
+          <DialogDescription>Record a financial transaction. Ensure debits equal credits.</DialogDescription>
         </DialogHeader>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
@@ -155,10 +197,10 @@ const JournalEntryForm = ({ isOpen, setIsOpen }: { isOpen: boolean; setIsOpen: (
               {fields.map((field, index) => (
                 <div key={field.id} className="flex items-center gap-2">
                   <FormField control={form.control} name={`items.${index}.account_id`} render={({ field }) => (
-                    <FormItem className="flex-1"><Select onValueChange={field.onChange} defaultValue={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select Account" /></SelectTrigger></FormControl><SelectContent>{accounts?.map(acc => <SelectItem key={acc.id} value={acc.id}>{acc.name}</SelectItem>)}</SelectContent></Select></FormItem>
+                    <FormItem className="flex-1"><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select Account" /></SelectTrigger></FormControl><SelectContent>{accounts?.map(acc => <SelectItem key={acc.id} value={acc.id}>{acc.name}</SelectItem>)}</SelectContent></Select></FormItem>
                   )} />
                   <FormField control={form.control} name={`items.${index}.type`} render={({ field }) => (
-                    <FormItem><Select onValueChange={field.onChange} defaultValue={field.value}><FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl><SelectContent><SelectItem value="debit">Debit</SelectItem><SelectItem value="credit">Credit</SelectItem></SelectContent></Select></FormItem>
+                    <FormItem><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl><SelectContent><SelectItem value="debit">Debit</SelectItem><SelectItem value="credit">Credit</SelectItem></SelectContent></Select></FormItem>
                   )} />
                   <FormField control={form.control} name={`items.${index}.amount`} render={({ field }) => (
                     <FormItem><FormControl><Input type="number" step="0.01" placeholder="Amount" {...field} /></FormControl></FormItem>
@@ -177,7 +219,7 @@ const JournalEntryForm = ({ isOpen, setIsOpen }: { isOpen: boolean; setIsOpen: (
 
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setIsOpen(false)}>Cancel</Button>
-              <Button type="submit" disabled={mutation.isPending}>{mutation.isPending ? 'Saving...' : 'Save Entry'}</Button>
+              <Button type="submit" disabled={mutation.isPending}>{mutation.isPending ? 'Saving...' : (isEditing ? 'Update Entry' : 'Save Entry')}</Button>
             </DialogFooter>
           </form>
         </Form>

@@ -34,7 +34,8 @@ type JournalEntry = {
 
 const JournalEntries = () => {
   const [isFormOpen, setIsFormOpen] = useState(false);
-  const [selectedEntryId, setSelectedEntryId] = useState<string | null>(null);
+  const [selectedEntryIdForDetail, setSelectedEntryIdForDetail] = useState<string | null>(null);
+  const [selectedEntryIdForEdit, setSelectedEntryIdForEdit] = useState<string | undefined>(undefined);
   const queryClient = useQueryClient();
 
   const fetchJournalEntries = async () => {
@@ -73,6 +74,16 @@ const JournalEntries = () => {
     },
   });
 
+  const handleAddNew = () => {
+    setSelectedEntryIdForEdit(undefined);
+    setIsFormOpen(true);
+  };
+
+  const handleEdit = (id: string) => {
+    setSelectedEntryIdForEdit(id);
+    setIsFormOpen(true);
+  };
+
   const handleDelete = (id: string) => {
     if (window.confirm('Are you sure you want to delete this journal entry? This action cannot be undone.')) {
       deleteMutation.mutate(id);
@@ -90,7 +101,7 @@ const JournalEntries = () => {
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle>Journal Entries</CardTitle>
-          <Button onClick={() => setIsFormOpen(true)}>
+          <Button onClick={handleAddNew}>
             <PlusCircle className="mr-2 h-4 w-4" />
             New Journal Entry
           </Button>
@@ -125,8 +136,8 @@ const JournalEntries = () => {
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => setSelectedEntryId(entry.id)}>View Details</DropdownMenuItem>
-                          <DropdownMenuItem disabled>Edit</DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => setSelectedEntryIdForDetail(entry.id)}>View Details</DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleEdit(entry.id)}>Edit</DropdownMenuItem>
                           <DropdownMenuItem onClick={() => handleDelete(entry.id)} className="text-red-600">Delete</DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
@@ -142,11 +153,15 @@ const JournalEntries = () => {
           </Table>
         </CardContent>
       </Card>
-      <JournalEntryForm isOpen={isFormOpen} setIsOpen={setIsFormOpen} />
+      <JournalEntryForm 
+        isOpen={isFormOpen} 
+        setIsOpen={setIsFormOpen} 
+        entryId={selectedEntryIdForEdit}
+      />
       <JournalEntryDetail 
-        entryId={selectedEntryId} 
-        isOpen={!!selectedEntryId} 
-        setIsOpen={() => setSelectedEntryId(null)} 
+        entryId={selectedEntryIdForDetail} 
+        isOpen={!!selectedEntryIdForDetail} 
+        setIsOpen={() => setSelectedEntryIdForDetail(null)} 
       />
     </>
   );
