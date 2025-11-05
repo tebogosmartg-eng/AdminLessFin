@@ -1,7 +1,7 @@
 import { NavLink, Outlet } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
-import { Book, LayoutDashboard, LogOut } from 'lucide-react';
+import { Book, LayoutDashboard, LogOut, BookText } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const Layout = () => {
@@ -25,6 +25,10 @@ const Layout = () => {
           <NavLink to="/chart-of-accounts" className={navLinkClasses}>
             <Book className="mr-3 h-5 w-5" />
             Chart of Accounts
+          </NavLink>
+          <NavLink to="/journal-entries" className={navLinkClasses}>
+            <BookText className="mr-3 h-5 w-5" />
+            Journal Entries
           </NavLink>
         </nav>
         <div className="mt-auto">
