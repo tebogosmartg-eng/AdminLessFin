@@ -31,7 +31,7 @@ const IncomeExpenseChart = ({ data }: IncomeExpenseChartProps) => {
       >
         <CartesianGrid strokeDasharray="3 3" />
         <XAxis dataKey="month" />
-        <YAxis tickFormatter={(value) => `${value / 1000}k`} />
+        <YAxis tickFormatter={(value) => `R${value / 1000}k`} />
         <Tooltip
           formatter={(value: number) => formatCurrency(value)}
         />
