@@ -22,6 +22,7 @@ import Bills from "./pages/Bills";
 import PayBills from "./pages/PayBills";
 import ReceivePayments from "./pages/ReceivePayments";
 import Products from "./pages/Products";
+import Reconciliation from "./pages/Reconciliation";
 
 const queryClient = new QueryClient();
 
@@ -44,6 +45,7 @@ const App = () => (
               <Route path="/journal-entries" element={<JournalEntries />} />
               <Route path="/recurring-entries" element={<RecurringEntries />} />
               <Route path="/general-ledger" element={<GeneralLedger />} />
+              <Route path="/reconciliation" element={<Reconciliation />} />
               <Route path="/budgets" element={<Budgets />} />
               <Route path="/reports" element={<Reports />} />
               <Route path="/settings" element={<Settings />} />
