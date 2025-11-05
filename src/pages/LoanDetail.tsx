@@ -7,7 +7,8 @@ import { Skeleton } from '../components/ui/skeleton';
 import { Button } from '../components/ui/button';
 import { Badge } from '../components/ui/badge';
 import { format } from 'date-fns';
-import { formatCurrency } from '../lib/utils';
+import { formatCurrency, downloadCSV } from '../lib/utils';
+import { Download } from 'lucide-react';
 
 type LoanDetailData = {
   id: string;
@@ -59,6 +60,20 @@ const LoanDetail = () => {
     },
   });
 
+  const handleDownload = () => {
+    if (!schedule) return;
+    const dataToExport = schedule.map(item => ({
+      'Payment Number': item.payment_number,
+      'Payment Date': item.payment_date,
+      'Payment Amount': item.payment_amount,
+      'Principal': item.principal,
+      'Interest': item.interest,
+      'Remaining Balance': item.remaining_balance,
+      'Status': item.status,
+    }));
+    downloadCSV(dataToExport, `amortization-schedule-loan-${id}.csv`);
+  };
+
   if (isLoadingLoan) {
     return <Skeleton className="h-96 w-full" />;
   }
@@ -88,9 +103,14 @@ const LoanDetail = () => {
       </Card>
 
       <Card>
-        <CardHeader>
-          <CardTitle>Amortization Schedule</CardTitle>
-          <CardDescription>The full payment schedule for the lifetime of the loan.</CardDescription>
+        <CardHeader className="flex flex-row items-center justify-between">
+          <div>
+            <CardTitle>Amortization Schedule</CardTitle>
+            <CardDescription>The full payment schedule for the lifetime of the loan.</CardDescription>
+          </div>
+          <Button variant="outline" size="sm" onClick={handleDownload} disabled={!schedule || schedule.length === 0}>
+            <Download className="mr-2 h-4 w-4" /> Download CSV
+          </Button>
         </CardHeader>
         <CardContent>
           <Table>
