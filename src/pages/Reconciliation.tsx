@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
@@ -11,6 +11,7 @@ import { Button } from '../components/ui/button';
 import { Skeleton } from '../components/ui/skeleton';
 import { format } from 'date-fns';
 import { cn } from '../lib/utils';
+import { showError, showSuccess } from '../utils/toast';
 
 type Transaction = {
   id: string;
@@ -25,6 +26,7 @@ const Reconciliation = () => {
   const [statementEndDate, setStatementEndDate] = useState('');
   const [statementEndBalance, setStatementEndBalance] = useState('');
   const [clearedItemIds, setClearedItemIds] = useState<Set<string>>(new Set());
+  const queryClient = useQueryClient();
 
   const isSetupComplete = !!selectedAccountId && !!statementEndDate && !!statementEndBalance;
 
@@ -56,6 +58,7 @@ const Reconciliation = () => {
           )
         `)
         .eq('account_id', selectedAccountId!)
+        .eq('reconciled', false)
         .lte('journal_entries.entry_date', statementEndDate);
 
       if (error) throw new Error(error.message);
@@ -83,6 +86,28 @@ const Reconciliation = () => {
     enabled: isSetupComplete,
   });
 
+  const finishReconciliationMutation = useMutation({
+    mutationFn: async (clearedIds: string[]) => {
+      const { error } = await supabase
+        .from('journal_entry_items')
+        .update({ reconciled: true, reconciled_at: new Date().toISOString() })
+        .in('id', clearedIds);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      showSuccess('Reconciliation complete!');
+      queryClient.invalidateQueries({ queryKey: ['reconciliation_transactions', selectedAccountId, statementEndDate] });
+      queryClient.invalidateQueries({ queryKey: ['book_balance_as_of', selectedAccountId, statementEndDate] });
+      setSelectedAccountId(null);
+      setStatementEndDate('');
+      setStatementEndBalance('');
+      setClearedItemIds(new Set());
+    },
+    onError: (error: any) => {
+      showError(`Error finishing reconciliation: ${error.message}`);
+    },
+  });
+
   const handleClearItem = (itemId: string, isCleared: boolean) => {
     setClearedItemIds(prev => {
       const newSet = new Set(prev);
@@ -92,15 +117,12 @@ const Reconciliation = () => {
     });
   };
 
-  const { payments, deposits, clearedPaymentsTotal, clearedDepositsTotal, difference } = useMemo(() => {
-    if (!transactions || !bookBalanceData) return { payments: [], deposits: [], clearedPaymentsTotal: 0, clearedDepositsTotal: 0, difference: null };
+  const { payments, deposits, difference } = useMemo(() => {
+    if (!transactions || !bookBalanceData) return { payments: [], deposits: [], difference: null };
 
     const isDebitNormal = bankAccounts?.find(acc => acc.id === selectedAccountId)?.type === 'Asset';
-    const payments = transactions.filter(t => (isDebitNormal ? t.type === 'debit' : t.type === 'credit'));
-    const deposits = transactions.filter(t => (isDebitNormal ? t.type === 'credit' : t.type === 'debit'));
-
-    const clearedPaymentsTotal = payments.filter(p => clearedItemIds.has(p.id)).reduce((sum, p) => sum + p.amount, 0);
-    const clearedDepositsTotal = deposits.filter(d => clearedItemIds.has(d.id)).reduce((sum, d) => sum + d.amount, 0);
+    const payments = transactions.filter(t => (isDebitNormal ? t.type === 'credit' : t.type === 'debit'));
+    const deposits = transactions.filter(t => (isDebitNormal ? t.type === 'debit' : t.type === 'credit'));
 
     const bookBalance = bookBalanceData.balance;
     const statementBalance = parseFloat(statementEndBalance) || 0;
@@ -111,8 +133,11 @@ const Reconciliation = () => {
     const reconciledBookBalance = bookBalance - unclearedDeposits + unclearedPayments;
     const difference = statementBalance - reconciledBookBalance;
 
-    return { payments, deposits, clearedPaymentsTotal, clearedDepositsTotal, difference };
+    return { payments, deposits, difference };
   }, [transactions, clearedItemIds, bookBalanceData, statementEndBalance, selectedAccountId, bankAccounts]);
+
+  const clearedPaymentsTotal = useMemo(() => transactions?.filter(t => clearedItemIds.has(t.id) && (bankAccounts?.find(acc => acc.id === selectedAccountId)?.type === 'Asset' ? t.type === 'credit' : t.type === 'debit')).reduce((sum, t) => sum + t.amount, 0) || 0, [transactions, clearedItemIds, selectedAccountId, bankAccounts]);
+  const clearedDepositsTotal = useMemo(() => transactions?.filter(t => clearedItemIds.has(t.id) && (bankAccounts?.find(acc => acc.id === selectedAccountId)?.type === 'Asset' ? t.type === 'debit' : t.type === 'credit')).reduce((sum, t) => sum + t.amount, 0) || 0, [transactions, clearedItemIds, selectedAccountId, bankAccounts]);
 
   const formatCurrency = (amount: number) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount);
 
@@ -193,14 +218,16 @@ const Reconciliation = () => {
 
           {isLoadingTransactions ? <Skeleton className="h-64 w-full" /> : (
             <div className="grid md:grid-cols-2 gap-6">
-              {renderTransactionsTable('Payments and Debits', payments)}
               {renderTransactionsTable('Deposits and Credits', deposits)}
+              {renderTransactionsTable('Payments and Debits', payments)}
             </div>
           )}
 
           {difference !== null && Math.abs(difference) < 0.001 && (
             <div className="text-center pt-4">
-              <Button size="lg">Finish Reconciliation</Button>
+              <Button size="lg" onClick={() => finishReconciliationMutation.mutate(Array.from(clearedItemIds))} disabled={finishReconciliationMutation.isPending}>
+                {finishReconciliationMutation.isPending ? 'Finishing...' : 'Finish Reconciliation'}
+              </Button>
               <p className="text-sm text-muted-foreground mt-2">Once finished, these transactions will be marked as cleared.</p>
             </div>
           )}
