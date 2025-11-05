@@ -31,6 +31,7 @@ type EntryDetail = {
   description: string | null;
   attachment_url: string | null;
   vendors: { name: string }[] | null;
+  customers: { name: string }[] | null;
   journal_entry_items: {
     type: 'debit' | 'credit';
     amount: number;
@@ -50,6 +51,7 @@ const JournalEntryDetail = ({ entryId, isOpen, setIsOpen }: JournalEntryDetailPr
         description,
         attachment_url,
         vendors ( name ),
+        customers ( name ),
         journal_entry_items (
           type,
           amount,
@@ -93,6 +95,10 @@ const JournalEntryDetail = ({ entryId, isOpen, setIsOpen }: JournalEntryDetailPr
               <div>
                 <span className="font-semibold text-gray-800 dark:text-gray-200">Vendor:</span>
                 <p className="text-gray-600 dark:text-gray-400">{entry.vendors?.[0]?.name || 'N/A'}</p>
+              </div>
+              <div>
+                <span className="font-semibold text-gray-800 dark:text-gray-200">Customer:</span>
+                <p className="text-gray-600 dark:text-gray-400">{entry.customers?.[0]?.name || 'N/A'}</p>
               </div>
             </div>
             

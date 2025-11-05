@@ -34,6 +34,7 @@ import { Textarea } from './ui/textarea';
 import { showError, showSuccess } from '../utils/toast';
 import { Account } from '../pages/ChartOfAccounts';
 import { Vendor } from '../pages/Vendors';
+import { Customer } from '../pages/Customers';
 import { Trash2 } from 'lucide-react';
 
 const journalEntryItemSchema = z.object({
@@ -46,6 +47,7 @@ const journalEntrySchema = z.object({
   entry_date: z.string().min(1, "Date is required."),
   description: z.string().optional(),
   vendor_id: z.string().optional(),
+  customer_id: z.string().optional(),
   items: z.array(journalEntryItemSchema).min(2, "At least two accounts are required."),
 }).refine(data => {
   const debits = data.items.filter(i => i.type === 'debit').reduce((sum, i) => sum + i.amount, 0);
@@ -77,6 +79,7 @@ const JournalEntryForm = ({ isOpen, setIsOpen, entryId }: JournalEntryFormProps)
       entry_date: new Date().toISOString().split('T')[0],
       description: '',
       vendor_id: '',
+      customer_id: '',
       items: [
         { account_id: '', type: 'debit', amount: 0 },
         { account_id: '', type: 'credit', amount: 0 },
@@ -89,7 +92,7 @@ const JournalEntryForm = ({ isOpen, setIsOpen, entryId }: JournalEntryFormProps)
     queryFn: async () => {
       const { data, error } = await supabase
         .from('journal_entries')
-        .select('entry_date, description, attachment_url, vendor_id, journal_entry_items(account_id, type, amount)')
+        .select('entry_date, description, attachment_url, vendor_id, customer_id, journal_entry_items(account_id, type, amount)')
         .eq('id', entryId)
         .single();
       if (error) throw new Error(error.message);
@@ -104,6 +107,7 @@ const JournalEntryForm = ({ isOpen, setIsOpen, entryId }: JournalEntryFormProps)
         entry_date: entryToEdit.entry_date,
         description: entryToEdit.description || '',
         vendor_id: entryToEdit.vendor_id || '',
+        customer_id: entryToEdit.customer_id || '',
         items: entryToEdit.journal_entry_items,
       });
       setExistingAttachmentUrl(entryToEdit.attachment_url);
@@ -112,6 +116,7 @@ const JournalEntryForm = ({ isOpen, setIsOpen, entryId }: JournalEntryFormProps)
         entry_date: new Date().toISOString().split('T')[0],
         description: '',
         vendor_id: '',
+        customer_id: '',
         items: [
           { account_id: '', type: 'debit', amount: 0 },
           { account_id: '', type: 'credit', amount: 0 },
@@ -129,6 +134,7 @@ const JournalEntryForm = ({ isOpen, setIsOpen, entryId }: JournalEntryFormProps)
 
   const { data: accounts } = useQuery<Account[]>({ queryKey: ['accounts'] });
   const { data: vendors } = useQuery<Vendor[]>({ queryKey: ['vendors'] });
+  const { data: customers } = useQuery<Customer[]>({ queryKey: ['customers'] });
 
   const mutation = useMutation({
     mutationFn: async (values: JournalEntryFormValues) => {
@@ -153,6 +159,7 @@ const JournalEntryForm = ({ isOpen, setIsOpen, entryId }: JournalEntryFormProps)
         entry_date: values.entry_date,
         description: values.description,
         vendor_id: values.vendor_id || null,
+        customer_id: values.customer_id || null,
         attachment_url: attachmentUrl,
       };
 
@@ -199,11 +206,20 @@ const JournalEntryForm = ({ isOpen, setIsOpen, entryId }: JournalEntryFormProps)
               <FormField control={form.control} name="entry_date" render={({ field }) => (
                 <FormItem><FormLabel>Date</FormLabel><FormControl><Input type="date" {...field} /></FormControl><FormMessage /></FormItem>
               )} />
+              <div />
               <FormField control={form.control} name="vendor_id" render={({ field }) => (
                 <FormItem><FormLabel>Vendor (Optional)</FormLabel>
                   <Select onValueChange={field.onChange} value={field.value}>
                     <FormControl><SelectTrigger><SelectValue placeholder="Select a vendor" /></SelectTrigger></FormControl>
                     <SelectContent><SelectItem value="">None</SelectItem>{vendors?.map(v => <SelectItem key={v.id} value={v.id}>{v.name}</SelectItem>)}</SelectContent>
+                  </Select><FormMessage />
+                </FormItem>
+              )} />
+              <FormField control={form.control} name="customer_id" render={({ field }) => (
+                <FormItem><FormLabel>Customer (Optional)</FormLabel>
+                  <Select onValueChange={field.onChange} value={field.value}>
+                    <FormControl><SelectTrigger><SelectValue placeholder="Select a customer" /></SelectTrigger></FormControl>
+                    <SelectContent><SelectItem value="">None</SelectItem>{customers?.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}</SelectContent>
                   </Select><FormMessage />
                 </FormItem>
               )} />
