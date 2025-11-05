@@ -17,7 +17,6 @@ import Budgets from "./pages/Budgets";
 import RecurringEntries from "./pages/RecurringEntries";
 import Vendors from "./pages/Vendors";
 import Customers from "./pages/Customers";
-import Sales from "./pages/Sales";
 import Bills from "./pages/Bills";
 import PayBills from "./pages/PayBills";
 import ReceivePayments from "./pages/ReceivePayments";
@@ -49,7 +48,6 @@ const App = () => (
             <Route path="/auth" element={<AuthPage />} />
             <Route element={<ProtectedRoute />}>
               <Route path="/" element={<Dashboard />} />
-              <Route path="/sales" element={<Sales />} />
               <Route path="/invoices" element={<Invoices />} />
               <Route path="/invoices/:id" element={<InvoiceDetail />} />
               <Route path="/bills" element={<Bills />} />

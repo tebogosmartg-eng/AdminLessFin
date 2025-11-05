@@ -43,7 +43,6 @@ export const SidebarNav = () => {
   const pathname = location.pathname;
 
   const salesLinks = [
-    { to: '/sales', label: 'Sales', icon: TrendingUp },
     { to: '/invoices', label: 'Invoices', icon: FileSignature },
     { to: '/receive-payments', label: 'Receive Payments', icon: HandCoins },
     { to: '/customers', label: 'Customers', icon: Users },

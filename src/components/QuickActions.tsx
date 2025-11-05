@@ -2,12 +2,12 @@ import { useState } from 'react';
 import { Button } from './ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { PlusCircle } from 'lucide-react';
-import SaleForm from './SaleForm';
+import InvoiceForm from './InvoiceForm';
 import BillForm from './BillForm';
 import JournalEntryForm from './JournalEntryForm';
 
 const QuickActions = () => {
-  const [isSaleFormOpen, setIsSaleFormOpen] = useState(false);
+  const [isInvoiceFormOpen, setIsInvoiceFormOpen] = useState(false);
   const [isBillFormOpen, setIsBillFormOpen] = useState(false);
   const [isJournalEntryFormOpen, setIsJournalEntryFormOpen] = useState(false);
 
@@ -18,9 +18,9 @@ const QuickActions = () => {
           <CardTitle>Quick Actions</CardTitle>
         </CardHeader>
         <CardContent className="flex flex-wrap gap-4">
-          <Button onClick={() => setIsSaleFormOpen(true)}>
+          <Button onClick={() => setIsInvoiceFormOpen(true)}>
             <PlusCircle className="mr-2 h-4 w-4" />
-            New Sale
+            New Invoice
           </Button>
           <Button onClick={() => setIsBillFormOpen(true)}>
             <PlusCircle className="mr-2 h-4 w-4" />
@@ -33,7 +33,7 @@ const QuickActions = () => {
         </CardContent>
       </Card>
 
-      <SaleForm isOpen={isSaleFormOpen} setIsOpen={setIsSaleFormOpen} />
+      <InvoiceForm isOpen={isInvoiceFormOpen} setIsOpen={setIsInvoiceFormOpen} />
       <BillForm isOpen={isBillFormOpen} setIsOpen={setIsBillFormOpen} />
       <JournalEntryForm isOpen={isJournalEntryFormOpen} setIsOpen={setIsJournalEntryFormOpen} />
     </>
