@@ -13,6 +13,7 @@ import { format, startOfYear, endOfYear, subDays } from 'date-fns';
 import { cn, downloadCSV } from '../lib/utils';
 import { formatCurrency } from '../lib/utils';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
+import FinancialStatementNotes from './FinancialStatementNotes';
 
 type AccountBalance = {
   id: string;
@@ -222,6 +223,7 @@ const FinancialStatements = () => {
           <TabsTrigger value="equity">Changes in Equity</TabsTrigger>
           <TabsTrigger value="cash-flow">Cash Flow</TabsTrigger>
           <TabsTrigger value="trial-balance">Trial Balance</TabsTrigger>
+          <TabsTrigger value="notes">Notes</TabsTrigger>
         </TabsList>
 
         <TabsContent value="income-statement">
@@ -351,6 +353,10 @@ const FinancialStatements = () => {
               </Table>
             )}</CardContent>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="notes">
+          <FinancialStatementNotes />
         </TabsContent>
       </Tabs>
     </div>
