@@ -32,6 +32,7 @@ type JournalEntry = {
   entry_date: string;
   description: string | null;
   attachment_url: string | null;
+  vendors: { name: string } | null;
   journal_entry_items: {
     type: 'debit' | 'credit';
     amount: number;
@@ -53,6 +54,7 @@ const JournalEntries = () => {
         entry_date,
         description,
         attachment_url,
+        vendors ( name ),
         journal_entry_items (
           type,
           amount
@@ -163,6 +165,7 @@ const JournalEntries = () => {
               <TableRow>
                 <TableHead>Date</TableHead>
                 <TableHead>Description</TableHead>
+                <TableHead>Vendor</TableHead>
                 <TableHead className="text-right">Amount</TableHead>
                 <TableHead className="w-[50px]"></TableHead>
               </TableRow>
@@ -170,7 +173,7 @@ const JournalEntries = () => {
             <TableBody>
               {isLoading ? (
                 <TableRow>
-                  <TableCell colSpan={4} className="text-center">Loading entries...</TableCell>
+                  <TableCell colSpan={5} className="text-center">Loading entries...</TableCell>
                 </TableRow>
               ) : entries && entries.length > 0 ? (
                 entries.map((entry) => (
@@ -180,6 +183,7 @@ const JournalEntries = () => {
                       {entry.description}
                       {entry.attachment_url && <Paperclip className="inline-block h-4 w-4 ml-2 text-gray-400" />}
                     </TableCell>
+                    <TableCell>{entry.vendors?.name || 'N/A'}</TableCell>
                     <TableCell className="text-right">${calculateTotal(entry.journal_entry_items).toFixed(2)}</TableCell>
                     <TableCell>
                       <DropdownMenu>
@@ -200,7 +204,7 @@ const JournalEntries = () => {
                 ))
               ) : (
                 <TableRow>
-                  <TableCell colSpan={4} className="text-center">No journal entries found for the selected period.</TableCell>
+                  <TableCell colSpan={5} className="text-center">No journal entries found for the selected period.</TableCell>
                 </TableRow>
               )}
             </TableBody>

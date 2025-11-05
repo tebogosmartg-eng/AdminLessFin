@@ -30,12 +30,13 @@ type EntryDetail = {
   entry_date: string;
   description: string | null;
   attachment_url: string | null;
+  vendors: { name: string } | null;
   journal_entry_items: {
     type: 'debit' | 'credit';
     amount: number;
     chart_of_accounts: {
       name: string;
-    }[] | null;
+    } | null;
   }[];
 };
 
@@ -48,6 +49,7 @@ const JournalEntryDetail = ({ entryId, isOpen, setIsOpen }: JournalEntryDetailPr
         entry_date,
         description,
         attachment_url,
+        vendors ( name ),
         journal_entry_items (
           type,
           amount,
@@ -83,9 +85,16 @@ const JournalEntryDetail = ({ entryId, isOpen, setIsOpen }: JournalEntryDetailPr
           </div>
         ) : entry && (
           <div className="mt-4 space-y-4">
-            <p className="text-sm text-gray-600 dark:text-gray-400">
-              <span className="font-semibold text-gray-800 dark:text-gray-200">Description:</span> {entry.description || 'N/A'}
-            </p>
+            <div className="grid grid-cols-2 gap-4 text-sm">
+              <div>
+                <span className="font-semibold text-gray-800 dark:text-gray-200">Description:</span>
+                <p className="text-gray-600 dark:text-gray-400">{entry.description || 'N/A'}</p>
+              </div>
+              <div>
+                <span className="font-semibold text-gray-800 dark:text-gray-200">Vendor:</span>
+                <p className="text-gray-600 dark:text-gray-400">{entry.vendors?.name || 'N/A'}</p>
+              </div>
+            </div>
             
             {entry.attachment_url && (
               <div>
@@ -110,7 +119,7 @@ const JournalEntryDetail = ({ entryId, isOpen, setIsOpen }: JournalEntryDetailPr
               <TableBody>
                 {entry.journal_entry_items.map((item, index) => (
                   <TableRow key={index}>
-                    <TableCell className="font-medium">{item.chart_of_accounts?.[0]?.name}</TableCell>
+                    <TableCell className="font-medium">{item.chart_of_accounts?.name}</TableCell>
                     <TableCell className="text-right font-mono">
                       {item.type === 'debit' ? `$${item.amount.toFixed(2)}` : ''}
                     </TableCell>

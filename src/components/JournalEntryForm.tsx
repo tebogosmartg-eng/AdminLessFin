@@ -33,6 +33,7 @@ import {
 import { Textarea } from './ui/textarea';
 import { showError, showSuccess } from '../utils/toast';
 import { Account } from '../pages/ChartOfAccounts';
+import { Vendor } from '../pages/Vendors';
 import { Trash2 } from 'lucide-react';
 
 const journalEntryItemSchema = z.object({
@@ -44,6 +45,7 @@ const journalEntryItemSchema = z.object({
 const journalEntrySchema = z.object({
   entry_date: z.string().min(1, "Date is required."),
   description: z.string().optional(),
+  vendor_id: z.string().optional(),
   items: z.array(journalEntryItemSchema).min(2, "At least two accounts are required."),
 }).refine(data => {
   const debits = data.items.filter(i => i.type === 'debit').reduce((sum, i) => sum + i.amount, 0);
@@ -74,6 +76,7 @@ const JournalEntryForm = ({ isOpen, setIsOpen, entryId }: JournalEntryFormProps)
     defaultValues: {
       entry_date: new Date().toISOString().split('T')[0],
       description: '',
+      vendor_id: '',
       items: [
         { account_id: '', type: 'debit', amount: 0 },
         { account_id: '', type: 'credit', amount: 0 },
@@ -86,7 +89,7 @@ const JournalEntryForm = ({ isOpen, setIsOpen, entryId }: JournalEntryFormProps)
     queryFn: async () => {
       const { data, error } = await supabase
         .from('journal_entries')
-        .select('entry_date, description, attachment_url, journal_entry_items(account_id, type, amount)')
+        .select('entry_date, description, attachment_url, vendor_id, journal_entry_items(account_id, type, amount)')
         .eq('id', entryId)
         .single();
       if (error) throw new Error(error.message);
@@ -100,6 +103,7 @@ const JournalEntryForm = ({ isOpen, setIsOpen, entryId }: JournalEntryFormProps)
       form.reset({
         entry_date: entryToEdit.entry_date,
         description: entryToEdit.description || '',
+        vendor_id: entryToEdit.vendor_id || '',
         items: entryToEdit.journal_entry_items,
       });
       setExistingAttachmentUrl(entryToEdit.attachment_url);
@@ -107,6 +111,7 @@ const JournalEntryForm = ({ isOpen, setIsOpen, entryId }: JournalEntryFormProps)
       form.reset({
         entry_date: new Date().toISOString().split('T')[0],
         description: '',
+        vendor_id: '',
         items: [
           { account_id: '', type: 'debit', amount: 0 },
           { account_id: '', type: 'credit', amount: 0 },
@@ -122,14 +127,8 @@ const JournalEntryForm = ({ isOpen, setIsOpen, entryId }: JournalEntryFormProps)
     name: "items",
   });
 
-  const { data: accounts } = useQuery<Account[]>({
-    queryKey: ['accounts'],
-    queryFn: async () => {
-      const { data, error } = await supabase.from('chart_of_accounts').select('*');
-      if (error) throw new Error(error.message);
-      return data;
-    },
-  });
+  const { data: accounts } = useQuery<Account[]>({ queryKey: ['accounts'] });
+  const { data: vendors } = useQuery<Vendor[]>({ queryKey: ['vendors'] });
 
   const mutation = useMutation({
     mutationFn: async (values: JournalEntryFormValues) => {
@@ -138,48 +137,38 @@ const JournalEntryForm = ({ isOpen, setIsOpen, entryId }: JournalEntryFormProps)
       let entryIdToUpdate = entryId;
       let attachmentUrl: string | null = existingAttachmentUrl;
 
-      // Handle file upload
       if (attachmentFile) {
         const fileExt = attachmentFile.name.split('.').pop();
         const fileName = `${Date.now()}.${fileExt}`;
         const filePath = `${user.id}/${entryIdToUpdate || 'new'}/${fileName}`;
         
-        const { error: uploadError } = await supabase.storage
-          .from('attachments')
-          .upload(filePath, attachmentFile);
-
+        const { error: uploadError } = await supabase.storage.from('attachments').upload(filePath, attachmentFile);
         if (uploadError) throw new Error(`Storage Error: ${uploadError.message}`);
         
         const { data: urlData } = supabase.storage.from('attachments').getPublicUrl(filePath);
         attachmentUrl = urlData.publicUrl;
       }
 
+      const entryData = {
+        entry_date: values.entry_date,
+        description: values.description,
+        vendor_id: values.vendor_id || null,
+        attachment_url: attachmentUrl,
+      };
+
       if (isEditing) {
-        const { error: updateError } = await supabase.from('journal_entries').update({
-          entry_date: values.entry_date,
-          description: values.description,
-          attachment_url: attachmentUrl,
-        }).eq('id', entryIdToUpdate!);
+        const { error: updateError } = await supabase.from('journal_entries').update(entryData).eq('id', entryIdToUpdate!);
         if (updateError) throw updateError;
 
-        const { error: deleteError } = await supabase.from('journal_entry_items').delete().eq('journal_entry_id', entryIdToUpdate!);
-        if (deleteError) throw deleteError;
-
+        await supabase.from('journal_entry_items').delete().eq('journal_entry_id', entryIdToUpdate!);
         const itemsToInsert = values.items.map(item => ({ ...item, journal_entry_id: entryIdToUpdate }));
-        const { error: insertError } = await supabase.from('journal_entry_items').insert(itemsToInsert);
-        if (insertError) throw insertError;
+        await supabase.from('journal_entry_items').insert(itemsToInsert);
       } else {
-        const { data: entry, error: entryError } = await supabase.from('journal_entries').insert({
-          user_id: user.id,
-          entry_date: values.entry_date,
-          description: values.description,
-          attachment_url: attachmentUrl,
-        }).select('id').single();
+        const { data: entry, error: entryError } = await supabase.from('journal_entries').insert({ ...entryData, user_id: user.id }).select('id').single();
         if (entryError) throw entryError;
 
         const itemsToInsert = values.items.map(item => ({ ...item, journal_entry_id: entry.id }));
-        const { error: itemsError } = await supabase.from('journal_entry_items').insert(itemsToInsert);
-        if (itemsError) throw itemsError;
+        await supabase.from('journal_entry_items').insert(itemsToInsert);
       }
     },
     onSuccess: () => {
@@ -193,10 +182,7 @@ const JournalEntryForm = ({ isOpen, setIsOpen, entryId }: JournalEntryFormProps)
     },
   });
 
-  const onSubmit = (values: JournalEntryFormValues) => {
-    mutation.mutate(values);
-  };
-
+  const onSubmit = (values: JournalEntryFormValues) => mutation.mutate(values);
   const debits = form.watch('items').filter(i => i.type === 'debit').reduce((sum, i) => sum + Number(i.amount || 0), 0);
   const credits = form.watch('items').filter(i => i.type === 'credit').reduce((sum, i) => sum + Number(i.amount || 0), 0);
 
@@ -212,6 +198,14 @@ const JournalEntryForm = ({ isOpen, setIsOpen, entryId }: JournalEntryFormProps)
             <div className="grid grid-cols-2 gap-4">
               <FormField control={form.control} name="entry_date" render={({ field }) => (
                 <FormItem><FormLabel>Date</FormLabel><FormControl><Input type="date" {...field} /></FormControl><FormMessage /></FormItem>
+              )} />
+              <FormField control={form.control} name="vendor_id" render={({ field }) => (
+                <FormItem><FormLabel>Vendor (Optional)</FormLabel>
+                  <Select onValueChange={field.onChange} value={field.value}>
+                    <FormControl><SelectTrigger><SelectValue placeholder="Select a vendor" /></SelectTrigger></FormControl>
+                    <SelectContent><SelectItem value="">None</SelectItem>{vendors?.map(v => <SelectItem key={v.id} value={v.id}>{v.name}</SelectItem>)}</SelectContent>
+                  </Select><FormMessage />
+                </FormItem>
               )} />
               <FormField control={form.control} name="description" render={({ field }) => (
                 <FormItem className="col-span-2"><FormLabel>Description</FormLabel><FormControl><Textarea placeholder="e.g., Paid monthly office rent" {...field} /></FormControl><FormMessage /></FormItem>
@@ -245,13 +239,9 @@ const JournalEntryForm = ({ isOpen, setIsOpen, entryId }: JournalEntryFormProps)
 
             <FormItem>
               <FormLabel>Attachment (Optional)</FormLabel>
-              <FormControl>
-                <Input type="file" onChange={(e) => setAttachmentFile(e.target.files?.[0] || null)} />
-              </FormControl>
+              <FormControl><Input type="file" onChange={(e) => setAttachmentFile(e.target.files?.[0] || null)} /></FormControl>
               {existingAttachmentUrl && !attachmentFile && (
-                <p className="text-sm text-gray-500 mt-1">
-                  Current file: <a href={existingAttachmentUrl} target="_blank" rel="noopener noreferrer" className="underline">View</a>. Upload a new file to replace it.
-                </p>
+                <p className="text-sm text-gray-500 mt-1">Current file: <a href={existingAttachmentUrl} target="_blank" rel="noopener noreferrer" className="underline">View</a>. Upload a new file to replace it.</p>
               )}
             </FormItem>
 
