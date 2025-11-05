@@ -57,6 +57,7 @@ export const SidebarNav = () => {
 
   const payrollLinks = [
     { to: '/employees', label: 'Employees', icon: Users },
+    { to: '/payroll-runs', label: 'Payroll Runs', icon: Repeat },
   ];
 
   const accountingLinks = [

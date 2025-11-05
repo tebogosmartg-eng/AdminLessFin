@@ -21,6 +21,7 @@ import {
   DropdownMenuTrigger,
 } from "../components/ui/dropdown-menu";
 import { Badge } from '../components/ui/badge';
+import { formatCurrency } from '../lib/utils';
 
 export type Employee = {
   id: string;
@@ -37,6 +38,8 @@ export type Employee = {
   position: string | null;
   start_date: string;
   end_date: string | null;
+  salary_amount: number | null;
+  salary_period: 'monthly' | 'weekly' | 'fortnightly' | null;
 };
 
 const Employees = () => {
@@ -109,25 +112,25 @@ const Employees = () => {
               <TableRow>
                 <TableHead>Name</TableHead>
                 <TableHead>Position</TableHead>
-                <TableHead>Department</TableHead>
                 <TableHead>Type</TableHead>
-                <TableHead>Email</TableHead>
+                <TableHead>Salary</TableHead>
                 <TableHead className="w-[50px]"></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {isLoading ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center">Loading employees...</TableCell>
+                  <TableCell colSpan={5} className="text-center">Loading employees...</TableCell>
                 </TableRow>
               ) : employees && employees.length > 0 ? (
                 employees.map((employee) => (
                   <TableRow key={employee.id}>
                     <TableCell className="font-medium">{employee.first_name} {employee.last_name}</TableCell>
                     <TableCell>{employee.position}</TableCell>
-                    <TableCell>{employee.department}</TableCell>
                     <TableCell><Badge variant="outline" className="capitalize">{employee.employment_type}</Badge></TableCell>
-                    <TableCell>{employee.email}</TableCell>
+                    <TableCell>
+                      {employee.salary_amount ? `${formatCurrency(employee.salary_amount)} / ${employee.salary_period}` : 'N/A'}
+                    </TableCell>
                     <TableCell>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
@@ -146,7 +149,7 @@ const Employees = () => {
                 ))
               ) : (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center">No employees found. Add one to get started.</TableCell>
+                  <TableCell colSpan={5} className="text-center">No employees found. Add one to get started.</TableCell>
                 </TableRow>
               )}
             </TableBody>

@@ -47,6 +47,8 @@ const employeeSchema = z.object({
   position: z.string().optional(),
   start_date: z.string().min(1, 'Start date is required.'),
   end_date: z.string().optional(),
+  salary_amount: z.coerce.number().min(0, 'Salary must be a positive number.').optional().nullable(),
+  salary_period: z.enum(['monthly', 'weekly', 'fortnightly']).optional().nullable(),
 });
 
 type EmployeeFormValues = z.infer<typeof employeeSchema>;
@@ -77,6 +79,8 @@ const EmployeeForm = ({ isOpen, setIsOpen, employee }: EmployeeFormProps) => {
         department: employee.department || '',
         position: employee.position || '',
         end_date: employee.end_date || '',
+        salary_amount: employee.salary_amount || undefined,
+        salary_period: employee.salary_period || undefined,
       });
     } else {
       form.reset({
@@ -93,6 +97,8 @@ const EmployeeForm = ({ isOpen, setIsOpen, employee }: EmployeeFormProps) => {
         position: '',
         start_date: new Date().toISOString().split('T')[0],
         end_date: '',
+        salary_amount: undefined,
+        salary_period: undefined,
       });
     }
   }, [employee, form, isOpen]);
@@ -105,6 +111,8 @@ const EmployeeForm = ({ isOpen, setIsOpen, employee }: EmployeeFormProps) => {
         ...values,
         user_id: user.id,
         end_date: values.end_date || null,
+        salary_amount: values.salary_amount || null,
+        salary_period: values.salary_period || null,
       };
 
       const { error } = employee
@@ -185,6 +193,25 @@ const EmployeeForm = ({ isOpen, setIsOpen, employee }: EmployeeFormProps) => {
               )} />
               <FormField control={form.control} name="end_date" render={({ field }) => (
                 <FormItem><FormLabel>End Date (Optional)</FormLabel><FormControl><Input type="date" {...field} /></FormControl><FormMessage /></FormItem>
+              )} />
+            </fieldset>
+
+            <fieldset className="grid grid-cols-2 gap-4 border p-4 rounded-md">
+              <legend className="text-sm font-medium px-1">Salary Information</legend>
+              <FormField control={form.control} name="salary_amount" render={({ field }) => (
+                  <FormItem><FormLabel>Salary Amount</FormLabel><FormControl><Input type="number" step="0.01" placeholder="e.g., 50000" {...field} /></FormControl><FormMessage /></FormItem>
+              )} />
+              <FormField control={form.control} name="salary_period" render={({ field }) => (
+                  <FormItem><FormLabel>Salary Period</FormLabel>
+                      <Select onValueChange={field.onChange} value={field.value || ''}>
+                          <FormControl><SelectTrigger><SelectValue placeholder="Select a period" /></SelectTrigger></FormControl>
+                          <SelectContent>
+                              <SelectItem value="monthly">Monthly</SelectItem>
+                              <SelectItem value="weekly">Weekly</SelectItem>
+                              <SelectItem value="fortnightly">Fortnightly</SelectItem>
+                          </SelectContent>
+                      </Select><FormMessage />
+                  </FormItem>
               )} />
             </fieldset>
 
