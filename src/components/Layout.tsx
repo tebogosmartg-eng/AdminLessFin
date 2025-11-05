@@ -6,6 +6,7 @@ import { cn } from '../lib/utils';
 import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from './ui/dropdown-menu';
 import { SidebarNav } from './SidebarNav';
+import { ThemeToggle } from './ThemeToggle';
 
 const Layout = () => {
   const { signOut, profile } = useAuth();
@@ -39,6 +40,7 @@ const Layout = () => {
       </aside>
       <div className="flex-1 flex flex-col">
         <header className="flex h-16 items-center justify-end gap-4 border-b bg-white dark:bg-gray-800 px-6">
+          <ThemeToggle />
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" className="relative h-10 w-10 rounded-full">
