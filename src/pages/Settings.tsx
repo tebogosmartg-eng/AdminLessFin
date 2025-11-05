@@ -10,30 +10,42 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { Input } from '../components/ui/input';
 import { showError, showSuccess } from '../utils/toast';
 import { useEffect } from 'react';
+import AvatarUploader from '../components/AvatarUploader';
 
 const profileSchema = z.object({
   full_name: z.string().min(1, 'Full name is required.'),
 });
-
 type ProfileFormValues = z.infer<typeof profileSchema>;
+
+const passwordSchema = z.object({
+  password: z.string().min(6, 'Password must be at least 6 characters.'),
+  confirmPassword: z.string(),
+}).refine(data => data.password === data.confirmPassword, {
+  message: "Passwords don't match",
+  path: ["confirmPassword"],
+});
+type PasswordFormValues = z.infer<typeof passwordSchema>;
 
 const Settings = () => {
   const { user, profile, refreshProfile } = useAuth();
 
-  const form = useForm<ProfileFormValues>({
+  const profileForm = useForm<ProfileFormValues>({
     resolver: zodResolver(profileSchema),
-    defaultValues: {
-      full_name: '',
-    },
+    defaultValues: { full_name: '' },
+  });
+
+  const passwordForm = useForm<PasswordFormValues>({
+    resolver: zodResolver(passwordSchema),
+    defaultValues: { password: '', confirmPassword: '' },
   });
 
   useEffect(() => {
     if (profile) {
-      form.reset({ full_name: profile.full_name || '' });
+      profileForm.reset({ full_name: profile.full_name || '' });
     }
-  }, [profile, form]);
+  }, [profile, profileForm]);
 
-  const mutation = useMutation({
+  const profileMutation = useMutation({
     mutationFn: async (values: ProfileFormValues) => {
       if (!user) throw new Error('User not authenticated');
       const { error } = await supabase
@@ -46,28 +58,57 @@ const Settings = () => {
       await refreshProfile();
       showSuccess('Profile updated successfully.');
     },
-    onError: (error) => {
+    onError: (error: any) => {
       showError(`Error updating profile: ${error.message}`);
     },
   });
 
-  const onSubmit = (values: ProfileFormValues) => {
-    mutation.mutate(values);
+  const passwordMutation = useMutation({
+    mutationFn: async (values: PasswordFormValues) => {
+      const { error } = await supabase.auth.updateUser({ password: values.password });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      passwordForm.reset();
+      showSuccess('Password updated successfully.');
+    },
+    onError: (error: any) => {
+      showError(`Error updating password: ${error.message}`);
+    },
+  });
+
+  const onProfileSubmit = (values: ProfileFormValues) => {
+    profileMutation.mutate(values);
+  };
+
+  const onPasswordSubmit = (values: PasswordFormValues) => {
+    passwordMutation.mutate(values);
   };
 
   return (
-    <div>
-      <h1 className="text-3xl font-bold mb-6">Settings</h1>
+    <div className="space-y-6">
+      <h1 className="text-3xl font-bold">Settings</h1>
+      
       <Card>
         <CardHeader>
-          <CardTitle>Profile</CardTitle>
-          <CardDescription>Update your personal information.</CardDescription>
+          <CardTitle>Profile Picture</CardTitle>
+          <CardDescription>Update your avatar.</CardDescription>
         </CardHeader>
         <CardContent>
-          <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 max-w-md">
+          <AvatarUploader />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Personal Information</CardTitle>
+          <CardDescription>Update your name.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Form {...profileForm}>
+            <form onSubmit={profileForm.handleSubmit(onProfileSubmit)} className="space-y-4 max-w-md">
               <FormField
-                control={form.control}
+                control={profileForm.control}
                 name="full_name"
                 render={({ field }) => (
                   <FormItem>
@@ -79,8 +120,50 @@ const Settings = () => {
                   </FormItem>
                 )}
               />
-              <Button type="submit" disabled={mutation.isPending}>
-                {mutation.isPending ? 'Saving...' : 'Save Changes'}
+              <Button type="submit" disabled={profileMutation.isPending}>
+                {profileMutation.isPending ? 'Saving...' : 'Save Changes'}
+              </Button>
+            </form>
+          </Form>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Change Password</CardTitle>
+          <CardDescription>Update your account password.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Form {...passwordForm}>
+            <form onSubmit={passwordForm.handleSubmit(onPasswordSubmit)} className="space-y-4 max-w-md">
+              <FormField
+                control={passwordForm.control}
+                name="password"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>New Password</FormLabel>
+                    <FormControl>
+                      <Input type="password" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={passwordForm.control}
+                name="confirmPassword"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Confirm New Password</FormLabel>
+                    <FormControl>
+                      <Input type="password" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <Button type="submit" disabled={passwordMutation.isPending}>
+                {passwordMutation.isPending ? 'Saving...' : 'Update Password'}
               </Button>
             </form>
           </Form>
