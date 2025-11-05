@@ -18,6 +18,7 @@ import RecurringEntries from "./pages/RecurringEntries";
 import Vendors from "./pages/Vendors";
 import Customers from "./pages/Customers";
 import Sales from "./pages/Sales";
+import Bills from "./pages/Bills";
 
 const queryClient = new QueryClient();
 
@@ -32,6 +33,8 @@ const App = () => (
             <Route path="/auth" element={<AuthPage />} />
             <Route element={<ProtectedRoute />}>
               <Route path="/" element={<Dashboard />} />
+              <Route path="/sales" element={<Sales />} />
+              <Route path="/bills" element={<Bills />} />
               <Route path="/chart-of-accounts" element={<ChartOfAccounts />} />
               <Route path="/journal-entries" element={<JournalEntries />} />
               <Route path="/recurring-entries" element={<RecurringEntries />} />
@@ -41,7 +44,6 @@ const App = () => (
               <Route path="/settings" element={<Settings />} />
               <Route path="/vendors" element={<Vendors />} />
               <Route path="/customers" element={<Customers />} />
-              <Route path="/sales" element={<Sales />} />
             </Route>
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
