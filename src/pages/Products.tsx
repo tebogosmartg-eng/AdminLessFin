@@ -27,6 +27,7 @@ export type Product = {
   name: string;
   description: string | null;
   price: number | null;
+  cost: number | null;
   type: 'service' | 'inventory';
   quantity_on_hand: number;
   income_account_id: string | null;
@@ -110,7 +111,8 @@ const Products = () => {
                 <TableHead>Name</TableHead>
                 <TableHead>Type</TableHead>
                 <TableHead>Qty on Hand</TableHead>
-                <TableHead className="text-right">Price</TableHead>
+                <TableHead className="text-right">Sale Price</TableHead>
+                <TableHead className="text-right">Cost</TableHead>
                 <TableHead>Income Account</TableHead>
                 <TableHead>COGS Account</TableHead>
                 <TableHead className="w-[50px]"></TableHead>
@@ -118,7 +120,7 @@ const Products = () => {
             </TableHeader>
             <TableBody>
               {isLoading ? (
-                <TableRow><TableCell colSpan={7} className="text-center">Loading items...</TableCell></TableRow>
+                <TableRow><TableCell colSpan={8} className="text-center">Loading items...</TableCell></TableRow>
               ) : products && products.length > 0 ? (
                 products.map((product) => (
                   <TableRow key={product.id}>
@@ -126,6 +128,7 @@ const Products = () => {
                     <TableCell className="capitalize">{product.type}</TableCell>
                     <TableCell>{product.type === 'inventory' ? product.quantity_on_hand : 'N/A'}</TableCell>
                     <TableCell className="text-right font-mono">{product.price ? formatCurrency(product.price) : ''}</TableCell>
+                    <TableCell className="text-right font-mono">{product.cost ? formatCurrency(product.cost) : ''}</TableCell>
                     <TableCell>{product.income_account?.name || 'N/A'}</TableCell>
                     <TableCell>{product.cogs_account?.name || 'N/A'}</TableCell>
                     <TableCell>
@@ -142,7 +145,7 @@ const Products = () => {
                   </TableRow>
                 ))
               ) : (
-                <TableRow><TableCell colSpan={7} className="text-center">No items found. Add one to get started.</TableCell></TableRow>
+                <TableRow><TableCell colSpan={8} className="text-center">No items found. Add one to get started.</TableCell></TableRow>
               )}
             </TableBody>
           </Table>
