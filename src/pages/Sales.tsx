@@ -13,7 +13,7 @@ import {
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/card';
 import { PlusCircle } from 'lucide-react';
 import SaleForm from '../components/SaleForm';
-import { useNavigate } from 'react-router-dom';
+import JournalEntryDetail from '../components/JournalEntryDetail';
 
 type SaleEntry = {
   id: string;
@@ -25,7 +25,7 @@ type SaleEntry = {
 
 const Sales = () => {
   const [isFormOpen, setIsFormOpen] = useState(false);
-  const navigate = useNavigate();
+  const [selectedEntryIdForDetail, setSelectedEntryIdForDetail] = useState<string | null>(null);
 
   const fetchSales = async () => {
     const { data, error } = await supabase
@@ -88,7 +88,7 @@ const Sales = () => {
                 </TableRow>
               ) : sales && sales.length > 0 ? (
                 sales.map((sale) => (
-                  <TableRow key={sale.id} className="cursor-pointer" onClick={() => navigate(`/journal-entries`)}>
+                  <TableRow key={sale.id} className="cursor-pointer" onClick={() => setSelectedEntryIdForDetail(sale.id)}>
                     <TableCell>{new Date(sale.entry_date).toLocaleDateString()}</TableCell>
                     <TableCell>{sale.customers?.[0]?.name || 'N/A'}</TableCell>
                     <TableCell>{sale.description}</TableCell>
@@ -107,6 +107,11 @@ const Sales = () => {
       <SaleForm
         isOpen={isFormOpen}
         setIsOpen={setIsFormOpen}
+      />
+      <JournalEntryDetail 
+        entryId={selectedEntryIdForDetail} 
+        isOpen={!!selectedEntryIdForDetail} 
+        setIsOpen={() => setSelectedEntryIdForDetail(null)} 
       />
     </>
   );

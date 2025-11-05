@@ -13,7 +13,7 @@ import {
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/card';
 import { PlusCircle } from 'lucide-react';
 import BillForm from '../components/BillForm';
-import { useNavigate } from 'react-router-dom';
+import JournalEntryDetail from '../components/JournalEntryDetail';
 
 type BillEntry = {
   id: string;
@@ -25,7 +25,7 @@ type BillEntry = {
 
 const Bills = () => {
   const [isFormOpen, setIsFormOpen] = useState(false);
-  const navigate = useNavigate();
+  const [selectedEntryIdForDetail, setSelectedEntryIdForDetail] = useState<string | null>(null);
 
   const fetchBills = async () => {
     const { data, error } = await supabase
@@ -88,7 +88,7 @@ const Bills = () => {
                 </TableRow>
               ) : bills && bills.length > 0 ? (
                 bills.map((bill) => (
-                  <TableRow key={bill.id} className="cursor-pointer" onClick={() => navigate(`/journal-entries`)}>
+                  <TableRow key={bill.id} className="cursor-pointer" onClick={() => setSelectedEntryIdForDetail(bill.id)}>
                     <TableCell>{new Date(bill.entry_date).toLocaleDateString()}</TableCell>
                     <TableCell>{bill.vendors?.[0]?.name || 'N/A'}</TableCell>
                     <TableCell>{bill.description}</TableCell>
@@ -107,6 +107,11 @@ const Bills = () => {
       <BillForm
         isOpen={isFormOpen}
         setIsOpen={setIsFormOpen}
+      />
+      <JournalEntryDetail 
+        entryId={selectedEntryIdForDetail} 
+        isOpen={!!selectedEntryIdForDetail} 
+        setIsOpen={() => setSelectedEntryIdForDetail(null)} 
       />
     </>
   );
