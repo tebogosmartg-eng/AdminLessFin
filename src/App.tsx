@@ -34,6 +34,7 @@ import LoanDetail from "./pages/LoanDetail";
 import FixedAssets from "./pages/FixedAssets";
 import AssetCategories from "./pages/AssetCategories";
 import AssetDetail from "./pages/AssetDetail";
+import FinancialStatements from "./pages/FinancialStatements";
 
 const queryClient = new QueryClient();
 
@@ -60,6 +61,7 @@ const App = () => (
               <Route path="/reconciliation" element={<Reconciliation />} />
               <Route path="/budgets" element={<Budgets />} />
               <Route path="/reports" element={<Reports />} />
+              <Route path="/financial-statements" element={<FinancialStatements />} />
               <Route path="/settings" element={<Settings />} />
               <Route path="/vendors" element={<Vendors />} />
               <Route path="/customers" element={<Customers />} />

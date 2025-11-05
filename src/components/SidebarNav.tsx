@@ -75,7 +75,8 @@ export const SidebarNav = () => {
 
   const planningLinks = [
     { to: '/budgets', label: 'Budgets', icon: Target },
-    { to: '/reports', label: 'Reports', icon: FileText },
+    { to: '/reports', label: 'Operational Reports', icon: FileText },
+    { to: '/financial-statements', label: 'Financial Statements', icon: FileSignature },
   ];
 
   return (
