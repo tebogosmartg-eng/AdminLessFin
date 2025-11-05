@@ -4,11 +4,12 @@ import { supabase } from '../integrations/supabase/client';
 import { Button } from '../components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/table';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/card';
-import { PlusCircle, MoreHorizontal } from 'lucide-react';
+import { PlusCircle, MoreHorizontal, Terminal } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "../components/ui/dropdown-menu";
 import { showError, showSuccess } from '../utils/toast';
 import RecurringEntryForm from '../components/RecurringEntryForm';
 import { format } from 'date-fns';
+import { Alert, AlertDescription, AlertTitle } from '../components/ui/alert';
 
 type RecurringEntry = {
   id: string;
@@ -68,6 +69,14 @@ const RecurringEntries = () => {
 
   return (
     <>
+      <Alert className="mb-4">
+        <Terminal className="h-4 w-4" />
+        <AlertTitle>Automate Your Bookkeeping!</AlertTitle>
+        <AlertDescription>
+          To have these recurring entries post automatically, you need to set up a schedule. 
+          Go to your Supabase dashboard, find the `process-recurring-entries` Edge Function, and create a cron job to run it daily.
+        </AlertDescription>
+      </Alert>
       <Card>
         <CardHeader>
           <div className="flex flex-row items-center justify-between">
