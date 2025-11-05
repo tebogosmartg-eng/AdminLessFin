@@ -1,10 +1,11 @@
 import { useAuth } from '../contexts/AuthContext';
-import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/card';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../integrations/supabase/client';
 import { Account } from './ChartOfAccounts';
 import { Landmark, TrendingUp, TrendingDown, Scale, Wallet } from 'lucide-react';
 import { Skeleton } from '../components/ui/skeleton';
+import IncomeExpenseChart from '../components/IncomeExpenseChart';
 
 const Dashboard = () => {
   const { user, profile } = useAuth();
@@ -15,9 +16,20 @@ const Dashboard = () => {
     return data as Account[];
   };
 
-  const { data: accounts, isLoading } = useQuery({
+  const { data: accounts, isLoading: isLoadingAccounts } = useQuery({
     queryKey: ['accounts'],
     queryFn: fetchAccounts,
+  });
+
+  const fetchMonthlySummary = async () => {
+    const { data, error } = await supabase.rpc('get_monthly_summary', { p_months: 6 });
+    if (error) throw new Error(error.message);
+    return data;
+  };
+
+  const { data: monthlySummary, isLoading: isLoadingSummary } = useQuery({
+    queryKey: ['monthlySummary'],
+    queryFn: fetchMonthlySummary,
   });
 
   const calculateTotals = (accounts: Account[] | undefined) => {
@@ -72,7 +84,7 @@ const Dashboard = () => {
                 <card.icon className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
-                {isLoading ? (
+                {isLoadingAccounts ? (
                   <Skeleton className="h-8 w-3/4" />
                 ) : (
                   <div className={`text-2xl font-bold ${card.color || ''}`}>
@@ -86,9 +98,16 @@ const Dashboard = () => {
         <Card className="mt-6">
           <CardHeader>
             <CardTitle>Financial Overview</CardTitle>
+            <CardDescription>Income vs. Expenses for the last 6 months.</CardDescription>
           </CardHeader>
           <CardContent>
-            <p className="text-md text-gray-600 dark:text-gray-400">Here's a quick look at your company's financial health. More detailed reports are coming soon!</p>
+            {isLoadingSummary ? (
+              <Skeleton className="h-[300px] w-full" />
+            ) : monthlySummary && monthlySummary.length > 0 ? (
+              <IncomeExpenseChart data={monthlySummary} />
+            ) : (
+              <p className="text-md text-gray-600 dark:text-gray-400">Not enough data to display a chart. Create some income and expense journal entries to get started.</p>
+            )}
           </CardContent>
         </Card>
       </main>
