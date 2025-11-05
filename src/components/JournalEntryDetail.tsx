@@ -18,6 +18,7 @@ import {
 import { Skeleton } from './ui/skeleton';
 import { Button } from './ui/button';
 import { Paperclip } from 'lucide-react';
+import { formatCurrency } from '../lib/utils';
 
 type JournalEntryDetailProps = {
   entryId: string | null;
@@ -127,10 +128,10 @@ const JournalEntryDetail = ({ entryId, isOpen, setIsOpen }: JournalEntryDetailPr
                   <TableRow key={index}>
                     <TableCell className="font-medium">{item.chart_of_accounts?.[0]?.name}</TableCell>
                     <TableCell className="text-right font-mono">
-                      {item.type === 'debit' ? `$${item.amount.toFixed(2)}` : ''}
+                      {item.type === 'debit' ? formatCurrency(item.amount) : ''}
                     </TableCell>
                     <TableCell className="text-right font-mono">
-                      {item.type === 'credit' ? `$${item.amount.toFixed(2)}` : ''}
+                      {item.type === 'credit' ? formatCurrency(item.amount) : ''}
                     </TableCell>
                   </TableRow>
                 ))}

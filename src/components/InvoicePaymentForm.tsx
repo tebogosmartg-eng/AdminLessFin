@@ -12,6 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { showError, showSuccess } from '../utils/toast';
 import { Account } from '../pages/ChartOfAccounts';
 import { format } from 'date-fns';
+import { formatCurrency } from '../lib/utils';
 
 const paymentSchema = z.object({
   payment_date: z.string().min(1, "Date is required."),
@@ -79,7 +80,7 @@ const InvoicePaymentForm = ({ isOpen, setIsOpen, invoice }: InvoicePaymentFormPr
         <DialogHeader>
           <DialogTitle>Receive Payment for Invoice</DialogTitle>
           <DialogDescription>
-            Recording payment of ${invoice.totalAmount.toFixed(2)} from {invoice.customerName}.
+            Recording payment of {formatCurrency(invoice.totalAmount)} from {invoice.customerName}.
           </DialogDescription>
         </DialogHeader>
         <Form {...form}>

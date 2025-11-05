@@ -14,6 +14,7 @@ import { showError, showSuccess } from '../utils/toast';
 import { Account } from '../pages/ChartOfAccounts';
 import { Alert, AlertDescription } from './ui/alert';
 import { Textarea } from './ui/textarea';
+import { formatCurrency } from '../lib/utils';
 
 const paymentSchema = z.object({
   payment_date: z.string().min(1, "Date is required."),
@@ -132,7 +133,7 @@ const BillPaymentForm = ({ isOpen, setIsOpen, vendorId, vendorName, amountDue }:
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>Record Payment to {vendorName}</DialogTitle>
-          <DialogDescription>Amount Due: ${amountDue.toFixed(2)}</DialogDescription>
+          <DialogDescription>Amount Due: {formatCurrency(amountDue)}</DialogDescription>
         </DialogHeader>
         {!apAccounts?.some(acc => acc.name.toLowerCase().includes('accounts payable')) && (
             <Alert variant="destructive">

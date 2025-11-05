@@ -36,6 +36,7 @@ import { Account } from '../pages/ChartOfAccounts';
 import { Vendor } from '../pages/Vendors';
 import { Customer } from '../pages/Customers';
 import { Trash2, X } from 'lucide-react';
+import { formatCurrency } from '../lib/utils';
 
 const journalEntryItemSchema = z.object({
   account_id: z.string().min(1, "Account is required."),
@@ -255,8 +256,8 @@ const JournalEntryForm = ({ isOpen, setIsOpen, entryId }: JournalEntryFormProps)
             {form.formState.errors.items && <p className="text-sm font-medium text-destructive">{form.formState.errors.items.message}</p>}
 
             <div className="flex justify-between font-mono text-sm pt-2 border-t">
-              <span>Total Debits: ${debits.toFixed(2)}</span>
-              <span>Total Credits: ${credits.toFixed(2)}</span>
+              <span>Total Debits: {formatCurrency(debits)}</span>
+              <span>Total Credits: {formatCurrency(credits)}</span>
             </div>
 
             <FormItem>

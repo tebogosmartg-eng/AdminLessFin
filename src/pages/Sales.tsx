@@ -17,6 +17,7 @@ import JournalEntryDetail from '../components/JournalEntryDetail';
 import JournalEntryForm from '../components/JournalEntryForm';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '../components/ui/dropdown-menu';
 import { showError, showSuccess } from '../utils/toast';
+import { formatCurrency } from '../lib/utils';
 
 type SaleEntry = {
   id: string;
@@ -124,7 +125,7 @@ const Sales = () => {
                     <TableCell>{new Date(sale.entry_date).toLocaleDateString()}</TableCell>
                     <TableCell>{sale.customers?.[0]?.name || 'N/A'}</TableCell>
                     <TableCell>{sale.description}</TableCell>
-                    <TableCell className="text-right">${sale.total.toFixed(2)}</TableCell>
+                    <TableCell className="text-right">{formatCurrency(sale.total)}</TableCell>
                     <TableCell>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>

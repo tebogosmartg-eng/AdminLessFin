@@ -11,6 +11,7 @@ import { Calendar } from '../components/ui/calendar';
 import { DateRange } from 'react-day-picker';
 import { format, startOfMonth, endOfMonth } from 'date-fns';
 import { cn } from '../lib/utils';
+import { formatCurrency } from '../lib/utils';
 
 type AccountBalance = {
   id: string;
@@ -81,10 +82,6 @@ const Reports = () => {
   });
 
   const isLoading = isLoadingPointInTime || isLoadingPeriodActivity || isLoadingAgedReceivables;
-
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount);
-  };
 
   const incomeAccounts = periodActivityAccounts?.filter(acc => acc.type === 'Income') || [];
   const expenseAccounts = periodActivityAccounts?.filter(acc => acc.type === 'Expense') || [];

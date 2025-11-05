@@ -22,6 +22,7 @@ import {
   DropdownMenuTrigger,
 } from "../components/ui/dropdown-menu";
 import { cn } from '../lib/utils';
+import { formatCurrency } from '../lib/utils';
 
 export type Budget = {
   id: string;
@@ -80,8 +81,6 @@ const Budgets = () => {
       deleteMutation.mutate(id);
     }
   };
-
-  const formatCurrency = (amount: number) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount);
 
   return (
     <>

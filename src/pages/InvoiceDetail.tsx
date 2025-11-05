@@ -12,6 +12,7 @@ import { showError, showSuccess } from '../utils/toast';
 import InvoicePaymentForm from '../components/InvoicePaymentForm';
 import { useAuth } from '../contexts/AuthContext';
 import SendInvoiceDialog from '../components/SendInvoiceDialog';
+import { formatCurrency } from '../lib/utils';
 
 type InvoiceDetailData = {
   id: string;
@@ -87,7 +88,6 @@ const InvoiceDetail = () => {
 
   const lineItems = invoice?.journal_entries?.[0]?.journal_entry_items.filter(item => item.type === 'credit') || [];
   const totalAmount = lineItems.reduce((sum, item) => sum + item.amount, 0);
-  const formatCurrency = (amount: number) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount);
 
   if (isLoading) {
     return <div className="space-y-4"><Skeleton className="h-96 w-full" /></div>;

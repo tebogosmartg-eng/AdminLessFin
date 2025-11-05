@@ -10,6 +10,7 @@ import { Link } from 'react-router-dom';
 import { Button } from '../components/ui/button';
 import QuickActions from '../components/QuickActions';
 import { formatDistanceToNow } from 'date-fns';
+import { formatCurrency } from '../lib/utils';
 
 type OverdueInvoice = {
   id: string;
@@ -94,8 +95,6 @@ const Dashboard = () => {
   const totals = calculateTotals(accounts);
   const totalAr = arBalances?.reduce((sum, item) => sum + item.balance, 0) || 0;
   const totalAp = apBalances?.reduce((sum, item) => sum + item.balance, 0) || 0;
-
-  const formatCurrency = (amount: number) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount);
 
   const summaryCards = [
     { title: 'Cash Balance', value: totals.cash, icon: DollarSign },

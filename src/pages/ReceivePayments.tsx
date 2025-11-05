@@ -12,6 +12,7 @@ import {
 } from '../components/ui/table';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/card';
 import ReceivePaymentForm from '../components/ReceivePaymentForm';
+import { formatCurrency } from '../lib/utils';
 
 type CustomerBalance = {
   customer_id: string;
@@ -48,8 +49,6 @@ const ReceivePayments = () => {
     });
     setIsFormOpen(true);
   };
-
-  const formatCurrency = (amount: number) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount);
 
   return (
     <>

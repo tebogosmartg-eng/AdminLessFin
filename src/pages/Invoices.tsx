@@ -17,6 +17,7 @@ import { showError, showSuccess } from '../utils/toast';
 import { Badge } from '../components/ui/badge';
 import { useNavigate } from 'react-router-dom';
 import InvoiceForm from '../components/InvoiceForm';
+import { formatCurrency } from '../lib/utils';
 
 export type Invoice = {
   id: string;
@@ -93,8 +94,6 @@ const Invoices = () => {
       .filter(item => item.type === 'debit')
       .reduce((sum, item) => sum + item.amount, 0) || 0;
   };
-
-  const formatCurrency = (amount: number) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount);
 
   const getStatusVariant = (status: string) => {
     switch (status) {

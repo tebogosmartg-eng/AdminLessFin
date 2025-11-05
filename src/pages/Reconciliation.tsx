@@ -12,6 +12,7 @@ import { Skeleton } from '../components/ui/skeleton';
 import { format } from 'date-fns';
 import { cn } from '../lib/utils';
 import { showError, showSuccess } from '../utils/toast';
+import { formatCurrency } from '../lib/utils';
 
 type Transaction = {
   id: string;
@@ -138,8 +139,6 @@ const Reconciliation = () => {
 
   const clearedPaymentsTotal = useMemo(() => transactions?.filter(t => clearedItemIds.has(t.id) && (bankAccounts?.find(acc => acc.id === selectedAccountId)?.type === 'Asset' ? t.type === 'credit' : t.type === 'debit')).reduce((sum, t) => sum + t.amount, 0) || 0, [transactions, clearedItemIds, selectedAccountId, bankAccounts]);
   const clearedDepositsTotal = useMemo(() => transactions?.filter(t => clearedItemIds.has(t.id) && (bankAccounts?.find(acc => acc.id === selectedAccountId)?.type === 'Asset' ? t.type === 'debit' : t.type === 'credit')).reduce((sum, t) => sum + t.amount, 0) || 0, [transactions, clearedItemIds, selectedAccountId, bankAccounts]);
-
-  const formatCurrency = (amount: number) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount);
 
   const renderTransactionsTable = (title: string, items: Transaction[]) => (
     <div>

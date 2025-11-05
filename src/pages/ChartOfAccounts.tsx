@@ -28,6 +28,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "../components/ui/dropdown-menu"
+import { formatCurrency } from '../lib/utils';
 
 export type Account = {
   id: string;
@@ -154,7 +155,7 @@ const ChartOfAccounts = () => {
                     <TableCell className="font-medium">{account.name}</TableCell>
                     <TableCell>{account.type}</TableCell>
                     <TableCell>{account.description}</TableCell>
-                    <TableCell className="text-right">${account.balance.toFixed(2)}</TableCell>
+                    <TableCell className="text-right">{formatCurrency(account.balance)}</TableCell>
                     <TableCell>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>

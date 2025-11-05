@@ -6,6 +6,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '.
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { Skeleton } from '../components/ui/skeleton';
 import { Account } from './ChartOfAccounts';
+import { formatCurrency } from '../lib/utils';
 
 type LedgerEntry = {
   entry_date: string;
@@ -74,8 +75,6 @@ const GeneralLedger = () => {
   };
 
   const entriesWithBalance = calculateRunningBalance();
-
-  const formatCurrency = (amount: number) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount);
 
   return (
     <div className="space-y-6">

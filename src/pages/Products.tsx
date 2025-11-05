@@ -20,6 +20,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "../components/ui/dropdown-menu";
+import { formatCurrency } from '../lib/utils';
 
 export type Product = {
   id: string;
@@ -86,11 +87,6 @@ const Products = () => {
     }
   };
 
-  const formatCurrency = (amount: number | null) => {
-    if (amount === null) return '';
-    return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount);
-  }
-
   return (
     <>
       <Card>
@@ -126,7 +122,7 @@ const Products = () => {
                   <TableRow key={product.id}>
                     <TableCell className="font-medium">{product.name}</TableCell>
                     <TableCell className="capitalize">{product.type}</TableCell>
-                    <TableCell className="text-right font-mono">{formatCurrency(product.price)}</TableCell>
+                    <TableCell className="text-right font-mono">{product.price ? formatCurrency(product.price) : ''}</TableCell>
                     <TableCell>{product.income_account?.name || 'N/A'}</TableCell>
                     <TableCell>{product.expense_account?.name || 'N/A'}</TableCell>
                     <TableCell>
