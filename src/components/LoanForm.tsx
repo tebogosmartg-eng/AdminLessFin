@@ -77,6 +77,7 @@ const LoanForm = ({ isOpen, setIsOpen, loanId }: LoanFormProps) => {
           term_months: values.term_months,
           repayment_frequency: values.repayment_frequency,
           start_date: values.start_date,
+          liability_account_id: values.liability_account_id,
         })
         .select('id')
         .single();
