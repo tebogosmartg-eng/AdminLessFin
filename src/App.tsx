@@ -20,6 +20,7 @@ import Customers from "./pages/Customers";
 import Sales from "./pages/Sales";
 import Bills from "./pages/Bills";
 import PayBills from "./pages/PayBills";
+import ReceivePayments from "./pages/ReceivePayments";
 
 const queryClient = new QueryClient();
 
@@ -37,6 +38,7 @@ const App = () => (
               <Route path="/sales" element={<Sales />} />
               <Route path="/bills" element={<Bills />} />
               <Route path="/pay-bills" element={<PayBills />} />
+              <Route path="/receive-payments" element={<ReceivePayments />} />
               <Route path="/chart-of-accounts" element={<ChartOfAccounts />} />
               <Route path="/journal-entries" element={<JournalEntries />} />
               <Route path="/recurring-entries" element={<RecurringEntries />} />
