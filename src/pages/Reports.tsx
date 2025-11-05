@@ -5,12 +5,12 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../co
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from '../components/ui/table';
 import { Skeleton } from '../components/ui/skeleton';
 import { Button } from '../components/ui/button';
-import { Calendar as CalendarIcon } from 'lucide-react';
+import { Calendar as CalendarIcon, Download } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '../components/ui/popover';
 import { Calendar } from '../components/ui/calendar';
 import { DateRange } from 'react-day-picker';
 import { format, startOfMonth, endOfMonth } from 'date-fns';
-import { cn } from '../lib/utils';
+import { cn, downloadCSV } from '../lib/utils';
 import { formatCurrency } from '../lib/utils';
 
 type AccountBalance = {
@@ -107,6 +107,57 @@ const Reports = () => {
     }
   });
 
+  const handleDownloadTrialBalance = () => {
+    const data = pointInTimeAccounts?.map(account => ({
+      Account: account.name,
+      Debit: ['Asset', 'Expense'].includes(account.type) && account.balance >= 0 ? account.balance.toFixed(2) : (['Liability', 'Equity', 'Income'].includes(account.type) && account.balance < 0 ? (-account.balance).toFixed(2) : ''),
+      Credit: ['Liability', 'Equity', 'Income'].includes(account.type) && account.balance >= 0 ? account.balance.toFixed(2) : (['Asset', 'Expense'].includes(account.type) && account.balance < 0 ? (-account.balance).toFixed(2) : ''),
+    })) || [];
+    data.push({ Account: 'Totals', Debit: totalDebits.toFixed(2), Credit: totalCredits.toFixed(2) });
+    downloadCSV(data, `trial-balance-${format(toDate, 'yyyy-MM-dd')}.csv`);
+  };
+
+  const handleDownloadIncomeStatement = () => {
+    const data: { Section: string, Account: string, Amount: string }[] = [];
+    data.push({ Section: 'Income', Account: '', Amount: '' });
+    incomeAccounts.forEach(acc => data.push({ Section: '', Account: acc.name, Amount: acc.activity.toFixed(2) }));
+    data.push({ Section: 'Total Income', Account: '', Amount: totalIncome.toFixed(2) });
+    data.push({ Section: 'Expenses', Account: '', Amount: '' });
+    expenseAccounts.forEach(acc => data.push({ Section: '', Account: acc.name, Amount: acc.activity.toFixed(2) }));
+    data.push({ Section: 'Total Expenses', Account: '', Amount: totalExpenses.toFixed(2) });
+    data.push({ Section: 'Net Income', Account: '', Amount: netIncome.toFixed(2) });
+    downloadCSV(data, `income-statement-${format(fromDate, 'yyyy-MM-dd')}-to-${format(toDate, 'yyyy-MM-dd')}.csv`);
+  };
+
+  const handleDownloadBalanceSheet = () => {
+    const data: { Section: string, Account: string, Amount: string }[] = [];
+    data.push({ Section: 'Assets', Account: '', Amount: '' });
+    assetAccounts.forEach(acc => data.push({ Section: '', Account: acc.name, Amount: acc.balance.toFixed(2) }));
+    data.push({ Section: 'Total Assets', Account: '', Amount: totalAssets.toFixed(2) });
+    data.push({ Section: '', Account: '', Amount: '' });
+    data.push({ Section: 'Liabilities', Account: '', Amount: '' });
+    liabilityAccounts.forEach(acc => data.push({ Section: '', Account: acc.name, Amount: acc.balance.toFixed(2) }));
+    data.push({ Section: 'Total Liabilities', Account: '', Amount: totalLiabilities.toFixed(2) });
+    data.push({ Section: 'Equity', Account: '', Amount: '' });
+    equityAccounts.forEach(acc => data.push({ Section: '', Account: acc.name, Amount: acc.balance.toFixed(2) }));
+    data.push({ Section: 'Total Equity', Account: '', Amount: totalEquity.toFixed(2) });
+    data.push({ Section: 'Total Liabilities & Equity', Account: '', Amount: totalLiabilitiesAndEquity.toFixed(2) });
+    downloadCSV(data, `balance-sheet-${format(toDate, 'yyyy-MM-dd')}.csv`);
+  };
+
+  const handleDownloadAgedReceivables = () => {
+    const data = agedReceivables?.map(row => ({
+      Customer: row.customer_name,
+      Current: row.current.toFixed(2),
+      '1-30 Days': row.days_1_30.toFixed(2),
+      '31-60 Days': row.days_31_60.toFixed(2),
+      '61-90 Days': row.days_61_90.toFixed(2),
+      '90+ Days': row.days_90_plus.toFixed(2),
+      Total: row.total_due.toFixed(2),
+    })) || [];
+    downloadCSV(data, `aged-receivables-${format(new Date(), 'yyyy-MM-dd')}.csv`);
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
@@ -154,9 +205,12 @@ const Reports = () => {
       ) : (
         <>
           <Card>
-            <CardHeader>
-              <CardTitle>Trial Balance</CardTitle>
-              <CardDescription>As of {format(toDate, "PPP")}</CardDescription>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <div>
+                <CardTitle>Trial Balance</CardTitle>
+                <CardDescription>As of {format(toDate, "PPP")}</CardDescription>
+              </div>
+              <Button variant="outline" size="sm" onClick={handleDownloadTrialBalance}><Download className="mr-2 h-4 w-4" /> Download CSV</Button>
             </CardHeader>
             <CardContent>
               <Table>
@@ -176,9 +230,12 @@ const Reports = () => {
           </Card>
 
           <Card>
-            <CardHeader>
-              <CardTitle>Income Statement</CardTitle>
-              <CardDescription>For the period from {format(fromDate, "PPP")} to {format(toDate, "PPP")}</CardDescription>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <div>
+                <CardTitle>Income Statement</CardTitle>
+                <CardDescription>For the period from {format(fromDate, "PPP")} to {format(toDate, "PPP")}</CardDescription>
+              </div>
+              <Button variant="outline" size="sm" onClick={handleDownloadIncomeStatement}><Download className="mr-2 h-4 w-4" /> Download CSV</Button>
             </CardHeader>
             <CardContent>
               <Table>
@@ -197,9 +254,12 @@ const Reports = () => {
           </Card>
 
           <Card>
-            <CardHeader>
-              <CardTitle>Balance Sheet</CardTitle>
-              <CardDescription>As of {format(toDate, "PPP")}</CardDescription>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <div>
+                <CardTitle>Balance Sheet</CardTitle>
+                <CardDescription>As of {format(toDate, "PPP")}</CardDescription>
+              </div>
+              <Button variant="outline" size="sm" onClick={handleDownloadBalanceSheet}><Download className="mr-2 h-4 w-4" /> Download CSV</Button>
             </CardHeader>
             <CardContent>
               <div className="grid md:grid-cols-2 gap-8">
@@ -229,9 +289,12 @@ const Reports = () => {
           </Card>
 
           <Card>
-            <CardHeader>
-              <CardTitle>Aged Receivables Summary</CardTitle>
-              <CardDescription>Outstanding customer balances by aging period as of today.</CardDescription>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <div>
+                <CardTitle>Aged Receivables Summary</CardTitle>
+                <CardDescription>Outstanding customer balances by aging period as of today.</CardDescription>
+              </div>
+              <Button variant="outline" size="sm" onClick={handleDownloadAgedReceivables}><Download className="mr-2 h-4 w-4" /> Download CSV</Button>
             </CardHeader>
             <CardContent>
               {agedReceivables && agedReceivables.length > 0 ? (
