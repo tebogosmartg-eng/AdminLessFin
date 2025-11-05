@@ -11,6 +11,7 @@ import {
   TableRow,
 } from '../components/ui/table';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/card';
+import { Progress } from '../components/ui/progress';
 import { PlusCircle, MoreHorizontal } from 'lucide-react';
 import { showError, showSuccess } from '../utils/toast';
 import BudgetForm from '../components/BudgetForm';
@@ -20,7 +21,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "../components/ui/dropdown-menu";
-import { format } from 'date-fns';
+import { cn } from '../lib/utils';
 
 export type Budget = {
   id: string;
@@ -28,9 +29,10 @@ export type Budget = {
   amount: number;
   period: 'monthly' | 'quarterly' | 'yearly';
   start_date: string;
-  chart_of_accounts: {
-    name: string;
-  };
+  account_name: string;
+  actual_amount: number;
+  period_start_date: string;
+  period_end_date: string;
 };
 
 const Budgets = () => {
@@ -39,21 +41,13 @@ const Budgets = () => {
   const queryClient = useQueryClient();
 
   const fetchBudgets = async () => {
-    const { data, error } = await supabase
-      .from('budgets')
-      .select(`
-        *,
-        chart_of_accounts (
-          name
-        )
-      `)
-      .order('start_date', { ascending: false });
+    const { data, error } = await supabase.rpc('get_budgets_with_activity');
     if (error) throw new Error(error.message);
     return data;
   };
 
   const { data: budgets, isLoading } = useQuery<Budget[]>({
-    queryKey: ['budgets'],
+    queryKey: ['budgets_with_activity'],
     queryFn: fetchBudgets,
   });
 
@@ -63,7 +57,7 @@ const Budgets = () => {
       if (error) throw new Error(error.message);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['budgets'] });
+      queryClient.invalidateQueries({ queryKey: ['budgets_with_activity'] });
       showSuccess('Budget deleted successfully.');
     },
     onError: (error) => {
@@ -88,7 +82,6 @@ const Budgets = () => {
   };
 
   const formatCurrency = (amount: number) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount);
-  const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
   return (
     <>
@@ -96,8 +89,8 @@ const Budgets = () => {
         <CardHeader>
           <div className="flex flex-row items-center justify-between">
             <div>
-              <CardTitle>Budgets</CardTitle>
-              <CardDescription>Manage your spending targets for expense accounts.</CardDescription>
+              <CardTitle>Budgets vs. Actuals</CardTitle>
+              <CardDescription>Track your spending against your budget for the current period.</CardDescription>
             </div>
             <Button onClick={handleAddNew}>
               <PlusCircle className="mr-2 h-4 w-4" />
@@ -110,43 +103,53 @@ const Budgets = () => {
             <TableHeader>
               <TableRow>
                 <TableHead>Account</TableHead>
-                <TableHead>Period</TableHead>
-                <TableHead>Start Date</TableHead>
-                <TableHead className="text-right">Amount</TableHead>
+                <TableHead className="w-[300px]">Progress</TableHead>
+                <TableHead className="text-right">Actual</TableHead>
+                <TableHead className="text-right">Budgeted</TableHead>
+                <TableHead className="text-right">Remaining</TableHead>
                 <TableHead className="w-[50px]"></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {isLoading ? (
                 <TableRow>
-                  <TableCell colSpan={5} className="text-center">Loading budgets...</TableCell>
+                  <TableCell colSpan={6} className="text-center">Loading budgets...</TableCell>
                 </TableRow>
               ) : budgets && budgets.length > 0 ? (
-                budgets.map((budget) => (
-                  <TableRow key={budget.id}>
-                    <TableCell className="font-medium">{budget.chart_of_accounts.name}</TableCell>
-                    <TableCell>{capitalize(budget.period)}</TableCell>
-                    <TableCell>{format(new Date(budget.start_date), 'PPP')}</TableCell>
-                    <TableCell className="text-right font-mono">{formatCurrency(budget.amount)}</TableCell>
-                    <TableCell>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" className="h-8 w-8 p-0">
-                            <span className="sr-only">Open menu</span>
-                            <MoreHorizontal className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => handleEdit(budget)}>Edit</DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => handleDelete(budget.id)} className="text-red-600">Delete</DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </TableCell>
-                  </TableRow>
-                ))
+                budgets.map((budget) => {
+                  const remaining = budget.amount - budget.actual_amount;
+                  const progress = budget.amount > 0 ? (budget.actual_amount / budget.amount) * 100 : 0;
+                  return (
+                    <TableRow key={budget.id}>
+                      <TableCell className="font-medium">{budget.account_name}</TableCell>
+                      <TableCell>
+                        <Progress value={progress} className={cn(progress > 100 && "bg-red-500")} />
+                      </TableCell>
+                      <TableCell className="text-right font-mono">{formatCurrency(budget.actual_amount)}</TableCell>
+                      <TableCell className="text-right font-mono">{formatCurrency(budget.amount)}</TableCell>
+                      <TableCell className={cn("text-right font-mono", remaining < 0 && "text-red-600")}>
+                        {formatCurrency(remaining)}
+                      </TableCell>
+                      <TableCell>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" className="h-8 w-8 p-0">
+                              <span className="sr-only">Open menu</span>
+                              <MoreHorizontal className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={() => handleEdit(budget)}>Edit</DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleDelete(budget.id)} className="text-red-600">Delete</DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </TableCell>
+                    </TableRow>
+                  )
+                })
               ) : (
                 <TableRow>
-                  <TableCell colSpan={5} className="text-center">No budgets found. Create one to get started.</TableCell>
+                  <TableCell colSpan={6} className="text-center">No budgets found. Create one to get started.</TableCell>
                 </TableRow>
               )}
             </TableBody>
