@@ -24,17 +24,37 @@ const Reports = () => {
     }).format(amount);
   };
 
+  // Income Statement Calculations
   const incomeAccounts = accounts?.filter(acc => acc.type === 'Income') || [];
   const expenseAccounts = accounts?.filter(acc => acc.type === 'Expense') || [];
-
   const totalIncome = incomeAccounts.reduce((sum, acc) => sum + acc.balance, 0);
   const totalExpenses = expenseAccounts.reduce((sum, acc) => sum + acc.balance, 0);
   const netIncome = totalIncome - totalExpenses;
 
+  // Balance Sheet Calculations
+  const assetAccounts = accounts?.filter(acc => acc.type === 'Asset') || [];
+  const liabilityAccounts = accounts?.filter(acc => acc.type === 'Liability') || [];
+  const equityAccounts = accounts?.filter(acc => acc.type === 'Equity') || [];
+  
+  const totalAssets = assetAccounts.reduce((sum, acc) => sum + acc.balance, 0);
+  const totalLiabilities = liabilityAccounts.reduce((sum, acc) => sum + acc.balance, 0);
+  const totalOwnerEquity = equityAccounts.reduce((sum, acc) => sum + acc.balance, 0);
+  const totalEquity = totalOwnerEquity + netIncome;
+  const totalLiabilitiesAndEquity = totalLiabilities + totalEquity;
+
   if (isLoading) {
     return (
-      <div className="space-y-4">
+      <div className="space-y-6">
         <Skeleton className="h-10 w-1/4" />
+        <Card>
+          <CardHeader>
+            <Skeleton className="h-8 w-1/2" />
+            <Skeleton className="h-4 w-3/4" />
+          </CardHeader>
+          <CardContent>
+            <Skeleton className="h-40 w-full" />
+          </CardContent>
+        </Card>
         <Card>
           <CardHeader>
             <Skeleton className="h-8 w-1/2" />
@@ -49,8 +69,9 @@ const Reports = () => {
   }
 
   return (
-    <div>
-      <h1 className="text-3xl font-bold mb-6">Reports</h1>
+    <div className="space-y-6">
+      <h1 className="text-3xl font-bold">Reports</h1>
+      
       <Card>
         <CardHeader>
           <CardTitle>Income Statement</CardTitle>
@@ -102,6 +123,93 @@ const Reports = () => {
               </TableRow>
             </TableFooter>
           </Table>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Balance Sheet</CardTitle>
+          <CardDescription>As of {new Date().toLocaleDateString()}</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid md:grid-cols-2 gap-8">
+            <div>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Assets</TableHead>
+                    <TableHead className="text-right">Amount</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {assetAccounts.map(account => (
+                    <TableRow key={account.id}>
+                      <TableCell>{account.name}</TableCell>
+                      <TableCell className="text-right">{formatCurrency(account.balance)}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+                <TableFooter>
+                  <TableRow className="text-lg font-bold bg-gray-100 dark:bg-gray-700">
+                    <TableCell>Total Assets</TableCell>
+                    <TableCell className="text-right">{formatCurrency(totalAssets)}</TableCell>
+                  </TableRow>
+                </TableFooter>
+              </Table>
+            </div>
+
+            <div>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Liabilities & Equity</TableHead>
+                    <TableHead className="text-right">Amount</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  <TableRow className="font-semibold bg-gray-50 dark:bg-gray-800">
+                    <TableCell>Liabilities</TableCell>
+                    <TableCell></TableCell>
+                  </TableRow>
+                  {liabilityAccounts.map(account => (
+                    <TableRow key={account.id}>
+                      <TableCell className="pl-8">{account.name}</TableCell>
+                      <TableCell className="text-right">{formatCurrency(account.balance)}</TableCell>
+                    </TableRow>
+                  ))}
+                  <TableRow className="font-semibold">
+                    <TableCell>Total Liabilities</TableCell>
+                    <TableCell className="text-right">{formatCurrency(totalLiabilities)}</TableCell>
+                  </TableRow>
+
+                  <TableRow className="font-semibold bg-gray-50 dark:bg-gray-800">
+                    <TableCell>Equity</TableCell>
+                    <TableCell></TableCell>
+                  </TableRow>
+                  {equityAccounts.map(account => (
+                    <TableRow key={account.id}>
+                      <TableCell className="pl-8">{account.name}</TableCell>
+                      <TableCell className="text-right">{formatCurrency(account.balance)}</TableCell>
+                    </TableRow>
+                  ))}
+                  <TableRow>
+                    <TableCell className="pl-8">Net Income</TableCell>
+                    <TableCell className="text-right">{formatCurrency(netIncome)}</TableCell>
+                  </TableRow>
+                  <TableRow className="font-semibold">
+                    <TableCell>Total Equity</TableCell>
+                    <TableCell className="text-right">{formatCurrency(totalEquity)}</TableCell>
+                  </TableRow>
+                </TableBody>
+                <TableFooter>
+                  <TableRow className="text-lg font-bold bg-gray-100 dark:bg-gray-700">
+                    <TableCell>Total Liabilities & Equity</TableCell>
+                    <TableCell className="text-right">{formatCurrency(totalLiabilitiesAndEquity)}</TableCell>
+                  </TableRow>
+                </TableFooter>
+              </Table>
+            </div>
+          </div>
         </CardContent>
       </Card>
     </div>
