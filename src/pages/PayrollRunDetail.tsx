@@ -16,8 +16,9 @@ import { Employee } from './Employees';
 import { Account } from './ChartOfAccounts';
 import { useAuth } from '../contexts/AuthContext';
 import { formatCurrency } from '../lib/utils';
+import PayslipDialog from '../components/PayslipDialog';
 
-type Payslip = {
+export type Payslip = {
   id: string;
   basic_salary: number;
   total_earnings: number;
@@ -32,6 +33,9 @@ const PayrollRunDetail = () => {
   const queryClient = useQueryClient();
   const [wageAccountId, setWageAccountId] = useState('');
   const [bankAccountId, setBankAccountId] = useState('');
+  const [liabilityAccountId, setLiabilityAccountId] = useState('');
+  const [isPayslipDialogOpen, setIsPayslipDialogOpen] = useState(false);
+  const [selectedPayslipId, setSelectedPayslipId] = useState<string | null>(null);
 
   const { data: run, isLoading: isLoadingRun } = useQuery({
     queryKey: ['payroll_run', id],
@@ -54,6 +58,12 @@ const PayrollRunDetail = () => {
   const { data: accounts } = useQuery<Account[]>({ queryKey: ['accounts'] });
   const expenseAccounts = accounts?.filter(a => a.type === 'Expense');
   const assetAccounts = accounts?.filter(a => a.type === 'Asset');
+  const liabilityAccounts = accounts?.filter(a => a.type === 'Liability');
+
+  const handleEditPayslip = (payslipId: string) => {
+    setSelectedPayslipId(payslipId);
+    setIsPayslipDialogOpen(true);
+  };
 
   const generatePayslipsMutation = useMutation({
     mutationFn: async () => {
@@ -97,6 +107,7 @@ const PayrollRunDetail = () => {
       
       const totalNetPay = payslips.reduce((sum, p) => sum + p.net_pay, 0);
       const totalWages = payslips.reduce((sum, p) => sum + p.total_earnings, 0);
+      const totalDeductions = payslips.reduce((sum, p) => sum + p.total_deductions, 0);
 
       const { data: entry, error: entryError } = await supabase.from('journal_entries').insert({
         user_id: user.id,
@@ -109,6 +120,10 @@ const PayrollRunDetail = () => {
         { journal_entry_id: entry.id, account_id: wageAccountId, type: 'debit', amount: totalWages },
         { journal_entry_id: entry.id, account_id: bankAccountId, type: 'credit', amount: totalNetPay },
       ];
+      if (totalDeductions > 0) {
+        journalItems.push({ journal_entry_id: entry.id, account_id: liabilityAccountId, type: 'credit', amount: totalDeductions });
+      }
+
       const { error: itemsError } = await supabase.from('journal_entry_items').insert(journalItems);
       if (itemsError) throw itemsError;
 
@@ -123,114 +138,130 @@ const PayrollRunDetail = () => {
     onError: (error: any) => showError(error.message),
   });
 
+  const totalEarnings = payslips?.reduce((sum, p) => sum + p.total_earnings, 0) || 0;
+  const totalDeductions = payslips?.reduce((sum, p) => sum + p.total_deductions, 0) || 0;
   const totalNetPay = payslips?.reduce((sum, p) => sum + p.net_pay, 0) || 0;
 
   if (isLoadingRun) return <Skeleton className="h-96 w-full" />;
 
   return (
-    <div className="space-y-6">
-      <Card>
-        <CardHeader>
-          <div className="flex justify-between items-start">
-            <div>
-              <CardTitle>Payroll Run</CardTitle>
-              <CardDescription>
-                {format(new Date(run.pay_period_start), 'PPP')} - {format(new Date(run.pay_period_end), 'PPP')}
-              </CardDescription>
-            </div>
-            <Badge variant="outline" className="capitalize text-lg">{run.status}</Badge>
-          </div>
-        </CardHeader>
-      </Card>
-
-      {run.status === 'draft' && (!payslips || payslips.length === 0) && (
-        <Card className="text-center p-8">
-          <CardHeader>
-            <CardTitle>Ready to Generate Payslips?</CardTitle>
-            <CardDescription>This will create payslips for all employees with salary information for this period.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Button size="lg" onClick={() => generatePayslipsMutation.mutate()} disabled={generatePayslipsMutation.isPending}>
-              {generatePayslipsMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <PlayCircle className="mr-2 h-4 w-4" />}
-              Generate Payslips
-            </Button>
-          </CardContent>
-        </Card>
-      )}
-
-      {payslips && payslips.length > 0 && (
-        <Card>
-          <CardHeader><CardTitle>Payslips</CardTitle></CardHeader>
-          <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Employee</TableHead>
-                  <TableHead className="text-right">Gross Pay</TableHead>
-                  <TableHead className="text-right">Deductions</TableHead>
-                  <TableHead className="text-right">Net Pay</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {isLoadingPayslips ? <TableRow><TableCell colSpan={4}><Skeleton className="h-8 w-full" /></TableCell></TableRow> :
-                  payslips.map(p => (
-                    <TableRow key={p.id}>
-                      <TableCell>{p.employees.first_name} {p.employees.last_name}</TableCell>
-                      <TableCell className="text-right font-mono">{formatCurrency(p.total_earnings)}</TableCell>
-                      <TableCell className="text-right font-mono">{formatCurrency(p.total_deductions)}</TableCell>
-                      <TableCell className="text-right font-mono">{formatCurrency(p.net_pay)}</TableCell>
-                    </TableRow>
-                  ))
-                }
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
-      )}
-
-      {run.status === 'draft' && payslips && payslips.length > 0 && (
+    <>
+      <div className="space-y-6">
         <Card>
           <CardHeader>
-            <CardTitle>Finalize Run & Post Journal Entry</CardTitle>
-            <CardDescription>Select accounts and post the payroll transaction to your general ledger.</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid md:grid-cols-2 gap-4">
-              <Select value={wageAccountId} onValueChange={setWageAccountId}>
-                <SelectTrigger><SelectValue placeholder="Select Wages/Salary Expense Account..." /></SelectTrigger>
-                <SelectContent>{expenseAccounts?.map(a => <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>)}</SelectContent>
-              </Select>
-              <Select value={bankAccountId} onValueChange={setBankAccountId}>
-                <SelectTrigger><SelectValue placeholder="Select Bank/Cash Account..." /></SelectTrigger>
-                <SelectContent>{assetAccounts?.map(a => <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>)}</SelectContent>
-              </Select>
+            <div className="flex justify-between items-start">
+              <div>
+                <CardTitle>Payroll Run</CardTitle>
+                <CardDescription>
+                  {format(new Date(run.pay_period_start), 'PPP')} - {format(new Date(run.pay_period_end), 'PPP')}
+                </CardDescription>
+              </div>
+              <Badge variant="outline" className="capitalize text-lg">{run.status}</Badge>
             </div>
-            <Alert>
-              <AlertCircle className="h-4 w-4" />
-              <AlertTitle>Journal Entry Preview</AlertTitle>
-              <AlertDescription>
-                <p>Debit <strong>{accounts?.find(a => a.id === wageAccountId)?.name || 'Wages Expense'}</strong>: {formatCurrency(totalNetPay)}</p>
-                <p>Credit <strong>{accounts?.find(a => a.id === bankAccountId)?.name || 'Bank Account'}</strong>: {formatCurrency(totalNetPay)}</p>
-              </AlertDescription>
-            </Alert>
-            <Button onClick={() => finalizeRunMutation.mutate()} disabled={!wageAccountId || !bankAccountId || finalizeRunMutation.isPending}>
-              {finalizeRunMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CheckCircle className="mr-2 h-4 w-4" />}
-              Finalize & Post
-            </Button>
-          </CardContent>
+          </CardHeader>
         </Card>
-      )}
 
-      {run.status === 'processed' && (
-        <Alert variant="default" className="bg-green-50 border-green-200 dark:bg-green-950 dark:border-green-800">
-          <CheckCircle className="h-4 w-4 text-green-600" />
-          <AlertTitle className="text-green-800 dark:text-green-300">Payroll Run Complete</AlertTitle>
-          <AlertDescription className="text-green-700 dark:text-green-400">
-            This payroll run has been processed and the corresponding journal entry has been posted.
-          </AlertDescription>
-        </Alert>
+        {run.status === 'draft' && (!payslips || payslips.length === 0) && (
+          <Card className="text-center p-8">
+            <CardHeader>
+              <CardTitle>Ready to Generate Payslips?</CardTitle>
+              <CardDescription>This will create payslips for all employees with salary information for this period.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Button size="lg" onClick={() => generatePayslipsMutation.mutate()} disabled={generatePayslipsMutation.isPending}>
+                {generatePayslipsMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <PlayCircle className="mr-2 h-4 w-4" />}
+                Generate Payslips
+              </Button>
+            </CardContent>
+          </Card>
+        )}
+
+        {payslips && payslips.length > 0 && (
+          <Card>
+            <CardHeader><CardTitle>Payslips</CardTitle></CardHeader>
+            <CardContent>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Employee</TableHead>
+                    <TableHead className="text-right">Gross Pay</TableHead>
+                    <TableHead className="text-right">Deductions</TableHead>
+                    <TableHead className="text-right">Net Pay</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {isLoadingPayslips ? <TableRow><TableCell colSpan={4}><Skeleton className="h-8 w-full" /></TableCell></TableRow> :
+                    payslips.map(p => (
+                      <TableRow key={p.id} onClick={() => handleEditPayslip(p.id)} className="cursor-pointer hover:bg-muted/50">
+                        <TableCell>{p.employees.first_name} {p.employees.last_name}</TableCell>
+                        <TableCell className="text-right font-mono">{formatCurrency(p.total_earnings)}</TableCell>
+                        <TableCell className="text-right font-mono">{formatCurrency(p.total_deductions)}</TableCell>
+                        <TableCell className="text-right font-mono">{formatCurrency(p.net_pay)}</TableCell>
+                      </TableRow>
+                    ))
+                  }
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        )}
+
+        {run.status === 'draft' && payslips && payslips.length > 0 && (
+          <Card>
+            <CardHeader>
+              <CardTitle>Finalize Run & Post Journal Entry</CardTitle>
+              <CardDescription>Select accounts and post the payroll transaction to your general ledger.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid md:grid-cols-3 gap-4">
+                <Select value={wageAccountId} onValueChange={setWageAccountId}>
+                  <SelectTrigger><SelectValue placeholder="Select Wages/Salary Expense Account..." /></SelectTrigger>
+                  <SelectContent>{expenseAccounts?.map(a => <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>)}</SelectContent>
+                </Select>
+                <Select value={bankAccountId} onValueChange={setBankAccountId}>
+                  <SelectTrigger><SelectValue placeholder="Select Bank/Cash Account..." /></SelectTrigger>
+                  <SelectContent>{assetAccounts?.map(a => <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>)}</SelectContent>
+                </Select>
+                <Select value={liabilityAccountId} onValueChange={setLiabilityAccountId} disabled={totalDeductions === 0}>
+                  <SelectTrigger><SelectValue placeholder="Select Payroll Liability Account..." /></SelectTrigger>
+                  <SelectContent>{liabilityAccounts?.map(a => <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>)}</SelectContent>
+                </Select>
+              </div>
+              <Alert>
+                <AlertCircle className="h-4 w-4" />
+                <AlertTitle>Journal Entry Preview</AlertTitle>
+                <AlertDescription>
+                  <p>Debit <strong>{accounts?.find(a => a.id === wageAccountId)?.name || 'Wages Expense'}</strong>: {formatCurrency(totalEarnings)}</p>
+                  <p>Credit <strong>{accounts?.find(a => a.id === bankAccountId)?.name || 'Bank Account'}</strong>: {formatCurrency(totalNetPay)}</p>
+                  {totalDeductions > 0 && <p>Credit <strong>{accounts?.find(a => a.id === liabilityAccountId)?.name || 'Payroll Liabilities'}</strong>: {formatCurrency(totalDeductions)}</p>}
+                </AlertDescription>
+              </Alert>
+              <Button onClick={() => finalizeRunMutation.mutate()} disabled={!wageAccountId || !bankAccountId || (totalDeductions > 0 && !liabilityAccountId) || finalizeRunMutation.isPending}>
+                {finalizeRunMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CheckCircle className="mr-2 h-4 w-4" />}
+                Finalize & Post
+              </Button>
+            </CardContent>
+          </Card>
+        )}
+
+        {run.status === 'processed' && (
+          <Alert variant="default" className="bg-green-50 border-green-200 dark:bg-green-950 dark:border-green-800">
+            <CheckCircle className="h-4 w-4 text-green-600" />
+            <AlertTitle className="text-green-800 dark:text-green-300">Payroll Run Complete</AlertTitle>
+            <AlertDescription className="text-green-700 dark:text-green-400">
+              This payroll run has been processed and the corresponding journal entry has been posted.
+            </AlertDescription>
+          </Alert>
+        )}
+      </div>
+      {selectedPayslipId && (
+        <PayslipDialog
+          isOpen={isPayslipDialogOpen}
+          setIsOpen={setIsPayslipDialogOpen}
+          payslipId={selectedPayslipId}
+        />
       )}
-    </div>
+    </>
   );
 };
 
