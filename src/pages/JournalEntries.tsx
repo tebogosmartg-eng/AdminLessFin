@@ -11,7 +11,7 @@ import {
   TableRow,
 } from '../components/ui/table';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
-import { PlusCircle, MoreHorizontal } from 'lucide-react';
+import { PlusCircle, MoreHorizontal, Paperclip } from 'lucide-react';
 import JournalEntryForm from '../components/JournalEntryForm';
 import JournalEntryDetail from '../components/JournalEntryDetail';
 import {
@@ -26,6 +26,7 @@ type JournalEntry = {
   id: string;
   entry_date: string;
   description: string | null;
+  attachment_url: string | null;
   journal_entry_items: {
     type: 'debit' | 'credit';
     amount: number;
@@ -45,6 +46,7 @@ const JournalEntries = () => {
         id,
         entry_date,
         description,
+        attachment_url,
         journal_entry_items (
           type,
           amount
@@ -125,7 +127,10 @@ const JournalEntries = () => {
                 entries.map((entry) => (
                   <TableRow key={entry.id}>
                     <TableCell>{new Date(entry.entry_date).toLocaleDateString()}</TableCell>
-                    <TableCell>{entry.description}</TableCell>
+                    <TableCell>
+                      {entry.description}
+                      {entry.attachment_url && <Paperclip className="inline-block h-4 w-4 ml-2 text-gray-400" />}
+                    </TableCell>
                     <TableCell className="text-right">${calculateTotal(entry.journal_entry_items).toFixed(2)}</TableCell>
                     <TableCell>
                       <DropdownMenu>

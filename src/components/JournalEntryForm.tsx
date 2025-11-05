@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -66,6 +66,8 @@ const JournalEntryForm = ({ isOpen, setIsOpen, entryId }: JournalEntryFormProps)
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const isEditing = !!entryId;
+  const [attachmentFile, setAttachmentFile] = useState<File | null>(null);
+  const [existingAttachmentUrl, setExistingAttachmentUrl] = useState<string | null>(null);
 
   const form = useForm<JournalEntryFormValues>({
     resolver: zodResolver(journalEntrySchema),
@@ -84,7 +86,7 @@ const JournalEntryForm = ({ isOpen, setIsOpen, entryId }: JournalEntryFormProps)
     queryFn: async () => {
       const { data, error } = await supabase
         .from('journal_entries')
-        .select('entry_date, description, journal_entry_items(account_id, type, amount)')
+        .select('entry_date, description, attachment_url, journal_entry_items(account_id, type, amount)')
         .eq('id', entryId)
         .single();
       if (error) throw new Error(error.message);
@@ -100,6 +102,7 @@ const JournalEntryForm = ({ isOpen, setIsOpen, entryId }: JournalEntryFormProps)
         description: entryToEdit.description || '',
         items: entryToEdit.journal_entry_items,
       });
+      setExistingAttachmentUrl(entryToEdit.attachment_url);
     } else if (!isEditing) {
       form.reset({
         entry_date: new Date().toISOString().split('T')[0],
@@ -109,7 +112,9 @@ const JournalEntryForm = ({ isOpen, setIsOpen, entryId }: JournalEntryFormProps)
           { account_id: '', type: 'credit', amount: 0 },
         ],
       });
+      setExistingAttachmentUrl(null);
     }
+    setAttachmentFile(null);
   }, [entryToEdit, isEditing, isOpen, form]);
 
   const { fields, append, remove } = useFieldArray({
@@ -130,17 +135,37 @@ const JournalEntryForm = ({ isOpen, setIsOpen, entryId }: JournalEntryFormProps)
     mutationFn: async (values: JournalEntryFormValues) => {
       if (!user) throw new Error('User not authenticated');
       
+      let entryIdToUpdate = entryId;
+      let attachmentUrl: string | null = existingAttachmentUrl;
+
+      // Handle file upload
+      if (attachmentFile) {
+        const fileExt = attachmentFile.name.split('.').pop();
+        const fileName = `${Date.now()}.${fileExt}`;
+        const filePath = `${user.id}/${entryIdToUpdate || 'new'}/${fileName}`;
+        
+        const { error: uploadError } = await supabase.storage
+          .from('attachments')
+          .upload(filePath, attachmentFile);
+
+        if (uploadError) throw new Error(`Storage Error: ${uploadError.message}`);
+        
+        const { data: urlData } = supabase.storage.from('attachments').getPublicUrl(filePath);
+        attachmentUrl = urlData.publicUrl;
+      }
+
       if (isEditing) {
         const { error: updateError } = await supabase.from('journal_entries').update({
           entry_date: values.entry_date,
           description: values.description,
-        }).eq('id', entryId);
+          attachment_url: attachmentUrl,
+        }).eq('id', entryIdToUpdate!);
         if (updateError) throw updateError;
 
-        const { error: deleteError } = await supabase.from('journal_entry_items').delete().eq('journal_entry_id', entryId);
+        const { error: deleteError } = await supabase.from('journal_entry_items').delete().eq('journal_entry_id', entryIdToUpdate!);
         if (deleteError) throw deleteError;
 
-        const itemsToInsert = values.items.map(item => ({ ...item, journal_entry_id: entryId }));
+        const itemsToInsert = values.items.map(item => ({ ...item, journal_entry_id: entryIdToUpdate }));
         const { error: insertError } = await supabase.from('journal_entry_items').insert(itemsToInsert);
         if (insertError) throw insertError;
       } else {
@@ -148,6 +173,7 @@ const JournalEntryForm = ({ isOpen, setIsOpen, entryId }: JournalEntryFormProps)
           user_id: user.id,
           entry_date: values.entry_date,
           description: values.description,
+          attachment_url: attachmentUrl,
         }).select('id').single();
         if (entryError) throw entryError;
 
@@ -216,6 +242,18 @@ const JournalEntryForm = ({ isOpen, setIsOpen, entryId }: JournalEntryFormProps)
               <span>Total Debits: ${debits.toFixed(2)}</span>
               <span>Total Credits: ${credits.toFixed(2)}</span>
             </div>
+
+            <FormItem>
+              <FormLabel>Attachment (Optional)</FormLabel>
+              <FormControl>
+                <Input type="file" onChange={(e) => setAttachmentFile(e.target.files?.[0] || null)} />
+              </FormControl>
+              {existingAttachmentUrl && !attachmentFile && (
+                <p className="text-sm text-gray-500 mt-1">
+                  Current file: <a href={existingAttachmentUrl} target="_blank" rel="noopener noreferrer" className="underline">View</a>. Upload a new file to replace it.
+                </p>
+              )}
+            </FormItem>
 
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setIsOpen(false)}>Cancel</Button>

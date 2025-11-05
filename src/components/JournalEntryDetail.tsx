@@ -16,6 +16,8 @@ import {
   TableRow,
 } from './ui/table';
 import { Skeleton } from './ui/skeleton';
+import { Button } from './ui/button';
+import { Paperclip } from 'lucide-react';
 
 type JournalEntryDetailProps = {
   entryId: string | null;
@@ -27,6 +29,7 @@ type EntryDetail = {
   id: string;
   entry_date: string;
   description: string | null;
+  attachment_url: string | null;
   journal_entry_items: {
     type: 'debit' | 'credit';
     amount: number;
@@ -44,6 +47,7 @@ const JournalEntryDetail = ({ entryId, isOpen, setIsOpen }: JournalEntryDetailPr
         id,
         entry_date,
         description,
+        attachment_url,
         journal_entry_items (
           type,
           amount,
@@ -78,11 +82,24 @@ const JournalEntryDetail = ({ entryId, isOpen, setIsOpen }: JournalEntryDetailPr
             <Skeleton className="h-20 w-full" />
           </div>
         ) : entry && (
-          <div className="mt-4">
+          <div className="mt-4 space-y-4">
             <p className="text-sm text-gray-600 dark:text-gray-400">
               <span className="font-semibold text-gray-800 dark:text-gray-200">Description:</span> {entry.description || 'N/A'}
             </p>
-            <Table className="mt-4">
+            
+            {entry.attachment_url && (
+              <div>
+                <h4 className="text-sm font-semibold text-gray-800 dark:text-gray-200 mb-1">Attachment</h4>
+                <Button asChild variant="outline" size="sm">
+                  <a href={entry.attachment_url} target="_blank" rel="noopener noreferrer">
+                    <Paperclip className="mr-2 h-4 w-4" />
+                    View Attachment
+                  </a>
+                </Button>
+              </div>
+            )}
+
+            <Table>
               <TableHeader>
                 <TableRow>
                   <TableHead>Account</TableHead>
