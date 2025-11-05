@@ -15,6 +15,7 @@ import { PlusCircle } from 'lucide-react';
 import NewPayrollRunDialog from '../components/NewPayrollRunDialog';
 import { Badge } from '../components/ui/badge';
 import { format } from 'date-fns';
+import { useNavigate } from 'react-router-dom';
 
 type PayrollRun = {
   id: string;
@@ -26,6 +27,7 @@ type PayrollRun = {
 
 const PayrollRuns = () => {
   const [isFormOpen, setIsFormOpen] = useState(false);
+  const navigate = useNavigate();
 
   const { data: payrollRuns, isLoading } = useQuery<PayrollRun[]>({
     queryKey: ['payroll_runs'],
@@ -80,7 +82,7 @@ const PayrollRuns = () => {
                       <Badge variant="outline" className="capitalize">{run.status}</Badge>
                     </TableCell>
                     <TableCell>
-                      <Button variant="outline" size="sm">View</Button>
+                      <Button variant="outline" size="sm" onClick={() => navigate(`/payroll-runs/${run.id}`)}>View</Button>
                     </TableCell>
                   </TableRow>
                 ))
