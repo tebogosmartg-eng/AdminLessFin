@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../integrations/supabase/client';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from '../components/ui/table';
 import { Skeleton } from '../components/ui/skeleton';
 import { Button } from '../components/ui/button';
@@ -10,6 +10,7 @@ import { Printer, Send, HandCoins, Ban } from 'lucide-react';
 import { Badge } from '../components/ui/badge';
 import { showError, showSuccess } from '../utils/toast';
 import InvoicePaymentForm from '../components/InvoicePaymentForm';
+import { useAuth } from '../contexts/AuthContext';
 
 type InvoiceDetailData = {
   id: string;
@@ -35,6 +36,7 @@ type InvoiceDetailData = {
 
 const InvoiceDetail = () => {
   const { id } = useParams();
+  const { profile } = useAuth();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [isPaymentFormOpen, setIsPaymentFormOpen] = useState(false);
@@ -129,8 +131,8 @@ const InvoiceDetail = () => {
         <Card className="print:shadow-none print:border-none">
           <CardHeader className="grid grid-cols-2 gap-4">
             <div>
-              <CardTitle>SmaAcc Inc.</CardTitle>
-              <CardDescription>123 Accounting Lane, Finance City</CardDescription>
+              <CardTitle>{profile?.company_name || 'Your Company'}</CardTitle>
+              <p className="text-sm text-muted-foreground">{profile?.company_address || 'Your Company Address'}</p>
             </div>
             <div className="text-right">
               <p className="text-3xl font-bold tracking-tight">INVOICE</p>

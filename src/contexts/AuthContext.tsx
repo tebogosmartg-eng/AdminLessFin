@@ -6,6 +6,8 @@ type Profile = {
   full_name: string;
   avatar_url: string;
   role: string;
+  company_name: string | null;
+  company_address: string | null;
 };
 
 type AuthContextType = {
