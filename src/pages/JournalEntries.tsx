@@ -13,6 +13,7 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { PlusCircle } from 'lucide-react';
 import JournalEntryForm from '../components/JournalEntryForm';
+import JournalEntryDetail from '../components/JournalEntryDetail';
 
 type JournalEntry = {
   id: string;
@@ -26,6 +27,7 @@ type JournalEntry = {
 
 const JournalEntries = () => {
   const [isFormOpen, setIsFormOpen] = useState(false);
+  const [selectedEntryId, setSelectedEntryId] = useState<string | null>(null);
 
   const fetchJournalEntries = async () => {
     const { data, error } = await supabase
@@ -81,7 +83,11 @@ const JournalEntries = () => {
                 </TableRow>
               ) : entries && entries.length > 0 ? (
                 entries.map((entry) => (
-                  <TableRow key={entry.id}>
+                  <TableRow 
+                    key={entry.id} 
+                    onClick={() => setSelectedEntryId(entry.id)}
+                    className="cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800"
+                  >
                     <TableCell>{new Date(entry.entry_date).toLocaleDateString()}</TableCell>
                     <TableCell>{entry.description}</TableCell>
                     <TableCell className="text-right">${calculateTotal(entry.journal_entry_items).toFixed(2)}</TableCell>
@@ -97,6 +103,11 @@ const JournalEntries = () => {
         </CardContent>
       </Card>
       <JournalEntryForm isOpen={isFormOpen} setIsOpen={setIsFormOpen} />
+      <JournalEntryDetail 
+        entryId={selectedEntryId} 
+        isOpen={!!selectedEntryId} 
+        setIsOpen={() => setSelectedEntryId(null)} 
+      />
     </>
   );
 };
