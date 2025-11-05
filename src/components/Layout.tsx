@@ -23,8 +23,8 @@ const Layout = () => {
   }
 
   return (
-    <div className="flex min-h-screen w-full bg-gray-100 dark:bg-gray-900">
-      <aside className="w-64 flex-shrink-0 border-r bg-white dark:bg-gray-800 p-4 flex flex-col">
+    <div className="flex min-h-screen w-full bg-gray-100 dark:bg-gray-900 print:bg-white">
+      <aside className="w-64 flex-shrink-0 border-r bg-white dark:bg-gray-800 p-4 flex flex-col print:hidden">
         <h1 className="text-2xl font-bold mb-8 text-gray-900 dark:text-white">SmaAcc</h1>
         <SidebarNav />
         <div className="mt-auto">
@@ -39,7 +39,7 @@ const Layout = () => {
         </div>
       </aside>
       <div className="flex-1 flex flex-col">
-        <header className="flex h-16 items-center justify-end gap-4 border-b bg-white dark:bg-gray-800 px-6">
+        <header className="flex h-16 items-center justify-end gap-4 border-b bg-white dark:bg-gray-800 px-6 print:hidden">
           <ThemeToggle />
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -76,7 +76,7 @@ const Layout = () => {
             </DropdownMenuContent>
           </DropdownMenu>
         </header>
-        <main className="flex-1 p-6">
+        <main className="flex-1 p-6 print:p-0">
           <Outlet />
         </main>
       </div>

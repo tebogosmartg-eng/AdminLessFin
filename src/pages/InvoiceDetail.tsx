@@ -99,13 +99,13 @@ const InvoiceDetail = () => {
 
   return (
     <>
-      <div className="max-w-4xl mx-auto p-4 sm:p-6 lg:p-8 bg-background">
-        <div className="flex justify-between items-start mb-6">
+      <div className="max-w-4xl mx-auto p-4 sm:p-6 lg:p-8 bg-background print:max-w-none print:p-8 print:mx-0 print:bg-white">
+        <div className="flex justify-between items-start mb-6 print:hidden">
           <div>
             <h1 className="text-3xl font-bold">Invoice {invoice.invoice_number}</h1>
             <Badge className="mt-2 capitalize">{invoice.status}</Badge>
           </div>
-          <div className="flex gap-2 print:hidden">
+          <div className="flex gap-2">
             {invoice.status === 'draft' && (
               <Button onClick={() => setIsSendDialogOpen(true)}>
                 <Send className="mr-2 h-4 w-4" /> Send Invoice
