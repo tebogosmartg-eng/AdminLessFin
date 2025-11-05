@@ -17,6 +17,7 @@ import { Vendor } from '../pages/Vendors';
 import { Product } from '../pages/Products';
 import { Trash2 } from 'lucide-react';
 import { Alert, AlertDescription } from './ui/alert';
+import { addDays, format } from 'date-fns';
 
 const billItemSchema = z.object({
   product_id: z.string().optional(),
@@ -26,7 +27,8 @@ const billItemSchema = z.object({
 });
 
 const billSchema = z.object({
-  entry_date: z.string().min(1, "Date is required."),
+  bill_date: z.string().min(1, "Date is required."),
+  due_date: z.string().min(1, "Due date is required."),
   vendor_id: z.string().min(1, "Vendor is required."),
   accounts_payable_id: z.string().min(1, "Accounts Payable account is required."),
   description: z.string().optional(),
@@ -46,7 +48,8 @@ const BillForm = ({ isOpen, setIsOpen }: BillFormProps) => {
   const form = useForm<BillFormValues>({
     resolver: zodResolver(billSchema),
     defaultValues: {
-      entry_date: new Date().toISOString().split('T')[0],
+      bill_date: format(new Date(), 'yyyy-MM-dd'),
+      due_date: format(addDays(new Date(), 30), 'yyyy-MM-dd'),
       vendor_id: '',
       accounts_payable_id: '',
       description: '',
@@ -57,7 +60,8 @@ const BillForm = ({ isOpen, setIsOpen }: BillFormProps) => {
   useEffect(() => {
     if (!isOpen) {
       form.reset({
-        entry_date: new Date().toISOString().split('T')[0],
+        bill_date: format(new Date(), 'yyyy-MM-dd'),
+        due_date: format(addDays(new Date(), 30), 'yyyy-MM-dd'),
         vendor_id: '',
         accounts_payable_id: '',
         description: '',
@@ -109,7 +113,7 @@ const BillForm = ({ isOpen, setIsOpen }: BillFormProps) => {
         .from('journal_entries')
         .insert({
           user_id: user.id,
-          entry_date: values.entry_date,
+          entry_date: values.bill_date,
           description,
           vendor_id: values.vendor_id,
         })
@@ -119,14 +123,7 @@ const BillForm = ({ isOpen, setIsOpen }: BillFormProps) => {
       if (entryError) throw entryError;
 
       const journalItems = [
-        // Credit Accounts Payable
-        {
-          journal_entry_id: entry.id,
-          account_id: values.accounts_payable_id,
-          type: 'credit',
-          amount: totalAmount,
-        },
-        // Debit each expense account
+        { journal_entry_id: entry.id, account_id: values.accounts_payable_id, type: 'credit', amount: totalAmount },
         ...values.items.map(item => ({
           journal_entry_id: entry.id,
           account_id: item.expense_account_id,
@@ -137,6 +134,16 @@ const BillForm = ({ isOpen, setIsOpen }: BillFormProps) => {
 
       const { error: itemsError } = await supabase.from('journal_entry_items').insert(journalItems);
       if (itemsError) throw itemsError;
+
+      const { error: billError } = await supabase.from('bills').insert({
+        user_id: user.id,
+        vendor_id: values.vendor_id,
+        journal_entry_id: entry.id,
+        bill_date: values.bill_date,
+        due_date: values.due_date,
+        status: 'open',
+      });
+      if (billError) throw billError;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['bills'] });
@@ -156,7 +163,7 @@ const BillForm = ({ isOpen, setIsOpen }: BillFormProps) => {
       <DialogContent className="sm:max-w-3xl">
         <DialogHeader>
           <DialogTitle>Record New Bill</DialogTitle>
-          <DialogDescription>This will create a new journal entry for the expense.</DialogDescription>
+          <DialogDescription>This will create a new bill and its corresponding journal entry.</DialogDescription>
         </DialogHeader>
         {!apAccounts?.some(acc => acc.name.toLowerCase().includes('accounts payable')) && (
             <Alert variant="destructive">
@@ -167,15 +174,18 @@ const BillForm = ({ isOpen, setIsOpen }: BillFormProps) => {
         )}
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-            <div className="grid grid-cols-3 gap-4">
-              <FormField control={form.control} name="entry_date" render={({ field }) => (
-                <FormItem><FormLabel>Date</FormLabel><FormControl><Input type="date" {...field} /></FormControl><FormMessage /></FormItem>
-              )} />
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <FormField control={form.control} name="vendor_id" render={({ field }) => (
                 <FormItem><FormLabel>Vendor</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select vendor" /></SelectTrigger></FormControl><SelectContent>{vendors?.map(v => <SelectItem key={v.id} value={v.id}>{v.name}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem>
               )} />
+              <FormField control={form.control} name="bill_date" render={({ field }) => (
+                <FormItem><FormLabel>Bill Date</FormLabel><FormControl><Input type="date" {...field} /></FormControl><FormMessage /></FormItem>
+              )} />
+              <FormField control={form.control} name="due_date" render={({ field }) => (
+                <FormItem><FormLabel>Due Date</FormLabel><FormControl><Input type="date" {...field} /></FormControl><FormMessage /></FormItem>
+              )} />
               <FormField control={form.control} name="accounts_payable_id" render={({ field }) => (
-                <FormItem><FormLabel>Credit Account</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select A/P Account" /></SelectTrigger></FormControl><SelectContent>{apAccounts?.map(acc => <SelectItem key={acc.id} value={acc.id}>{acc.name}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem>
+                <FormItem><FormLabel>Credit A/P</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select A/P Account" /></SelectTrigger></FormControl><SelectContent>{apAccounts?.map(acc => <SelectItem key={acc.id} value={acc.id}>{acc.name}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem>
               )} />
             </div>
             <FormField control={form.control} name="description" render={({ field }) => (

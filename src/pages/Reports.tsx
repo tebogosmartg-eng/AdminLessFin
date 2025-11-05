@@ -38,6 +38,17 @@ type AgedReceivable = {
   days_90_plus: number;
 };
 
+type AgedPayable = {
+  vendor_id: string;
+  vendor_name: string;
+  total_due: number;
+  current: number;
+  days_1_30: number;
+  days_31_60: number;
+  days_61_90: number;
+  days_90_plus: number;
+};
+
 const Reports = () => {
   const [date, setDate] = useState<DateRange | undefined>({
     from: startOfMonth(new Date()),
@@ -81,7 +92,16 @@ const Reports = () => {
     },
   });
 
-  const isLoading = isLoadingPointInTime || isLoadingPeriodActivity || isLoadingAgedReceivables;
+  const { data: agedPayables, isLoading: isLoadingAgedPayables } = useQuery<AgedPayable[]>({
+    queryKey: ['aged_payables'],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc('get_aged_payables');
+      if (error) throw new Error(error.message);
+      return data;
+    },
+  });
+
+  const isLoading = isLoadingPointInTime || isLoadingPeriodActivity || isLoadingAgedReceivables || isLoadingAgedPayables;
 
   const incomeAccounts = periodActivityAccounts?.filter(acc => acc.type === 'Income') || [];
   const expenseAccounts = periodActivityAccounts?.filter(acc => acc.type === 'Expense') || [];
@@ -156,6 +176,19 @@ const Reports = () => {
       Total: row.total_due.toFixed(2),
     })) || [];
     downloadCSV(data, `aged-receivables-${format(new Date(), 'yyyy-MM-dd')}.csv`);
+  };
+
+  const handleDownloadAgedPayables = () => {
+    const data = agedPayables?.map(row => ({
+      Vendor: row.vendor_name,
+      Current: row.current.toFixed(2),
+      '1-30 Days': row.days_1_30.toFixed(2),
+      '31-60 Days': row.days_31_60.toFixed(2),
+      '61-90 Days': row.days_61_90.toFixed(2),
+      '90+ Days': row.days_90_plus.toFixed(2),
+      Total: row.total_due.toFixed(2),
+    })) || [];
+    downloadCSV(data, `aged-payables-${format(new Date(), 'yyyy-MM-dd')}.csv`);
   };
 
   return (
@@ -337,6 +370,59 @@ const Reports = () => {
                 </Table>
               ) : (
                 <p className="text-center text-muted-foreground py-4">No outstanding receivables found.</p>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <div>
+                <CardTitle>Aged Payables Summary</CardTitle>
+                <CardDescription>Outstanding vendor balances by aging period as of today.</CardDescription>
+              </div>
+              <Button variant="outline" size="sm" onClick={handleDownloadAgedPayables}><Download className="mr-2 h-4 w-4" /> Download CSV</Button>
+            </CardHeader>
+            <CardContent>
+              {agedPayables && agedPayables.length > 0 ? (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Vendor</TableHead>
+                      <TableHead className="text-right">Current</TableHead>
+                      <TableHead className="text-right">1-30 Days</TableHead>
+                      <TableHead className="text-right">31-60 Days</TableHead>
+                      <TableHead className="text-right">61-90 Days</TableHead>
+                      <TableHead className="text-right">90+ Days</TableHead>
+                      <TableHead className="text-right">Total</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {agedPayables?.map(row => (
+                      <TableRow key={row.vendor_id}>
+                        <TableCell>{row.vendor_name}</TableCell>
+                        <TableCell className="text-right font-mono">{formatCurrency(row.current)}</TableCell>
+                        <TableCell className="text-right font-mono">{formatCurrency(row.days_1_30)}</TableCell>
+                        <TableCell className="text-right font-mono">{formatCurrency(row.days_31_60)}</TableCell>
+                        <TableCell className="text-right font-mono">{formatCurrency(row.days_61_90)}</TableCell>
+                        <TableCell className="text-right font-mono">{formatCurrency(row.days_90_plus)}</TableCell>
+                        <TableCell className="text-right font-mono font-bold">{formatCurrency(row.total_due)}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                  <TableFooter>
+                    <TableRow className="text-lg font-bold bg-gray-100 dark:bg-gray-700">
+                      <TableCell>Totals</TableCell>
+                      <TableCell className="text-right font-mono">{formatCurrency(agedPayables?.reduce((sum, r) => sum + r.current, 0) || 0)}</TableCell>
+                      <TableCell className="text-right font-mono">{formatCurrency(agedPayables?.reduce((sum, r) => sum + r.days_1_30, 0) || 0)}</TableCell>
+                      <TableCell className="text-right font-mono">{formatCurrency(agedPayables?.reduce((sum, r) => sum + r.days_31_60, 0) || 0)}</TableCell>
+                      <TableCell className="text-right font-mono">{formatCurrency(agedPayables?.reduce((sum, r) => sum + r.days_61_90, 0) || 0)}</TableCell>
+                      <TableCell className="text-right font-mono">{formatCurrency(agedPayables?.reduce((sum, r) => sum + r.days_90_plus, 0) || 0)}</TableCell>
+                      <TableCell className="text-right font-mono">{formatCurrency(agedPayables?.reduce((sum, r) => sum + r.total_due, 0) || 0)}</TableCell>
+                    </TableRow>
+                  </TableFooter>
+                </Table>
+              ) : (
+                <p className="text-center text-muted-foreground py-4">No outstanding payables found.</p>
               )}
             </CardContent>
           </Card>
