@@ -10,13 +10,20 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Badge } from '../components/ui/badge';
 import { Skeleton } from '../components/ui/skeleton';
 import { format } from 'date-fns';
-import { PlayCircle, Loader2, CheckCircle, AlertCircle } from 'lucide-react';
+import { PlayCircle, Loader2, CheckCircle, AlertCircle, MoreHorizontal } from 'lucide-react';
 import { showError, showSuccess } from '../utils/toast';
 import { Employee } from './Employees';
 import { Account } from './ChartOfAccounts';
 import { useAuth } from '../contexts/AuthContext';
 import { formatCurrency } from '../lib/utils';
 import PayslipDialog from '../components/PayslipDialog';
+import PayslipDetailDialog from '../components/PayslipDetailDialog';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "../components/ui/dropdown-menu";
 
 export type Payslip = {
   id: string;
@@ -36,6 +43,8 @@ const PayrollRunDetail = () => {
   const [liabilityAccountId, setLiabilityAccountId] = useState('');
   const [isPayslipDialogOpen, setIsPayslipDialogOpen] = useState(false);
   const [selectedPayslipId, setSelectedPayslipId] = useState<string | null>(null);
+  const [isPayslipDetailOpen, setIsPayslipDetailOpen] = useState(false);
+  const [selectedPayslipIdForDetail, setSelectedPayslipIdForDetail] = useState<string | null>(null);
 
   const { data: run, isLoading: isLoadingRun } = useQuery({
     queryKey: ['payroll_run', id],
@@ -63,6 +72,11 @@ const PayrollRunDetail = () => {
   const handleEditPayslip = (payslipId: string) => {
     setSelectedPayslipId(payslipId);
     setIsPayslipDialogOpen(true);
+  };
+
+  const handleViewPayslip = (payslipId: string) => {
+    setSelectedPayslipIdForDetail(payslipId);
+    setIsPayslipDetailOpen(true);
   };
 
   const generatePayslipsMutation = useMutation({
@@ -187,16 +201,28 @@ const PayrollRunDetail = () => {
                     <TableHead className="text-right">Gross Pay</TableHead>
                     <TableHead className="text-right">Deductions</TableHead>
                     <TableHead className="text-right">Net Pay</TableHead>
+                    <TableHead className="w-[50px]"></TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {isLoadingPayslips ? <TableRow><TableCell colSpan={4}><Skeleton className="h-8 w-full" /></TableCell></TableRow> :
+                  {isLoadingPayslips ? <TableRow><TableCell colSpan={5}><Skeleton className="h-8 w-full" /></TableCell></TableRow> :
                     payslips.map(p => (
-                      <TableRow key={p.id} onClick={() => handleEditPayslip(p.id)} className="cursor-pointer hover:bg-muted/50">
+                      <TableRow key={p.id}>
                         <TableCell>{p.employees.first_name} {p.employees.last_name}</TableCell>
                         <TableCell className="text-right font-mono">{formatCurrency(p.total_earnings)}</TableCell>
                         <TableCell className="text-right font-mono">{formatCurrency(p.total_deductions)}</TableCell>
                         <TableCell className="text-right font-mono">{formatCurrency(p.net_pay)}</TableCell>
+                        <TableCell>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild><Button variant="ghost" className="h-8 w-8 p-0"><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem onClick={() => handleViewPayslip(p.id)}>View</DropdownMenuItem>
+                              {run.status === 'draft' && (
+                                <DropdownMenuItem onClick={() => handleEditPayslip(p.id)}>Edit</DropdownMenuItem>
+                              )}
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </TableCell>
                       </TableRow>
                     ))
                   }
@@ -259,6 +285,13 @@ const PayrollRunDetail = () => {
           isOpen={isPayslipDialogOpen}
           setIsOpen={setIsPayslipDialogOpen}
           payslipId={selectedPayslipId}
+        />
+      )}
+      {selectedPayslipIdForDetail && (
+        <PayslipDetailDialog
+          isOpen={isPayslipDetailOpen}
+          setIsOpen={setIsPayslipDetailOpen}
+          payslipId={selectedPayslipIdForDetail}
         />
       )}
     </>
