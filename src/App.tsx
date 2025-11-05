@@ -10,6 +10,7 @@ import { AuthProvider } from "./contexts/AuthContext";
 import ProtectedRoute from "./components/ProtectedRoute";
 import ChartOfAccounts from "./pages/ChartOfAccounts";
 import JournalEntries from "./pages/JournalEntries";
+import Reports from "./pages/Reports";
 
 const queryClient = new QueryClient();
 
@@ -26,6 +27,7 @@ const App = () => (
               <Route path="/" element={<Dashboard />} />
               <Route path="/chart-of-accounts" element={<ChartOfAccounts />} />
               <Route path="/journal-entries" element={<JournalEntries />} />
+              <Route path="/reports" element={<Reports />} />
             </Route>
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
