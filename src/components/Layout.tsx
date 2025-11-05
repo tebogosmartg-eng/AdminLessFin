@@ -1,10 +1,11 @@
 import { NavLink, Outlet } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { Button } from './ui/button';
-import { Book, LayoutDashboard, LogOut, BookText, FileText, Settings, Library, Target, Repeat, User as UserIcon, Building2, Users, TrendingUp, Receipt, Banknote, HandCoins } from 'lucide-react';
+import { LogOut, Settings, User as UserIcon } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from './ui/dropdown-menu';
+import { SidebarNav } from './SidebarNav';
 
 const Layout = () => {
   const { signOut, profile } = useAuth();
@@ -24,60 +25,7 @@ const Layout = () => {
     <div className="flex min-h-screen w-full bg-gray-100 dark:bg-gray-900">
       <aside className="w-64 flex-shrink-0 border-r bg-white dark:bg-gray-800 p-4 flex flex-col">
         <h1 className="text-2xl font-bold mb-8 text-gray-900 dark:text-white">SmaAcc</h1>
-        <nav className="flex flex-col space-y-2 flex-grow">
-          <NavLink to="/" end className={navLinkClasses}>
-            <LayoutDashboard className="mr-3 h-5 w-5" />
-            Dashboard
-          </NavLink>
-          <NavLink to="/sales" className={navLinkClasses}>
-            <TrendingUp className="mr-3 h-5 w-5" />
-            Sales
-          </NavLink>
-          <NavLink to="/receive-payments" className={navLinkClasses}>
-            <HandCoins className="mr-3 h-5 w-5" />
-            Receive Payments
-          </NavLink>
-          <NavLink to="/bills" className={navLinkClasses}>
-            <Receipt className="mr-3 h-5 w-5" />
-            Bills
-          </NavLink>
-          <NavLink to="/pay-bills" className={navLinkClasses}>
-            <Banknote className="mr-3 h-5 w-5" />
-            Pay Bills
-          </NavLink>
-          <NavLink to="/chart-of-accounts" className={navLinkClasses}>
-            <Book className="mr-3 h-5 w-5" />
-            Chart of Accounts
-          </NavLink>
-          <NavLink to="/journal-entries" className={navLinkClasses}>
-            <BookText className="mr-3 h-5 w-5" />
-            Journal Entries
-          </NavLink>
-          <NavLink to="/recurring-entries" className={navLinkClasses}>
-            <Repeat className="mr-3 h-5 w-5" />
-            Recurring Entries
-          </NavLink>
-          <NavLink to="/general-ledger" className={navLinkClasses}>
-            <Library className="mr-3 h-5 w-5" />
-            General Ledger
-          </NavLink>
-           <NavLink to="/budgets" className={navLinkClasses}>
-            <Target className="mr-3 h-5 w-5" />
-            Budgets
-          </NavLink>
-          <NavLink to="/vendors" className={navLinkClasses}>
-            <Building2 className="mr-3 h-5 w-5" />
-            Vendors
-          </NavLink>
-          <NavLink to="/customers" className={navLinkClasses}>
-            <Users className="mr-3 h-5 w-5" />
-            Customers
-          </NavLink>
-          <NavLink to="/reports" className={navLinkClasses}>
-            <FileText className="mr-3 h-5 w-5" />
-            Reports
-          </NavLink>
-        </nav>
+        <SidebarNav />
         <div className="mt-auto">
            <NavLink to="/settings" className={navLinkClasses}>
              <Settings className="mr-3 h-5 w-5" />
