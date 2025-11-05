@@ -16,6 +16,7 @@ import GeneralLedger from "./pages/GeneralLedger";
 import Budgets from "./pages/Budgets";
 import RecurringEntries from "./pages/RecurringEntries";
 import Vendors from "./pages/Vendors";
+import Customers from "./pages/Customers";
 
 const queryClient = new QueryClient();
 
@@ -38,6 +39,7 @@ const App = () => (
               <Route path="/reports" element={<Reports />} />
               <Route path="/settings" element={<Settings />} />
               <Route path="/vendors" element={<Vendors />} />
+              <Route path="/customers" element={<Customers />} />
             </Route>
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
