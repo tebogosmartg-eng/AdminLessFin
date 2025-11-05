@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../co
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../integrations/supabase/client';
 import { Account } from './ChartOfAccounts';
-import { Landmark, TrendingUp, TrendingDown, Scale, Wallet } from 'lucide-react';
+import { Landmark, TrendingUp, TrendingDown, Wallet, DollarSign } from 'lucide-react';
 import { Skeleton } from '../components/ui/skeleton';
 import IncomeExpenseChart from '../components/IncomeExpenseChart';
 import { Link } from 'react-router-dom';
@@ -49,13 +49,27 @@ const Dashboard = () => {
   });
 
   const calculateTotals = (accounts: Account[] | undefined) => {
-    if (!accounts) return { assets: 0, liabilities: 0, equity: 0, netIncome: 0 };
+    if (!accounts) return { assets: 0, liabilities: 0, netIncome: 0, cash: 0 };
+    
+    const bankAccountKeywords = ['cash', 'bank', 'checking', 'savings'];
+
     const totals = accounts.reduce((acc, account) => {
       const type = account.type.toLowerCase() as keyof typeof acc;
       acc[type] = (acc[type] || 0) + account.balance;
+
+      if (account.type === 'Asset' && bankAccountKeywords.some(keyword => account.name.toLowerCase().includes(keyword))) {
+          acc.cash = (acc.cash || 0) + account.balance;
+      }
+
       return acc;
-    }, { asset: 0, liability: 0, equity: 0, income: 0, expense: 0 });
-    return { assets: totals.asset, liabilities: totals.liability, equity: totals.equity, netIncome: totals.income - totals.expense };
+    }, { asset: 0, liability: 0, equity: 0, income: 0, expense: 0, cash: 0 });
+
+    return { 
+        assets: totals.asset, 
+        liabilities: totals.liability, 
+        netIncome: totals.income - totals.expense,
+        cash: totals.cash
+    };
   };
 
   const totals = calculateTotals(accounts);
@@ -65,9 +79,9 @@ const Dashboard = () => {
   const formatCurrency = (amount: number) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount);
 
   const summaryCards = [
+    { title: 'Cash Balance', value: totals.cash, icon: DollarSign },
     { title: 'Total Assets', value: totals.assets, icon: Wallet },
     { title: 'Total Liabilities', value: totals.liabilities, icon: Landmark },
-    { title: 'Total Equity', value: totals.equity, icon: Scale },
     { title: 'Net Income', value: totals.netIncome, icon: totals.netIncome >= 0 ? TrendingUp : TrendingDown, color: totals.netIncome >= 0 ? 'text-green-600' : 'text-red-600' },
   ];
 
