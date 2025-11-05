@@ -69,6 +69,8 @@ export const SidebarNav = () => {
     { to: '/general-ledger', label: 'General Ledger', icon: Library },
     { to: '/reconciliation', label: 'Reconcile', icon: Scale },
     { to: '/loans', label: 'Loans', icon: Landmark },
+    { to: '/fixed-assets', label: 'Fixed Assets', icon: Building2 },
+    { to: '/asset-categories', label: 'Asset Categories', icon: Library },
     { to: '/import', label: 'Import Data', icon: Upload },
   ];
 

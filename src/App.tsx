@@ -32,6 +32,8 @@ import PayrollRunDetail from "./pages/PayrollRunDetail";
 import PayrollReports from "./pages/PayrollReports";
 import Loans from "./pages/Loans";
 import LoanDetail from "./pages/LoanDetail";
+import FixedAssets from "./pages/FixedAssets";
+import AssetCategories from "./pages/AssetCategories";
 
 const queryClient = new QueryClient();
 
@@ -70,6 +72,8 @@ const App = () => (
               <Route path="/payroll-reports" element={<PayrollReports />} />
               <Route path="/loans" element={<Loans />} />
               <Route path="/loans/:id" element={<LoanDetail />} />
+              <Route path="/fixed-assets" element={<FixedAssets />} />
+              <Route path="/asset-categories" element={<AssetCategories />} />
             </Route>
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
