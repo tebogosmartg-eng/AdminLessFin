@@ -23,6 +23,7 @@ import PayBills from "./pages/PayBills";
 import ReceivePayments from "./pages/ReceivePayments";
 import Products from "./pages/Products";
 import Reconciliation from "./pages/Reconciliation";
+import Import from "./pages/Import";
 
 const queryClient = new QueryClient();
 
@@ -52,6 +53,7 @@ const App = () => (
               <Route path="/vendors" element={<Vendors />} />
               <Route path="/customers" element={<Customers />} />
               <Route path="/products" element={<Products />} />
+              <Route path="/import" element={<Import />} />
             </Route>
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />

@@ -4,7 +4,7 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible"
-import { Book, LayoutDashboard, BookText, FileText, Library, Target, Repeat, Building2, Users, TrendingUp, Receipt, Banknote, HandCoins, ChevronRight, Package, Scale } from 'lucide-react';
+import { Book, LayoutDashboard, BookText, FileText, Library, Target, Repeat, Building2, Users, TrendingUp, Receipt, Banknote, HandCoins, ChevronRight, Package, Scale, Upload } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { Button } from './ui/button';
 
@@ -61,6 +61,7 @@ export const SidebarNav = () => {
     { to: '/recurring-entries', label: 'Recurring Entries', icon: Repeat },
     { to: '/general-ledger', label: 'General Ledger', icon: Library },
     { to: '/reconciliation', label: 'Reconcile', icon: Scale },
+    { to: '/import', label: 'Import Data', icon: Upload },
   ];
 
   const planningLinks = [
