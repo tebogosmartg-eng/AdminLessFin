@@ -1,0 +1,161 @@
+import { useState } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { supabase } from '../integrations/supabase/client';
+import { Button } from '../components/ui/button';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '../components/ui/table';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/card';
+import { PlusCircle, MoreHorizontal } from 'lucide-react';
+import { showError, showSuccess } from '../utils/toast';
+import ProductForm from '../components/ProductForm';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "../components/ui/dropdown-menu";
+
+export type Product = {
+  id: string;
+  name: string;
+  description: string | null;
+  price: number | null;
+  type: 'service' | 'inventory';
+  income_account_id: string | null;
+  expense_account_id: string | null;
+  income_account?: { name: string };
+  expense_account?: { name: string };
+};
+
+const Products = () => {
+  const [isFormOpen, setIsFormOpen] = useState(false);
+  const [selectedProduct, setSelectedProduct] = useState<Product | undefined>(undefined);
+  const queryClient = useQueryClient();
+
+  const fetchProducts = async () => {
+    const { data, error } = await supabase
+      .from('products')
+      .select(`
+        *,
+        income_account:income_account_id ( name ),
+        expense_account:expense_account_id ( name )
+      `)
+      .order('name', { ascending: true });
+    if (error) throw new Error(error.message);
+    return data;
+  };
+
+  const { data: products, isLoading } = useQuery<Product[]>({
+    queryKey: ['products'],
+    queryFn: fetchProducts,
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from('products').delete().eq('id', id);
+      if (error) throw new Error(error.message);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['products'] });
+      showSuccess('Item deleted successfully.');
+    },
+    onError: (error) => {
+      showError(`Error deleting item: ${error.message}`);
+    },
+  });
+
+  const handleEdit = (product: Product) => {
+    setSelectedProduct(product);
+    setIsFormOpen(true);
+  };
+
+  const handleAddNew = () => {
+    setSelectedProduct(undefined);
+    setIsFormOpen(true);
+  };
+  
+  const handleDelete = (id: string) => {
+    if (window.confirm('Are you sure you want to delete this item?')) {
+      deleteMutation.mutate(id);
+    }
+  };
+
+  const formatCurrency = (amount: number | null) => {
+    if (amount === null) return '';
+    return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount);
+  }
+
+  return (
+    <>
+      <Card>
+        <CardHeader>
+          <div className="flex flex-row items-center justify-between">
+            <div>
+              <CardTitle>Products and Services</CardTitle>
+              <CardDescription>Manage items you frequently buy or sell.</CardDescription>
+            </div>
+            <Button onClick={handleAddNew}>
+              <PlusCircle className="mr-2 h-4 w-4" />
+              New Item
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Name</TableHead>
+                <TableHead>Type</TableHead>
+                <TableHead className="text-right">Price</TableHead>
+                <TableHead>Income Account</TableHead>
+                <TableHead>Expense Account</TableHead>
+                <TableHead className="w-[50px]"></TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {isLoading ? (
+                <TableRow><TableCell colSpan={6} className="text-center">Loading items...</TableCell></TableRow>
+              ) : products && products.length > 0 ? (
+                products.map((product) => (
+                  <TableRow key={product.id}>
+                    <TableCell className="font-medium">{product.name}</TableCell>
+                    <TableCell className="capitalize">{product.type}</TableCell>
+                    <TableCell className="text-right font-mono">{formatCurrency(product.price)}</TableCell>
+                    <TableCell>{product.income_account?.name || 'N/A'}</TableCell>
+                    <TableCell>{product.expense_account?.name || 'N/A'}</TableCell>
+                    <TableCell>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" className="h-8 w-8 p-0"><MoreHorizontal className="h-4 w-4" /></Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={() => handleEdit(product)}>Edit</DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleDelete(product.id)} className="text-red-600">Delete</DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </TableCell>
+                  </TableRow>
+                ))
+              ) : (
+                <TableRow><TableCell colSpan={6} className="text-center">No items found. Add one to get started.</TableCell></TableRow>
+              )}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
+      <ProductForm
+        isOpen={isFormOpen}
+        setIsOpen={setIsFormOpen}
+        product={selectedProduct}
+      />
+    </>
+  );
+};
+
+export default Products;

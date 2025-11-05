@@ -4,7 +4,7 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible"
-import { Book, LayoutDashboard, BookText, FileText, Library, Target, Repeat, Building2, Users, TrendingUp, Receipt, Banknote, HandCoins, ChevronRight } from 'lucide-react';
+import { Book, LayoutDashboard, BookText, FileText, Library, Target, Repeat, Building2, Users, TrendingUp, Receipt, Banknote, HandCoins, ChevronRight, Package } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { Button } from './ui/button';
 
@@ -56,6 +56,7 @@ export const SidebarNav = () => {
 
   const accountingLinks = [
     { to: '/chart-of-accounts', label: 'Chart of Accounts', icon: Book },
+    { to: '/products', label: 'Products & Services', icon: Package },
     { to: '/journal-entries', label: 'Journal Entries', icon: BookText },
     { to: '/recurring-entries', label: 'Recurring Entries', icon: Repeat },
     { to: '/general-ledger', label: 'General Ledger', icon: Library },

@@ -21,6 +21,7 @@ import Sales from "./pages/Sales";
 import Bills from "./pages/Bills";
 import PayBills from "./pages/PayBills";
 import ReceivePayments from "./pages/ReceivePayments";
+import Products from "./pages/Products";
 
 const queryClient = new QueryClient();
 
@@ -48,6 +49,7 @@ const App = () => (
               <Route path="/settings" element={<Settings />} />
               <Route path="/vendors" element={<Vendors />} />
               <Route path="/customers" element={<Customers />} />
+              <Route path="/products" element={<Products />} />
             </Route>
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
