@@ -30,13 +30,13 @@ type EntryDetail = {
   entry_date: string;
   description: string | null;
   attachment_url: string | null;
-  vendors: { name: string } | null;
+  vendors: { name: string }[] | null;
   journal_entry_items: {
     type: 'debit' | 'credit';
     amount: number;
     chart_of_accounts: {
       name: string;
-    } | null;
+    }[] | null;
   }[];
 };
 
@@ -92,7 +92,7 @@ const JournalEntryDetail = ({ entryId, isOpen, setIsOpen }: JournalEntryDetailPr
               </div>
               <div>
                 <span className="font-semibold text-gray-800 dark:text-gray-200">Vendor:</span>
-                <p className="text-gray-600 dark:text-gray-400">{entry.vendors?.name || 'N/A'}</p>
+                <p className="text-gray-600 dark:text-gray-400">{entry.vendors?.[0]?.name || 'N/A'}</p>
               </div>
             </div>
             
@@ -119,7 +119,7 @@ const JournalEntryDetail = ({ entryId, isOpen, setIsOpen }: JournalEntryDetailPr
               <TableBody>
                 {entry.journal_entry_items.map((item, index) => (
                   <TableRow key={index}>
-                    <TableCell className="font-medium">{item.chart_of_accounts?.name}</TableCell>
+                    <TableCell className="font-medium">{item.chart_of_accounts?.[0]?.name}</TableCell>
                     <TableCell className="text-right font-mono">
                       {item.type === 'debit' ? `$${item.amount.toFixed(2)}` : ''}
                     </TableCell>
