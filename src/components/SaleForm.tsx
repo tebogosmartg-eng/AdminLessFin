@@ -14,10 +14,12 @@ import { Textarea } from './ui/textarea';
 import { showError, showSuccess } from '../utils/toast';
 import { Account } from '../pages/ChartOfAccounts';
 import { Customer } from '../pages/Customers';
+import { Product } from '../pages/Products';
 import { Trash2 } from 'lucide-react';
 import { Alert, AlertDescription } from './ui/alert';
 
 const saleItemSchema = z.object({
+  product_id: z.string().optional(),
   description: z.string().min(1, "Description is required."),
   amount: z.coerce.number().min(0.01, "Amount must be positive."),
   income_account_id: z.string().min(1, "Income account is required."),
@@ -67,6 +69,7 @@ const SaleForm = ({ isOpen, setIsOpen }: SaleFormProps) => {
   const { fields, append, remove } = useFieldArray({ control: form.control, name: "items" });
 
   const { data: customers } = useQuery<Customer[]>({ queryKey: ['customers'] });
+  const { data: products } = useQuery<Product[]>({ queryKey: ['products'] });
   const { data: incomeAccounts } = useQuery<Account[]>({
     queryKey: ['income_accounts'],
     queryFn: async () => {
@@ -83,6 +86,17 @@ const SaleForm = ({ isOpen, setIsOpen }: SaleFormProps) => {
       return data;
     }
   });
+
+  const handleProductSelect = (productId: string, index: number) => {
+    const product = products?.find(p => p.id === productId);
+    if (product) {
+      form.setValue(`items.${index}.description`, product.description || product.name);
+      form.setValue(`items.${index}.amount`, product.price || 0);
+      if (product.income_account_id) {
+        form.setValue(`items.${index}.income_account_id`, product.income_account_id);
+      }
+    }
+  };
 
   const mutation = useMutation({
     mutationFn: async (values: SaleFormValues) => {
@@ -139,7 +153,7 @@ const SaleForm = ({ isOpen, setIsOpen }: SaleFormProps) => {
 
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
-      <DialogContent className="sm:max-w-2xl">
+      <DialogContent className="sm:max-w-3xl">
         <DialogHeader>
           <DialogTitle>Record New Sale</DialogTitle>
           <DialogDescription>This will create a new journal entry for the sale.</DialogDescription>
@@ -171,19 +185,22 @@ const SaleForm = ({ isOpen, setIsOpen }: SaleFormProps) => {
               <FormLabel>Products/Services Sold</FormLabel>
               {fields.map((field, index) => (
                 <div key={field.id} className="grid grid-cols-12 gap-2 items-start">
-                  <FormField control={form.control} name={`items.${index}.description`} render={({ field }) => (
-                    <FormItem className="col-span-5"><FormControl><Textarea placeholder="Description" {...field} rows={1} /></FormControl><FormMessage /></FormItem>
+                  <FormField control={form.control} name={`items.${index}.product_id`} render={({ field }) => (
+                    <FormItem className="col-span-4"><Select onValueChange={(value) => { field.onChange(value); handleProductSelect(value, index); }} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select an item" /></SelectTrigger></FormControl><SelectContent>{products?.map(p => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem>
                   )} />
-                  <FormField control={form.control} name={`items.${index}.income_account_id`} render={({ field }) => (
-                    <FormItem className="col-span-4"><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Income Account" /></SelectTrigger></FormControl><SelectContent>{incomeAccounts?.map(acc => <SelectItem key={acc.id} value={acc.id}>{acc.name}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem>
+                  <FormField control={form.control} name={`items.${index}.description`} render={({ field }) => (
+                    <FormItem className="col-span-3"><FormControl><Textarea placeholder="Description" {...field} rows={1} /></FormControl><FormMessage /></FormItem>
                   )} />
                   <FormField control={form.control} name={`items.${index}.amount`} render={({ field }) => (
                     <FormItem className="col-span-2"><FormControl><Input type="number" step="0.01" placeholder="Amount" {...field} /></FormControl><FormMessage /></FormItem>
                   )} />
+                  <FormField control={form.control} name={`items.${index}.income_account_id`} render={({ field }) => (
+                    <FormItem className="col-span-2"><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Income Account" /></SelectTrigger></FormControl><SelectContent>{incomeAccounts?.map(acc => <SelectItem key={acc.id} value={acc.id}>{acc.name}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem>
+                  )} />
                   <div className="col-span-1 pt-2"><Button type="button" variant="ghost" size="icon" onClick={() => remove(index)} disabled={fields.length <= 1}><Trash2 className="h-4 w-4" /></Button></div>
                 </div>
               ))}
-              <Button type="button" variant="outline" size="sm" onClick={() => append({ description: '', amount: 0, income_account_id: '' })}>Add Line</Button>
+              <Button type="button" variant="outline" size="sm" onClick={() => append({ product_id: '', description: '', amount: 0, income_account_id: '' })}>Add Line</Button>
             </div>
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setIsOpen(false)}>Cancel</Button>
