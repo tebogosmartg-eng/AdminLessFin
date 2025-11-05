@@ -1,5 +1,6 @@
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { format } from 'date-fns';
+import { formatCurrency } from '../lib/utils';
 
 type ChartData = {
   month_start: string;
@@ -30,14 +31,9 @@ const IncomeExpenseChart = ({ data }: IncomeExpenseChartProps) => {
       >
         <CartesianGrid strokeDasharray="3 3" />
         <XAxis dataKey="month" />
-        <YAxis tickFormatter={(value) => `R${value / 1000}k`} />
+        <YAxis tickFormatter={(value) => `${value / 1000}k`} />
         <Tooltip
-          formatter={(value: number) =>
-            new Intl.NumberFormat('en-ZA', {
-              style: 'currency',
-              currency: 'ZAR',
-            }).format(value)
-          }
+          formatter={(value: number) => formatCurrency(value)}
         />
         <Legend />
         <Bar dataKey="total_income" fill="#16a34a" name="Income" />
