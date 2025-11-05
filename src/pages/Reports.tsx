@@ -7,7 +7,7 @@ import { Account } from './ChartOfAccounts';
 
 const Reports = () => {
   const fetchAccounts = async () => {
-    const { data, error } = await supabase.from('chart_of_accounts').select('*');
+    const { data, error } = await supabase.from('chart_of_accounts').select('*').order('name');
     if (error) throw new Error(error.message);
     return data as Account[];
   };
@@ -42,28 +42,32 @@ const Reports = () => {
   const totalEquity = totalOwnerEquity + netIncome;
   const totalLiabilitiesAndEquity = totalLiabilities + totalEquity;
 
+  // Trial Balance Calculations
+  let totalDebits = 0;
+  let totalCredits = 0;
+  accounts?.forEach(acc => {
+    if (['Asset', 'Expense'].includes(acc.type)) {
+      totalDebits += acc.balance;
+    } else {
+      totalCredits += acc.balance;
+    }
+  });
+
   if (isLoading) {
     return (
       <div className="space-y-6">
         <Skeleton className="h-10 w-1/4" />
-        <Card>
-          <CardHeader>
-            <Skeleton className="h-8 w-1/2" />
-            <Skeleton className="h-4 w-3/4" />
-          </CardHeader>
-          <CardContent>
-            <Skeleton className="h-40 w-full" />
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader>
-            <Skeleton className="h-8 w-1/2" />
-            <Skeleton className="h-4 w-3/4" />
-          </CardHeader>
-          <CardContent>
-            <Skeleton className="h-40 w-full" />
-          </CardContent>
-        </Card>
+        {[...Array(3)].map((_, i) => (
+          <Card key={i}>
+            <CardHeader>
+              <Skeleton className="h-8 w-1/2" />
+              <Skeleton className="h-4 w-3/4" />
+            </CardHeader>
+            <CardContent>
+              <Skeleton className="h-40 w-full" />
+            </CardContent>
+          </Card>
+        ))}
       </div>
     );
   }
@@ -72,6 +76,44 @@ const Reports = () => {
     <div className="space-y-6">
       <h1 className="text-3xl font-bold">Reports</h1>
       
+      <Card>
+        <CardHeader>
+          <CardTitle>Trial Balance</CardTitle>
+          <CardDescription>As of {new Date().toLocaleDateString()}</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Account</TableHead>
+                <TableHead className="text-right">Debit</TableHead>
+                <TableHead className="text-right">Credit</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {accounts?.map(account => (
+                <TableRow key={account.id}>
+                  <TableCell>{account.name}</TableCell>
+                  <TableCell className="text-right font-mono">
+                    {['Asset', 'Expense'].includes(account.type) ? formatCurrency(account.balance) : ''}
+                  </TableCell>
+                  <TableCell className="text-right font-mono">
+                    {['Liability', 'Equity', 'Income'].includes(account.type) ? formatCurrency(account.balance) : ''}
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+            <TableFooter>
+              <TableRow className="text-lg font-bold bg-gray-100 dark:bg-gray-700">
+                <TableCell>Totals</TableCell>
+                <TableCell className="text-right font-mono">{formatCurrency(totalDebits)}</TableCell>
+                <TableCell className="text-right font-mono">{formatCurrency(totalCredits)}</TableCell>
+              </TableRow>
+            </TableFooter>
+          </Table>
+        </CardContent>
+      </Card>
+
       <Card>
         <CardHeader>
           <CardTitle>Income Statement</CardTitle>
