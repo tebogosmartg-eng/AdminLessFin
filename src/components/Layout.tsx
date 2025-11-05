@@ -1,7 +1,7 @@
 import { NavLink, Outlet } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { Button } from './ui/button';
-import { Book, LayoutDashboard, LogOut, BookText, FileText, Settings, Library, Target, Repeat, User as UserIcon } from 'lucide-react';
+import { Book, LayoutDashboard, LogOut, BookText, FileText, Settings, Library, Target, Repeat, User as UserIcon, Building2 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from './ui/dropdown-menu';
@@ -48,6 +48,10 @@ const Layout = () => {
            <NavLink to="/budgets" className={navLinkClasses}>
             <Target className="mr-3 h-5 w-5" />
             Budgets
+          </NavLink>
+          <NavLink to="/vendors" className={navLinkClasses}>
+            <Building2 className="mr-3 h-5 w-5" />
+            Vendors
           </NavLink>
           <NavLink to="/reports" className={navLinkClasses}>
             <FileText className="mr-3 h-5 w-5" />
