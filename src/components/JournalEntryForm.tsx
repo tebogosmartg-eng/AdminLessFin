@@ -142,47 +142,64 @@ const JournalEntryForm = ({ isOpen, setIsOpen, entryId }: JournalEntryFormProps)
   const mutation = useMutation({
     mutationFn: async (values: JournalEntryFormValues) => {
       if (!user) throw new Error('User not authenticated');
-      
-      let entryIdToUpdate = entryId;
-      let attachmentUrl: string | null = existingAttachmentUrl;
 
-      if (removeAttachment) {
-        attachmentUrl = null;
+      // 1. Upsert the core journal entry data (without attachment URL)
+      let upsertedEntryId: string;
+      const entryCoreData = {
+        entry_date: values.entry_date,
+        description: values.description,
+        vendor_id: values.vendor_id || null,
+        customer_id: values.customer_id || null,
+      };
+
+      if (isEditing) {
+        upsertedEntryId = entryId!;
+        const { error } = await supabase.from('journal_entries').update(entryCoreData).eq('id', upsertedEntryId);
+        if (error) throw error;
+      } else {
+        const { data, error } = await supabase.from('journal_entries').insert({ ...entryCoreData, user_id: user.id }).select('id').single();
+        if (error) throw error;
+        upsertedEntryId = data.id;
+      }
+
+      // 2. Sync the journal entry items
+      await supabase.from('journal_entry_items').delete().eq('journal_entry_id', upsertedEntryId);
+      const itemsToInsert = values.items.map(item => ({ ...item, journal_entry_id: upsertedEntryId }));
+      const { error: itemsError } = await supabase.from('journal_entry_items').insert(itemsToInsert);
+      if (itemsError) throw itemsError;
+
+      // 3. Handle the attachment file logic
+      let newAttachmentUrl: string | null = existingAttachmentUrl;
+      let needsUrlUpdate = false;
+
+      if (removeAttachment && existingAttachmentUrl) {
+        const oldFilePath = existingAttachmentUrl.split('/attachments/')[1];
+        await supabase.storage.from('attachments').remove([oldFilePath]);
+        newAttachmentUrl = null;
+        needsUrlUpdate = true;
       }
 
       if (attachmentFile) {
+        if (existingAttachmentUrl) {
+          const oldFilePath = existingAttachmentUrl.split('/attachments/')[1];
+          await supabase.storage.from('attachments').remove([oldFilePath]);
+        }
         const fileExt = attachmentFile.name.split('.').pop();
         const fileName = `${Date.now()}.${fileExt}`;
-        const filePath = `${user.id}/${entryIdToUpdate || 'new'}/${fileName}`;
+        const filePath = `${user.id}/${upsertedEntryId}/${fileName}`;
         
         const { error: uploadError } = await supabase.storage.from('attachments').upload(filePath, attachmentFile);
         if (uploadError) throw new Error(`Storage Error: ${uploadError.message}`);
         
         const { data: urlData } = supabase.storage.from('attachments').getPublicUrl(filePath);
-        attachmentUrl = urlData.publicUrl;
+        newAttachmentUrl = urlData.publicUrl;
+        needsUrlUpdate = true;
       }
 
-      const entryData = {
-        entry_date: values.entry_date,
-        description: values.description,
-        vendor_id: values.vendor_id || null,
-        customer_id: values.customer_id || null,
-        attachment_url: attachmentUrl,
-      };
-
-      if (isEditing) {
-        const { error: updateError } = await supabase.from('journal_entries').update(entryData).eq('id', entryIdToUpdate!);
-        if (updateError) throw updateError;
-
-        await supabase.from('journal_entry_items').delete().eq('journal_entry_id', entryIdToUpdate!);
-        const itemsToInsert = values.items.map(item => ({ ...item, journal_entry_id: entryIdToUpdate }));
-        await supabase.from('journal_entry_items').insert(itemsToInsert);
-      } else {
-        const { data: entry, error: entryError } = await supabase.from('journal_entries').insert({ ...entryData, user_id: user.id }).select('id').single();
-        if (entryError) throw entryError;
-
-        const itemsToInsert = values.items.map(item => ({ ...item, journal_entry_id: entry.id }));
-        await supabase.from('journal_entry_items').insert(itemsToInsert);
+      // 4. If the attachment URL has changed, update the journal entry
+      if (needsUrlUpdate) {
+        const { error } = await supabase.from('journal_entries').update({ attachment_url: newAttachmentUrl }).eq('id', upsertedEntryId);
+        if (error) throw error;
       }
     },
     onSuccess: () => {
