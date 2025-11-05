@@ -8,6 +8,7 @@ import { Skeleton } from '../components/ui/skeleton';
 import IncomeExpenseChart from '../components/IncomeExpenseChart';
 import { Link } from 'react-router-dom';
 import { Button } from '../components/ui/button';
+import QuickActions from '../components/QuickActions';
 
 const Dashboard = () => {
   const { user, profile } = useAuth();
@@ -92,6 +93,8 @@ const Dashboard = () => {
         <p className="text-gray-600 dark:text-gray-400">Welcome back, {profile?.full_name || user?.email}!</p>
       </header>
       <main className="space-y-6">
+        <QuickActions />
+        
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
           {summaryCards.map((card, index) => (
             <Card key={index}>
