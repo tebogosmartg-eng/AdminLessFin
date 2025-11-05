@@ -1,7 +1,15 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../integrations/supabase/client';
 import { Button } from '../components/ui/button';
+import { Input } from '../components/ui/input';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '../components/ui/select';
 import {
   Table,
   TableBody,
@@ -11,7 +19,7 @@ import {
   TableRow,
 } from '../components/ui/table';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
-import { PlusCircle, MoreHorizontal } from 'lucide-react';
+import { PlusCircle, MoreHorizontal, Search } from 'lucide-react';
 import { showError, showSuccess } from '../utils/toast';
 import AccountForm from '../components/AccountForm';
 import {
@@ -32,6 +40,8 @@ export type Account = {
 const ChartOfAccounts = () => {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [selectedAccount, setSelectedAccount] = useState<Account | undefined>(undefined);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filterType, setFilterType] = useState('all');
   const queryClient = useQueryClient();
 
   const fetchAccounts = async () => {
@@ -47,6 +57,15 @@ const ChartOfAccounts = () => {
     queryKey: ['accounts'],
     queryFn: fetchAccounts,
   });
+
+  const filteredAccounts = useMemo(() => {
+    if (!accounts) return [];
+    return accounts.filter(account => {
+      const matchesSearch = account.name.toLowerCase().includes(searchTerm.toLowerCase());
+      const matchesType = filterType === 'all' || account.type === filterType;
+      return matchesSearch && matchesType;
+    });
+  }, [accounts, searchTerm, filterType]);
 
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
@@ -89,6 +108,31 @@ const ChartOfAccounts = () => {
           </Button>
         </CardHeader>
         <CardContent>
+          <div className="flex items-center gap-4 mb-4">
+            <div className="relative flex-1">
+              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Input
+                type="search"
+                placeholder="Search by account name..."
+                className="pl-8 w-full"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+            </div>
+            <Select value={filterType} onValueChange={setFilterType}>
+              <SelectTrigger className="w-[180px]">
+                <SelectValue placeholder="Filter by type" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Types</SelectItem>
+                <SelectItem value="Asset">Asset</SelectItem>
+                <SelectItem value="Liability">Liability</SelectItem>
+                <SelectItem value="Equity">Equity</SelectItem>
+                <SelectItem value="Income">Income</SelectItem>
+                <SelectItem value="Expense">Expense</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
           <Table>
             <TableHeader>
               <TableRow>
@@ -104,8 +148,8 @@ const ChartOfAccounts = () => {
                 <TableRow>
                   <TableCell colSpan={5} className="text-center">Loading accounts...</TableCell>
                 </TableRow>
-              ) : accounts && accounts.length > 0 ? (
-                accounts.map((account) => (
+              ) : filteredAccounts.length > 0 ? (
+                filteredAccounts.map((account) => (
                   <TableRow key={account.id}>
                     <TableCell className="font-medium">{account.name}</TableCell>
                     <TableCell>{account.type}</TableCell>
@@ -129,7 +173,7 @@ const ChartOfAccounts = () => {
                 ))
               ) : (
                 <TableRow>
-                  <TableCell colSpan={5} className="text-center">No accounts found. Add one to get started!</TableCell>
+                  <TableCell colSpan={5} className="text-center">No accounts found.</TableCell>
                 </TableRow>
               )}
             </TableBody>
