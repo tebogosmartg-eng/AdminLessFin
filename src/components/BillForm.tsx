@@ -20,7 +20,7 @@ import { Alert, AlertDescription } from './ui/alert';
 
 const billItemSchema = z.object({
   product_id: z.string().optional(),
-  description: z.string().optional(),
+  description: z.string().min(1, "Description is required."),
   amount: z.coerce.number().min(0.01, "Amount must be positive."),
   expense_account_id: z.string().min(1, "Expense account is required."),
 });
@@ -50,7 +50,7 @@ const BillForm = ({ isOpen, setIsOpen }: BillFormProps) => {
       vendor_id: '',
       accounts_payable_id: '',
       description: '',
-      items: [{ description: '', amount: 0, expense_account_id: '' }],
+      items: [{ product_id: '', description: '', amount: 0, expense_account_id: '' }],
     },
   });
 
@@ -61,7 +61,7 @@ const BillForm = ({ isOpen, setIsOpen }: BillFormProps) => {
         vendor_id: '',
         accounts_payable_id: '',
         description: '',
-        items: [{ description: '', amount: 0, expense_account_id: '' }],
+        items: [{ product_id: '', description: '', amount: 0, expense_account_id: '' }],
       });
     }
   }, [isOpen, form]);
@@ -186,16 +186,16 @@ const BillForm = ({ isOpen, setIsOpen }: BillFormProps) => {
               {fields.map((field, index) => (
                 <div key={field.id} className="grid grid-cols-12 gap-2 items-start">
                   <FormField control={form.control} name={`items.${index}.product_id`} render={({ field }) => (
-                    <FormItem className="col-span-4"><Select onValueChange={(value) => { field.onChange(value); handleProductSelect(value, index); }} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select an item" /></SelectTrigger></FormControl><SelectContent>{products?.map(p => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem>
-                  )} />
-                  <FormField control={form.control} name={`items.${index}.expense_account_id`} render={({ field }) => (
-                    <FormItem className="col-span-3"><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Expense Account" /></SelectTrigger></FormControl><SelectContent>{expenseAccounts?.map(acc => <SelectItem key={acc.id} value={acc.id}>{acc.name}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem>
-                  )} />
-                  <FormField control={form.control} name={`items.${index}.amount`} render={({ field }) => (
-                    <FormItem className="col-span-2"><FormControl><Input type="number" step="0.01" placeholder="Amount" {...field} /></FormControl><FormMessage /></FormItem>
+                    <FormItem className="col-span-4"><Select onValueChange={(value) => { field.onChange(value); handleProductSelect(value, index); }} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select an item" /></SelectTrigger></FormControl><SelectContent>{products?.map(p => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}</SelectContent></Select></FormItem>
                   )} />
                   <FormField control={form.control} name={`items.${index}.description`} render={({ field }) => (
-                    <FormItem className="col-span-2"><FormControl><Input placeholder="Description" {...field} /></FormControl><FormMessage /></FormItem>
+                    <FormItem className="col-span-3"><FormControl><Textarea placeholder="Description" {...field} rows={1} /></FormControl></FormItem>
+                  )} />
+                  <FormField control={form.control} name={`items.${index}.amount`} render={({ field }) => (
+                    <FormItem className="col-span-2"><FormControl><Input type="number" step="0.01" placeholder="Amount" {...field} /></FormControl></FormItem>
+                  )} />
+                  <FormField control={form.control} name={`items.${index}.expense_account_id`} render={({ field }) => (
+                    <FormItem className="col-span-2"><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Expense Account" /></SelectTrigger></FormControl><SelectContent>{expenseAccounts?.map(acc => <SelectItem key={acc.id} value={acc.id}>{acc.name}</SelectItem>)}</SelectContent></Select></FormItem>
                   )} />
                   <div className="col-span-1 pt-2"><Button type="button" variant="ghost" size="icon" onClick={() => remove(index)} disabled={fields.length <= 1}><Trash2 className="h-4 w-4" /></Button></div>
                 </div>
