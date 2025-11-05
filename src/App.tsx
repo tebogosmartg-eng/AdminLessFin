@@ -17,6 +17,7 @@ import Budgets from "./pages/Budgets";
 import RecurringEntries from "./pages/RecurringEntries";
 import Vendors from "./pages/Vendors";
 import Customers from "./pages/Customers";
+import Sales from "./pages/Sales";
 
 const queryClient = new QueryClient();
 
@@ -40,6 +41,7 @@ const App = () => (
               <Route path="/settings" element={<Settings />} />
               <Route path="/vendors" element={<Vendors />} />
               <Route path="/customers" element={<Customers />} />
+              <Route path="/sales" element={<Sales />} />
             </Route>
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
