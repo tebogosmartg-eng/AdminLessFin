@@ -4,7 +4,7 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible"
-import { Book, LayoutDashboard, BookText, FileText, Library, Target, Repeat, Building2, Users, TrendingUp, Receipt, Banknote, HandCoins, ChevronRight, Package, Scale, Upload } from 'lucide-react';
+import { Book, LayoutDashboard, BookText, FileText, Library, Target, Repeat, Building2, Users, TrendingUp, Receipt, Banknote, HandCoins, ChevronRight, Package, Scale, Upload, FileSignature } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { Button } from './ui/button';
 
@@ -18,7 +18,7 @@ const NavGroup = ({ title, icon: Icon, links, defaultOpen }: { title: string, ic
   return (
     <Collapsible defaultOpen={defaultOpen}>
       <CollapsibleTrigger asChild>
-        <Button variant="ghost" className="w-full justify-between px-3">
+        <Button variant="ghost" className="w-full justify-between px-3 group">
           <div className="flex items-center">
             <Icon className="mr-3 h-5 w-5" />
             <span>{title}</span>
@@ -44,6 +44,7 @@ export const SidebarNav = () => {
 
   const salesLinks = [
     { to: '/sales', label: 'Sales', icon: TrendingUp },
+    { to: '/invoices', label: 'Invoices', icon: FileSignature },
     { to: '/receive-payments', label: 'Receive Payments', icon: HandCoins },
     { to: '/customers', label: 'Customers', icon: Users },
   ];

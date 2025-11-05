@@ -1,0 +1,137 @@
+import { useParams } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
+import { supabase } from '../integrations/supabase/client';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/card';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from '../components/ui/table';
+import { Skeleton } from '../components/ui/skeleton';
+import { Button } from '../components/ui/button';
+import { Printer } from 'lucide-react';
+import { Badge } from '../components/ui/badge';
+
+type InvoiceDetailData = {
+  id: string;
+  invoice_number: string;
+  invoice_date: string;
+  due_date: string;
+  status: string;
+  customers: {
+    name: string;
+    address: string | null;
+    email: string | null;
+  }[] | null;
+  journal_entries: {
+    journal_entry_items: {
+      amount: number;
+      type: 'debit' | 'credit';
+      chart_of_accounts: {
+        name: string;
+      } | null;
+    }[];
+  }[] | null;
+};
+
+const InvoiceDetail = () => {
+  const { id } = useParams();
+
+  const fetchInvoiceDetail = async () => {
+    const { data, error } = await supabase
+      .from('invoices')
+      .select(`
+        id,
+        invoice_number,
+        invoice_date,
+        due_date,
+        status,
+        customers ( name, address, email ),
+        journal_entries (
+          journal_entry_items (
+            amount,
+            type,
+            chart_of_accounts ( name )
+          )
+        )
+      `)
+      .eq('id', id!)
+      .single();
+    if (error) throw error;
+    return data as InvoiceDetailData;
+  };
+
+  const { data: invoice, isLoading } = useQuery({
+    queryKey: ['invoice_detail', id],
+    queryFn: fetchInvoiceDetail,
+    enabled: !!id,
+  });
+
+  const lineItems = invoice?.journal_entries?.[0]?.journal_entry_items.filter(item => item.type === 'credit') || [];
+  const totalAmount = lineItems.reduce((sum, item) => sum + item.amount, 0);
+  const formatCurrency = (amount: number) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount);
+
+  if (isLoading) {
+    return <div className="space-y-4"><Skeleton className="h-96 w-full" /></div>;
+  }
+
+  if (!invoice) {
+    return <div>Invoice not found.</div>;
+  }
+
+  return (
+    <div className="max-w-4xl mx-auto p-4 sm:p-6 lg:p-8 bg-background">
+      <div className="flex justify-between items-center mb-6 print:hidden">
+        <h1 className="text-3xl font-bold">Invoice {invoice.invoice_number}</h1>
+        <Button onClick={() => window.print()}><Printer className="mr-2 h-4 w-4" /> Print</Button>
+      </div>
+      <Card className="print:shadow-none print:border-none">
+        <CardHeader className="grid grid-cols-2 gap-4">
+          <div>
+            <CardTitle>SmaAcc Inc.</CardTitle>
+            <CardDescription>123 Accounting Lane, Finance City</CardDescription>
+          </div>
+          <div className="text-right">
+            <p className="text-3xl font-bold tracking-tight">INVOICE</p>
+            <p className="text-sm text-muted-foreground"># {invoice.invoice_number}</p>
+            <Badge className="mt-2 capitalize">{invoice.status}</Badge>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-2 gap-4 mb-8">
+            <div>
+              <h3 className="font-semibold mb-1">Bill To:</h3>
+              <p>{invoice.customers?.[0]?.name}</p>
+              <p>{invoice.customers?.[0]?.address}</p>
+              <p>{invoice.customers?.[0]?.email}</p>
+            </div>
+            <div className="text-right">
+              <p><span className="font-semibold">Invoice Date:</span> {new Date(invoice.invoice_date).toLocaleDateString()}</p>
+              <p><span className="font-semibold">Due Date:</span> {new Date(invoice.due_date).toLocaleDateString()}</p>
+            </div>
+          </div>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Description</TableHead>
+                <TableHead className="text-right">Amount</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {lineItems.map((item, index) => (
+                <TableRow key={index}>
+                  <TableCell>{item.chart_of_accounts?.name || 'Service/Product'}</TableCell>
+                  <TableCell className="text-right font-mono">{formatCurrency(item.amount)}</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+            <TableFooter>
+              <TableRow className="text-lg font-bold bg-gray-50 dark:bg-gray-800">
+                <TableCell>Total</TableCell>
+                <TableCell className="text-right font-mono">{formatCurrency(totalAmount)}</TableCell>
+              </TableRow>
+            </TableFooter>
+          </Table>
+        </CardContent>
+      </Card>
+    </div>
+  );
+};
+
+export default InvoiceDetail;

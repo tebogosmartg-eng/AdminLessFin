@@ -24,6 +24,8 @@ import ReceivePayments from "./pages/ReceivePayments";
 import Products from "./pages/Products";
 import Reconciliation from "./pages/Reconciliation";
 import Import from "./pages/Import";
+import Invoices from "./pages/Invoices";
+import InvoiceDetail from "./pages/InvoiceDetail";
 
 const queryClient = new QueryClient();
 
@@ -39,6 +41,8 @@ const App = () => (
             <Route element={<ProtectedRoute />}>
               <Route path="/" element={<Dashboard />} />
               <Route path="/sales" element={<Sales />} />
+              <Route path="/invoices" element={<Invoices />} />
+              <Route path="/invoices/:id" element={<InvoiceDetail />} />
               <Route path="/bills" element={<Bills />} />
               <Route path="/pay-bills" element={<PayBills />} />
               <Route path="/receive-payments" element={<ReceivePayments />} />
