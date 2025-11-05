@@ -28,6 +28,12 @@ type AccountActivity = {
   activity: number;
 };
 
+type CashFlowItem = {
+  section: 'Operating' | 'Investing' | 'Financing';
+  category: string;
+  amount: number;
+};
+
 const FinancialStatements = () => {
   const [date, setDate] = useState<DateRange | undefined>({
     from: startOfYear(new Date()),
@@ -71,7 +77,20 @@ const FinancialStatements = () => {
     enabled: !!fromDate && !!toDate,
   });
 
-  const isLoading = isLoadingBalances || isLoadingActivity || isLoadingOpeningBalances;
+  const { data: cashFlowData, isLoading: isLoadingCashFlow } = useQuery<CashFlowItem[]>({
+    queryKey: ['cashFlow', fromDate, toDate],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc('get_cash_flow_statement', {
+        p_start_date: format(fromDate, 'yyyy-MM-dd'),
+        p_end_date: format(toDate, 'yyyy-MM-dd'),
+      });
+      if (error) throw new Error(error.message);
+      return data;
+    },
+    enabled: !!fromDate && !!toDate,
+  });
+
+  const isLoading = isLoadingBalances || isLoadingActivity || isLoadingOpeningBalances || isLoadingCashFlow;
 
   // Income Statement Calculations
   const incomeAccounts = periodActivity?.filter(acc => acc.type === 'Income') || [];
@@ -104,6 +123,15 @@ const FinancialStatements = () => {
     }
   });
 
+  // Cash Flow Calculations
+  const operatingActivities = cashFlowData?.filter(i => i.section === 'Operating') || [];
+  const investingActivities = cashFlowData?.filter(i => i.section === 'Investing') || [];
+  const financingActivities = cashFlowData?.filter(i => i.section === 'Financing') || [];
+  const totalOperating = operatingActivities.reduce((sum, i) => sum + i.amount, 0);
+  const totalInvesting = investingActivities.reduce((sum, i) => sum + i.amount, 0);
+  const totalFinancing = financingActivities.reduce((sum, i) => sum + i.amount, 0);
+  const netCashFlow = totalOperating + totalInvesting + totalFinancing;
+
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center print:hidden">
@@ -126,6 +154,7 @@ const FinancialStatements = () => {
           <TabsTrigger value="income-statement">Income Statement</TabsTrigger>
           <TabsTrigger value="balance-sheet">Balance Sheet</TabsTrigger>
           <TabsTrigger value="equity">Changes in Equity</TabsTrigger>
+          <TabsTrigger value="cash-flow">Cash Flow</TabsTrigger>
           <TabsTrigger value="trial-balance">Trial Balance</TabsTrigger>
         </TabsList>
 
@@ -192,6 +221,31 @@ const FinancialStatements = () => {
                   <TableRow><TableCell>Dividends or Drawings</TableCell><TableCell className="text-right">{formatCurrency(0)}</TableCell></TableRow>
                 </TableBody>
                 <TableFooter><TableRow className="text-lg font-bold"><TableCell>Retained Earnings at end of period</TableCell><TableCell className="text-right">{formatCurrency(closingRetainedEarnings)}</TableCell></TableRow></TableFooter>
+              </Table>
+            )}</CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="cash-flow">
+          <Card>
+            <CardHeader><CardTitle>Statement of Cash Flows</CardTitle><CardDescription>For the period from {format(fromDate, "PPP")} to {format(toDate, "PPP")}</CardDescription></CardHeader>
+            <CardContent>{isLoading ? <Skeleton className="h-64 w-full" /> : (
+              <Table>
+                <TableHeader><TableRow><TableHead>Description</TableHead><TableHead className="text-right">Amount</TableHead></TableRow></TableHeader>
+                <TableBody>
+                  <TableRow className="font-semibold bg-muted/50"><TableCell>Cash Flow from Operating Activities</TableCell><TableCell></TableCell></TableRow>
+                  {operatingActivities.map(item => (<TableRow key={item.category}><TableCell className="pl-8">{item.category}</TableCell><TableCell className="text-right">{formatCurrency(item.amount)}</TableCell></TableRow>))}
+                  <TableRow className="font-semibold"><TableCell>Net Cash from Operating Activities</TableCell><TableCell className="text-right">{formatCurrency(totalOperating)}</TableCell></TableRow>
+                  
+                  <TableRow className="font-semibold bg-muted/50"><TableCell>Cash Flow from Investing Activities</TableCell><TableCell></TableCell></TableRow>
+                  {investingActivities.map(item => (<TableRow key={item.category}><TableCell className="pl-8">{item.category}</TableCell><TableCell className="text-right">{formatCurrency(item.amount)}</TableCell></TableRow>))}
+                  <TableRow className="font-semibold"><TableCell>Net Cash from Investing Activities</TableCell><TableCell className="text-right">{formatCurrency(totalInvesting)}</TableCell></TableRow>
+
+                  <TableRow className="font-semibold bg-muted/50"><TableCell>Cash Flow from Financing Activities</TableCell><TableCell></TableCell></TableRow>
+                  {financingActivities.map(item => (<TableRow key={item.category}><TableCell className="pl-8">{item.category}</TableCell><TableCell className="text-right">{formatCurrency(item.amount)}</TableCell></TableRow>))}
+                  <TableRow className="font-semibold"><TableCell>Net Cash from Financing Activities</TableCell><TableCell className="text-right">{formatCurrency(totalFinancing)}</TableCell></TableRow>
+                </TableBody>
+                <TableFooter><TableRow className="text-lg font-bold"><TableCell>Net Change in Cash</TableCell><TableCell className="text-right">{formatCurrency(netCashFlow)}</TableCell></TableRow></TableFooter>
               </Table>
             )}</CardContent>
           </Card>
