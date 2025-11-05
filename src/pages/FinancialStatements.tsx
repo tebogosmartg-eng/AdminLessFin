@@ -13,6 +13,7 @@ import { format, startOfYear, endOfYear, subDays } from 'date-fns';
 import { cn, downloadCSV } from '../lib/utils';
 import { formatCurrency } from '../lib/utils';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
+import PpeNote from '@/components/notes/PpeNote';
 
 type AccountBalance = {
   id: string;
@@ -222,6 +223,7 @@ const FinancialStatements = () => {
           <TabsTrigger value="equity">Changes in Equity</TabsTrigger>
           <TabsTrigger value="cash-flow">Cash Flow</TabsTrigger>
           <TabsTrigger value="trial-balance">Trial Balance</TabsTrigger>
+          <TabsTrigger value="notes">Notes</TabsTrigger>
         </TabsList>
 
         <TabsContent value="income-statement">
@@ -350,6 +352,19 @@ const FinancialStatements = () => {
                 <TableFooter><TableRow className="text-lg font-bold"><TableCell>Totals</TableCell><TableCell className="text-right font-mono">{formatCurrency(totalDebits)}</TableCell><TableCell className="text-right font-mono">{formatCurrency(totalCredits)}</TableCell></TableRow></TableFooter>
               </Table>
             )}</CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="notes">
+          <Card>
+            <CardHeader>
+              <CardTitle>Notes to the Financial Statements</CardTitle>
+              <CardDescription>Supporting details for the financial statements.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <PpeNote />
+              {/* Other notes will be added here in the future */}
+            </CardContent>
           </Card>
         </TabsContent>
       </Tabs>
