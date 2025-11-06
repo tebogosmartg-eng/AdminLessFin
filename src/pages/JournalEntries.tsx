@@ -36,6 +36,7 @@ import { cn } from '../lib/utils';
 import { Account } from './ChartOfAccounts';
 import { Vendor } from './Vendors';
 import { Customer } from './Customers';
+import { useAuth } from '../contexts/AuthContext';
 
 type JournalEntry = {
   id: string;
@@ -59,35 +60,43 @@ const JournalEntries = () => {
   const [filterVendor, setFilterVendor] = useState('all');
   const [filterCustomer, setFilterCustomer] = useState('all');
   const queryClient = useQueryClient();
+  const { activeCompany } = useAuth();
 
   const { data: accounts } = useQuery<Account[]>({
-    queryKey: ['accounts'],
+    queryKey: ['accounts', activeCompany?.id],
     queryFn: async () => {
-      const { data, error } = await supabase.from('chart_of_accounts').select('*').order('name');
+      if (!activeCompany) return [];
+      const { data, error } = await supabase.from('chart_of_accounts').select('*').eq('company_id', activeCompany.id).order('name');
       if (error) throw error;
       return data;
-    }
+    },
+    enabled: !!activeCompany,
   });
 
   const { data: vendors } = useQuery<Vendor[]>({
-    queryKey: ['vendors'],
+    queryKey: ['vendors', activeCompany?.id],
     queryFn: async () => {
-      const { data, error } = await supabase.from('vendors').select('*').order('name');
+      if (!activeCompany) return [];
+      const { data, error } = await supabase.from('vendors').select('*').eq('company_id', activeCompany.id).order('name');
       if (error) throw error;
       return data;
-    }
+    },
+    enabled: !!activeCompany,
   });
 
   const { data: customers } = useQuery<Customer[]>({
-    queryKey: ['customers'],
+    queryKey: ['customers', activeCompany?.id],
     queryFn: async () => {
-      const { data, error } = await supabase.from('customers').select('*').order('name');
+      if (!activeCompany) return [];
+      const { data, error } = await supabase.from('customers').select('*').eq('company_id', activeCompany.id).order('name');
       if (error) throw error;
       return data;
-    }
+    },
+    enabled: !!activeCompany,
   });
 
   const fetchJournalEntries = async () => {
+    if (!activeCompany) return [];
     let entryIdsFromAccountFilter: string[] | null = null;
     if (filterAccount !== 'all') {
       const { data: items, error: itemsError } = await supabase
@@ -113,6 +122,7 @@ const JournalEntries = () => {
           amount
         )
       `)
+      .eq('company_id', activeCompany.id)
       .order('entry_date', { ascending: false });
 
     if (entryIdsFromAccountFilter) {
@@ -137,8 +147,9 @@ const JournalEntries = () => {
   };
 
   const { data: entries, isLoading } = useQuery<JournalEntry[]>({
-    queryKey: ['journal_entries', date, filterAccount, filterVendor, filterCustomer],
+    queryKey: ['journal_entries', date, filterAccount, filterVendor, filterCustomer, activeCompany?.id],
     queryFn: fetchJournalEntries,
+    enabled: !!activeCompany,
   });
 
   const deleteMutation = useMutation({

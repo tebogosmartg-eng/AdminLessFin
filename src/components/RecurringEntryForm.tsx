@@ -46,7 +46,7 @@ interface RecurringEntryFormProps {
 }
 
 const RecurringEntryForm = ({ isOpen, setIsOpen, entryId }: RecurringEntryFormProps) => {
-  const { user } = useAuth();
+  const { user, activeCompany } = useAuth();
   const queryClient = useQueryClient();
   const isEditing = !!entryId;
 
@@ -102,18 +102,24 @@ const RecurringEntryForm = ({ isOpen, setIsOpen, entryId }: RecurringEntryFormPr
   }, [entryToEdit, isEditing, isOpen, form]);
 
   const { fields, append, remove } = useFieldArray({ control: form.control, name: "items" });
-  const { data: accounts } = useQuery<Account[]>({ queryKey: ['accounts'], queryFn: async () => {
-    const { data, error } = await supabase.from('chart_of_accounts').select('*').order('account_number');
-    if (error) throw new Error(error.message);
-    return data;
-  }});
+  const { data: accounts } = useQuery<Account[]>({ 
+    queryKey: ['accounts', activeCompany?.id], 
+    queryFn: async () => {
+        if (!activeCompany) return [];
+        const { data, error } = await supabase.from('chart_of_accounts').select('*').eq('company_id', activeCompany.id).order('account_number');
+        if (error) throw new Error(error.message);
+        return data;
+    },
+    enabled: !!activeCompany
+  });
 
   const mutation = useMutation({
     mutationFn: async (values: RecurringEntryFormValues) => {
-      if (!user) throw new Error('User not authenticated');
+      if (!user || !activeCompany) throw new Error('User not authenticated or no active company');
       
       const entryPayload = {
         user_id: user.id,
+        company_id: activeCompany.id,
         description: values.description,
         frequency: values.frequency,
         start_date: values.start_date,
@@ -138,7 +144,7 @@ const RecurringEntryForm = ({ isOpen, setIsOpen, entryId }: RecurringEntryFormPr
       }
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['recurring_entries'] });
+      queryClient.invalidateQueries({ queryKey: ['recurring_entries', activeCompany?.id] });
       showSuccess(`Recurring entry ${isEditing ? 'updated' : 'created'}.`);
       setIsOpen(false);
     },

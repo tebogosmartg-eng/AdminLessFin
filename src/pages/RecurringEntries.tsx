@@ -10,6 +10,7 @@ import { showError, showSuccess } from '../utils/toast';
 import RecurringEntryForm from '../components/RecurringEntryForm';
 import { format } from 'date-fns';
 import { Alert, AlertDescription, AlertTitle } from '../components/ui/alert';
+import { useAuth } from '../contexts/AuthContext';
 
 type RecurringEntry = {
   id: string;
@@ -22,17 +23,21 @@ const RecurringEntries = () => {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [selectedEntryId, setSelectedEntryId] = useState<string | undefined>(undefined);
   const queryClient = useQueryClient();
+  const { activeCompany } = useAuth();
 
   const { data: entries, isLoading } = useQuery<RecurringEntry[]>({
-    queryKey: ['recurring_entries'],
+    queryKey: ['recurring_entries', activeCompany?.id],
     queryFn: async () => {
+      if (!activeCompany) return [];
       const { data, error } = await supabase
         .from('recurring_journal_entries')
         .select('id, description, frequency, next_run_date')
+        .eq('company_id', activeCompany.id)
         .order('created_at', { ascending: false });
       if (error) throw new Error(error.message);
       return data;
     },
+    enabled: !!activeCompany,
   });
 
   const deleteMutation = useMutation({
@@ -41,7 +46,7 @@ const RecurringEntries = () => {
       if (error) throw new Error(error.message);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['recurring_entries'] });
+      queryClient.invalidateQueries({ queryKey: ['recurring_entries', activeCompany?.id] });
       showSuccess('Recurring entry deleted.');
     },
     onError: (error) => {

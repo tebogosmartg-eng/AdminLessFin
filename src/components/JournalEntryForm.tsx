@@ -68,7 +68,7 @@ interface JournalEntryFormProps {
 }
 
 const JournalEntryForm = ({ isOpen, setIsOpen, entryId }: JournalEntryFormProps) => {
-  const { user } = useAuth();
+  const { user, activeCompany } = useAuth();
   const queryClient = useQueryClient();
   const isEditing = !!entryId;
   const [attachmentFile, setAttachmentFile] = useState<File | null>(null);
@@ -135,13 +135,40 @@ const JournalEntryForm = ({ isOpen, setIsOpen, entryId }: JournalEntryFormProps)
     name: "items",
   });
 
-  const { data: accounts } = useQuery<Account[]>({ queryKey: ['accounts'] });
-  const { data: vendors } = useQuery<Vendor[]>({ queryKey: ['vendors'] });
-  const { data: customers } = useQuery<Customer[]>({ queryKey: ['customers'] });
+  const { data: accounts } = useQuery<Account[]>({ 
+    queryKey: ['accounts', activeCompany?.id],
+    queryFn: async () => {
+        if (!activeCompany) return [];
+        const { data, error } = await supabase.from('chart_of_accounts').select('*').eq('company_id', activeCompany.id).order('name');
+        if (error) throw error;
+        return data;
+    },
+    enabled: !!activeCompany
+  });
+  const { data: vendors } = useQuery<Vendor[]>({ 
+    queryKey: ['vendors', activeCompany?.id],
+    queryFn: async () => {
+        if (!activeCompany) return [];
+        const { data, error } = await supabase.from('vendors').select('*').eq('company_id', activeCompany.id).order('name');
+        if (error) throw error;
+        return data;
+    },
+    enabled: !!activeCompany
+  });
+  const { data: customers } = useQuery<Customer[]>({ 
+    queryKey: ['customers', activeCompany?.id],
+    queryFn: async () => {
+        if (!activeCompany) return [];
+        const { data, error } = await supabase.from('customers').select('*').eq('company_id', activeCompany.id).order('name');
+        if (error) throw error;
+        return data;
+    },
+    enabled: !!activeCompany
+  });
 
   const mutation = useMutation({
     mutationFn: async (values: JournalEntryFormValues) => {
-      if (!user) throw new Error('User not authenticated');
+      if (!user || !activeCompany) throw new Error('User not authenticated or no active company');
 
       // 1. Upsert the core journal entry data (without attachment URL)
       let upsertedEntryId: string;
@@ -157,7 +184,7 @@ const JournalEntryForm = ({ isOpen, setIsOpen, entryId }: JournalEntryFormProps)
         const { error } = await supabase.from('journal_entries').update(entryCoreData).eq('id', upsertedEntryId);
         if (error) throw error;
       } else {
-        const { data, error } = await supabase.from('journal_entries').insert({ ...entryCoreData, user_id: user.id }).select('id').single();
+        const { data, error } = await supabase.from('journal_entries').insert({ ...entryCoreData, user_id: user.id, company_id: activeCompany.id }).select('id').single();
         if (error) throw error;
         upsertedEntryId = data.id;
       }
