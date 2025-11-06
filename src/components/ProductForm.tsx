@@ -114,8 +114,8 @@ const ProductForm = ({ isOpen, setIsOpen, product }: ProductFormProps) => {
       };
 
       const { error } = product
-        ? await supabase.from('products').update(productData).eq('id', product.id)
-        : await supabase.from('products').insert(productData);
+        ? await supabase.from('products').update(productData).eq('id', product.id).select().single()
+        : await supabase.from('products').insert(productData).select().single();
 
       if (error) throw new Error(error.message);
     },

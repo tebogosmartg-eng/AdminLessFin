@@ -85,8 +85,8 @@ const AccountForm = ({ isOpen, setIsOpen, account }: AccountFormProps) => {
       };
 
       const { error } = account
-        ? await supabase.from('chart_of_accounts').update(accountData).eq('id', account.id)
-        : await supabase.from('chart_of_accounts').insert(accountData);
+        ? await supabase.from('chart_of_accounts').update(accountData).eq('id', account.id).select().single()
+        : await supabase.from('chart_of_accounts').insert(accountData).select().single();
 
       if (error) throw new Error(error.message);
     },
