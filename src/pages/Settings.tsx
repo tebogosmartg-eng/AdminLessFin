@@ -12,6 +12,7 @@ import { Textarea } from '../components/ui/textarea';
 import { showError, showSuccess } from '../utils/toast';
 import { useEffect } from 'react';
 import AvatarUploader from '../components/AvatarUploader';
+import FinancialYearSettings from '../components/FinancialYearSettings';
 
 const profileSchema = z.object({
   full_name: z.string().min(1, 'Full name is required.'),
@@ -119,6 +120,8 @@ const Settings = () => {
     <div className="space-y-6">
       <h1 className="text-3xl font-bold">Settings</h1>
       
+      <FinancialYearSettings />
+
       <Card>
         <CardHeader>
           <CardTitle>Profile Picture</CardTitle>
