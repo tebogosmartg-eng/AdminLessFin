@@ -48,7 +48,7 @@ interface AccountFormProps {
 }
 
 const AccountForm = ({ isOpen, setIsOpen, account }: AccountFormProps) => {
-  const { user } = useAuth();
+  const { activeCompany } = useAuth();
   const queryClient = useQueryClient();
   const form = useForm<AccountFormValues>({
     resolver: zodResolver(accountSchema),
@@ -77,11 +77,11 @@ const AccountForm = ({ isOpen, setIsOpen, account }: AccountFormProps) => {
 
   const mutation = useMutation({
     mutationFn: async (values: AccountFormValues) => {
-      if (!user) throw new Error('User not authenticated');
+      if (!activeCompany) throw new Error('No active company selected');
 
       const accountData = {
         ...values,
-        user_id: user.id,
+        company_id: activeCompany.id,
       };
 
       const { error } = account
@@ -91,7 +91,7 @@ const AccountForm = ({ isOpen, setIsOpen, account }: AccountFormProps) => {
       if (error) throw new Error(error.message);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['accounts'] });
+      queryClient.invalidateQueries({ queryKey: ['accounts', activeCompany?.id] });
       showSuccess(`Account ${account ? 'updated' : 'created'} successfully.`);
       setIsOpen(false);
     },

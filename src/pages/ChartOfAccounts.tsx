@@ -29,6 +29,7 @@ import {
   DropdownMenuTrigger,
 } from "../components/ui/dropdown-menu"
 import { formatCurrency } from '../lib/utils';
+import { useAuth } from '../contexts/AuthContext';
 
 export type Account = {
   id: string;
@@ -45,19 +46,23 @@ const ChartOfAccounts = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterType, setFilterType] = useState('all');
   const queryClient = useQueryClient();
+  const { activeCompany } = useAuth();
 
   const fetchAccounts = async () => {
+    if (!activeCompany) return [];
     const { data, error } = await supabase
       .from('chart_of_accounts')
       .select('*')
+      .eq('company_id', activeCompany.id)
       .order('account_number', { ascending: true });
     if (error) throw new Error(error.message);
     return data;
   };
 
   const { data: accounts, isLoading } = useQuery<Account[]>({
-    queryKey: ['accounts'],
+    queryKey: ['accounts', activeCompany?.id],
     queryFn: fetchAccounts,
+    enabled: !!activeCompany,
   });
 
   const filteredAccounts = useMemo(() => {
@@ -78,7 +83,7 @@ const ChartOfAccounts = () => {
       if (error) throw new Error(error.message);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['accounts'] });
+      queryClient.invalidateQueries({ queryKey: ['accounts', activeCompany?.id] });
       showSuccess('Account deleted successfully.');
     },
     onError: (error) => {
