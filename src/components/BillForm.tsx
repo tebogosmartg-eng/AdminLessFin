@@ -128,18 +128,74 @@ const BillForm = ({ isOpen, setIsOpen }: BillFormProps) => {
     mutationFn: async (values: BillFormValues) => {
       if (!user || !activeCompany) throw new Error('User not authenticated or no active company');
       const description = values.description || `Bill from ${vendors?.find(v => v.id === values.vendor_id)?.name}`;
-      const itemsPayload = values.items.map(item => ({ ...item, product_id: item.product_id || null }));
 
-      const { error } = await supabase.rpc('record_bill_with_inventory', {
-        p_company_id: activeCompany.id,
-        p_vendor_id: values.vendor_id,
-        p_bill_date: values.bill_date,
-        p_due_date: values.due_date,
-        p_accounts_payable_id: values.accounts_payable_id,
-        p_description: description,
-        p_items: itemsPayload
+      // 1. Create Journal Entry
+      const { data: je, error: jeError } = await supabase
+        .from('journal_entries')
+        .insert({
+          company_id: activeCompany.id,
+          vendor_id: values.vendor_id,
+          entry_date: values.bill_date,
+          description: description,
+        })
+        .select('id')
+        .single();
+      if (jeError) throw jeError;
+      const journalEntryId = je.id;
+
+      // 2. Create Bill record
+      const { error: billError } = await supabase.from('bills').insert({
+        company_id: activeCompany.id,
+        vendor_id: values.vendor_id,
+        journal_entry_id: journalEntryId,
+        bill_date: values.bill_date,
+        due_date: values.due_date,
+        status: 'open',
       });
-      if (error) throw error;
+      if (billError) throw billError;
+
+      // 3. Prepare and insert Journal Entry Items
+      const journalItems = [];
+      let totalAmount = 0;
+
+      for (const item of values.items) {
+        const lineTotal = item.quantity * item.unit_cost;
+        totalAmount += lineTotal;
+
+        // Debit Expense/Asset account
+        journalItems.push({
+          journal_entry_id: journalEntryId,
+          account_id: item.expense_account_id,
+          type: 'debit',
+          amount: lineTotal,
+        });
+
+        // Update inventory if applicable
+        if (item.product_id) {
+          const product = products?.find(p => p.id === item.product_id);
+          if (product && product.type === 'inventory') {
+            const { error: productUpdateError } = await supabase
+              .from('products')
+              .update({
+                quantity_on_hand: product.quantity_on_hand + item.quantity,
+                cost: item.unit_cost,
+              })
+              .eq('id', product.id);
+            if (productUpdateError) throw productUpdateError;
+          }
+        }
+      }
+
+      // Credit Accounts Payable
+      journalItems.push({
+        journal_entry_id: journalEntryId,
+        account_id: values.accounts_payable_id,
+        type: 'credit',
+        amount: totalAmount,
+      });
+
+      const { error: itemsError } = await supabase.from('journal_entry_items').insert(journalItems);
+      if (itemsError) throw itemsError;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['bills', activeCompany?.id] });
