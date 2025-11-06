@@ -12,6 +12,9 @@ import { Textarea } from '../components/ui/textarea';
 import { showError, showSuccess } from '../utils/toast';
 import { useEffect } from 'react';
 import AvatarUploader from '../components/AvatarUploader';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
+import { Alert, AlertDescription, AlertTitle } from '../components/ui/alert';
+import { AlertCircle } from 'lucide-react';
 
 const profileSchema = z.object({
   full_name: z.string().min(1, 'Full name is required.'),
@@ -33,6 +36,12 @@ const passwordSchema = z.object({
 });
 type PasswordFormValues = z.infer<typeof passwordSchema>;
 
+const financialYearSchema = z.object({
+    financial_year_end_month: z.coerce.number().min(1).max(12),
+    financial_year_end_day: z.coerce.number().min(1).max(31),
+});
+type FinancialYearFormValues = z.infer<typeof financialYearSchema>;
+
 const Settings = () => {
   const { user, profile, refreshProfile } = useAuth();
 
@@ -51,6 +60,11 @@ const Settings = () => {
     defaultValues: { password: '', confirmPassword: '' },
   });
 
+  const financialYearForm = useForm<FinancialYearFormValues>({
+    resolver: zodResolver(financialYearSchema),
+    defaultValues: { financial_year_end_month: 12, financial_year_end_day: 31 },
+  });
+
   useEffect(() => {
     if (profile) {
       profileForm.reset({ full_name: profile.full_name || '' });
@@ -58,8 +72,12 @@ const Settings = () => {
         company_name: profile.company_name || '',
         company_address: profile.company_address || '',
       });
+      financialYearForm.reset({
+        financial_year_end_month: profile.financial_year_end_month || 12,
+        financial_year_end_day: profile.financial_year_end_day || 31,
+      });
     }
-  }, [profile, profileForm, companyForm]);
+  }, [profile, profileForm, companyForm, financialYearForm]);
 
   const profileMutation = useMutation({
     mutationFn: async (values: ProfileFormValues) => {
@@ -111,9 +129,40 @@ const Settings = () => {
     },
   });
 
+  const financialYearMutation = useMutation({
+    mutationFn: async (values: FinancialYearFormValues) => {
+        if (!user) throw new Error('User not authenticated');
+        const { error } = await supabase.from('profiles').update(values).eq('id', user.id);
+        if (error) throw error;
+    },
+    onSuccess: async () => {
+        await refreshProfile();
+        showSuccess('Financial year settings updated.');
+    },
+    onError: (error: any) => showError(`Error: ${error.message}`),
+  });
+
+  const yearEndCloseMutation = useMutation({
+      mutationFn: async () => {
+          const { error } = await supabase.functions.invoke('year-end-close');
+          if (error) throw new Error(`Function Error: ${error.message}`);
+      },
+      onSuccess: async () => {
+          await refreshProfile();
+          showSuccess('Financial year closed successfully! Your new financial year has started.');
+      },
+      onError: (error: any) => showError(`Error closing year: ${error.message}`),
+  });
+
   const onProfileSubmit = (values: ProfileFormValues) => profileMutation.mutate(values);
   const onCompanySubmit = (values: CompanyFormValues) => companyMutation.mutate(values);
   const onPasswordSubmit = (values: PasswordFormValues) => passwordMutation.mutate(values);
+  const onFinancialYearSubmit = (values: FinancialYearFormValues) => financialYearMutation.mutate(values);
+  const handleCloseYear = () => {
+      if (window.confirm('Are you sure you want to close the financial year? This will post a closing journal entry and move you to the next financial year. This action cannot be undone.')) {
+          yearEndCloseMutation.mutate();
+      }
+  }
 
   return (
     <div className="space-y-6">
@@ -197,6 +246,47 @@ const Settings = () => {
               </Button>
             </form>
           </Form>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Financial Year</CardTitle>
+          <CardDescription>Set your company's financial year end and close your books.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <Form {...financialYearForm}>
+            <form onSubmit={financialYearForm.handleSubmit(onFinancialYearSubmit)} className="space-y-4 max-w-md">
+              <div className="flex items-end gap-4">
+                <FormField control={financialYearForm.control} name="financial_year_end_month" render={({ field }) => (
+                  <FormItem><FormLabel>Year End Month</FormLabel>
+                    <Select onValueChange={field.onChange} value={String(field.value)}>
+                      <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
+                      <SelectContent>{Array.from({ length: 12 }, (_, i) => <SelectItem key={i + 1} value={String(i + 1)}>{new Date(0, i).toLocaleString('default', { month: 'long' })}</SelectItem>)}</SelectContent>
+                    </Select>
+                  <FormMessage /></FormItem>
+                )} />
+                <FormField control={financialYearForm.control} name="financial_year_end_day" render={({ field }) => (
+                  <FormItem><FormLabel>Year End Day</FormLabel><FormControl><Input type="number" min="1" max="31" {...field} /></FormControl><FormMessage /></FormItem>
+                )} />
+              </div>
+              <Button type="submit" disabled={financialYearMutation.isPending}>{financialYearMutation.isPending ? 'Saving...' : 'Save Settings'}</Button>
+            </form>
+          </Form>
+          <div className="border-t pt-6">
+            <h4 className="font-semibold">Close Financial Year</h4>
+            <p className="text-sm text-muted-foreground mt-1">Current financial year started on: {profile?.current_financial_year_start ? new Date(profile.current_financial_year_start).toLocaleDateString() : 'N/A'}</p>
+            <Alert variant="destructive" className="my-4">
+              <AlertCircle className="h-4 w-4" />
+              <AlertTitle>Warning</AlertTitle>
+              <AlertDescription>
+                This is an irreversible action. It will post a closing journal entry and advance your company to the next financial year. Ensure all transactions for the current year are recorded and reconciled before proceeding.
+              </AlertDescription>
+            </Alert>
+            <Button variant="destructive" onClick={handleCloseYear} disabled={yearEndCloseMutation.isPending}>
+              {yearEndCloseMutation.isPending ? 'Closing...' : 'Close Financial Year'}
+            </Button>
+          </div>
         </CardContent>
       </Card>
 

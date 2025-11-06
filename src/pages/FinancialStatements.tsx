@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/card';
@@ -9,11 +9,12 @@ import { Calendar as CalendarIcon, Download, Printer } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '../components/ui/popover';
 import { Calendar } from '../components/ui/calendar';
 import { DateRange } from 'react-day-picker';
-import { format, startOfYear, endOfYear, subDays } from 'date-fns';
+import { format, subDays } from 'date-fns';
 import { cn, downloadCSV } from '../lib/utils';
 import { formatCurrency } from '../lib/utils';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
 import FinancialRatios from '../components/FinancialRatios';
+import { useAuth } from '../contexts/AuthContext';
 
 type AccountBalance = {
   id: string;
@@ -37,10 +38,24 @@ type CashFlowItem = {
 };
 
 const FinancialStatements = () => {
-  const [date, setDate] = useState<DateRange | undefined>({
-    from: startOfYear(new Date()),
-    to: endOfYear(new Date()),
-  });
+  const { profile } = useAuth();
+  const [date, setDate] = useState<DateRange | undefined>();
+
+  useEffect(() => {
+    if (profile) {
+      const startDate = new Date(profile.current_financial_year_start);
+      const year = startDate.getFullYear();
+      const month = profile.financial_year_end_month - 1; // JS months are 0-indexed
+      const day = profile.financial_year_end_day;
+      
+      let endDate = new Date(year, month, day);
+      if (endDate < startDate) {
+        endDate.setFullYear(year + 1);
+      }
+      
+      setDate({ from: startDate, to: endDate });
+    }
+  }, [profile]);
 
   const fromDate = date?.from ?? new Date();
   const toDate = date?.to ?? new Date();

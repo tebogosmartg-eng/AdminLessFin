@@ -8,6 +8,9 @@ type Profile = {
   role: string;
   company_name: string | null;
   company_address: string | null;
+  financial_year_end_month: number;
+  financial_year_end_day: number;
+  current_financial_year_start: string;
 };
 
 type AuthContextType = {
