@@ -7,6 +7,7 @@ interface FinancialRatiosProps {
     currentRatio: number | null;
     netProfitMargin: number | null;
     debtToEquity: number | null;
+    returnOnEquity: number | null;
   };
 }
 
@@ -51,6 +52,11 @@ const FinancialRatios = ({ ratios }: FinancialRatiosProps) => {
             title="Net Profit Margin" 
             value={formatPercentage(ratios.netProfitMargin)}
             tooltip="Measures how much net income is generated as a percentage of revenue. (Net Income / Total Income)"
+          />
+          <RatioCard 
+            title="Return on Equity (ROE)" 
+            value={formatPercentage(ratios.returnOnEquity)}
+            tooltip="Measures the profitability of a corporation in relation to shareholders’ equity. (Net Income / Total Equity)"
           />
         </div>
       </div>

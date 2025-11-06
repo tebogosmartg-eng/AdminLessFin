@@ -143,6 +143,7 @@ const FinancialStatements = () => {
     currentRatio: currentLiabilities > 0 ? currentAssets / currentLiabilities : null,
     netProfitMargin: totalIncome > 0 ? netIncome / totalIncome : null,
     debtToEquity: totalEquity > 0 ? totalLiabilities / totalEquity : null,
+    returnOnEquity: totalEquity > 0 ? netIncome / totalEquity : null,
   };
 
   return (
