@@ -227,7 +227,7 @@ const JournalEntries = () => {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Accounts</SelectItem>
-                {accounts?.map(acc => <SelectItem key={acc.id} value={acc.id}>{acc.account_number} - {acc.name}</SelectItem>)}
+                {accounts?.map(acc => <SelectItem key={acc.id} value={acc.id}>{acc.name}</SelectItem>)}
               </SelectContent>
             </Select>
             <Select value={filterVendor} onValueChange={setFilterVendor}>

@@ -170,10 +170,10 @@ const LoanForm = ({ isOpen, setIsOpen, loanId }: LoanFormProps) => {
             <fieldset className="grid grid-cols-2 gap-4 border p-4 rounded-md">
               <legend className="text-sm font-medium px-1 -mb-2">Accounting</legend>
               <FormField control={form.control} name="deposit_account_id" render={({ field }) => (
-                <FormItem><FormLabel>Deposit To</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select asset account" /></SelectTrigger></FormControl><SelectContent>{assetAccounts?.map(a => <SelectItem key={a.id} value={a.id}>{a.account_number} - {a.name}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem>
+                <FormItem><FormLabel>Deposit To</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select asset account" /></SelectTrigger></FormControl><SelectContent>{assetAccounts?.map(a => <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem>
               )} />
               <FormField control={form.control} name="liability_account_id" render={({ field }) => (
-                <FormItem><FormLabel>Loan Account</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select liability account" /></SelectTrigger></FormControl><SelectContent>{liabilityAccounts?.map(a => <SelectItem key={a.id} value={a.id}>{a.account_number} - {a.name}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem>
+                <FormItem><FormLabel>Loan Account</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select liability account" /></SelectTrigger></FormControl><SelectContent>{liabilityAccounts?.map(a => <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem>
               )} />
             </fieldset>
 

@@ -242,15 +242,15 @@ const PayrollRunDetail = () => {
               <div className="grid md:grid-cols-3 gap-4">
                 <Select value={wageAccountId} onValueChange={setWageAccountId}>
                   <SelectTrigger><SelectValue placeholder="Select Wages/Salary Expense Account..." /></SelectTrigger>
-                  <SelectContent>{expenseAccounts?.map(a => <SelectItem key={a.id} value={a.id}>{a.account_number} - {a.name}</SelectItem>)}</SelectContent>
+                  <SelectContent>{expenseAccounts?.map(a => <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>)}</SelectContent>
                 </Select>
                 <Select value={bankAccountId} onValueChange={setBankAccountId}>
                   <SelectTrigger><SelectValue placeholder="Select Bank/Cash Account..." /></SelectTrigger>
-                  <SelectContent>{assetAccounts?.map(a => <SelectItem key={a.id} value={a.id}>{a.account_number} - {a.name}</SelectItem>)}</SelectContent>
+                  <SelectContent>{assetAccounts?.map(a => <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>)}</SelectContent>
                 </Select>
                 <Select value={liabilityAccountId} onValueChange={setLiabilityAccountId} disabled={totalDeductions === 0}>
                   <SelectTrigger><SelectValue placeholder="Select Payroll Liability Account..." /></SelectTrigger>
-                  <SelectContent>{liabilityAccounts?.map(a => <SelectItem key={a.id} value={a.id}>{a.account_number} - {a.name}</SelectItem>)}</SelectContent>
+                  <SelectContent>{liabilityAccounts?.map(a => <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>)}</SelectContent>
                 </Select>
               </div>
               <Alert>
