@@ -103,7 +103,7 @@ const RecurringEntryForm = ({ isOpen, setIsOpen, entryId }: RecurringEntryFormPr
 
   const { fields, append, remove } = useFieldArray({ control: form.control, name: "items" });
   const { data: accounts } = useQuery<Account[]>({ queryKey: ['accounts'], queryFn: async () => {
-    const { data, error } = await supabase.from('chart_of_accounts').select('*');
+    const { data, error } = await supabase.from('chart_of_accounts').select('*').order('account_number');
     if (error) throw new Error(error.message);
     return data;
   }});
@@ -177,7 +177,7 @@ const RecurringEntryForm = ({ isOpen, setIsOpen, entryId }: RecurringEntryFormPr
               {fields.map((field, index) => (
                 <div key={field.id} className="flex items-center gap-2">
                   <FormField control={form.control} name={`items.${index}.account_id`} render={({ field }) => (
-                    <FormItem className="flex-1"><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select Account" /></SelectTrigger></FormControl><SelectContent>{accounts?.map(acc => <SelectItem key={acc.id} value={acc.id}>{acc.name}</SelectItem>)}</SelectContent></Select></FormItem>
+                    <FormItem className="flex-1"><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select Account" /></SelectTrigger></FormControl><SelectContent>{accounts?.map(acc => <SelectItem key={acc.id} value={acc.id}>{acc.account_number} - {acc.name}</SelectItem>)}</SelectContent></Select></FormItem>
                   )} />
                   <FormField control={form.control} name={`items.${index}.type`} render={({ field }) => (
                     <FormItem><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl><SelectContent><SelectItem value="debit">Debit</SelectItem><SelectItem value="credit">Credit</SelectItem></SelectContent></Select></FormItem>

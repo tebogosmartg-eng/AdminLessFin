@@ -88,7 +88,7 @@ const BudgetForm = ({ isOpen, setIsOpen, budget }: BudgetFormProps) => {
         .from('chart_of_accounts')
         .select('*')
         .eq('type', 'Expense')
-        .order('name');
+        .order('account_number');
       if (error) throw new Error(error.message);
       return data;
     },
@@ -146,7 +146,7 @@ const BudgetForm = ({ isOpen, setIsOpen, budget }: BudgetFormProps) => {
                     </FormControl>
                     <SelectContent>
                       {expenseAccounts?.map(acc => (
-                        <SelectItem key={acc.id} value={acc.id}>{acc.name}</SelectItem>
+                        <SelectItem key={acc.id} value={acc.id}>{acc.account_number} - {acc.name}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>

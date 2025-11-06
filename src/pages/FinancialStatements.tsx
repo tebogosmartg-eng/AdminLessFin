@@ -17,6 +17,7 @@ import FinancialRatios from '../components/FinancialRatios';
 
 type AccountBalance = {
   id: string;
+  account_number: number;
   name: string;
   type: 'Asset' | 'Liability' | 'Equity' | 'Income' | 'Expense';
   balance: number;
@@ -145,6 +146,17 @@ const FinancialStatements = () => {
     debtToEquity: totalEquity > 0 ? totalLiabilities / totalEquity : null,
     returnOnEquity: totalEquity > 0 ? netIncome / totalEquity : null,
     returnOnAssets: totalAssets > 0 ? netIncome / totalAssets : null,
+  };
+
+  const handleDownloadTrialBalance = () => {
+    const data = balancesAsOf?.map(account => ({
+      'Account Number': account.account_number.toString(),
+      'Account Name': account.name,
+      'Debit': ['Asset', 'Expense'].includes(account.type) && account.balance >= 0 ? account.balance.toFixed(2) : (['Liability', 'Equity', 'Income'].includes(account.type) && account.balance < 0 ? (-account.balance).toFixed(2) : ''),
+      'Credit': ['Liability', 'Equity', 'Income'].includes(account.type) && account.balance >= 0 ? account.balance.toFixed(2) : (['Asset', 'Expense'].includes(account.type) && account.balance < 0 ? (-account.balance).toFixed(2) : ''),
+    })) || [];
+    data.push({ 'Account Number': '', 'Account Name': 'Totals', Debit: totalDebits.toFixed(2), Credit: totalCredits.toFixed(2) });
+    downloadCSV(data, `trial-balance-${format(toDate, 'yyyy-MM-dd')}.csv`);
   };
 
   return (
@@ -286,21 +298,22 @@ const FinancialStatements = () => {
           <Card>
             <CardHeader className="flex flex-row items-center justify-between">
               <div><CardTitle>Trial Balance</CardTitle><CardDescription>As of {format(toDate, "PPP")}</CardDescription></div>
-              <Button variant="outline" size="sm" onClick={() => {}} className="print:hidden"><Download className="mr-2 h-4 w-4" /> Download CSV</Button>
+              <Button variant="outline" size="sm" onClick={handleDownloadTrialBalance} className="print:hidden"><Download className="mr-2 h-4 w-4" /> Download CSV</Button>
             </CardHeader>
             <CardContent>{isLoading ? <Skeleton className="h-96 w-full" /> : (
               <Table>
-                <TableHeader><TableRow><TableHead>Account</TableHead><TableHead className="text-right">Debit</TableHead><TableHead className="text-right">Credit</TableHead></TableRow></TableHeader>
+                <TableHeader><TableRow><TableHead>Acc. No.</TableHead><TableHead>Account</TableHead><TableHead className="text-right">Debit</TableHead><TableHead className="text-right">Credit</TableHead></TableRow></TableHeader>
                 <TableBody>
-                  {balancesAsOf?.map(acc => (
+                  {balancesAsOf?.sort((a, b) => a.account_number - b.account_number).map(acc => (
                     <TableRow key={acc.id}>
+                      <TableCell>{acc.account_number}</TableCell>
                       <TableCell>{acc.name}</TableCell>
                       <TableCell className="text-right font-mono">{['Asset', 'Expense'].includes(acc.type) && acc.balance >= 0 ? formatCurrency(acc.balance) : (['Liability', 'Equity', 'Income'].includes(acc.type) && acc.balance < 0 ? formatCurrency(-acc.balance) : '')}</TableCell>
                       <TableCell className="text-right font-mono">{['Liability', 'Equity', 'Income'].includes(acc.type) && acc.balance >= 0 ? formatCurrency(acc.balance) : (['Asset', 'Expense'].includes(acc.type) && acc.balance < 0 ? formatCurrency(-acc.balance) : '')}</TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
-                <TableFooter><TableRow className="text-lg font-bold"><TableCell>Totals</TableCell><TableCell className="text-right font-mono">{formatCurrency(totalDebits)}</TableCell><TableCell className="text-right font-mono">{formatCurrency(totalCredits)}</TableCell></TableRow></TableFooter>
+                <TableFooter><TableRow className="text-lg font-bold"><TableCell colSpan={2}>Totals</TableCell><TableCell className="text-right font-mono">{formatCurrency(totalDebits)}</TableCell><TableCell className="text-right font-mono">{formatCurrency(totalCredits)}</TableCell></TableRow></TableFooter>
               </Table>
             )}</CardContent>
           </Card>

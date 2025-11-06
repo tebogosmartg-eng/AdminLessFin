@@ -13,6 +13,7 @@ type LedgerEntry = {
   description: string | null;
   type: 'debit' | 'credit';
   amount: number;
+  journal_entry_id: string;
 };
 
 const GeneralLedger = () => {
@@ -21,7 +22,7 @@ const GeneralLedger = () => {
   const { data: accounts, isLoading: isLoadingAccounts } = useQuery<Account[]>({
     queryKey: ['accounts'],
     queryFn: async () => {
-      const { data, error } = await supabase.from('chart_of_accounts').select('*').order('name');
+      const { data, error } = await supabase.from('chart_of_accounts').select('*').order('account_number');
       if (error) throw new Error(error.message);
       return data;
     },
@@ -37,6 +38,7 @@ const GeneralLedger = () => {
           amount,
           type,
           journal_entries (
+            id,
             entry_date,
             description
           )
@@ -51,6 +53,7 @@ const GeneralLedger = () => {
         type: item.type,
         entry_date: (item.journal_entries as any).entry_date,
         description: (item.journal_entries as any).description,
+        journal_entry_id: (item.journal_entries as any).id,
       }));
     },
     enabled: !!selectedAccountId,
@@ -93,7 +96,7 @@ const GeneralLedger = () => {
               {isLoadingAccounts ? (
                 <SelectItem value="loading" disabled>Loading accounts...</SelectItem>
               ) : (
-                accounts?.map(acc => <SelectItem key={acc.id} value={acc.id}>{acc.name}</SelectItem>)
+                accounts?.map(acc => <SelectItem key={acc.id} value={acc.id}>{acc.account_number} - {acc.name}</SelectItem>)
               )}
             </SelectContent>
           </Select>
@@ -103,7 +106,7 @@ const GeneralLedger = () => {
       {selectedAccountId && (
         <Card>
           <CardHeader>
-            <CardTitle>{selectedAccount?.name || 'Ledger'}</CardTitle>
+            <CardTitle>{selectedAccount?.account_number} - {selectedAccount?.name || 'Ledger'}</CardTitle>
             <CardDescription>Transaction details and running balance.</CardDescription>
           </CardHeader>
           <CardContent>
@@ -112,6 +115,7 @@ const GeneralLedger = () => {
                 <TableRow>
                   <TableHead>Date</TableHead>
                   <TableHead>Description</TableHead>
+                  <TableHead>Ref #</TableHead>
                   <TableHead className="text-right">Debit</TableHead>
                   <TableHead className="text-right">Credit</TableHead>
                   <TableHead className="text-right">Balance</TableHead>
@@ -121,7 +125,7 @@ const GeneralLedger = () => {
                 {isLoadingEntries ? (
                   [...Array(5)].map((_, i) => (
                     <TableRow key={i}>
-                      <TableCell colSpan={5}><Skeleton className="h-5 w-full" /></TableCell>
+                      <TableCell colSpan={6}><Skeleton className="h-5 w-full" /></TableCell>
                     </TableRow>
                   ))
                 ) : entriesWithBalance.length > 0 ? (
@@ -129,6 +133,7 @@ const GeneralLedger = () => {
                     <TableRow key={index}>
                       <TableCell>{new Date(entry.entry_date).toLocaleDateString()}</TableCell>
                       <TableCell>{entry.description}</TableCell>
+                      <TableCell className="text-xs text-muted-foreground">{entry.journal_entry_id.substring(0, 8)}</TableCell>
                       <TableCell className="text-right font-mono">{entry.type === 'debit' ? formatCurrency(entry.amount) : ''}</TableCell>
                       <TableCell className="text-right font-mono">{entry.type === 'credit' ? formatCurrency(entry.amount) : ''}</TableCell>
                       <TableCell className="text-right font-mono">{formatCurrency(entry.runningBalance)}</TableCell>
@@ -136,7 +141,7 @@ const GeneralLedger = () => {
                   ))
                 ) : (
                   <TableRow>
-                    <TableCell colSpan={5} className="text-center">No transactions found for this account.</TableCell>
+                    <TableCell colSpan={6} className="text-center">No transactions found for this account.</TableCell>
                   </TableRow>
                 )}
               </TableBody>

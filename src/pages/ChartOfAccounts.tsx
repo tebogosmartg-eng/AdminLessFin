@@ -32,6 +32,7 @@ import { formatCurrency } from '../lib/utils';
 
 export type Account = {
   id: string;
+  account_number: number;
   name: string;
   type: 'Asset' | 'Liability' | 'Equity' | 'Income' | 'Expense';
   description: string | null;
@@ -49,7 +50,7 @@ const ChartOfAccounts = () => {
     const { data, error } = await supabase
       .from('chart_of_accounts')
       .select('*')
-      .order('name', { ascending: true });
+      .order('account_number', { ascending: true });
     if (error) throw new Error(error.message);
     return data;
   };
@@ -62,7 +63,10 @@ const ChartOfAccounts = () => {
   const filteredAccounts = useMemo(() => {
     if (!accounts) return [];
     return accounts.filter(account => {
-      const matchesSearch = account.name.toLowerCase().includes(searchTerm.toLowerCase());
+      const lowerCaseSearch = searchTerm.toLowerCase();
+      const matchesSearch = 
+        account.name.toLowerCase().includes(lowerCaseSearch) ||
+        String(account.account_number).includes(lowerCaseSearch);
       const matchesType = filterType === 'all' || account.type === filterType;
       return matchesSearch && matchesType;
     });
@@ -114,7 +118,7 @@ const ChartOfAccounts = () => {
               <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
               <Input
                 type="search"
-                placeholder="Search by account name..."
+                placeholder="Search by name or number..."
                 className="pl-8 w-full"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
@@ -137,6 +141,7 @@ const ChartOfAccounts = () => {
           <Table>
             <TableHeader>
               <TableRow>
+                <TableHead className="w-[100px]">Number</TableHead>
                 <TableHead>Name</TableHead>
                 <TableHead>Type</TableHead>
                 <TableHead>Description</TableHead>
@@ -147,11 +152,12 @@ const ChartOfAccounts = () => {
             <TableBody>
               {isLoading ? (
                 <TableRow>
-                  <TableCell colSpan={5} className="text-center">Loading accounts...</TableCell>
+                  <TableCell colSpan={6} className="text-center">Loading accounts...</TableCell>
                 </TableRow>
               ) : filteredAccounts.length > 0 ? (
                 filteredAccounts.map((account) => (
                   <TableRow key={account.id}>
+                    <TableCell>{account.account_number}</TableCell>
                     <TableCell className="font-medium">{account.name}</TableCell>
                     <TableCell>{account.type}</TableCell>
                     <TableCell>{account.description}</TableCell>
@@ -174,7 +180,7 @@ const ChartOfAccounts = () => {
                 ))
               ) : (
                 <TableRow>
-                  <TableCell colSpan={5} className="text-center">No accounts found.</TableCell>
+                  <TableCell colSpan={6} className="text-center">No accounts found.</TableCell>
                 </TableRow>
               )}
             </TableBody>
