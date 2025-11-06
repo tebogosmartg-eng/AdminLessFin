@@ -53,7 +53,7 @@ interface ProductFormProps {
 }
 
 const ProductForm = ({ isOpen, setIsOpen, product }: ProductFormProps) => {
-  const { user } = useAuth();
+  const { activeCompany } = useAuth();
   const queryClient = useQueryClient();
   const form = useForm<ProductFormValues>({
     resolver: zodResolver(productSchema),
@@ -89,17 +89,20 @@ const ProductForm = ({ isOpen, setIsOpen, product }: ProductFormProps) => {
     }
   }, [product, form, isOpen]);
 
-  const { data: accounts } = useQuery<Account[]>({ queryKey: ['accounts'] });
+  const { data: accounts } = useQuery<Account[]>({ 
+    queryKey: ['accounts', activeCompany?.id],
+    enabled: !!activeCompany,
+  });
   const incomeAccounts = accounts?.filter(acc => acc.type === 'Income');
   const expenseAccounts = accounts?.filter(acc => acc.type === 'Expense');
 
   const mutation = useMutation({
     mutationFn: async (values: ProductFormValues) => {
-      if (!user) throw new Error('User not authenticated');
+      if (!activeCompany) throw new Error('No active company selected');
 
       const productData = {
         ...values,
-        user_id: user.id,
+        company_id: activeCompany.id,
         income_account_id: values.income_account_id || null,
         cogs_account_id: values.cogs_account_id || null,
       };
@@ -111,7 +114,7 @@ const ProductForm = ({ isOpen, setIsOpen, product }: ProductFormProps) => {
       if (error) throw new Error(error.message);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['products'] });
+      queryClient.invalidateQueries({ queryKey: ['products', activeCompany?.id] });
       showSuccess(`Item ${product ? 'updated' : 'created'} successfully.`);
       setIsOpen(false);
     },

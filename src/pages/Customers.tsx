@@ -20,6 +20,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "../components/ui/dropdown-menu";
+import { useAuth } from '../contexts/AuthContext';
 
 export type Customer = {
   id: string;
@@ -33,20 +34,24 @@ export type Customer = {
 const Customers = () => {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | undefined>(undefined);
+  const { activeCompany } = useAuth();
   const queryClient = useQueryClient();
 
   const fetchCustomers = async () => {
+    if (!activeCompany) return [];
     const { data, error } = await supabase
       .from('customers')
       .select('*')
+      .eq('company_id', activeCompany.id)
       .order('name', { ascending: true });
     if (error) throw new Error(error.message);
     return data;
   };
 
   const { data: customers, isLoading } = useQuery<Customer[]>({
-    queryKey: ['customers'],
+    queryKey: ['customers', activeCompany?.id],
     queryFn: fetchCustomers,
+    enabled: !!activeCompany,
   });
 
   const deleteMutation = useMutation({
@@ -55,7 +60,7 @@ const Customers = () => {
       if (error) throw new Error(error.message);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['customers'] });
+      queryClient.invalidateQueries({ queryKey: ['customers', activeCompany?.id] });
       showSuccess('Customer deleted successfully.');
     },
     onError: (error) => {

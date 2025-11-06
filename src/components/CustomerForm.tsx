@@ -44,7 +44,7 @@ interface CustomerFormProps {
 }
 
 const CustomerForm = ({ isOpen, setIsOpen, customer }: CustomerFormProps) => {
-  const { user } = useAuth();
+  const { activeCompany } = useAuth();
   const queryClient = useQueryClient();
   const form = useForm<CustomerFormValues>({
     resolver: zodResolver(customerSchema),
@@ -79,11 +79,11 @@ const CustomerForm = ({ isOpen, setIsOpen, customer }: CustomerFormProps) => {
 
   const mutation = useMutation({
     mutationFn: async (values: CustomerFormValues) => {
-      if (!user) throw new Error('User not authenticated');
+      if (!activeCompany) throw new Error('No active company selected');
 
       const customerData = {
         ...values,
-        user_id: user.id,
+        company_id: activeCompany.id,
       };
 
       const { error } = customer
@@ -93,7 +93,7 @@ const CustomerForm = ({ isOpen, setIsOpen, customer }: CustomerFormProps) => {
       if (error) throw new Error(error.message);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['customers'] });
+      queryClient.invalidateQueries({ queryKey: ['customers', activeCompany?.id] });
       showSuccess(`Customer ${customer ? 'updated' : 'created'} successfully.`);
       setIsOpen(false);
     },

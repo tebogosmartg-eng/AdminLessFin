@@ -21,6 +21,7 @@ import {
   DropdownMenuTrigger,
 } from "../components/ui/dropdown-menu";
 import { formatCurrency } from '../lib/utils';
+import { useAuth } from '../contexts/AuthContext';
 
 export type Product = {
   id: string;
@@ -39,9 +40,11 @@ export type Product = {
 const Products = () => {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<Product | undefined>(undefined);
+  const { activeCompany } = useAuth();
   const queryClient = useQueryClient();
 
   const fetchProducts = async () => {
+    if (!activeCompany) return [];
     const { data, error } = await supabase
       .from('products')
       .select(`
@@ -49,14 +52,16 @@ const Products = () => {
         income_account:income_account_id ( name ),
         cogs_account:cogs_account_id ( name )
       `)
+      .eq('company_id', activeCompany.id)
       .order('name', { ascending: true });
     if (error) throw new Error(error.message);
     return data;
   };
 
   const { data: products, isLoading } = useQuery<Product[]>({
-    queryKey: ['products'],
+    queryKey: ['products', activeCompany?.id],
     queryFn: fetchProducts,
+    enabled: !!activeCompany,
   });
 
   const deleteMutation = useMutation({
@@ -65,7 +70,7 @@ const Products = () => {
       if (error) throw new Error(error.message);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['products'] });
+      queryClient.invalidateQueries({ queryKey: ['products', activeCompany?.id] });
       showSuccess('Item deleted successfully.');
     },
     onError: (error) => {

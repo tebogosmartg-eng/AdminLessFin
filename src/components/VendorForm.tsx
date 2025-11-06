@@ -44,7 +44,7 @@ interface VendorFormProps {
 }
 
 const VendorForm = ({ isOpen, setIsOpen, vendor }: VendorFormProps) => {
-  const { user } = useAuth();
+  const { activeCompany } = useAuth();
   const queryClient = useQueryClient();
   const form = useForm<VendorFormValues>({
     resolver: zodResolver(vendorSchema),
@@ -79,11 +79,11 @@ const VendorForm = ({ isOpen, setIsOpen, vendor }: VendorFormProps) => {
 
   const mutation = useMutation({
     mutationFn: async (values: VendorFormValues) => {
-      if (!user) throw new Error('User not authenticated');
+      if (!activeCompany) throw new Error('No active company selected');
 
       const vendorData = {
         ...values,
-        user_id: user.id,
+        company_id: activeCompany.id,
       };
 
       const { error } = vendor
@@ -93,7 +93,7 @@ const VendorForm = ({ isOpen, setIsOpen, vendor }: VendorFormProps) => {
       if (error) throw new Error(error.message);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['vendors'] });
+      queryClient.invalidateQueries({ queryKey: ['vendors', activeCompany?.id] });
       showSuccess(`Vendor ${vendor ? 'updated' : 'created'} successfully.`);
       setIsOpen(false);
     },
