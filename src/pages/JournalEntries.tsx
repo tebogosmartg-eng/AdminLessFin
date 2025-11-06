@@ -31,7 +31,7 @@ import { showError, showSuccess } from '../utils/toast';
 import { DateRange } from 'react-day-picker';
 import { Popover, PopoverContent, PopoverTrigger } from '../components/ui/popover';
 import { Calendar } from '../components/ui/calendar';
-import { format } from 'date-fns';
+import { format, getYear } from 'date-fns';
 import { cn } from '../lib/utils';
 import { Account } from './ChartOfAccounts';
 import { Vendor } from './Vendors';
@@ -229,6 +229,9 @@ const JournalEntries = () => {
                   selected={date}
                   onSelect={setDate}
                   numberOfMonths={2}
+                  captionLayout="dropdown-buttons"
+                  fromYear={getYear(new Date()) - 10}
+                  toYear={getYear(new Date()) + 5}
                 />
               </PopoverContent>
             </Popover>
