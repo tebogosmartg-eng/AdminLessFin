@@ -11,6 +11,7 @@ import { Button } from '../components/ui/button';
 import QuickActions from '../components/QuickActions';
 import { formatDistanceToNow } from 'date-fns';
 import { formatCurrency } from '../lib/utils';
+import BudgetStatus from '../components/BudgetStatus';
 
 type OverdueInvoice = {
   id: string;
@@ -126,7 +127,7 @@ const Dashboard = () => {
           ))}
         </div>
 
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-4 md:grid-cols-2">
           <Card>
             <CardHeader>
               <CardTitle>Accounts Receivable</CardTitle>
@@ -171,7 +172,8 @@ const Dashboard = () => {
               )}
             </CardContent>
           </Card>
-          <Card className="md:col-span-2 lg:col-span-1">
+          <BudgetStatus />
+          <Card>
             <CardHeader>
               <CardTitle>Overdue Invoices</CardTitle>
               <CardDescription>Invoices past their due date.</CardDescription>
