@@ -8,6 +8,7 @@ import { PlusCircle, MoreHorizontal } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "../components/ui/dropdown-menu";
 import { showError, showSuccess } from '../utils/toast';
 import AssetCategoryForm from '../components/AssetCategoryForm';
+import { useAuth } from '../contexts/AuthContext';
 
 type AssetCategory = {
   id: string;
@@ -18,14 +19,17 @@ const AssetCategories = () => {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<AssetCategory | undefined>(undefined);
   const queryClient = useQueryClient();
+  const { activeCompany } = useAuth();
 
   const { data: categories, isLoading } = useQuery<AssetCategory[]>({
-    queryKey: ['asset_categories'],
+    queryKey: ['asset_categories', activeCompany?.id],
     queryFn: async () => {
-      const { data, error } = await supabase.from('asset_categories').select('*').order('name');
+      if (!activeCompany) return [];
+      const { data, error } = await supabase.from('asset_categories').select('*').eq('company_id', activeCompany.id).order('name');
       if (error) throw error;
       return data;
     },
+    enabled: !!activeCompany,
   });
 
   const deleteMutation = useMutation({
@@ -34,7 +38,7 @@ const AssetCategories = () => {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['asset_categories'] });
+      queryClient.invalidateQueries({ queryKey: ['asset_categories', activeCompany?.id] });
       showSuccess('Category deleted.');
     },
     onError: (error: any) => showError(error.message),

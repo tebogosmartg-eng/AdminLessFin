@@ -12,6 +12,7 @@ import { format } from 'date-fns';
 import { useNavigate } from 'react-router-dom';
 import { Alert, AlertDescription, AlertTitle } from '../components/ui/alert';
 import AssetDisposalForm from '../components/AssetDisposalForm';
+import { useAuth } from '../contexts/AuthContext';
 
 type FixedAsset = {
   id: string;
@@ -30,13 +31,16 @@ const FixedAssets = () => {
   const [isDisposalFormOpen, setIsDisposalFormOpen] = useState(false);
   const [selectedAsset, setSelectedAsset] = useState<FixedAsset | undefined>(undefined);
   const navigate = useNavigate();
+  const { activeCompany } = useAuth();
 
   const { data: assets, isLoading } = useQuery<FixedAsset[]>({
-    queryKey: ['fixed_assets'],
+    queryKey: ['fixed_assets', activeCompany?.id],
     queryFn: async () => {
+      if (!activeCompany) return [];
       const { data, error } = await supabase
         .from('fixed_assets')
         .select('*, asset_categories(name)')
+        .eq('company_id', activeCompany.id)
         .order('purchase_date', { ascending: false });
       if (error) throw new Error(error.message);
       return data.map(asset => ({
@@ -44,6 +48,7 @@ const FixedAssets = () => {
         net_book_value: asset.purchase_cost - asset.accumulated_depreciation,
       }));
     },
+    enabled: !!activeCompany,
   });
 
   const handleAddNew = () => {

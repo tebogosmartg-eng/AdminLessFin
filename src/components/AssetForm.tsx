@@ -43,7 +43,7 @@ interface AssetFormProps {
 }
 
 const AssetForm = ({ isOpen, setIsOpen, assetId }: AssetFormProps) => {
-  const { user } = useAuth();
+  const { user, activeCompany } = useAuth();
   const queryClient = useQueryClient();
   const isEditing = !!assetId;
 
@@ -59,10 +59,10 @@ const AssetForm = ({ isOpen, setIsOpen, assetId }: AssetFormProps) => {
     if (!isOpen) form.reset({ purchase_date: new Date().toISOString().split('T')[0], residual_value: 0 });
   }, [isOpen, form]);
 
-  const { data: vendors } = useQuery<Vendor[]>({ queryKey: ['vendors'] });
-  const { data: employees } = useQuery<Employee[]>({ queryKey: ['employees'] });
-  const { data: categories } = useQuery<{id: string, name: string}[]>({ queryKey: ['asset_categories'] });
-  const { data: accounts } = useQuery<Account[]>({ queryKey: ['accounts'] });
+  const { data: vendors } = useQuery<Vendor[]>({ queryKey: ['vendors', activeCompany?.id], enabled: !!activeCompany });
+  const { data: employees } = useQuery<Employee[]>({ queryKey: ['employees', activeCompany?.id], enabled: !!activeCompany });
+  const { data: categories } = useQuery<{id: string, name: string}[]>({ queryKey: ['asset_categories', activeCompany?.id], enabled: !!activeCompany });
+  const { data: accounts } = useQuery<Account[]>({ queryKey: ['accounts', activeCompany?.id], enabled: !!activeCompany });
   const assetAccounts = accounts?.filter(a => a.type === 'Asset');
   const liabilityAccounts = accounts?.filter(a => a.type === 'Liability');
   const expenseAccounts = accounts?.filter(a => a.type === 'Expense');
@@ -70,19 +70,19 @@ const AssetForm = ({ isOpen, setIsOpen, assetId }: AssetFormProps) => {
 
   const mutation = useMutation({
     mutationFn: async (values: AssetFormValues) => {
-      if (!user) throw new Error('User not authenticated');
+      if (!user || !activeCompany) throw new Error('User not authenticated or no active company');
 
       const { payment_account_id, ...assetData } = values;
 
       const { data: asset, error: assetError } = await supabase
         .from('fixed_assets')
-        .insert({ ...assetData, user_id: user.id })
+        .insert({ ...assetData, company_id: activeCompany.id })
         .select('id')
         .single();
       if (assetError) throw assetError;
 
       const { data: entry, error: entryError } = await supabase.from('journal_entries').insert({
-        user_id: user.id,
+        company_id: activeCompany.id,
         entry_date: values.purchase_date,
         description: `Acquisition of asset: ${values.description}`,
         vendor_id: values.vendor_id || null,

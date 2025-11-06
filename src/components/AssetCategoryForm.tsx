@@ -37,7 +37,7 @@ interface AssetCategoryFormProps {
 }
 
 const AssetCategoryForm = ({ isOpen, setIsOpen, category }: AssetCategoryFormProps) => {
-  const { user } = useAuth();
+  const { activeCompany } = useAuth();
   const queryClient = useQueryClient();
   const form = useForm<CategoryFormValues>({
     resolver: zodResolver(categorySchema),
@@ -53,14 +53,15 @@ const AssetCategoryForm = ({ isOpen, setIsOpen, category }: AssetCategoryFormPro
 
   const mutation = useMutation({
     mutationFn: async (values: CategoryFormValues) => {
-      if (!user) throw new Error('User not authenticated');
+      if (!activeCompany) throw new Error('No active company selected');
+      const categoryData = { ...values, company_id: activeCompany.id };
       const { error } = category
-        ? await supabase.from('asset_categories').update({ ...values, user_id: user.id }).eq('id', category.id)
-        : await supabase.from('asset_categories').insert({ ...values, user_id: user.id });
+        ? await supabase.from('asset_categories').update(categoryData).eq('id', category.id)
+        : await supabase.from('asset_categories').insert(categoryData);
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['asset_categories'] });
+      queryClient.invalidateQueries({ queryKey: ['asset_categories', activeCompany?.id] });
       showSuccess(`Category ${category ? 'updated' : 'created'}.`);
       setIsOpen(false);
     },

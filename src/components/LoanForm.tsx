@@ -34,7 +34,7 @@ interface LoanFormProps {
 }
 
 const LoanForm = ({ isOpen, setIsOpen, loanId }: LoanFormProps) => {
-  const { user } = useAuth();
+  const { user, activeCompany } = useAuth();
   const queryClient = useQueryClient();
   const isEditing = !!loanId;
   const [attachmentFile, setAttachmentFile] = useState<File | null>(null);
@@ -57,20 +57,20 @@ const LoanForm = ({ isOpen, setIsOpen, loanId }: LoanFormProps) => {
     }
   }, [isOpen, form]);
 
-  const { data: vendors } = useQuery<Vendor[]>({ queryKey: ['vendors'] });
-  const { data: accounts } = useQuery<Account[]>({ queryKey: ['accounts'] });
+  const { data: vendors } = useQuery<Vendor[]>({ queryKey: ['vendors', activeCompany?.id], enabled: !!activeCompany });
+  const { data: accounts } = useQuery<Account[]>({ queryKey: ['accounts', activeCompany?.id], enabled: !!activeCompany });
   const assetAccounts = accounts?.filter(a => a.type === 'Asset');
   const liabilityAccounts = accounts?.filter(a => a.type === 'Liability');
 
   const mutation = useMutation({
     mutationFn: async (values: LoanFormValues) => {
-      if (!user) throw new Error('User not authenticated');
+      if (!user || !activeCompany) throw new Error('User not authenticated or no active company');
 
       // 1. Insert loan record
       const { data: loan, error: loanError } = await supabase
         .from('loans')
         .insert({
-          user_id: user.id,
+          company_id: activeCompany.id,
           lender_id: values.lender_id,
           principal_amount: values.principal_amount,
           interest_rate: values.interest_rate,
@@ -88,7 +88,7 @@ const LoanForm = ({ isOpen, setIsOpen, loanId }: LoanFormProps) => {
       const { data: entry, error: entryError } = await supabase
         .from('journal_entries')
         .insert({
-          user_id: user.id,
+          company_id: activeCompany.id,
           entry_date: values.start_date,
           description: `Loan received from ${lenderName}`,
           vendor_id: values.lender_id,
@@ -112,7 +112,7 @@ const LoanForm = ({ isOpen, setIsOpen, loanId }: LoanFormProps) => {
       if (attachmentFile) {
         const fileExt = attachmentFile.name.split('.').pop();
         const fileName = `agreement.${fileExt}`;
-        const filePath = `${user.id}/loans/${loan.id}/${fileName}`;
+        const filePath = `${activeCompany.id}/loans/${loan.id}/${fileName}`;
         
         const { error: uploadError } = await supabase.storage.from('attachments').upload(filePath, attachmentFile, { upsert: true });
         if (uploadError) throw new Error(`Storage Error: ${uploadError.message}`);
@@ -124,8 +124,8 @@ const LoanForm = ({ isOpen, setIsOpen, loanId }: LoanFormProps) => {
       }
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['loans'] });
-      queryClient.invalidateQueries({ queryKey: ['journal_entries'] });
+      queryClient.invalidateQueries({ queryKey: ['loans', activeCompany?.id] });
+      queryClient.invalidateQueries({ queryKey: ['journal_entries', activeCompany?.id] });
       showSuccess(`Loan ${isEditing ? 'updated' : 'created'} successfully.`);
       setIsOpen(false);
     },

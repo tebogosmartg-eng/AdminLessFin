@@ -10,6 +10,7 @@ import { Badge } from '../components/ui/badge';
 import LoanForm from '../components/LoanForm';
 import { formatCurrency } from '../lib/utils';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../contexts/AuthContext';
 
 type Loan = {
   id: string;
@@ -24,17 +25,21 @@ const Loans = () => {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [selectedLoanId, setSelectedLoanId] = useState<string | undefined>(undefined);
   const navigate = useNavigate();
+  const { activeCompany } = useAuth();
 
   const { data: loans, isLoading } = useQuery<Loan[]>({
-    queryKey: ['loans'],
+    queryKey: ['loans', activeCompany?.id],
     queryFn: async () => {
+      if (!activeCompany) return [];
       const { data, error } = await supabase
         .from('loans')
         .select('id, principal_amount, interest_rate, status, loan_agreement_url, vendors ( name )')
+        .eq('company_id', activeCompany.id)
         .order('created_at', { ascending: false });
       if (error) throw new Error(error.message);
       return data;
     },
+    enabled: !!activeCompany,
   });
 
   const handleAddNew = () => {
