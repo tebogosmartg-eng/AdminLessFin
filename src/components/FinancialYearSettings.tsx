@@ -10,7 +10,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { showError, showSuccess } from '../utils/toast';
 import { useEffect, useMemo, useState } from 'react';
-import { format, getYear, set, subDays } from 'date-fns';
+import { format, getYear, set, isBefore } from 'date-fns';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from './ui/alert-dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table';
 import { Skeleton } from './ui/skeleton';
@@ -102,11 +102,24 @@ const FinancialYearSettings = () => {
   });
 
   const { currentYearStartDate, currentYearEndDate } = useMemo(() => {
-    if (!profile?.current_financial_year_start) {
+    if (!profile?.current_financial_year_start || !profile.financial_year_end_month || !profile.financial_year_end_day) {
       return { currentYearStartDate: null, currentYearEndDate: null };
     }
+    
     const startDate = new Date(profile.current_financial_year_start);
-    const endDate = subDays(set(startDate, { year: getYear(startDate) + 1 }), 1);
+    const startYear = getYear(startDate);
+    
+    const endMonth = profile.financial_year_end_month - 1; // date-fns months are 0-indexed
+    const endDay = profile.financial_year_end_day;
+
+    // Create temporary dates in the same year to compare month/day
+    const tempStartDate = set(new Date(0), { month: startDate.getMonth(), date: startDate.getDate() });
+    const tempEndDate = set(new Date(0), { month: endMonth, date: endDay });
+
+    const endYear = isBefore(tempEndDate, tempStartDate) ? startYear + 1 : startYear;
+    
+    const endDate = set(new Date(0), { year: endYear, month: endMonth, date: endDay });
+
     return { currentYearStartDate: startDate, currentYearEndDate: endDate };
   }, [profile]);
 

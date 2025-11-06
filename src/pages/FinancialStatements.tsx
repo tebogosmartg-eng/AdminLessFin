@@ -9,7 +9,7 @@ import { Calendar as CalendarIcon, Download, Printer } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '../components/ui/popover';
 import { Calendar } from '../components/ui/calendar';
 import { DateRange } from 'react-day-picker';
-import { format, startOfYear, endOfYear, subDays, getYear, set } from 'date-fns';
+import { format, startOfYear, endOfYear, subDays, getYear, set, isBefore } from 'date-fns';
 import { cn, downloadCSV } from '../lib/utils';
 import { formatCurrency } from '../lib/utils';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
@@ -58,9 +58,24 @@ const FinancialStatements = () => {
   });
 
   const currentYear = useMemo(() => {
-    if (!profile?.current_financial_year_start) return null;
+    if (!profile?.current_financial_year_start || !profile.financial_year_end_month || !profile.financial_year_end_day) {
+      return null;
+    }
+    
     const startDate = new Date(profile.current_financial_year_start);
-    const endDate = subDays(set(startDate, { year: getYear(startDate) + 1 }), 1);
+    const startYear = getYear(startDate);
+    
+    const endMonth = profile.financial_year_end_month - 1; // date-fns months are 0-indexed
+    const endDay = profile.financial_year_end_day;
+
+    // Create temporary dates in the same year to compare month/day
+    const tempStartDate = set(new Date(0), { month: startDate.getMonth(), date: startDate.getDate() });
+    const tempEndDate = set(new Date(0), { month: endMonth, date: endDay });
+
+    const endYear = isBefore(tempEndDate, tempStartDate) ? startYear + 1 : startYear;
+    
+    const endDate = set(new Date(0), { year: endYear, month: endMonth, date: endDay });
+
     return { start_date: startDate, end_date: endDate };
   }, [profile]);
 
