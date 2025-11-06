@@ -54,15 +54,19 @@ const InviteMemberDialog = ({ isOpen, setIsOpen }: InviteMemberDialogProps) => {
     mutationFn: async (values: InviteFormValues) => {
       if (!activeCompany) throw new Error('No active company');
       
-      // This will be replaced with an edge function call later for security
-      const { data, error } = await supabase.auth.admin.inviteUserByEmail(values.email, {
-        data: {
-          invited_to_company_id: activeCompany.id,
-          invited_role: values.role,
-        }
+      const { data, error } = await supabase.functions.invoke('invite-user', {
+        body: {
+          email: values.email,
+          role: values.role,
+          company_id: activeCompany.id,
+        },
       });
 
       if (error) throw error;
+      
+      // The edge function might return its own error in the body
+      if (data.error) throw new Error(data.error);
+
       return data;
     },
     onSuccess: () => {
@@ -71,7 +75,8 @@ const InviteMemberDialog = ({ isOpen, setIsOpen }: InviteMemberDialogProps) => {
       form.reset();
     },
     onError: (error: any) => {
-      showError(`Error sending invitation: ${error.message}`);
+      const errorMessage = error.context?.error?.message || error.message;
+      showError(`Error sending invitation: ${errorMessage}`);
     },
   });
 
