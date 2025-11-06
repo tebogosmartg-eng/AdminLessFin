@@ -12,6 +12,8 @@ import { showError, showSuccess } from '../utils/toast';
 import { useEffect, useMemo, useState } from 'react';
 import { format, getYear, set, subDays } from 'date-fns';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from './ui/alert-dialog';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table';
+import { Skeleton } from './ui/skeleton';
 
 const months = Array.from({ length: 12 }, (_, i) => ({ value: i + 1, name: new Date(0, i).toLocaleString('default', { month: 'long' }) }));
 const days = Array.from({ length: 31 }, (_, i) => i + 1);
@@ -23,7 +25,7 @@ const financialYearSchema = z.object({
 type FinancialYearFormValues = z.infer<typeof financialYearSchema>;
 
 const FinancialYearSettings = () => {
-  const { user, profile, refreshProfile } = useAuth();
+  const { user, profile, refreshProfile, activeCompany } = useAuth();
   const queryClient = useQueryClient();
   const [isClosing, setIsClosing] = useState(false);
 
@@ -43,6 +45,21 @@ const FinancialYearSettings = () => {
       });
     }
   }, [profile, form]);
+
+  const { data: closedYears, isLoading: isLoadingClosedYears } = useQuery({
+    queryKey: ['closed_financial_years', activeCompany?.id],
+    queryFn: async () => {
+      if (!activeCompany) return [];
+      const { data, error } = await supabase
+        .from('closed_financial_years')
+        .select('*')
+        .eq('company_id', activeCompany.id)
+        .order('end_date', { ascending: false });
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!activeCompany,
+  });
 
   const settingsMutation = useMutation({
     mutationFn: async (values: FinancialYearFormValues) => {
@@ -69,6 +86,19 @@ const FinancialYearSettings = () => {
     },
     onError: (error: any) => showError(error.message),
     onSettled: () => setIsClosing(false),
+  });
+
+  const reopenYearMutation = useMutation({
+    mutationFn: async (closedYearId: string) => {
+      const { error } = await supabase.rpc('reopen_financial_year', { p_closed_year_id: closedYearId });
+      if (error) throw error;
+    },
+    onSuccess: async () => {
+      await refreshProfile();
+      queryClient.invalidateQueries({ queryKey: ['closed_financial_years'] });
+      showSuccess('Financial year has been re-opened.');
+    },
+    onError: (error: any) => showError(error.message),
   });
 
   const { currentYearStartDate, currentYearEndDate } = useMemo(() => {
@@ -137,6 +167,55 @@ const FinancialYearSettings = () => {
             </div>
           ) : (
             <p className="text-sm text-muted-foreground mt-2">Your current financial year is not set.</p>
+          )}
+        </div>
+
+        <div className="border-t pt-6">
+          <h3 className="font-semibold">Closed Financial Years</h3>
+          <CardDescription>You can re-open a past year to make adjustments. This will reverse the closing entry.</CardDescription>
+          {isLoadingClosedYears ? (
+            <Skeleton className="h-20 w-full mt-2" />
+          ) : closedYears && closedYears.length > 0 ? (
+            <Table className="mt-4">
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Financial Year</TableHead>
+                  <TableHead className="text-right">Action</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {closedYears.map((year) => (
+                  <TableRow key={year.id}>
+                    <TableCell>
+                      {format(new Date(year.start_date), 'PPP')} - {format(new Date(year.end_date), 'PPP')}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button variant="outline" size="sm">Re-open</Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Re-open Financial Year?</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              This will delete the closing journal entry for this period and set it as your active financial year. You will need to close it again after making your changes. Are you sure?
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                            <AlertDialogAction onClick={() => reopenYearMutation.mutate(year.id)} disabled={reopenYearMutation.isPending}>
+                              {reopenYearMutation.isPending ? 'Re-opening...' : 'Yes, Re-open Year'}
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          ) : (
+            <p className="text-sm text-muted-foreground mt-2">No financial years have been closed yet.</p>
           )}
         </div>
       </CardContent>
