@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/card';
@@ -9,11 +9,13 @@ import { Calendar as CalendarIcon, Download, Printer } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '../components/ui/popover';
 import { Calendar } from '../components/ui/calendar';
 import { DateRange } from 'react-day-picker';
-import { format, startOfYear, endOfYear, subDays } from 'date-fns';
+import { format, startOfYear, endOfYear, subDays, getYear, set } from 'date-fns';
 import { cn, downloadCSV } from '../lib/utils';
 import { formatCurrency } from '../lib/utils';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
 import FinancialRatios from '../components/FinancialRatios';
+import { useAuth } from '../contexts/AuthContext';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 
 type AccountBalance = {
   id: string;
@@ -37,10 +39,63 @@ type CashFlowItem = {
 };
 
 const FinancialStatements = () => {
-  const [date, setDate] = useState<DateRange | undefined>({
-    from: startOfYear(new Date()),
-    to: endOfYear(new Date()),
+  const { profile, activeCompany } = useAuth();
+  const [date, setDate] = useState<DateRange | undefined>(undefined);
+
+  const { data: closedYears } = useQuery({
+    queryKey: ['closed_financial_years', activeCompany?.id],
+    queryFn: async () => {
+      if (!activeCompany) return [];
+      const { data, error } = await supabase
+        .from('closed_financial_years')
+        .select('start_date, end_date')
+        .eq('company_id', activeCompany.id)
+        .order('end_date', { ascending: false });
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!activeCompany,
   });
+
+  const currentYear = useMemo(() => {
+    if (!profile?.current_financial_year_start) return null;
+    const startDate = new Date(profile.current_financial_year_start);
+    const endDate = subDays(set(startDate, { year: getYear(startDate) + 1 }), 1);
+    return { start_date: startDate, end_date: endDate };
+  }, [profile]);
+
+  useEffect(() => {
+    if (currentYear && !date) {
+      setDate({
+        from: currentYear.start_date,
+        to: currentYear.end_date,
+      });
+    }
+  }, [currentYear, date]);
+
+  const financialYears = useMemo(() => {
+    const years = [];
+    if (currentYear) {
+      years.push({
+        label: `${format(currentYear.start_date, 'PPP')} - ${format(currentYear.end_date, 'PPP')} (Current)`,
+        value: JSON.stringify({ from: currentYear.start_date, to: currentYear.end_date }),
+      });
+    }
+    if (closedYears) {
+      closedYears.forEach(year => {
+        years.push({
+          label: `${format(new Date(year.start_date), 'PPP')} - ${format(new Date(year.end_date), 'PPP')}`,
+          value: JSON.stringify({ from: new Date(year.start_date), to: new Date(year.end_date) }),
+        });
+      });
+    }
+    return years;
+  }, [currentYear, closedYears]);
+
+  const handleYearChange = (value: string) => {
+    const { from, to } = JSON.parse(value);
+    setDate({ from: new Date(from), to: new Date(to) });
+  };
 
   const fromDate = date?.from ?? new Date();
   const toDate = date?.to ?? new Date();
@@ -159,11 +214,25 @@ const FinancialStatements = () => {
     downloadCSV(data, `trial-balance-${format(toDate, 'yyyy-MM-dd')}.csv`);
   };
 
+  const currentSelectedYearValue = date ? JSON.stringify({ from: date.from, to: date.to }) : undefined;
+
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center print:hidden">
         <h1 className="text-3xl font-bold">Financial Statements</h1>
         <div className="flex items-center gap-2">
+          <Select onValueChange={handleYearChange} value={financialYears.find(y => y.value === currentSelectedYearValue)?.value}>
+            <SelectTrigger className="w-[320px]">
+              <SelectValue placeholder="Select a financial year..." />
+            </SelectTrigger>
+            <SelectContent>
+              {financialYears.map(year => (
+                <SelectItem key={year.label} value={year.value}>
+                  {year.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
           <Popover>
             <PopoverTrigger asChild>
               <Button id="date" variant={"outline"} className={cn("w-[300px] justify-start text-left font-normal", !date && "text-muted-foreground")}>
