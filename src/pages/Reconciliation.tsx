@@ -184,7 +184,7 @@ const Reconciliation = () => {
         <CardContent className="grid md:grid-cols-3 gap-4 items-end">
           <Select onValueChange={v => { setSelectedAccountId(v); setClearedItemIds(new Set()); }} value={selectedAccountId || ''}>
             <SelectTrigger><SelectValue placeholder="Select a bank or cash account..." /></SelectTrigger>
-            <SelectContent>{bankAccounts?.map(acc => <SelectItem key={acc.id} value={acc.id}>{acc.name}</SelectItem>)}</SelectContent>
+            <SelectContent>{bankAccounts?.map(acc => <SelectItem key={acc.id} value={acc.id}>{acc.account_number} - {acc.name}</SelectItem>)}</SelectContent>
           </Select>
           <Input type="date" value={statementEndDate} onChange={e => setStatementEndDate(e.target.value)} />
           <Input type="number" placeholder="Statement End Balance" value={statementEndBalance} onChange={e => setStatementEndBalance(e.target.value)} />
