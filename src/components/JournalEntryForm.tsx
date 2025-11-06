@@ -184,7 +184,7 @@ const JournalEntryForm = ({ isOpen, setIsOpen, entryId }: JournalEntryFormProps)
         const { error } = await supabase.from('journal_entries').update(entryCoreData).eq('id', upsertedEntryId);
         if (error) throw error;
       } else {
-        const { data, error } = await supabase.from('journal_entries').insert({ ...entryCoreData, user_id: user.id, company_id: activeCompany.id }).select('id').single();
+        const { data, error } = await supabase.from('journal_entries').insert({ ...entryCoreData, company_id: activeCompany.id }).select('id').single();
         if (error) throw error;
         upsertedEntryId = data.id;
       }

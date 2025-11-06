@@ -89,7 +89,6 @@ const BillPaymentForm = ({ isOpen, setIsOpen, vendorId, vendorName, amountDue }:
       const { data: entry, error: entryError } = await supabase
         .from('journal_entries')
         .insert({
-          user_id: user.id,
           company_id: activeCompany.id,
           entry_date: values.payment_date,
           description: values.description,

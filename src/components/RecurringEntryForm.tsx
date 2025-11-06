@@ -119,7 +119,6 @@ const RecurringEntryForm = ({ isOpen, setIsOpen, entryId }: RecurringEntryFormPr
       if (!user || !activeCompany) throw new Error('User not authenticated or no active company');
       
       const entryPayload = {
-        user_id: user.id,
         company_id: activeCompany.id,
         description: values.description,
         frequency: values.frequency,
