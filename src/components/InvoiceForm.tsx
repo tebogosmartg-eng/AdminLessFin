@@ -173,6 +173,19 @@ const InvoiceForm = ({ isOpen, setIsOpen, invoiceId }: InvoiceFormProps) => {
   });
 
   const onSubmit = (values: InvoiceFormValues) => {
+    // Check for missing COGS account on inventory items
+    for (const [index, item] of values.items.entries()) {
+      if (item.product_id) {
+        const product = products?.find(p => p.id === item.product_id);
+        if (product?.type === 'inventory' && !product.cogs_account_id) {
+          const errorMessage = `Inventory item "${product.name}" is missing a COGS account. Please edit it in Products & Services.`;
+          form.setError(`items.${index}.product_id`, { type: 'manual', message: errorMessage });
+          showError(errorMessage);
+          return; // Stop submission
+        }
+      }
+    }
+
     const hasInventoryItem = values.items.some(item => {
         const product = products?.find(p => p.id === item.product_id);
         return product?.type === 'inventory';
