@@ -15,7 +15,6 @@ import { formatCurrency } from '../lib/utils';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
 import FinancialRatios from '../components/FinancialRatios';
 import { useAuth } from '../contexts/AuthContext';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 
 type AccountBalance = {
   id: string;
@@ -39,86 +38,46 @@ type CashFlowItem = {
 };
 
 const FinancialStatements = () => {
-  const { profile, activeCompany } = useAuth();
-  const [date, setDate] = useState<DateRange | undefined>(undefined);
-
-  const { data: closedYears } = useQuery({
-    queryKey: ['closed_financial_years', activeCompany?.id],
-    queryFn: async () => {
-      if (!activeCompany) return [];
-      const { data, error } = await supabase
-        .from('closed_financial_years')
-        .select('start_date, end_date')
-        .eq('company_id', activeCompany.id)
-        .order('end_date', { ascending: false });
-      if (error) throw error;
-      return data;
-    },
-    enabled: !!activeCompany,
-  });
+  const { profile } = useAuth();
+  const [startDate, setStartDate] = useState<Date | undefined>();
+  const [endDate, setEndDate] = useState<Date | undefined>();
 
   const currentYear = useMemo(() => {
     if (!profile?.current_financial_year_start || !profile.financial_year_end_month || !profile.financial_year_end_day) {
       return null;
     }
     
-    const startDate = new Date(profile.current_financial_year_start);
-    const startYear = getYear(startDate);
+    const start = new Date(profile.current_financial_year_start);
+    const startYear = getYear(start);
     
-    const endMonth = profile.financial_year_end_month - 1; // date-fns months are 0-indexed
+    const endMonth = profile.financial_year_end_month - 1;
     const endDay = profile.financial_year_end_day;
 
-    const tempStartDate = set(new Date(0), { month: startDate.getMonth(), date: startDate.getDate() });
+    const tempStartDate = set(new Date(0), { month: start.getMonth(), date: start.getDate() });
     const tempEndDate = set(new Date(0), { month: endMonth, date: endDay });
 
     const endYear = isBefore(tempEndDate, tempStartDate) ? startYear + 1 : startYear;
     
-    const endDate = set(new Date(0), { year: endYear, month: endMonth, date: endDay });
+    const end = set(new Date(0), { year: endYear, month: endMonth, date: endDay });
 
-    return { start_date: startDate, end_date: endDate };
+    return { start_date: start, end_date: end };
   }, [profile]);
 
   useEffect(() => {
-    if (currentYear && !date) {
-      setDate({
-        from: currentYear.start_date,
-        to: currentYear.end_date,
-      });
+    if (currentYear && !startDate && !endDate) {
+      setStartDate(currentYear.start_date);
+      setEndDate(currentYear.end_date);
     }
-  }, [currentYear, date]);
+  }, [currentYear, startDate, endDate]);
 
-  const financialYears = useMemo(() => {
-    const years = [];
-    if (currentYear) {
-      years.push({
-        label: `${format(currentYear.start_date, 'PPP')} - ${format(currentYear.end_date, 'PPP')} (Current)`,
-        value: JSON.stringify({ from: currentYear.start_date, to: currentYear.end_date }),
-      });
-    }
-    if (closedYears) {
-      closedYears.forEach(year => {
-        years.push({
-          label: `${format(new Date(year.start_date), 'PPP')} - ${format(new Date(year.end_date), 'PPP')}`,
-          value: JSON.stringify({ from: new Date(year.start_date), to: new Date(year.end_date) }),
-        });
-      });
-    }
-    return years;
-  }, [currentYear, closedYears]);
-
-  const handleYearChange = (value: string) => {
-    const { from, to } = JSON.parse(value);
-    setDate({ from: new Date(from), to: new Date(to) });
-  };
-
-  const fromDate = date?.from ?? new Date();
-  const toDate = date?.to ?? new Date();
-  const priorDate = subDays(fromDate, 1);
+  const fromDate = startDate;
+  const toDate = endDate;
+  const priorDate = fromDate ? subDays(fromDate, 1) : undefined;
 
   const { data: balancesAsOf, isLoading: isLoadingBalances } = useQuery<AccountBalance[]>({
     queryKey: ['balancesAsOf', toDate],
     queryFn: async () => {
-      const { data, error } = await supabase.rpc('get_balances_as_of_date', { p_end_date: format(toDate, 'yyyy-MM-dd') });
+      const { data, error } = await supabase.rpc('get_balances_as_of_date', { p_end_date: format(toDate!, 'yyyy-MM-dd') });
       if (error) throw new Error(error.message);
       return data;
     },
@@ -128,7 +87,7 @@ const FinancialStatements = () => {
   const { data: openingBalances, isLoading: isLoadingOpeningBalances } = useQuery<AccountBalance[]>({
     queryKey: ['balancesAsOf', priorDate],
     queryFn: async () => {
-      const { data, error } = await supabase.rpc('get_balances_as_of_date', { p_end_date: format(priorDate, 'yyyy-MM-dd') });
+      const { data, error } = await supabase.rpc('get_balances_as_of_date', { p_end_date: format(priorDate!, 'yyyy-MM-dd') });
       if (error) throw new Error(error.message);
       return data;
     },
@@ -139,8 +98,8 @@ const FinancialStatements = () => {
     queryKey: ['periodActivity', fromDate, toDate],
     queryFn: async () => {
       const { data, error } = await supabase.rpc('get_period_activity', {
-        p_start_date: format(fromDate, 'yyyy-MM-dd'),
-        p_end_date: format(toDate, 'yyyy-MM-dd'),
+        p_start_date: format(fromDate!, 'yyyy-MM-dd'),
+        p_end_date: format(toDate!, 'yyyy-MM-dd'),
       });
       if (error) throw new Error(error.message);
       return data;
@@ -152,8 +111,8 @@ const FinancialStatements = () => {
     queryKey: ['cashFlow', fromDate, toDate],
     queryFn: async () => {
       const { data, error } = await supabase.rpc('get_cash_flow_statement', {
-        p_start_date: format(fromDate, 'yyyy-MM-dd'),
-        p_end_date: format(toDate, 'yyyy-MM-dd'),
+        p_start_date: format(fromDate!, 'yyyy-MM-dd'),
+        p_end_date: format(toDate!, 'yyyy-MM-dd'),
       });
       if (error) throw new Error(error.message);
       return data;
@@ -218,50 +177,54 @@ const FinancialStatements = () => {
   };
 
   const handleDownloadTrialBalance = () => {
-    const data = balancesAsOf?.map(account => ({
+    if (!balancesAsOf || !toDate) return;
+    const data = balancesAsOf.map(account => ({
       'Account Number': account.account_number.toString(),
       'Account Name': account.name,
       'Debit': ['Asset', 'Expense'].includes(account.type) && account.balance >= 0 ? account.balance.toFixed(2) : (['Liability', 'Equity', 'Income'].includes(account.type) && account.balance < 0 ? (-account.balance).toFixed(2) : ''),
       'Credit': ['Liability', 'Equity', 'Income'].includes(account.type) && account.balance >= 0 ? account.balance.toFixed(2) : (['Asset', 'Expense'].includes(account.type) && account.balance < 0 ? (-account.balance).toFixed(2) : ''),
-    })) || [];
+    }));
     data.push({ 'Account Number': '', 'Account Name': 'Totals', Debit: totalDebits.toFixed(2), Credit: totalCredits.toFixed(2) });
     downloadCSV(data, `trial-balance-${format(toDate, 'yyyy-MM-dd')}.csv`);
   };
-
-  const currentSelectedYearValue = date ? JSON.stringify({ from: date.from, to: date.to }) : undefined;
 
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center print:hidden">
         <h1 className="text-3xl font-bold">Financial Statements</h1>
         <div className="flex items-center gap-2">
-          <Select onValueChange={handleYearChange} value={financialYears.find(y => y.value === currentSelectedYearValue)?.value}>
-            <SelectTrigger className="w-[320px]">
-              <SelectValue placeholder="Select a financial year..." />
-            </SelectTrigger>
-            <SelectContent>
-              {financialYears.map(year => (
-                <SelectItem key={year.label} value={year.value}>
-                  {year.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
           <Popover>
             <PopoverTrigger asChild>
-              <Button id="date" variant={"outline"} className={cn("w-[300px] justify-start text-left font-normal", !date && "text-muted-foreground")}>
+              <Button variant={"outline"} className={cn("w-[240px] justify-start text-left font-normal", !startDate && "text-muted-foreground")}>
                 <CalendarIcon className="mr-2 h-4 w-4" />
-                {date?.from ? (date.to ? (<>{format(date.from, "LLL dd, y")} - {format(date.to, "LLL dd, y")}</>) : (format(date.from, "LLL dd, y"))) : (<span>Pick a date</span>)}
+                {startDate ? format(startDate, "PPP") : <span>Start Date</span>}
               </Button>
             </PopoverTrigger>
             <PopoverContent className="w-auto p-0" align="end">
               <Calendar
+                mode="single"
+                selected={startDate}
+                onSelect={setStartDate}
                 initialFocus
-                mode="range"
-                defaultMonth={date?.from}
-                selected={date}
-                onSelect={setDate}
-                numberOfMonths={2}
+                captionLayout="dropdown-buttons"
+                fromYear={getYear(new Date()) - 10}
+                toYear={getYear(new Date()) + 5}
+              />
+            </PopoverContent>
+          </Popover>
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button variant={"outline"} className={cn("w-[240px] justify-start text-left font-normal", !endDate && "text-muted-foreground")}>
+                <CalendarIcon className="mr-2 h-4 w-4" />
+                {endDate ? format(endDate, "PPP") : <span>End Date</span>}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="end">
+              <Calendar
+                mode="single"
+                selected={endDate}
+                onSelect={setEndDate}
+                initialFocus
                 captionLayout="dropdown-buttons"
                 fromYear={getYear(new Date()) - 10}
                 toYear={getYear(new Date()) + 5}
@@ -285,7 +248,7 @@ const FinancialStatements = () => {
         <TabsContent value="income-statement">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between">
-              <div><CardTitle>Income Statement</CardTitle><CardDescription>For the period from {format(fromDate, "PPP")} to {format(toDate, "PPP")}</CardDescription></div>
+              <div><CardTitle>Income Statement</CardTitle><CardDescription>{fromDate && toDate ? `For the period from ${format(fromDate, "PPP")} to ${format(toDate, "PPP")}` : 'Select a date range'}</CardDescription></div>
               <Button variant="outline" size="sm" onClick={() => {}} className="print:hidden"><Download className="mr-2 h-4 w-4" /> Download CSV</Button>
             </CardHeader>
             <CardContent>{isLoading ? <Skeleton className="h-64 w-full" /> : (
@@ -308,7 +271,7 @@ const FinancialStatements = () => {
         <TabsContent value="balance-sheet">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between">
-              <div><CardTitle>Balance Sheet</CardTitle><CardDescription>As of {format(toDate, "PPP")}</CardDescription></div>
+              <div><CardTitle>Balance Sheet</CardTitle><CardDescription>{toDate ? `As of ${format(toDate, "PPP")}` : 'Select an end date'}</CardDescription></div>
               <Button variant="outline" size="sm" onClick={() => {}} className="print:hidden"><Download className="mr-2 h-4 w-4" /> Download CSV</Button>
             </CardHeader>
             <CardContent>{isLoading ? <Skeleton className="h-96 w-full" /> : (
@@ -342,7 +305,7 @@ const FinancialStatements = () => {
         <TabsContent value="equity">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between">
-              <div><CardTitle>Statement of Changes in Equity</CardTitle><CardDescription>For the period from {format(fromDate, "PPP")} to {format(toDate, "PPP")}</CardDescription></div>
+              <div><CardTitle>Statement of Changes in Equity</CardTitle><CardDescription>{fromDate && toDate ? `For the period from ${format(fromDate, "PPP")} to ${format(toDate, "PPP")}` : 'Select a date range'}</CardDescription></div>
               <Button variant="outline" size="sm" onClick={() => {}} className="print:hidden"><Download className="mr-2 h-4 w-4" /> Download CSV</Button>
             </CardHeader>
             <CardContent>{isLoading ? <Skeleton className="h-40 w-full" /> : (
@@ -362,7 +325,7 @@ const FinancialStatements = () => {
         <TabsContent value="cash-flow">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between">
-              <div><CardTitle>Statement of Cash Flows</CardTitle><CardDescription>For the period from {format(fromDate, "PPP")} to {format(toDate, "PPP")}</CardDescription></div>
+              <div><CardTitle>Statement of Cash Flows</CardTitle><CardDescription>{fromDate && toDate ? `For the period from ${format(fromDate, "PPP")} to ${format(toDate, "PPP")}` : 'Select a date range'}</CardDescription></div>
               <Button variant="outline" size="sm" onClick={() => {}} className="print:hidden"><Download className="mr-2 h-4 w-4" /> Download CSV</Button>
             </CardHeader>
             <CardContent>{isLoading ? <Skeleton className="h-64 w-full" /> : (
@@ -390,7 +353,7 @@ const FinancialStatements = () => {
         <TabsContent value="trial-balance">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between">
-              <div><CardTitle>Trial Balance</CardTitle><CardDescription>As of {format(toDate, "PPP")}</CardDescription></div>
+              <div><CardTitle>Trial Balance</CardTitle><CardDescription>{toDate ? `As of ${format(toDate, "PPP")}` : 'Select an end date'}</CardDescription></div>
               <Button variant="outline" size="sm" onClick={handleDownloadTrialBalance} className="print:hidden"><Download className="mr-2 h-4 w-4" /> Download CSV</Button>
             </CardHeader>
             <CardContent>{isLoading ? <Skeleton className="h-96 w-full" /> : (
@@ -416,7 +379,7 @@ const FinancialStatements = () => {
           <Card>
             <CardHeader>
               <CardTitle>Ratio Analysis</CardTitle>
-              <CardDescription>Key performance indicators for the period ending {format(toDate, "PPP")}</CardDescription>
+              <CardDescription>{toDate ? `Key performance indicators for the period ending ${format(toDate, "PPP")}` : 'Select an end date'}</CardDescription>
             </CardHeader>
             <CardContent>
               {isLoading ? <Skeleton className="h-64 w-full" /> : <FinancialRatios ratios={ratios} />}
