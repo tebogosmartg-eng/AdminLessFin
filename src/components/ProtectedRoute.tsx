@@ -16,6 +16,11 @@ const ProtectedRoute = () => {
     return <Navigate to="/create-company" replace />;
   }
 
+  // If user has a company but is on the create-company page, redirect them.
+  if (activeCompany && location.pathname === '/create-company') {
+    return <Navigate to="/" replace />;
+  }
+
   return <Layout />;
 };
 

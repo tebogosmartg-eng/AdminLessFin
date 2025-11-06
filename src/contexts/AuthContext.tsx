@@ -48,27 +48,35 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         .select('*')
         .eq('id', user.id)
         .single();
-      if (profileError) throw profileError;
+      if (profileError) throw new Error(`Failed to fetch profile: ${profileError.message}`);
       setProfile(userProfile);
 
-      const { data: userCompanies, error: companiesError } = await supabase
-        .from('companies')
-        .select('*')
-        .in('id', (await supabase.from('company_users').select('company_id').eq('user_id', user.id)).data?.map(c => c.company_id) || []);
-      if (companiesError) throw companiesError;
-      setCompanies(userCompanies);
+      const { data: companyUsers, error: companyUsersError } = await supabase
+        .from('company_users')
+        .select('company_id')
+        .eq('user_id', user.id);
+      if (companyUsersError) throw new Error(`Failed to fetch company memberships: ${companyUsersError.message}`);
+      
+      const companyIds = companyUsers.map(c => c.company_id);
 
-      if (userProfile?.active_company_id) {
-        const active = userCompanies?.find(c => c.id === userProfile.active_company_id) || null;
+      if (companyIds.length > 0) {
+        const { data: userCompanies, error: companiesError } = await supabase
+          .from('companies')
+          .select('*')
+          .in('id', companyIds);
+        if (companiesError) throw new Error(`Failed to fetch companies: ${companiesError.message}`);
+        setCompanies(userCompanies);
+
+        let active = userCompanies?.find(c => c.id === userProfile.active_company_id) || null;
+        if (!active && userCompanies && userCompanies.length > 0) {
+          active = userCompanies[0];
+          await supabase.from('profiles').update({ active_company_id: active.id }).eq('id', user.id);
+        }
         setActiveCompany(active);
-      } else if (userCompanies && userCompanies.length > 0) {
-        // Default to the first company if no active one is set
-        setActiveCompany(userCompanies[0]);
-        await supabase.from('profiles').update({ active_company_id: userCompanies[0].id }).eq('id', user.id);
       } else {
+        setCompanies([]);
         setActiveCompany(null);
       }
-
     } else {
       setProfile(null);
       setCompanies(null);
@@ -113,7 +121,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const switchCompany = async (companyId: string) => {
     if (user) {
       const { error } = await supabase.from('profiles').update({ active_company_id: companyId }).eq('id', user.id);
-      if (error) throw error;
+      if (error) throw new Error(`Failed to switch company: ${error.message}`);
       await refreshProfile();
     }
   };

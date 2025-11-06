@@ -23,55 +23,64 @@ type OverdueInvoice = {
 };
 
 const Dashboard = () => {
-  const { user, profile } = useAuth();
+  const { user, profile, activeCompany } = useAuth();
 
   const { data: accounts, isLoading: isLoadingAccounts } = useQuery({
-    queryKey: ['accounts'],
+    queryKey: ['accounts', activeCompany?.id],
     queryFn: async () => {
-      const { data, error } = await supabase.from('chart_of_accounts').select('*');
+      if (!activeCompany) return [];
+      const { data, error } = await supabase
+        .from('chart_of_accounts')
+        .select('*')
+        .eq('company_id', activeCompany.id);
       if (error) throw new Error(error.message);
       return data as Account[];
     },
+    enabled: !!activeCompany,
   });
 
   const { data: monthlySummary, isLoading: isLoadingSummary } = useQuery({
-    queryKey: ['monthlySummary'],
+    queryKey: ['monthlySummary', activeCompany?.id],
     queryFn: async () => {
       const { data, error } = await supabase.rpc('get_monthly_summary', { p_months: 6 });
       if (error) throw new Error(error.message);
       return data;
     },
+    enabled: !!activeCompany,
   });
 
   const { data: arBalances, isLoading: isLoadingAr } = useQuery({
-    queryKey: ['customer_ar_balances'],
+    queryKey: ['customer_ar_balances', activeCompany?.id],
     queryFn: async () => {
       const { data, error } = await supabase.rpc('get_customer_ar_balances');
       if (error) throw new Error(error.message);
       return data;
-    }
+    },
+    enabled: !!activeCompany,
   });
 
   const { data: apBalances, isLoading: isLoadingAp } = useQuery({
-    queryKey: ['vendor_ap_balances'],
+    queryKey: ['vendor_ap_balances', activeCompany?.id],
     queryFn: async () => {
       const { data, error } = await supabase.rpc('get_vendor_ap_balances');
       if (error) throw new Error(error.message);
       return data;
-    }
+    },
+    enabled: !!activeCompany,
   });
 
   const { data: overdueInvoices, isLoading: isLoadingOverdue } = useQuery<OverdueInvoice[]>({
-    queryKey: ['overdue_invoices'],
+    queryKey: ['overdue_invoices', activeCompany?.id],
     queryFn: async () => {
       const { data, error } = await supabase.rpc('get_overdue_invoices');
       if (error) throw new Error(error.message);
       return data;
-    }
+    },
+    enabled: !!activeCompany,
   });
 
   const { data: topExpenses, isLoading: isLoadingTopExpenses } = useQuery({
-    queryKey: ['top_expenses_current_month'],
+    queryKey: ['top_expenses_current_month', activeCompany?.id],
     queryFn: async () => {
       const startDate = format(startOfMonth(new Date()), 'yyyy-MM-dd');
       const endDate = format(endOfMonth(new Date()), 'yyyy-MM-dd');
@@ -82,6 +91,7 @@ const Dashboard = () => {
       if (error) throw new Error(error.message);
       return data;
     },
+    enabled: !!activeCompany,
   });
 
   const calculateTotals = (accounts: Account[] | undefined) => {
