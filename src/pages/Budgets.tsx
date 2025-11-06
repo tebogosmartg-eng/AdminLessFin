@@ -23,6 +23,7 @@ import {
 } from "../components/ui/dropdown-menu";
 import { cn } from '../lib/utils';
 import { formatCurrency } from '../lib/utils';
+import { useAuth } from '../contexts/AuthContext';
 
 export type Budget = {
   id: string;
@@ -40,6 +41,7 @@ const Budgets = () => {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [selectedBudget, setSelectedBudget] = useState<Budget | undefined>(undefined);
   const queryClient = useQueryClient();
+  const { activeCompany } = useAuth();
 
   const fetchBudgets = async () => {
     const { data, error } = await supabase.rpc('get_budgets_with_activity');
@@ -48,8 +50,9 @@ const Budgets = () => {
   };
 
   const { data: budgets, isLoading } = useQuery<Budget[]>({
-    queryKey: ['budgets_with_activity'],
+    queryKey: ['budgets_with_activity', activeCompany?.id],
     queryFn: fetchBudgets,
+    enabled: !!activeCompany,
   });
 
   const deleteMutation = useMutation({
@@ -58,7 +61,7 @@ const Budgets = () => {
       if (error) throw new Error(error.message);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['budgets_with_activity'] });
+      queryClient.invalidateQueries({ queryKey: ['budgets_with_activity', activeCompany?.id] });
       showSuccess('Budget deleted successfully.');
     },
     onError: (error) => {

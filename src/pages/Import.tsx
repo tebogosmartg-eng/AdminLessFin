@@ -38,15 +38,15 @@ type ValidatedEntry = {
 };
 
 const Import = () => {
-  const { user } = useAuth();
+  const { activeCompany } = useAuth();
   const queryClient = useQueryClient();
   const [file, setFile] = useState<File | null>(null);
   const [parsedData, setParsedData] = useState<ValidatedEntry[]>([]);
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
 
-  const { data: accounts } = useQuery<Account[]>({ queryKey: ['accounts'] });
-  const { data: vendors } = useQuery<Vendor[]>({ queryKey: ['vendors'] });
-  const { data: customers } = useQuery<Customer[]>({ queryKey: ['customers'] });
+  const { data: accounts } = useQuery<Account[]>({ queryKey: ['accounts', activeCompany?.id], enabled: !!activeCompany });
+  const { data: vendors } = useQuery<Vendor[]>({ queryKey: ['vendors', activeCompany?.id], enabled: !!activeCompany });
+  const { data: customers } = useQuery<Customer[]>({ queryKey: ['customers', activeCompany?.id], enabled: !!activeCompany });
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = event.target.files?.[0];
@@ -147,7 +147,7 @@ const Import = () => {
 
   const importMutation = useMutation({
     mutationFn: async (entries: ValidatedEntry[]) => {
-      if (!user) throw new Error("User not authenticated");
+      if (!activeCompany) throw new Error("No active company selected");
       const toastId = showLoading("Importing entries...");
 
       try {
@@ -155,7 +155,7 @@ const Import = () => {
           const { data: newEntry, error: entryError } = await supabase
             .from('journal_entries')
             .insert({
-              user_id: user.id,
+              company_id: activeCompany.id,
               entry_date: entry.entry_date,
               description: entry.description,
               vendor_id: entry.vendor_id,
@@ -182,7 +182,7 @@ const Import = () => {
     },
     onSuccess: () => {
       showSuccess(`${parsedData.length} journal entries imported successfully!`);
-      queryClient.invalidateQueries({ queryKey: ['journal_entries'] });
+      queryClient.invalidateQueries({ queryKey: ['journal_entries', activeCompany?.id] });
       setFile(null);
       setParsedData([]);
     },

@@ -51,7 +51,7 @@ interface BudgetFormProps {
 }
 
 const BudgetForm = ({ isOpen, setIsOpen, budget }: BudgetFormProps) => {
-  const { user } = useAuth();
+  const { activeCompany } = useAuth();
   const queryClient = useQueryClient();
   const form = useForm<BudgetFormValues>({
     resolver: zodResolver(budgetSchema),
@@ -82,25 +82,28 @@ const BudgetForm = ({ isOpen, setIsOpen, budget }: BudgetFormProps) => {
   }, [budget, form, isOpen]);
 
   const { data: expenseAccounts } = useQuery<Account[]>({
-    queryKey: ['expense_accounts'],
+    queryKey: ['expense_accounts', activeCompany?.id],
     queryFn: async () => {
+      if (!activeCompany) return [];
       const { data, error } = await supabase
         .from('chart_of_accounts')
         .select('*')
         .eq('type', 'Expense')
+        .eq('company_id', activeCompany.id)
         .order('account_number');
       if (error) throw new Error(error.message);
       return data;
     },
+    enabled: !!activeCompany,
   });
 
   const mutation = useMutation({
     mutationFn: async (values: BudgetFormValues) => {
-      if (!user) throw new Error('User not authenticated');
+      if (!activeCompany) throw new Error('No active company selected');
 
       const budgetData = {
         ...values,
-        user_id: user.id,
+        company_id: activeCompany.id,
       };
 
       const { error } = budget
@@ -110,7 +113,7 @@ const BudgetForm = ({ isOpen, setIsOpen, budget }: BudgetFormProps) => {
       if (error) throw new Error(error.message);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['budgets'] });
+      queryClient.invalidateQueries({ queryKey: ['budgets_with_activity', activeCompany?.id] });
       showSuccess(`Budget ${budget ? 'updated' : 'created'} successfully.`);
       setIsOpen(false);
     },

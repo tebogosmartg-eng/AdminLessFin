@@ -12,6 +12,7 @@ import { DateRange } from 'react-day-picker';
 import { format, startOfMonth, endOfMonth } from 'date-fns';
 import { cn, downloadCSV } from '../lib/utils';
 import { formatCurrency } from '../lib/utils';
+import { useAuth } from '../contexts/AuthContext';
 
 type PayrollSummaryItem = {
   item_description: string;
@@ -20,6 +21,7 @@ type PayrollSummaryItem = {
 };
 
 const PayrollReports = () => {
+  const { activeCompany } = useAuth();
   const [date, setDate] = useState<DateRange | undefined>({
     from: startOfMonth(new Date()),
     to: endOfMonth(new Date()),
@@ -29,7 +31,7 @@ const PayrollReports = () => {
   const toDate = date?.to ?? new Date();
 
   const { data: summaryData, isLoading } = useQuery<PayrollSummaryItem[]>({
-    queryKey: ['payrollSummary', fromDate, toDate],
+    queryKey: ['payrollSummary', fromDate, toDate, activeCompany?.id],
     queryFn: async () => {
       const { data, error } = await supabase.rpc('get_payroll_summary_report', {
         p_start_date: format(fromDate, 'yyyy-MM-dd'),
@@ -38,7 +40,7 @@ const PayrollReports = () => {
       if (error) throw new Error(error.message);
       return data;
     },
-    enabled: !!fromDate && !!toDate,
+    enabled: !!fromDate && !!toDate && !!activeCompany,
   });
 
   const earnings = summaryData?.filter(item => item.item_type === 'earning') || [];

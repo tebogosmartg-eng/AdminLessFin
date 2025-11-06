@@ -12,6 +12,7 @@ import { DateRange } from 'react-day-picker';
 import { format, startOfMonth, endOfMonth } from 'date-fns';
 import { cn, downloadCSV } from '../lib/utils';
 import { formatCurrency } from '../lib/utils';
+import { useAuth } from '../contexts/AuthContext';
 
 type AccountBalance = {
   id: string;
@@ -50,6 +51,7 @@ type AgedPayable = {
 };
 
 const Reports = () => {
+  const { activeCompany } = useAuth();
   const [date, setDate] = useState<DateRange | undefined>({
     from: startOfMonth(new Date()),
     to: endOfMonth(new Date()),
@@ -59,7 +61,7 @@ const Reports = () => {
   const toDate = date?.to ?? new Date();
 
   const { data: pointInTimeAccounts, isLoading: isLoadingPointInTime } = useQuery<AccountBalance[]>({
-    queryKey: ['pointInTimeBalances', toDate],
+    queryKey: ['pointInTimeBalances', toDate, activeCompany?.id],
     queryFn: async () => {
       const { data, error } = await supabase.rpc('get_balances_as_of_date', {
         p_end_date: format(toDate, 'yyyy-MM-dd'),
@@ -67,11 +69,11 @@ const Reports = () => {
       if (error) throw new Error(error.message);
       return data;
     },
-    enabled: !!toDate,
+    enabled: !!toDate && !!activeCompany,
   });
 
   const { data: periodActivityAccounts, isLoading: isLoadingPeriodActivity } = useQuery<AccountActivity[]>({
-    queryKey: ['periodActivity', fromDate, toDate],
+    queryKey: ['periodActivity', fromDate, toDate, activeCompany?.id],
     queryFn: async () => {
       const { data, error } = await supabase.rpc('get_period_activity', {
         p_start_date: format(fromDate, 'yyyy-MM-dd'),
@@ -80,25 +82,27 @@ const Reports = () => {
       if (error) throw new Error(error.message);
       return data;
     },
-    enabled: !!fromDate && !!toDate,
+    enabled: !!fromDate && !!toDate && !!activeCompany,
   });
 
   const { data: agedReceivables, isLoading: isLoadingAgedReceivables } = useQuery<AgedReceivable[]>({
-    queryKey: ['aged_receivables'],
+    queryKey: ['aged_receivables', activeCompany?.id],
     queryFn: async () => {
       const { data, error } = await supabase.rpc('get_aged_receivables');
       if (error) throw new Error(error.message);
       return data;
     },
+    enabled: !!activeCompany,
   });
 
   const { data: agedPayables, isLoading: isLoadingAgedPayables } = useQuery<AgedPayable[]>({
-    queryKey: ['aged_payables'],
+    queryKey: ['aged_payables', activeCompany?.id],
     queryFn: async () => {
       const { data, error } = await supabase.rpc('get_aged_payables');
       if (error) throw new Error(error.message);
       return data;
     },
+    enabled: !!activeCompany,
   });
 
   const isLoading = isLoadingPointInTime || isLoadingPeriodActivity || isLoadingAgedReceivables || isLoadingAgedPayables;
