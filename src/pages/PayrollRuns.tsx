@@ -16,6 +16,7 @@ import NewPayrollRunDialog from '../components/NewPayrollRunDialog';
 import { Badge } from '../components/ui/badge';
 import { format } from 'date-fns';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../contexts/AuthContext';
 
 type PayrollRun = {
   id: string;
@@ -28,17 +29,21 @@ type PayrollRun = {
 const PayrollRuns = () => {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const navigate = useNavigate();
+  const { activeCompany } = useAuth();
 
   const { data: payrollRuns, isLoading } = useQuery<PayrollRun[]>({
-    queryKey: ['payroll_runs'],
+    queryKey: ['payroll_runs', activeCompany?.id],
     queryFn: async () => {
+      if (!activeCompany) return [];
       const { data, error } = await supabase
         .from('payroll_runs')
         .select('*')
+        .eq('company_id', activeCompany.id)
         .order('pay_period_start', { ascending: false });
       if (error) throw new Error(error.message);
       return data;
     },
+    enabled: !!activeCompany,
   });
 
   return (

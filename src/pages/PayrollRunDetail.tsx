@@ -36,7 +36,7 @@ export type Payslip = {
 
 const PayrollRunDetail = () => {
   const { id } = useParams();
-  const { user } = useAuth();
+  const { activeCompany } = useAuth();
   const queryClient = useQueryClient();
   const [wageAccountId, setWageAccountId] = useState('');
   const [bankAccountId, setBankAccountId] = useState('');
@@ -56,15 +56,20 @@ const PayrollRunDetail = () => {
   });
 
   const { data: payslips, isLoading: isLoadingPayslips } = useQuery<Payslip[]>({
-    queryKey: ['payslips', id],
+    queryKey: ['payslips', id, activeCompany?.id],
     queryFn: async () => {
-      const { data, error } = await supabase.from('payslips').select('*, employees(first_name, last_name)').eq('payroll_run_id', id!);
+      if (!activeCompany) return [];
+      const { data, error } = await supabase.from('payslips').select('*, employees(first_name, last_name)').eq('payroll_run_id', id!).eq('company_id', activeCompany.id);
       if (error) throw error;
       return data;
     },
+    enabled: !!activeCompany,
   });
 
-  const { data: accounts } = useQuery<Account[]>({ queryKey: ['accounts'] });
+  const { data: accounts } = useQuery<Account[]>({ 
+    queryKey: ['accounts', activeCompany?.id],
+    enabled: !!activeCompany,
+  });
   const expenseAccounts = accounts?.filter(a => a.type === 'Expense');
   const assetAccounts = accounts?.filter(a => a.type === 'Asset');
   const liabilityAccounts = accounts?.filter(a => a.type === 'Liability');
@@ -81,14 +86,14 @@ const PayrollRunDetail = () => {
 
   const generatePayslipsMutation = useMutation({
     mutationFn: async () => {
-      if (!user) throw new Error('User not authenticated');
-      const { data: employees, error: empError } = await supabase.from('employees').select('*').not('salary_amount', 'is', null);
+      if (!activeCompany) throw new Error('No active company selected');
+      const { data: employees, error: empError } = await supabase.from('employees').select('*').eq('company_id', activeCompany.id).not('salary_amount', 'is', null);
       if (empError) throw empError;
 
       const newPayslips = employees.map((emp: Employee) => ({
         payroll_run_id: id!,
         employee_id: emp.id,
-        user_id: user.id,
+        company_id: activeCompany.id,
         basic_salary: emp.salary_amount!,
         total_earnings: emp.salary_amount!,
         total_deductions: 0,
@@ -109,7 +114,7 @@ const PayrollRunDetail = () => {
       if (itemsError) throw itemsError;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['payslips', id] });
+      queryClient.invalidateQueries({ queryKey: ['payslips', id, activeCompany?.id] });
       showSuccess('Payslips generated successfully!');
     },
     onError: (error: any) => showError(error.message),
@@ -117,14 +122,14 @@ const PayrollRunDetail = () => {
 
   const finalizeRunMutation = useMutation({
     mutationFn: async () => {
-      if (!user || !payslips || payslips.length === 0) throw new Error('Prerequisites not met.');
+      if (!activeCompany || !payslips || payslips.length === 0) throw new Error('Prerequisites not met.');
       
       const totalNetPay = payslips.reduce((sum, p) => sum + p.net_pay, 0);
       const totalWages = payslips.reduce((sum, p) => sum + p.total_earnings, 0);
       const totalDeductions = payslips.reduce((sum, p) => sum + p.total_deductions, 0);
 
       const { data: entry, error: entryError } = await supabase.from('journal_entries').insert({
-        user_id: user.id,
+        company_id: activeCompany.id,
         entry_date: run.pay_date,
         description: `Payroll for period ${format(new Date(run.pay_period_start), 'P')} to ${format(new Date(run.pay_period_end), 'P')}`,
       }).select('id').single();
@@ -146,7 +151,7 @@ const PayrollRunDetail = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['payroll_run', id] });
-      queryClient.invalidateQueries({ queryKey: ['journal_entries'] });
+      queryClient.invalidateQueries({ queryKey: ['journal_entries', activeCompany?.id] });
       showSuccess('Payroll run finalized and journal entry posted.');
     },
     onError: (error: any) => showError(error.message),

@@ -60,7 +60,7 @@ interface EmployeeFormProps {
 }
 
 const EmployeeForm = ({ isOpen, setIsOpen, employee }: EmployeeFormProps) => {
-  const { user } = useAuth();
+  const { activeCompany } = useAuth();
   const queryClient = useQueryClient();
   const form = useForm<EmployeeFormValues>({
     resolver: zodResolver(employeeSchema),
@@ -105,11 +105,11 @@ const EmployeeForm = ({ isOpen, setIsOpen, employee }: EmployeeFormProps) => {
 
   const mutation = useMutation({
     mutationFn: async (values: EmployeeFormValues) => {
-      if (!user) throw new Error('User not authenticated');
+      if (!activeCompany) throw new Error('No active company selected');
 
       const employeeData = {
         ...values,
-        user_id: user.id,
+        company_id: activeCompany.id,
         end_date: values.end_date || null,
         salary_amount: values.salary_amount || null,
         salary_period: values.salary_period || null,
@@ -122,7 +122,7 @@ const EmployeeForm = ({ isOpen, setIsOpen, employee }: EmployeeFormProps) => {
       if (error) throw new Error(error.message);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['employees'] });
+      queryClient.invalidateQueries({ queryKey: ['employees', activeCompany?.id] });
       showSuccess(`Employee ${employee ? 'updated' : 'added'} successfully.`);
       setIsOpen(false);
     },

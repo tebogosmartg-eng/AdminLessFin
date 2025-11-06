@@ -22,6 +22,7 @@ import {
 } from "../components/ui/dropdown-menu";
 import { Badge } from '../components/ui/badge';
 import { formatCurrency } from '../lib/utils';
+import { useAuth } from '../contexts/AuthContext';
 
 export type Employee = {
   id: string;
@@ -46,19 +47,23 @@ const Employees = () => {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [selectedEmployee, setSelectedEmployee] = useState<Employee | undefined>(undefined);
   const queryClient = useQueryClient();
+  const { activeCompany } = useAuth();
 
   const fetchEmployees = async () => {
+    if (!activeCompany) return [];
     const { data, error } = await supabase
       .from('employees')
       .select('*')
+      .eq('company_id', activeCompany.id)
       .order('last_name', { ascending: true });
     if (error) throw new Error(error.message);
     return data;
   };
 
   const { data: employees, isLoading } = useQuery<Employee[]>({
-    queryKey: ['employees'],
+    queryKey: ['employees', activeCompany?.id],
     queryFn: fetchEmployees,
+    enabled: !!activeCompany,
   });
 
   const deleteMutation = useMutation({
@@ -67,7 +72,7 @@ const Employees = () => {
       if (error) throw new Error(error.message);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['employees'] });
+      queryClient.invalidateQueries({ queryKey: ['employees', activeCompany?.id] });
       showSuccess('Employee deleted successfully.');
     },
     onError: (error) => {

@@ -39,7 +39,7 @@ interface NewPayrollRunDialogProps {
 }
 
 const NewPayrollRunDialog = ({ isOpen, setIsOpen }: NewPayrollRunDialogProps) => {
-  const { user } = useAuth();
+  const { activeCompany } = useAuth();
   const queryClient = useQueryClient();
   const form = useForm<PayrollRunFormValues>({
     resolver: zodResolver(payrollRunSchema),
@@ -52,17 +52,17 @@ const NewPayrollRunDialog = ({ isOpen, setIsOpen }: NewPayrollRunDialogProps) =>
 
   const mutation = useMutation({
     mutationFn: async (values: PayrollRunFormValues) => {
-      if (!user) throw new Error('User not authenticated');
+      if (!activeCompany) throw new Error('No active company selected');
 
       const { error } = await supabase.from('payroll_runs').insert({
         ...values,
-        user_id: user.id,
+        company_id: activeCompany.id,
       });
 
       if (error) throw new Error(error.message);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['payroll_runs'] });
+      queryClient.invalidateQueries({ queryKey: ['payroll_runs', activeCompany?.id] });
       showSuccess('New payroll run created.');
       setIsOpen(false);
     },
