@@ -8,6 +8,7 @@ interface FinancialRatiosProps {
     netProfitMargin: number | null;
     debtToEquity: number | null;
     returnOnEquity: number | null;
+    returnOnAssets: number | null;
   };
 }
 
@@ -57,6 +58,11 @@ const FinancialRatios = ({ ratios }: FinancialRatiosProps) => {
             title="Return on Equity (ROE)" 
             value={formatPercentage(ratios.returnOnEquity)}
             tooltip="Measures the profitability of a corporation in relation to shareholders’ equity. (Net Income / Total Equity)"
+          />
+          <RatioCard 
+            title="Return on Assets (ROA)" 
+            value={formatPercentage(ratios.returnOnAssets)}
+            tooltip="Indicates how profitable a company is in relation to its total assets. (Net Income / Total Assets)"
           />
         </div>
       </div>

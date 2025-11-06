@@ -144,6 +144,7 @@ const FinancialStatements = () => {
     netProfitMargin: totalIncome > 0 ? netIncome / totalIncome : null,
     debtToEquity: totalEquity > 0 ? totalLiabilities / totalEquity : null,
     returnOnEquity: totalEquity > 0 ? netIncome / totalEquity : null,
+    returnOnAssets: totalAssets > 0 ? netIncome / totalAssets : null,
   };
 
   return (
