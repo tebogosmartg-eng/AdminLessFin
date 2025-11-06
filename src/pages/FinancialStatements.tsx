@@ -42,21 +42,6 @@ const FinancialStatements = () => {
   const { profile, activeCompany } = useAuth();
   const [date, setDate] = useState<DateRange | undefined>(undefined);
 
-  const { data: closedYears } = useQuery({
-    queryKey: ['closed_financial_years', activeCompany?.id],
-    queryFn: async () => {
-      if (!activeCompany) return [];
-      const { data, error } = await supabase
-        .from('closed_financial_years')
-        .select('start_date, end_date')
-        .eq('company_id', activeCompany.id)
-        .order('end_date', { ascending: false });
-      if (error) throw error;
-      return data;
-    },
-    enabled: !!activeCompany,
-  });
-
   const currentYear = useMemo(() => {
     if (!profile?.current_financial_year_start || !profile.financial_year_end_month || !profile.financial_year_end_day) {
       return null;
@@ -68,7 +53,6 @@ const FinancialStatements = () => {
     const endMonth = profile.financial_year_end_month - 1; // date-fns months are 0-indexed
     const endDay = profile.financial_year_end_day;
 
-    // Create temporary dates in the same year to compare month/day
     const tempStartDate = set(new Date(0), { month: startDate.getMonth(), date: startDate.getDate() });
     const tempEndDate = set(new Date(0), { month: endMonth, date: endDay });
 
@@ -88,29 +72,55 @@ const FinancialStatements = () => {
     }
   }, [currentYear, date]);
 
-  const financialYears = useMemo(() => {
-    const years = [];
-    if (currentYear) {
-      years.push({
-        label: `${format(currentYear.start_date, 'PPP')} - ${format(currentYear.end_date, 'PPP')} (Current)`,
-        value: JSON.stringify({ from: currentYear.start_date, to: currentYear.end_date }),
-      });
-    }
-    if (closedYears) {
-      closedYears.forEach(year => {
-        years.push({
-          label: `${format(new Date(year.start_date), 'PPP')} - ${format(new Date(year.end_date), 'PPP')}`,
-          value: JSON.stringify({ from: new Date(year.start_date), to: new Date(year.end_date) }),
-        });
-      });
-    }
-    return years;
-  }, [currentYear, closedYears]);
+  const periodOptions = useMemo(() => {
+    const options = [];
 
-  const handleYearChange = (value: string) => {
+    if (currentYear) {
+        options.push({
+            label: `Current Financial Year`,
+            value: JSON.stringify({ from: currentYear.start_date, to: currentYear.end_date }),
+        });
+        
+        const prevStartDate = new Date(currentYear.start_date);
+        prevStartDate.setFullYear(prevStartDate.getFullYear() - 1);
+        const prevEndDate = new Date(currentYear.end_date);
+        prevEndDate.setFullYear(prevEndDate.getFullYear() - 1);
+        options.push({
+            label: `Previous Financial Year`,
+            value: JSON.stringify({ from: prevStartDate, to: prevEndDate }),
+        });
+    }
+
+    const currentCalYear = new Date().getFullYear();
+    for (let i = 0; i < 5; i++) {
+        const year = currentCalYear - i;
+        options.push({
+            label: `Calendar Year ${year}`,
+            value: JSON.stringify({ from: new Date(year, 0, 1), to: new Date(year, 11, 31) }),
+        });
+    }
+
+    return options;
+  }, [currentYear]);
+
+  const handlePeriodChange = (value: string) => {
     const { from, to } = JSON.parse(value);
     setDate({ from: new Date(from), to: new Date(to) });
   };
+
+  const currentSelectedValue = useMemo(() => {
+    if (!date || !date.from || !date.to) return '';
+    
+    const fromTime = date.from.getTime();
+    const toTime = date.to.getTime();
+
+    const selectedOption = periodOptions.find(opt => {
+        const { from, to } = JSON.parse(opt.value);
+        return new Date(from).getTime() === fromTime && new Date(to).getTime() === toTime;
+    });
+
+    return selectedOption ? selectedOption.value : '';
+  }, [date, periodOptions]);
 
   const fromDate = date?.from ?? new Date();
   const toDate = date?.to ?? new Date();
@@ -229,21 +239,19 @@ const FinancialStatements = () => {
     downloadCSV(data, `trial-balance-${format(toDate, 'yyyy-MM-dd')}.csv`);
   };
 
-  const currentSelectedYearValue = date ? JSON.stringify({ from: date.from, to: date.to }) : undefined;
-
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center print:hidden">
         <h1 className="text-3xl font-bold">Financial Statements</h1>
         <div className="flex items-center gap-2">
-          <Select onValueChange={handleYearChange} value={financialYears.find(y => y.value === currentSelectedYearValue)?.value}>
-            <SelectTrigger className="w-[320px]">
-              <SelectValue placeholder="Select a financial year..." />
+          <Select onValueChange={handlePeriodChange} value={currentSelectedValue}>
+            <SelectTrigger className="w-[220px]">
+              <SelectValue placeholder="Select a period..." />
             </SelectTrigger>
             <SelectContent>
-              {financialYears.map(year => (
-                <SelectItem key={year.label} value={year.value}>
-                  {year.label}
+              {periodOptions.map(option => (
+                <SelectItem key={option.label} value={option.value}>
+                  {option.label}
                 </SelectItem>
               ))}
             </SelectContent>
