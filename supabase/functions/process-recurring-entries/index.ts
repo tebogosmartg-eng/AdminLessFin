@@ -45,7 +45,7 @@ serve(async (_req) => {
       const { data: newJournalEntry, error: journalError } = await supabaseAdmin
         .from('journal_entries')
         .insert({
-          user_id: entry.user_id,
+          company_id: entry.company_id,
           entry_date: entry.next_run_date,
           description: `(Recurring) ${entry.description}`,
         })

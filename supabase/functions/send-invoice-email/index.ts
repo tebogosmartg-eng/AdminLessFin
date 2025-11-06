@@ -43,8 +43,8 @@ serve(async (req) => {
         invoice_number,
         invoice_date,
         due_date,
-        user_id,
         customers ( name, address ),
+        companies ( name, address ),
         journal_entries (
           journal_entry_items (
             amount,
@@ -59,14 +59,6 @@ serve(async (req) => {
     if (invoiceError) throw invoiceError;
     if (!invoice) throw new Error("Invoice not found.");
 
-    const { data: profile, error: profileError } = await supabaseAdmin
-      .from('profiles')
-      .select('company_name, company_address')
-      .eq('id', invoice.user_id)
-      .single();
-    
-    if (profileError) throw profileError;
-
     const lineItems = invoice.journal_entries[0].journal_entry_items.filter((item: any) => item.type === 'credit');
     const totalAmount = lineItems.reduce((sum: number, item: any) => sum + item.amount, 0);
 
@@ -76,8 +68,8 @@ serve(async (req) => {
           <div style="max-width: 600px; margin: auto; padding: 20px; border: 1px solid #eee; border-radius: 5px;">
             <div style="display: flex; justify-content: space-between; align-items: start; padding-bottom: 20px; border-bottom: 1px solid #eee;">
               <div>
-                <h1 style="font-size: 24px; font-weight: bold; margin: 0;">${profile?.company_name || 'Your Company'}</h1>
-                <p style="margin: 0; color: #666;">${profile?.company_address || ''}</p>
+                <h1 style="font-size: 24px; font-weight: bold; margin: 0;">${invoice.companies?.name || 'Your Company'}</h1>
+                <p style="margin: 0; color: #666;">${invoice.companies?.address || ''}</p>
               </div>
               <div style="text-align: right;">
                 <h2 style="font-size: 28px; font-weight: bold; margin: 0;">INVOICE</h2>

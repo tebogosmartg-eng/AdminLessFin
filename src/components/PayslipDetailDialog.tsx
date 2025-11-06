@@ -16,7 +16,7 @@ interface PayslipDetailDialogProps {
 }
 
 const PayslipDetailDialog = ({ isOpen, setIsOpen, payslipId }: PayslipDetailDialogProps) => {
-  const { profile } = useAuth();
+  const { activeCompany } = useAuth();
 
   const { data: payslipData, isLoading } = useQuery({
     queryKey: ['payslip_detail_view', payslipId],
@@ -58,8 +58,8 @@ const PayslipDetailDialog = ({ isOpen, setIsOpen, payslipId }: PayslipDetailDial
             <div className="grid grid-cols-2 gap-4 mb-4">
               <div>
                 <img src="/logo.png" alt="SmaAcc Logo" className="h-12 w-auto mb-2" />
-                <h3 className="font-bold text-base">{profile?.company_name || 'Your Company'}</h3>
-                <p className="text-muted-foreground">{profile?.company_address}</p>
+                <h3 className="font-bold text-base">{activeCompany?.name || 'Your Company'}</h3>
+                <p className="text-muted-foreground">{activeCompany?.address}</p>
               </div>
               <div className="text-right">
                 <p><span className="font-semibold">Pay Period:</span> {format(new Date(payslipData.payroll_runs.pay_period_start), 'PPP')} - {format(new Date(payslipData.payroll_runs.pay_period_end), 'PPP')}</p>

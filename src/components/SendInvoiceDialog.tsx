@@ -27,7 +27,7 @@ interface SendInvoiceDialogProps {
 }
 
 const SendInvoiceDialog = ({ isOpen, setIsOpen, invoice }: SendInvoiceDialogProps) => {
-  const { profile } = useAuth();
+  const { activeCompany } = useAuth();
   const queryClient = useQueryClient();
   const [to, setTo] = useState('');
   const [subject, setSubject] = useState('');
@@ -36,10 +36,10 @@ const SendInvoiceDialog = ({ isOpen, setIsOpen, invoice }: SendInvoiceDialogProp
   useEffect(() => {
     if (invoice) {
       setTo(invoice.customer_email || '');
-      setSubject(`Invoice ${invoice.invoice_number} from ${profile?.company_name || 'Your Company'}`);
-      setBody(`Hi,\n\nPlease find your invoice details below.\n\nThank you for your business!\n\nBest regards,\n${profile?.company_name || 'Your Company'}`);
+      setSubject(`Invoice ${invoice.invoice_number} from ${activeCompany?.name || 'Your Company'}`);
+      setBody(`Hi,\n\nPlease find your invoice details below.\n\nThank you for your business!\n\nBest regards,\n${activeCompany?.name || 'Your Company'}`);
     }
-  }, [invoice, profile, isOpen]);
+  }, [invoice, activeCompany, isOpen]);
 
   const sendEmailMutation = useMutation({
     mutationFn: async () => {

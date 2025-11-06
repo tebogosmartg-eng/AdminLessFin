@@ -39,7 +39,7 @@ type InvoiceDetailData = {
 
 const InvoiceDetail = () => {
   const { id } = useParams();
-  const { profile } = useAuth();
+  const { activeCompany } = useAuth();
   const queryClient = useQueryClient();
   const [isPaymentFormOpen, setIsPaymentFormOpen] = useState(false);
   const [isSendDialogOpen, setIsSendDialogOpen] = useState(false);
@@ -144,8 +144,8 @@ const InvoiceDetail = () => {
           <CardHeader className="grid grid-cols-2 gap-4">
             <div>
               <img src="/logo.png" alt="SmaAcc Logo" className="h-12 w-auto mb-2" />
-              <CardTitle className="text-base">{profile?.company_name || 'Your Company'}</CardTitle>
-              <p className="text-sm text-muted-foreground">{profile?.company_address || 'Your Company Address'}</p>
+              <CardTitle className="text-base">{activeCompany?.name || 'Your Company'}</CardTitle>
+              <p className="text-sm text-muted-foreground">{activeCompany?.address || 'Your Company Address'}</p>
             </div>
             <div className="text-right">
               <p className="text-3xl font-bold tracking-tight">INVOICE</p>

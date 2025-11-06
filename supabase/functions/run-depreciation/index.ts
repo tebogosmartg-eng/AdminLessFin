@@ -69,7 +69,7 @@ serve(async (_req) => {
 
       // 2. Create Journal Entry
       const { data: entry, error: entryError } = await supabaseAdmin.from('journal_entries').insert({
-        user_id: asset.user_id,
+        company_id: asset.company_id,
         entry_date: format(today, 'yyyy-MM-dd'),
         description: `Monthly depreciation for ${asset.description} (${asset.asset_code})`,
       }).select('id').single();

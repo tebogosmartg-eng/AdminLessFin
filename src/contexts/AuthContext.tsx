@@ -6,8 +6,6 @@ type Profile = {
   full_name: string;
   avatar_url: string;
   role: string;
-  company_name: string | null;
-  company_address: string | null;
   financial_year_end_month: number | null;
   financial_year_end_day: number | null;
   current_financial_year_start: string | null;
@@ -18,6 +16,7 @@ type Company = {
   id: string;
   name: string;
   owner_id: string;
+  address: string | null;
 };
 
 type AuthContextType = {

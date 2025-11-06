@@ -20,8 +20,8 @@ const profileSchema = z.object({
 type ProfileFormValues = z.infer<typeof profileSchema>;
 
 const companySchema = z.object({
-  company_name: z.string().optional(),
-  company_address: z.string().optional(),
+  name: z.string().min(1, 'Company name is required.'),
+  address: z.string().optional(),
 });
 type CompanyFormValues = z.infer<typeof companySchema>;
 
@@ -35,7 +35,7 @@ const passwordSchema = z.object({
 type PasswordFormValues = z.infer<typeof passwordSchema>;
 
 const Settings = () => {
-  const { user, profile, refreshProfile } = useAuth();
+  const { user, profile, activeCompany, refreshProfile } = useAuth();
 
   const profileForm = useForm<ProfileFormValues>({
     resolver: zodResolver(profileSchema),
@@ -44,7 +44,7 @@ const Settings = () => {
 
   const companyForm = useForm<CompanyFormValues>({
     resolver: zodResolver(companySchema),
-    defaultValues: { company_name: '', company_address: '' },
+    defaultValues: { name: '', address: '' },
   });
 
   const passwordForm = useForm<PasswordFormValues>({
@@ -55,12 +55,14 @@ const Settings = () => {
   useEffect(() => {
     if (profile) {
       profileForm.reset({ full_name: profile.full_name || '' });
+    }
+    if (activeCompany) {
       companyForm.reset({
-        company_name: profile.company_name || '',
-        company_address: profile.company_address || '',
+        name: activeCompany.name || '',
+        address: activeCompany.address || '',
       });
     }
-  }, [profile, profileForm, companyForm]);
+  }, [profile, activeCompany, profileForm, companyForm]);
 
   const profileMutation = useMutation({
     mutationFn: async (values: ProfileFormValues) => {
@@ -82,11 +84,11 @@ const Settings = () => {
 
   const companyMutation = useMutation({
     mutationFn: async (values: CompanyFormValues) => {
-      if (!user) throw new Error('User not authenticated');
+      if (!user || !activeCompany) throw new Error('User not authenticated or no active company');
       const { error } = await supabase
-        .from('profiles')
-        .update({ company_name: values.company_name, company_address: values.company_address })
-        .eq('id', user.id);
+        .from('companies')
+        .update({ name: values.name, address: values.address || null })
+        .eq('id', activeCompany.id);
       if (error) throw error;
     },
     onSuccess: async () => {
@@ -171,7 +173,7 @@ const Settings = () => {
             <form onSubmit={companyForm.handleSubmit(onCompanySubmit)} className="space-y-4 max-w-md">
               <FormField
                 control={companyForm.control}
-                name="company_name"
+                name="name"
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Company Name</FormLabel>
@@ -184,7 +186,7 @@ const Settings = () => {
               />
               <FormField
                 control={companyForm.control}
-                name="company_address"
+                name="address"
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Company Address</FormLabel>
