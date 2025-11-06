@@ -39,39 +39,24 @@ type CashFlowItem = {
 
 const FinancialStatements = () => {
   const { profile } = useAuth();
-  const [startDate, setStartDate] = useState<Date | undefined>();
-  const [endDate, setEndDate] = useState<Date | undefined>();
-
-  const currentYear = useMemo(() => {
-    if (!profile?.current_financial_year_start || !profile.financial_year_end_month || !profile.financial_year_end_day) {
-      return null;
-    }
-    
-    const start = new Date(profile.current_financial_year_start);
-    const startYear = getYear(start);
-    
-    const endMonth = profile.financial_year_end_month - 1;
-    const endDay = profile.financial_year_end_day;
-
-    const tempStartDate = set(new Date(0), { month: start.getMonth(), date: start.getDate() });
-    const tempEndDate = set(new Date(0), { month: endMonth, date: endDay });
-
-    const endYear = isBefore(tempEndDate, tempStartDate) ? startYear + 1 : startYear;
-    
-    const end = set(new Date(0), { year: endYear, month: endMonth, date: endDay });
-
-    return { start_date: start, end_date: end };
-  }, [profile]);
+  const [date, setDate] = useState<DateRange | undefined>();
 
   useEffect(() => {
-    if (currentYear && !startDate && !endDate) {
-      setStartDate(currentYear.start_date);
-      setEndDate(currentYear.end_date);
+    if (profile?.current_financial_year_start && !date) {
+      const start = new Date(profile.current_financial_year_start);
+      const startYear = getYear(start);
+      const endMonth = (profile.financial_year_end_month || 12) - 1;
+      const endDay = profile.financial_year_end_day || 31;
+      const tempStartDate = set(new Date(0), { month: start.getMonth(), date: start.getDate() });
+      const tempEndDate = set(new Date(0), { month: endMonth, date: endDay });
+      const endYear = isBefore(tempEndDate, tempStartDate) ? startYear + 1 : startYear;
+      const end = set(new Date(0), { year: endYear, month: endMonth, date: endDay });
+      setDate({ from: start, to: end });
     }
-  }, [currentYear, startDate, endDate]);
+  }, [profile, date]);
 
-  const fromDate = startDate;
-  const toDate = endDate;
+  const fromDate = date?.from;
+  const toDate = date?.to;
   const priorDate = fromDate ? subDays(fromDate, 1) : undefined;
 
   const { data: balancesAsOf, isLoading: isLoadingBalances } = useQuery<AccountBalance[]>({
@@ -176,16 +161,47 @@ const FinancialStatements = () => {
     returnOnAssets: totalAssets > 0 ? netIncome / totalAssets : null,
   };
 
-  const handleDownloadTrialBalance = () => {
-    if (!balancesAsOf || !toDate) return;
-    const data = balancesAsOf.map(account => ({
-      'Account Number': account.account_number.toString(),
-      'Account Name': account.name,
-      'Debit': ['Asset', 'Expense'].includes(account.type) && account.balance >= 0 ? account.balance.toFixed(2) : (['Liability', 'Equity', 'Income'].includes(account.type) && account.balance < 0 ? (-account.balance).toFixed(2) : ''),
-      'Credit': ['Liability', 'Equity', 'Income'].includes(account.type) && account.balance >= 0 ? account.balance.toFixed(2) : (['Asset', 'Expense'].includes(account.type) && account.balance < 0 ? (-account.balance).toFixed(2) : ''),
-    }));
-    data.push({ 'Account Number': '', 'Account Name': 'Totals', Debit: totalDebits.toFixed(2), Credit: totalCredits.toFixed(2) });
-    downloadCSV(data, `trial-balance-${format(toDate, 'yyyy-MM-dd')}.csv`);
+  const handleDownload = (type: string) => {
+    if (!fromDate || !toDate) return;
+    let data: any[] = [];
+    let filename = '';
+
+    switch (type) {
+      case 'income-statement':
+        data.push({ Section: 'Income', Account: '', Amount: '' });
+        incomeAccounts.forEach(acc => data.push({ Section: '', Account: acc.name, Amount: acc.activity.toFixed(2) }));
+        data.push({ Section: 'Total Income', Account: '', Amount: totalIncome.toFixed(2) });
+        data.push({ Section: 'Expenses', Account: '', Amount: '' });
+        expenseAccounts.forEach(acc => data.push({ Section: '', Account: acc.name, Amount: acc.activity.toFixed(2) }));
+        data.push({ Section: 'Total Expenses', Account: '', Amount: totalExpenses.toFixed(2) });
+        data.push({ Section: 'Net Income', Account: '', Amount: netIncome.toFixed(2) });
+        filename = `income-statement-${format(fromDate, 'yyyy-MM-dd')}-to-${format(toDate, 'yyyy-MM-dd')}.csv`;
+        break;
+      case 'balance-sheet':
+        data.push({ Section: 'Assets', Account: '', Amount: '' });
+        assetAccounts.forEach(acc => data.push({ Section: '', Account: acc.name, Amount: acc.balance.toFixed(2) }));
+        data.push({ Section: 'Total Assets', Account: '', Amount: totalAssets.toFixed(2) });
+        data.push({ Section: 'Liabilities', Account: '', Amount: '' });
+        liabilityAccounts.forEach(acc => data.push({ Section: '', Account: acc.name, Amount: acc.balance.toFixed(2) }));
+        data.push({ Section: 'Total Liabilities', Account: '', Amount: totalLiabilities.toFixed(2) });
+        data.push({ Section: 'Equity', Account: '', Amount: '' });
+        equityAccounts.forEach(acc => data.push({ Section: '', Account: acc.name, Amount: acc.balance.toFixed(2) }));
+        data.push({ Section: 'Total Equity', Account: '', Amount: totalEquity.toFixed(2) });
+        data.push({ Section: 'Total Liabilities & Equity', Account: '', Amount: totalLiabilitiesAndEquity.toFixed(2) });
+        filename = `balance-sheet-${format(toDate, 'yyyy-MM-dd')}.csv`;
+        break;
+      case 'trial-balance':
+        data = balancesAsOf?.map(account => ({
+          'Account Number': account.account_number.toString(),
+          'Account Name': account.name,
+          'Debit': ['Asset', 'Expense'].includes(account.type) && account.balance >= 0 ? account.balance.toFixed(2) : (['Liability', 'Equity', 'Income'].includes(account.type) && account.balance < 0 ? (-account.balance).toFixed(2) : ''),
+          'Credit': ['Liability', 'Equity', 'Income'].includes(account.type) && account.balance >= 0 ? account.balance.toFixed(2) : (['Asset', 'Expense'].includes(account.type) && account.balance < 0 ? (-account.balance).toFixed(2) : ''),
+        })) || [];
+        data.push({ 'Account Number': '', 'Account Name': 'Totals', Debit: totalDebits.toFixed(2), Credit: totalCredits.toFixed(2) });
+        filename = `trial-balance-${format(toDate, 'yyyy-MM-dd')}.csv`;
+        break;
+    }
+    downloadCSV(data, filename);
   };
 
   return (
@@ -195,40 +211,13 @@ const FinancialStatements = () => {
         <div className="flex items-center gap-2">
           <Popover>
             <PopoverTrigger asChild>
-              <Button variant={"outline"} className={cn("w-[240px] justify-start text-left font-normal", !startDate && "text-muted-foreground")}>
+              <Button id="date" variant={"outline"} className={cn("w-[300px] justify-start text-left font-normal", !date && "text-muted-foreground")}>
                 <CalendarIcon className="mr-2 h-4 w-4" />
-                {startDate ? format(startDate, "PPP") : <span>Start Date</span>}
+                {date?.from ? (date.to ? (<>{format(date.from, "LLL dd, y")} - {format(date.to, "LLL dd, y")}</>) : (format(date.from, "LLL dd, y"))) : (<span>Pick a date range</span>)}
               </Button>
             </PopoverTrigger>
             <PopoverContent className="w-auto p-0" align="end">
-              <Calendar
-                mode="single"
-                selected={startDate}
-                onSelect={setStartDate}
-                initialFocus
-                captionLayout="dropdown-buttons"
-                fromYear={getYear(new Date()) - 10}
-                toYear={getYear(new Date()) + 5}
-              />
-            </PopoverContent>
-          </Popover>
-          <Popover>
-            <PopoverTrigger asChild>
-              <Button variant={"outline"} className={cn("w-[240px] justify-start text-left font-normal", !endDate && "text-muted-foreground")}>
-                <CalendarIcon className="mr-2 h-4 w-4" />
-                {endDate ? format(endDate, "PPP") : <span>End Date</span>}
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-auto p-0" align="end">
-              <Calendar
-                mode="single"
-                selected={endDate}
-                onSelect={setEndDate}
-                initialFocus
-                captionLayout="dropdown-buttons"
-                fromYear={getYear(new Date()) - 10}
-                toYear={getYear(new Date()) + 5}
-              />
+              <Calendar initialFocus mode="range" defaultMonth={date?.from} selected={date} onSelect={setDate} numberOfMonths={2} />
             </PopoverContent>
           </Popover>
           <Button variant="outline" onClick={() => window.print()}><Printer className="mr-2 h-4 w-4" /> Print</Button>
@@ -249,7 +238,7 @@ const FinancialStatements = () => {
           <Card>
             <CardHeader className="flex flex-row items-center justify-between">
               <div><CardTitle>Income Statement</CardTitle><CardDescription>{fromDate && toDate ? `For the period from ${format(fromDate, "PPP")} to ${format(toDate, "PPP")}` : 'Select a date range'}</CardDescription></div>
-              <Button variant="outline" size="sm" onClick={() => {}} className="print:hidden"><Download className="mr-2 h-4 w-4" /> Download CSV</Button>
+              <Button variant="outline" size="sm" onClick={() => handleDownload('income-statement')} className="print:hidden"><Download className="mr-2 h-4 w-4" /> Download CSV</Button>
             </CardHeader>
             <CardContent>{isLoading ? <Skeleton className="h-64 w-full" /> : (
               <Table>
@@ -272,7 +261,7 @@ const FinancialStatements = () => {
           <Card>
             <CardHeader className="flex flex-row items-center justify-between">
               <div><CardTitle>Balance Sheet</CardTitle><CardDescription>{toDate ? `As of ${format(toDate, "PPP")}` : 'Select an end date'}</CardDescription></div>
-              <Button variant="outline" size="sm" onClick={() => {}} className="print:hidden"><Download className="mr-2 h-4 w-4" /> Download CSV</Button>
+              <Button variant="outline" size="sm" onClick={() => handleDownload('balance-sheet')} className="print:hidden"><Download className="mr-2 h-4 w-4" /> Download CSV</Button>
             </CardHeader>
             <CardContent>{isLoading ? <Skeleton className="h-96 w-full" /> : (
               <div className="grid md:grid-cols-2 gap-8">
@@ -354,7 +343,7 @@ const FinancialStatements = () => {
           <Card>
             <CardHeader className="flex flex-row items-center justify-between">
               <div><CardTitle>Trial Balance</CardTitle><CardDescription>{toDate ? `As of ${format(toDate, "PPP")}` : 'Select an end date'}</CardDescription></div>
-              <Button variant="outline" size="sm" onClick={handleDownloadTrialBalance} className="print:hidden"><Download className="mr-2 h-4 w-4" /> Download CSV</Button>
+              <Button variant="outline" size="sm" onClick={() => handleDownload('trial-balance')} className="print:hidden"><Download className="mr-2 h-4 w-4" /> Download CSV</Button>
             </CardHeader>
             <CardContent>{isLoading ? <Skeleton className="h-96 w-full" /> : (
               <Table>

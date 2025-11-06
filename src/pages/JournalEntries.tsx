@@ -32,7 +32,7 @@ import { DateRange } from 'react-day-picker';
 import { Popover, PopoverContent, PopoverTrigger } from '../components/ui/popover';
 import { Calendar } from '../components/ui/calendar';
 import { format, getYear } from 'date-fns';
-import { cn } from '../lib/utils';
+import { cn, formatCurrency } from '../lib/utils';
 import { Account } from './ChartOfAccounts';
 import { Vendor } from './Vendors';
 import { Customer } from './Customers';
@@ -291,7 +291,7 @@ const JournalEntries = () => {
                     </TableCell>
                     <TableCell>{entry.vendors?.[0]?.name || 'N/A'}</TableCell>
                     <TableCell>{entry.customers?.[0]?.name || 'N/A'}</TableCell>
-                    <TableCell className="text-right">${calculateTotal(entry.journal_entry_items).toFixed(2)}</TableCell>
+                    <TableCell className="text-right font-mono">{formatCurrency(calculateTotal(entry.journal_entry_items))}</TableCell>
                     <TableCell>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>

@@ -18,6 +18,7 @@ import JournalEntryForm from '../components/JournalEntryForm';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '../components/ui/dropdown-menu';
 import { showError, showSuccess } from '../utils/toast';
 import { useAuth } from '../contexts/AuthContext';
+import { formatCurrency } from '../lib/utils';
 
 type BillEntry = {
   id: string;
@@ -129,7 +130,7 @@ const Bills = () => {
                     <TableCell>{new Date(bill.entry_date).toLocaleDateString()}</TableCell>
                     <TableCell>{bill.vendors?.[0]?.name || 'N/A'}</TableCell>
                     <TableCell>{bill.description}</TableCell>
-                    <TableCell className="text-right">${bill.total.toFixed(2)}</TableCell>
+                    <TableCell className="text-right font-mono">{formatCurrency(bill.total)}</TableCell>
                     <TableCell>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>

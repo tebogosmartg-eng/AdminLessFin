@@ -174,11 +174,11 @@ const Import = () => {
           const { error: itemsError } = await supabase.from('journal_entry_items').insert(itemsToInsert);
           if (itemsError) throw itemsError;
         }
+        dismissToast(toastId);
       } catch (error) {
         dismissToast(toastId);
         throw error;
       }
-      dismissToast(toastId);
     },
     onSuccess: () => {
       showSuccess(`${parsedData.length} journal entries imported successfully!`);

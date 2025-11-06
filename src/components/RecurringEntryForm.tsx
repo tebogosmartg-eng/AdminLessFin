@@ -15,6 +15,7 @@ import { showError, showSuccess } from '../utils/toast';
 import { Account } from '../pages/ChartOfAccounts';
 import { Trash2 } from 'lucide-react';
 import { format } from 'date-fns';
+import { formatCurrency } from '../lib/utils';
 
 const recurringItemSchema = z.object({
   account_id: z.string().min(1, "Account is required."),
@@ -198,8 +199,8 @@ const RecurringEntryForm = ({ isOpen, setIsOpen, entryId }: RecurringEntryFormPr
             </div>
             {form.formState.errors.items && <p className="text-sm font-medium text-destructive">{form.formState.errors.items.message}</p>}
             <div className="flex justify-between font-mono text-sm pt-2 border-t">
-              <span>Total Debits: ${debits.toFixed(2)}</span>
-              <span>Total Credits: ${credits.toFixed(2)}</span>
+              <span>Total Debits: {formatCurrency(debits)}</span>
+              <span>Total Credits: {formatCurrency(credits)}</span>
             </div>
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setIsOpen(false)}>Cancel</Button>
