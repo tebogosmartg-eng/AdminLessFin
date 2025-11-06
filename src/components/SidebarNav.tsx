@@ -48,7 +48,7 @@ export const SidebarNav = () => {
     { to: '/customers', label: 'Customers', icon: Users },
   ];
 
-  const expensesLinks = [
+  const purchasesLinks = [
     { to: '/bills', label: 'Bills', icon: Receipt },
     { to: '/pay-bills', label: 'Pay Bills', icon: Banknote },
     { to: '/vendors', label: 'Vendors', icon: Building2 },
@@ -57,26 +57,27 @@ export const SidebarNav = () => {
   const payrollLinks = [
     { to: '/employees', label: 'Employees', icon: Users },
     { to: '/payroll-runs', label: 'Payroll Runs', icon: Repeat },
-    { to: '/payroll-reports', label: 'Payroll Reports', icon: FileText },
   ];
 
   const accountingLinks = [
     { to: '/chart-of-accounts', label: 'Chart of Accounts', icon: Book },
-    { to: '/products', label: 'Products & Services', icon: Package },
     { to: '/journal-entries', label: 'Journal Entries', icon: BookText },
     { to: '/recurring-entries', label: 'Recurring Entries', icon: Repeat },
-    { to: '/general-ledger', label: 'General Ledger', icon: Library },
     { to: '/reconciliation', label: 'Reconcile', icon: Scale },
-    { to: '/loans', label: 'Loans', icon: Landmark },
-    { to: '/fixed-assets', label: 'Fixed Assets', icon: Building2 },
-    { to: '/asset-categories', label: 'Asset Categories', icon: Library },
-    { to: '/import', label: 'Import Data', icon: Upload },
   ];
 
-  const planningLinks = [
-    { to: '/budgets', label: 'Budgets', icon: Target },
+  const assetsAndLoansLinks = [
+    { to: '/fixed-assets', label: 'Fixed Assets', icon: Building2 },
+    { to: '/asset-categories', label: 'Asset Categories', icon: Library },
+    { to: '/loans', label: 'Loans', icon: Landmark },
+  ];
+
+  const reportsLinks = [
     { to: '/reports', label: 'Operational Reports', icon: FileText },
     { to: '/financial-statements', label: 'Financial Statements', icon: FileSignature },
+    { to: '/general-ledger', label: 'General Ledger', icon: Library },
+    { to: '/payroll-reports', label: 'Payroll Reports', icon: FileText },
+    { to: '/budgets', label: 'Budgets', icon: Target },
   ];
 
   return (
@@ -93,10 +94,10 @@ export const SidebarNav = () => {
         defaultOpen={salesLinks.some(l => pathname.startsWith(l.to))}
       />
       <NavGroup 
-        title="Expenses" 
+        title="Purchases" 
         icon={Receipt} 
-        links={expensesLinks} 
-        defaultOpen={expensesLinks.some(l => pathname.startsWith(l.to))}
+        links={purchasesLinks} 
+        defaultOpen={purchasesLinks.some(l => pathname.startsWith(l.to))}
       />
       <NavGroup 
         title="Payroll" 
@@ -111,11 +112,26 @@ export const SidebarNav = () => {
         defaultOpen={accountingLinks.some(l => pathname.startsWith(l.to))}
       />
       <NavGroup 
-        title="Planning & Reports" 
-        icon={FileText} 
-        links={planningLinks} 
-        defaultOpen={planningLinks.some(l => pathname.startsWith(l.to))}
+        title="Assets & Loans" 
+        icon={Landmark} 
+        links={assetsAndLoansLinks} 
+        defaultOpen={assetsAndLoansLinks.some(l => pathname.startsWith(l.to))}
       />
+      <NavGroup 
+        title="Reports" 
+        icon={FileText} 
+        links={reportsLinks} 
+        defaultOpen={reportsLinks.some(l => pathname.startsWith(l.to))}
+      />
+      
+      <NavLink to="/products" className={navLinkClasses}>
+        <Package className="mr-3 h-5 w-5" />
+        Products & Services
+      </NavLink>
+      <NavLink to="/import" className={navLinkClasses}>
+        <Upload className="mr-3 h-5 w-5" />
+        Import Data
+      </NavLink>
     </nav>
   );
 };
