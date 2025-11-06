@@ -10,7 +10,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { showError, showSuccess } from '../utils/toast';
 import { useEffect, useMemo, useState } from 'react';
-import { format, getYear, set, isBefore } from 'date-fns';
+import { format, getYear, set, isBefore, isAfter, addDays } from 'date-fns';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from './ui/alert-dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table';
 import { Skeleton } from './ui/skeleton';
@@ -64,7 +64,30 @@ const FinancialYearSettings = () => {
   const settingsMutation = useMutation({
     mutationFn: async (values: FinancialYearFormValues) => {
       if (!user) throw new Error('User not authenticated');
-      const { error } = await supabase.from('profiles').update(values).eq('id', user.id);
+
+      // When changing the year-end, we need to adjust the current financial year start date
+      // to maintain a logical ~12 month period. We'll set the start date to be the day after
+      // the most recently passed financial year-end.
+      const newEndMonth = values.financial_year_end_month - 1;
+      const newEndDay = values.financial_year_end_day;
+      
+      const today = new Date();
+      const currentCalendarYear = getYear(today);
+
+      // Find the most recent past occurrence of the financial year end date.
+      let lastYearEnd = set(new Date(), { year: currentCalendarYear, month: newEndMonth, date: newEndDay });
+      if (isAfter(lastYearEnd, today)) {
+        lastYearEnd = set(lastYearEnd, { year: currentCalendarYear - 1 });
+      }
+
+      const newStartDate = addDays(lastYearEnd, 1);
+
+      const updatePayload = {
+        ...values,
+        current_financial_year_start: format(newStartDate, 'yyyy-MM-dd'),
+      };
+
+      const { error } = await supabase.from('profiles').update(updatePayload).eq('id', user.id);
       if (error) throw error;
     },
     onSuccess: async () => {
