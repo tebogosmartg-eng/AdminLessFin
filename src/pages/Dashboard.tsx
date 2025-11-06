@@ -9,9 +9,10 @@ import IncomeExpenseChart from '../components/IncomeExpenseChart';
 import { Link } from 'react-router-dom';
 import { Button } from '../components/ui/button';
 import QuickActions from '../components/QuickActions';
-import { formatDistanceToNow } from 'date-fns';
+import { formatDistanceToNow, startOfMonth, endOfMonth, format } from 'date-fns';
 import { formatCurrency } from '../lib/utils';
 import BudgetStatus from '../components/BudgetStatus';
+import TopExpensesChart from '../components/TopExpensesChart';
 
 type OverdueInvoice = {
   id: string;
@@ -67,6 +68,20 @@ const Dashboard = () => {
       if (error) throw new Error(error.message);
       return data;
     }
+  });
+
+  const { data: topExpenses, isLoading: isLoadingTopExpenses } = useQuery({
+    queryKey: ['top_expenses_current_month'],
+    queryFn: async () => {
+      const startDate = format(startOfMonth(new Date()), 'yyyy-MM-dd');
+      const endDate = format(endOfMonth(new Date()), 'yyyy-MM-dd');
+      const { data, error } = await supabase.rpc('get_top_expenses', {
+        p_start_date: startDate,
+        p_end_date: endDate,
+      });
+      if (error) throw new Error(error.message);
+      return data;
+    },
   });
 
   const calculateTotals = (accounts: Account[] | undefined) => {
@@ -205,15 +220,26 @@ const Dashboard = () => {
           </Card>
         </div>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Financial Overview</CardTitle>
-            <CardDescription>Income vs. Expenses for the last 6 months.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {isLoadingSummary ? <Skeleton className="h-[300px] w-full" /> : monthlySummary && monthlySummary.length > 0 ? <IncomeExpenseChart data={monthlySummary} /> : <p className="text-md text-gray-600 dark:text-gray-400">Not enough data to display a chart. Create some income and expense journal entries to get started.</p>}
-          </CardContent>
-        </Card>
+        <div className="grid gap-4 lg:grid-cols-2">
+          <Card>
+            <CardHeader>
+              <CardTitle>Financial Overview</CardTitle>
+              <CardDescription>Income vs. Expenses for the last 6 months.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {isLoadingSummary ? <Skeleton className="h-[300px] w-full" /> : monthlySummary && monthlySummary.length > 0 ? <IncomeExpenseChart data={monthlySummary} /> : <p className="text-md text-gray-600 dark:text-gray-400">Not enough data to display a chart.</p>}
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader>
+              <CardTitle>Top Expenses This Month</CardTitle>
+              <CardDescription>Your biggest spending categories for the current month.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {isLoadingTopExpenses ? <Skeleton className="h-[300px] w-full" /> : <TopExpensesChart data={topExpenses} />}
+            </CardContent>
+          </Card>
+        </div>
       </main>
     </div>
   );
