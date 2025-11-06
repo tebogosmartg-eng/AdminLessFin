@@ -35,6 +35,7 @@ import FixedAssets from "./pages/FixedAssets";
 import AssetCategories from "./pages/AssetCategories";
 import AssetDetail from "./pages/AssetDetail";
 import FinancialStatements from "./pages/FinancialStatements";
+import CreateCompany from "./pages/CreateCompany";
 
 const queryClient = new QueryClient();
 
@@ -49,6 +50,7 @@ const App = () => (
             <Route path="/auth" element={<AuthPage />} />
             <Route element={<ProtectedRoute />}>
               <Route path="/" element={<Dashboard />} />
+              <Route path="/create-company" element={<CreateCompany />} />
               <Route path="/invoices" element={<Invoices />} />
               <Route path="/invoices/:id" element={<InvoiceDetail />} />
               <Route path="/bills" element={<Bills />} />
