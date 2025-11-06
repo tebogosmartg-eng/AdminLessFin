@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState } from 'react';
 import { supabase } from '../integrations/supabase/client';
 import { Session, User } from '@supabase/supabase-js';
+import { getYear, set, isAfter, addDays, format } from 'date-fns';
 
 type Profile = {
   full_name: string;
@@ -42,12 +43,41 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   const fetchUserAndCompanyData = async (user: User | null) => {
     if (user) {
-      const { data: userProfile, error: profileError } = await supabase
+      let { data: userProfile, error: profileError } = await supabase
         .from('profiles')
         .select('*')
         .eq('id', user.id)
         .single();
       if (profileError) throw new Error(`Failed to fetch profile: ${profileError.message}`);
+
+      // Validate and correct the financial year start date if necessary
+      if (userProfile && userProfile.financial_year_end_month && userProfile.financial_year_end_day) {
+        const endMonth = userProfile.financial_year_end_month - 1;
+        const endDay = userProfile.financial_year_end_day;
+        const today = new Date();
+        const currentCalendarYear = getYear(today);
+
+        let lastYearEnd = set(new Date(), { year: currentCalendarYear, month: endMonth, date: endDay });
+        if (isAfter(lastYearEnd, today)) {
+          lastYearEnd = set(lastYearEnd, { year: currentCalendarYear - 1 });
+        }
+        const correctStartDate = format(addDays(lastYearEnd, 1), 'yyyy-MM-dd');
+
+        if (userProfile.current_financial_year_start !== correctStartDate) {
+          const { error: updateError } = await supabase
+            .from('profiles')
+            .update({ current_financial_year_start: correctStartDate })
+            .eq('id', user.id);
+          
+          if (updateError) {
+            console.error("Failed to auto-correct financial year start date:", updateError);
+          } else {
+            // Update the local profile object immediately for a responsive UI
+            userProfile.current_financial_year_start = correctStartDate;
+          }
+        }
+      }
+
       setProfile(userProfile);
 
       const { data: companyUsers, error: companyUsersError } = await supabase
