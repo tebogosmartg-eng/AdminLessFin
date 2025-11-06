@@ -37,6 +37,9 @@ const FinancialYearSettings = () => {
     },
   });
 
+  const watchedMonth = form.watch('financial_year_end_month');
+  const displayMonthName = months[(watchedMonth || profile?.financial_year_end_month || 1) - 1]?.name;
+
   useEffect(() => {
     if (profile) {
       form.reset({
@@ -203,7 +206,7 @@ const FinancialYearSettings = () => {
               <SelectContent>
                 {availableYears.map(year => (
                   <SelectItem key={year} value={String(year)}>
-                    Year ending {months[profile?.financial_year_end_month ? profile.financial_year_end_month - 1 : 0].name} {year}
+                    Year ending {displayMonthName} {year}
                   </SelectItem>
                 ))}
               </SelectContent>
