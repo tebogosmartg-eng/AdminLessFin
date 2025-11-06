@@ -133,27 +133,99 @@ const InvoiceForm = ({ isOpen, setIsOpen, invoiceId }: InvoiceFormProps) => {
   const mutation = useMutation({
     mutationFn: async (values: InvoiceFormValues) => {
       if (!user || !activeCompany) throw new Error('User not authenticated or no active company');
-      
-      const itemsForRpc = values.items.map(item => ({
-          product_id: item.product_id || null,
-          quantity: item.quantity,
-          unit_price: item.unit_price,
-          income_account_id: item.income_account_id,
-      }));
+      const description = values.description || `Invoice ${values.invoice_number}`;
 
-      const { error } = await supabase.rpc('create_invoice_with_inventory', {
-          p_company_id: activeCompany.id,
-          p_customer_id: values.customer_id,
-          p_invoice_date: values.invoice_date,
-          p_due_date: values.due_date,
-          p_invoice_number: values.invoice_number,
-          p_ar_account_id: values.accounts_receivable_id,
-          p_inventory_asset_account_id: values.inventory_asset_account_id || null,
-          p_description: values.description || `Invoice ${values.invoice_number}`,
-          p_items: itemsForRpc,
+      // 1. Create Journal Entry
+      const { data: je, error: jeError } = await supabase
+        .from('journal_entries')
+        .insert({
+          company_id: activeCompany.id,
+          customer_id: values.customer_id,
+          entry_date: values.invoice_date,
+          description: description,
+        })
+        .select('id')
+        .single();
+      if (jeError) throw jeError;
+      const journalEntryId = je.id;
+
+      // 2. Prepare Journal Entry Items
+      const journalItems = [];
+      let totalSaleAmount = 0;
+      let totalCogsAmount = 0;
+
+      for (const item of values.items) {
+        const lineTotal = item.quantity * item.unit_price;
+        totalSaleAmount += lineTotal;
+
+        // Credit Income
+        journalItems.push({
+          journal_entry_id: journalEntryId,
+          account_id: item.income_account_id,
+          type: 'credit',
+          amount: lineTotal,
+        });
+
+        // Handle inventory/COGS if applicable
+        if (item.product_id) {
+          const product = products?.find(p => p.id === item.product_id);
+          if (product && product.type === 'inventory') {
+            if (!product.cogs_account_id) throw new Error(`Inventory item "${product.name}" does not have a COGS account set.`);
+            if (!values.inventory_asset_account_id) throw new Error('An Inventory Asset account must be specified when selling inventory items.');
+            
+            const cogsForLine = item.quantity * (product.cost || 0);
+            totalCogsAmount += cogsForLine;
+
+            // Debit COGS
+            journalItems.push({
+              journal_entry_id: journalEntryId,
+              account_id: product.cogs_account_id,
+              type: 'debit',
+              amount: cogsForLine,
+            });
+
+            // Update product quantity
+            const { error: productUpdateError } = await supabase
+              .from('products')
+              .update({ quantity_on_hand: product.quantity_on_hand - item.quantity })
+              .eq('id', product.id);
+            if (productUpdateError) throw productUpdateError;
+          }
+        }
+      }
+
+      // Debit Accounts Receivable
+      journalItems.push({
+        journal_entry_id: journalEntryId,
+        account_id: values.accounts_receivable_id,
+        type: 'debit',
+        amount: totalSaleAmount,
       });
 
-      if (error) throw error;
+      // Credit Inventory Asset if needed
+      if (totalCogsAmount > 0) {
+        journalItems.push({
+          journal_entry_id: journalEntryId,
+          account_id: values.inventory_asset_account_id!,
+          type: 'credit',
+          amount: totalCogsAmount,
+        });
+      }
+
+      // 3. Insert all journal items
+      const { error: itemsError } = await supabase.from('journal_entry_items').insert(journalItems);
+      if (itemsError) throw itemsError;
+
+      // 4. Create Invoice record
+      const { error: invoiceError } = await supabase.from('invoices').insert({
+        company_id: activeCompany.id,
+        customer_id: values.customer_id,
+        journal_entry_id: journalEntryId,
+        invoice_number: values.invoice_number,
+        invoice_date: values.invoice_date,
+        due_date: values.due_date,
+      });
+      if (invoiceError) throw invoiceError;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['invoices', activeCompany?.id] });
