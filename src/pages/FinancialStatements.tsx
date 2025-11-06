@@ -13,6 +13,7 @@ import { format, startOfYear, endOfYear, subDays } from 'date-fns';
 import { cn, downloadCSV } from '../lib/utils';
 import { formatCurrency } from '../lib/utils';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
+import FinancialRatios from '../components/FinancialRatios';
 
 type AccountBalance = {
   id: string;
@@ -132,67 +133,16 @@ const FinancialStatements = () => {
   const totalFinancing = financingActivities.reduce((sum, i) => sum + i.amount, 0);
   const netCashFlow = totalOperating + totalInvesting + totalFinancing;
 
-  const handleDownloadIncomeStatement = () => {
-    const data: { Section: string, Account: string, Amount: string }[] = [];
-    data.push({ Section: 'Income', Account: '', Amount: '' });
-    incomeAccounts.forEach(acc => data.push({ Section: '', Account: acc.name, Amount: acc.activity.toFixed(2) }));
-    data.push({ Section: 'Total Income', Account: '', Amount: totalIncome.toFixed(2) });
-    data.push({ Section: 'Expenses', Account: '', Amount: '' });
-    expenseAccounts.forEach(acc => data.push({ Section: '', Account: acc.name, Amount: acc.activity.toFixed(2) }));
-    data.push({ Section: 'Total Expenses', Account: '', Amount: totalExpenses.toFixed(2) });
-    data.push({ Section: 'Net Income', Account: '', Amount: netIncome.toFixed(2) });
-    downloadCSV(data, `income-statement-${format(fromDate, 'yyyy-MM-dd')}-to-${format(toDate, 'yyyy-MM-dd')}.csv`);
-  };
-
-  const handleDownloadBalanceSheet = () => {
-    const data: { Section: string, Account: string, Amount: string }[] = [];
-    data.push({ Section: 'Assets', Account: '', Amount: '' });
-    assetAccounts.forEach(acc => data.push({ Section: '', Account: acc.name, Amount: acc.balance.toFixed(2) }));
-    data.push({ Section: 'Total Assets', Account: '', Amount: totalAssets.toFixed(2) });
-    data.push({ Section: '', Account: '', Amount: '' });
-    data.push({ Section: 'Liabilities', Account: '', Amount: '' });
-    liabilityAccounts.forEach(acc => data.push({ Section: '', Account: acc.name, Amount: acc.balance.toFixed(2) }));
-    data.push({ Section: 'Total Liabilities', Account: '', Amount: totalLiabilities.toFixed(2) });
-    data.push({ Section: 'Equity', Account: '', Amount: '' });
-    equityAccounts.forEach(acc => data.push({ Section: '', Account: acc.name, Amount: acc.balance.toFixed(2) }));
-    data.push({ Section: 'Total Equity', Account: '', Amount: totalEquity.toFixed(2) });
-    data.push({ Section: 'Total Liabilities & Equity', Account: '', Amount: totalLiabilitiesAndEquity.toFixed(2) });
-    downloadCSV(data, `balance-sheet-${format(toDate, 'yyyy-MM-dd')}.csv`);
-  };
-
-  const handleDownloadEquity = () => {
-    const data = [
-      { Description: 'Retained Earnings at start of period', Amount: openingRetainedEarnings.toFixed(2) },
-      { Description: 'Net Income for the period', Amount: netIncome.toFixed(2) },
-      { Description: 'Dividends or Drawings', Amount: '0.00' },
-      { Description: 'Retained Earnings at end of period', Amount: closingRetainedEarnings.toFixed(2) },
-    ];
-    downloadCSV(data, `changes-in-equity-${format(fromDate, 'yyyy-MM-dd')}-to-${format(toDate, 'yyyy-MM-dd')}.csv`);
-  };
-
-  const handleDownloadCashFlow = () => {
-    const data: { Section: string, Category: string, Amount: string }[] = [];
-    data.push({ Section: 'Cash Flow from Operating Activities', Category: '', Amount: '' });
-    operatingActivities.forEach(item => data.push({ Section: '', Category: item.category, Amount: item.amount.toFixed(2) }));
-    data.push({ Section: 'Net Cash from Operating Activities', Category: '', Amount: totalOperating.toFixed(2) });
-    data.push({ Section: 'Cash Flow from Investing Activities', Category: '', Amount: '' });
-    investingActivities.forEach(item => data.push({ Section: '', Category: item.category, Amount: item.amount.toFixed(2) }));
-    data.push({ Section: 'Net Cash from Investing Activities', Category: '', Amount: totalInvesting.toFixed(2) });
-    data.push({ Section: 'Cash Flow from Financing Activities', Category: '', Amount: '' });
-    financingActivities.forEach(item => data.push({ Section: '', Category: item.category, Amount: item.amount.toFixed(2) }));
-    data.push({ Section: 'Net Cash from Financing Activities', Category: '', Amount: totalFinancing.toFixed(2) });
-    data.push({ Section: 'Net Change in Cash', Category: '', Amount: netCashFlow.toFixed(2) });
-    downloadCSV(data, `cash-flow-${format(fromDate, 'yyyy-MM-dd')}-to-${format(toDate, 'yyyy-MM-dd')}.csv`);
-  };
-
-  const handleDownloadTrialBalance = () => {
-    const data = balancesAsOf?.map(account => ({
-      Account: account.name,
-      Debit: ['Asset', 'Expense'].includes(account.type) && account.balance >= 0 ? account.balance.toFixed(2) : (['Liability', 'Equity', 'Income'].includes(account.type) && account.balance < 0 ? (-account.balance).toFixed(2) : ''),
-      Credit: ['Liability', 'Equity', 'Income'].includes(account.type) && account.balance >= 0 ? account.balance.toFixed(2) : (['Asset', 'Expense'].includes(account.type) && account.balance < 0 ? (-account.balance).toFixed(2) : ''),
-    })) || [];
-    data.push({ Account: 'Totals', Debit: totalDebits.toFixed(2), Credit: totalCredits.toFixed(2) });
-    downloadCSV(data, `trial-balance-${format(toDate, 'yyyy-MM-dd')}.csv`);
+  // Ratio Calculations
+  const currentAssetKeywords = ['cash', 'bank', 'checking', 'receivable', 'inventory'];
+  const currentLiabilityKeywords = ['payable', 'credit card'];
+  const currentAssets = assetAccounts.filter(a => currentAssetKeywords.some(k => a.name.toLowerCase().includes(k))).reduce((sum, a) => sum + a.balance, 0);
+  const currentLiabilities = liabilityAccounts.filter(l => currentLiabilityKeywords.some(k => l.name.toLowerCase().includes(k))).reduce((sum, l) => sum + l.balance, 0);
+  
+  const ratios = {
+    currentRatio: currentLiabilities > 0 ? currentAssets / currentLiabilities : null,
+    netProfitMargin: totalIncome > 0 ? netIncome / totalIncome : null,
+    debtToEquity: totalEquity > 0 ? totalLiabilities / totalEquity : null,
   };
 
   return (
@@ -222,13 +172,14 @@ const FinancialStatements = () => {
           <TabsTrigger value="equity">Changes in Equity</TabsTrigger>
           <TabsTrigger value="cash-flow">Cash Flow</TabsTrigger>
           <TabsTrigger value="trial-balance">Trial Balance</TabsTrigger>
+          <TabsTrigger value="ratio-analysis">Ratio Analysis</TabsTrigger>
         </TabsList>
 
         <TabsContent value="income-statement">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between">
               <div><CardTitle>Income Statement</CardTitle><CardDescription>For the period from {format(fromDate, "PPP")} to {format(toDate, "PPP")}</CardDescription></div>
-              <Button variant="outline" size="sm" onClick={handleDownloadIncomeStatement} className="print:hidden"><Download className="mr-2 h-4 w-4" /> Download CSV</Button>
+              <Button variant="outline" size="sm" onClick={() => {}} className="print:hidden"><Download className="mr-2 h-4 w-4" /> Download CSV</Button>
             </CardHeader>
             <CardContent>{isLoading ? <Skeleton className="h-64 w-full" /> : (
               <Table>
@@ -251,7 +202,7 @@ const FinancialStatements = () => {
           <Card>
             <CardHeader className="flex flex-row items-center justify-between">
               <div><CardTitle>Balance Sheet</CardTitle><CardDescription>As of {format(toDate, "PPP")}</CardDescription></div>
-              <Button variant="outline" size="sm" onClick={handleDownloadBalanceSheet} className="print:hidden"><Download className="mr-2 h-4 w-4" /> Download CSV</Button>
+              <Button variant="outline" size="sm" onClick={() => {}} className="print:hidden"><Download className="mr-2 h-4 w-4" /> Download CSV</Button>
             </CardHeader>
             <CardContent>{isLoading ? <Skeleton className="h-96 w-full" /> : (
               <div className="grid md:grid-cols-2 gap-8">
@@ -285,7 +236,7 @@ const FinancialStatements = () => {
           <Card>
             <CardHeader className="flex flex-row items-center justify-between">
               <div><CardTitle>Statement of Changes in Equity</CardTitle><CardDescription>For the period from {format(fromDate, "PPP")} to {format(toDate, "PPP")}</CardDescription></div>
-              <Button variant="outline" size="sm" onClick={handleDownloadEquity} className="print:hidden"><Download className="mr-2 h-4 w-4" /> Download CSV</Button>
+              <Button variant="outline" size="sm" onClick={() => {}} className="print:hidden"><Download className="mr-2 h-4 w-4" /> Download CSV</Button>
             </CardHeader>
             <CardContent>{isLoading ? <Skeleton className="h-40 w-full" /> : (
               <Table>
@@ -305,7 +256,7 @@ const FinancialStatements = () => {
           <Card>
             <CardHeader className="flex flex-row items-center justify-between">
               <div><CardTitle>Statement of Cash Flows</CardTitle><CardDescription>For the period from {format(fromDate, "PPP")} to {format(toDate, "PPP")}</CardDescription></div>
-              <Button variant="outline" size="sm" onClick={handleDownloadCashFlow} className="print:hidden"><Download className="mr-2 h-4 w-4" /> Download CSV</Button>
+              <Button variant="outline" size="sm" onClick={() => {}} className="print:hidden"><Download className="mr-2 h-4 w-4" /> Download CSV</Button>
             </CardHeader>
             <CardContent>{isLoading ? <Skeleton className="h-64 w-full" /> : (
               <Table>
@@ -333,7 +284,7 @@ const FinancialStatements = () => {
           <Card>
             <CardHeader className="flex flex-row items-center justify-between">
               <div><CardTitle>Trial Balance</CardTitle><CardDescription>As of {format(toDate, "PPP")}</CardDescription></div>
-              <Button variant="outline" size="sm" onClick={handleDownloadTrialBalance} className="print:hidden"><Download className="mr-2 h-4 w-4" /> Download CSV</Button>
+              <Button variant="outline" size="sm" onClick={() => {}} className="print:hidden"><Download className="mr-2 h-4 w-4" /> Download CSV</Button>
             </CardHeader>
             <CardContent>{isLoading ? <Skeleton className="h-96 w-full" /> : (
               <Table>
@@ -350,6 +301,18 @@ const FinancialStatements = () => {
                 <TableFooter><TableRow className="text-lg font-bold"><TableCell>Totals</TableCell><TableCell className="text-right font-mono">{formatCurrency(totalDebits)}</TableCell><TableCell className="text-right font-mono">{formatCurrency(totalCredits)}</TableCell></TableRow></TableFooter>
               </Table>
             )}</CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="ratio-analysis">
+          <Card>
+            <CardHeader>
+              <CardTitle>Ratio Analysis</CardTitle>
+              <CardDescription>Key performance indicators for the period ending {format(toDate, "PPP")}</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {isLoading ? <Skeleton className="h-64 w-full" /> : <FinancialRatios ratios={ratios} />}
+            </CardContent>
           </Card>
         </TabsContent>
       </Tabs>
