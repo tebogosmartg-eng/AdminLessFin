@@ -38,10 +38,11 @@ import { Product } from '../pages/Products';
 const productSchema = z.object({
   name: z.string().min(1, 'Product/Service name is required.'),
   description: z.string().optional(),
-  price: z.coerce.number().min(0, 'Price cannot be negative.'),
+  price: z.coerce.number().min(0, 'Price cannot be negative.').optional().nullable(),
+  cost: z.coerce.number().min(0, 'Cost cannot be negative.').optional().nullable(),
   type: z.enum(['service', 'inventory']),
-  income_account_id: z.string().optional(),
-  cogs_account_id: z.string().optional(),
+  income_account_id: z.string().optional().nullable(),
+  cogs_account_id: z.string().optional().nullable(),
 });
 
 type ProductFormValues = z.infer<typeof productSchema>;
@@ -61,6 +62,7 @@ const ProductForm = ({ isOpen, setIsOpen, product }: ProductFormProps) => {
       name: '',
       description: '',
       price: 0,
+      cost: 0,
       type: 'service',
       income_account_id: '',
       cogs_account_id: '',
@@ -73,6 +75,7 @@ const ProductForm = ({ isOpen, setIsOpen, product }: ProductFormProps) => {
         name: product.name,
         description: product.description || '',
         price: product.price || 0,
+        cost: product.cost || 0,
         type: product.type,
         income_account_id: product.income_account_id || '',
         cogs_account_id: product.cogs_account_id || '',
@@ -82,6 +85,7 @@ const ProductForm = ({ isOpen, setIsOpen, product }: ProductFormProps) => {
         name: '',
         description: '',
         price: 0,
+        cost: 0,
         type: 'service',
         income_account_id: '',
         cogs_account_id: '',
@@ -103,6 +107,8 @@ const ProductForm = ({ isOpen, setIsOpen, product }: ProductFormProps) => {
       const productData = {
         ...values,
         company_id: activeCompany.id,
+        price: values.price || 0,
+        cost: values.cost || 0,
         income_account_id: values.income_account_id || null,
         cogs_account_id: values.cogs_account_id || null,
       };
@@ -165,24 +171,18 @@ const ProductForm = ({ isOpen, setIsOpen, product }: ProductFormProps) => {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Default Price</FormLabel>
-                    <FormControl><Input type="number" step="0.01" placeholder="0.00" {...field} /></FormControl>
+                    <FormControl><Input type="number" step="0.01" placeholder="0.00" {...field} value={field.value ?? ''} /></FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
               />
               <FormField
                 control={form.control}
-                name="type"
+                name="cost"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Type</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
-                      <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
-                      <SelectContent>
-                        <SelectItem value="service">Service</SelectItem>
-                        <SelectItem value="inventory">Inventory</SelectItem>
-                      </SelectContent>
-                    </Select>
+                    <FormLabel>Default Cost</FormLabel>
+                    <FormControl><Input type="number" step="0.01" placeholder="0.00" {...field} value={field.value ?? ''} /></FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -190,11 +190,28 @@ const ProductForm = ({ isOpen, setIsOpen, product }: ProductFormProps) => {
             </div>
             <FormField
               control={form.control}
+              name="type"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Type</FormLabel>
+                  <Select onValueChange={field.onChange} value={field.value}>
+                    <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
+                    <SelectContent>
+                      <SelectItem value="service">Service</SelectItem>
+                      <SelectItem value="inventory">Inventory</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
               name="income_account_id"
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Income Account (for Sales)</FormLabel>
-                  <Select onValueChange={field.onChange} value={field.value}>
+                  <Select onValueChange={field.onChange} value={field.value || ''}>
                     <FormControl><SelectTrigger><SelectValue placeholder="Select an income account" /></SelectTrigger></FormControl>
                     <SelectContent>{incomeAccounts?.map(acc => <SelectItem key={acc.id} value={acc.id}>{acc.name}</SelectItem>)}</SelectContent>
                   </Select>
@@ -208,7 +225,7 @@ const ProductForm = ({ isOpen, setIsOpen, product }: ProductFormProps) => {
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>COGS Account (for Inventory Sales)</FormLabel>
-                  <Select onValueChange={field.onChange} value={field.value}>
+                  <Select onValueChange={field.onChange} value={field.value || ''}>
                     <FormControl><SelectTrigger><SelectValue placeholder="Select a COGS account" /></SelectTrigger></FormControl>
                     <SelectContent>{expenseAccounts?.map(acc => <SelectItem key={acc.id} value={acc.id}>{acc.name}</SelectItem>)}</SelectContent>
                   </Select>
