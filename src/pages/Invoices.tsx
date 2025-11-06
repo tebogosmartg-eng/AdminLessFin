@@ -18,6 +18,7 @@ import { Badge } from '../components/ui/badge';
 import { useNavigate } from 'react-router-dom';
 import InvoiceForm from '../components/InvoiceForm';
 import { formatCurrency } from '../lib/utils';
+import { useAuth } from '../contexts/AuthContext';
 
 export type Invoice = {
   id: string;
@@ -37,10 +38,12 @@ export type Invoice = {
 const Invoices = () => {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [selectedInvoiceId, setSelectedInvoiceId] = useState<string | undefined>(undefined);
+  const { activeCompany } = useAuth();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
 
   const fetchInvoices = async () => {
+    if (!activeCompany) return [];
     const { data, error } = await supabase
       .from('invoices')
       .select(`
@@ -57,14 +60,16 @@ const Invoices = () => {
           )
         )
       `)
+      .eq('company_id', activeCompany.id)
       .order('invoice_date', { ascending: false });
     if (error) throw new Error(error.message);
     return data as Invoice[];
   };
 
   const { data: invoices, isLoading } = useQuery({
-    queryKey: ['invoices'],
+    queryKey: ['invoices', activeCompany?.id],
     queryFn: fetchInvoices,
+    enabled: !!activeCompany,
   });
 
   const updateStatusMutation = useMutation({
@@ -73,7 +78,7 @@ const Invoices = () => {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['invoices'] });
+      queryClient.invalidateQueries({ queryKey: ['invoices', activeCompany?.id] });
       showSuccess('Invoice status updated.');
     },
     onError: (error: any) => showError(error.message),

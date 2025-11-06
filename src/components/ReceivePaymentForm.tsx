@@ -35,7 +35,7 @@ interface ReceivePaymentFormProps {
 }
 
 const ReceivePaymentForm = ({ isOpen, setIsOpen, customerId, customerName, amountDue }: ReceivePaymentFormProps) => {
-  const { user } = useAuth();
+  const { user, activeCompany } = useAuth();
   const queryClient = useQueryClient();
   const form = useForm<PaymentFormValues>({
     resolver: zodResolver(paymentSchema),
@@ -61,22 +61,25 @@ const ReceivePaymentForm = ({ isOpen, setIsOpen, customerId, customerName, amoun
   }, [isOpen, amountDue, customerName, form]);
 
   const { data: assetAccounts } = useQuery<Account[]>({
-    queryKey: ['asset_accounts'],
+    queryKey: ['asset_accounts', activeCompany?.id],
     queryFn: async () => {
-      const { data, error } = await supabase.from('chart_of_accounts').select('*').eq('type', 'Asset');
+      if (!activeCompany) return [];
+      const { data, error } = await supabase.from('chart_of_accounts').select('*').eq('type', 'Asset').eq('company_id', activeCompany.id);
       if (error) throw error;
       return data;
-    }
+    },
+    enabled: !!activeCompany,
   });
 
   const mutation = useMutation({
     mutationFn: async (values: PaymentFormValues) => {
-      if (!user) throw new Error('User not authenticated');
+      if (!user || !activeCompany) throw new Error('User not authenticated or no active company');
 
       const { data: entry, error: entryError } = await supabase
         .from('journal_entries')
         .insert({
           user_id: user.id,
+          company_id: activeCompany.id,
           entry_date: values.payment_date,
           description: values.description,
           customer_id: customerId,
@@ -108,7 +111,7 @@ const ReceivePaymentForm = ({ isOpen, setIsOpen, customerId, customerName, amoun
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['customer_ar_balances'] });
-      queryClient.invalidateQueries({ queryKey: ['journal_entries'] });
+      queryClient.invalidateQueries({ queryKey: ['journal_entries', activeCompany?.id] });
       showSuccess('Payment received successfully.');
       setIsOpen(false);
     },

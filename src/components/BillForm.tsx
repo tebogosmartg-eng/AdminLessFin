@@ -45,7 +45,7 @@ interface BillFormProps {
 }
 
 const BillForm = ({ isOpen, setIsOpen }: BillFormProps) => {
-  const { user } = useAuth();
+  const { user, activeCompany } = useAuth();
   const queryClient = useQueryClient();
   const form = useForm<BillFormValues>({
     resolver: zodResolver(billSchema),
@@ -74,9 +74,36 @@ const BillForm = ({ isOpen, setIsOpen }: BillFormProps) => {
 
   const { fields, append, remove } = useFieldArray({ control: form.control, name: "items" });
 
-  const { data: vendors } = useQuery<Vendor[]>({ queryKey: ['vendors'] });
-  const { data: products } = useQuery<Product[]>({ queryKey: ['products'] });
-  const { data: accounts } = useQuery<Account[]>({ queryKey: ['accounts'] });
+  const { data: vendors } = useQuery<Vendor[]>({
+    queryKey: ['vendors', activeCompany?.id],
+    queryFn: async () => {
+      if (!activeCompany) return [];
+      const { data, error } = await supabase.from('vendors').select('*').eq('company_id', activeCompany.id);
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!activeCompany
+  });
+  const { data: products } = useQuery<Product[]>({
+    queryKey: ['products', activeCompany?.id],
+    queryFn: async () => {
+      if (!activeCompany) return [];
+      const { data, error } = await supabase.from('products').select('*').eq('company_id', activeCompany.id);
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!activeCompany
+  });
+  const { data: accounts } = useQuery<Account[]>({
+    queryKey: ['accounts', activeCompany?.id],
+    queryFn: async () => {
+      if (!activeCompany) return [];
+      const { data, error } = await supabase.from('chart_of_accounts').select('*').eq('company_id', activeCompany.id);
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!activeCompany
+  });
   const expenseAccounts = accounts?.filter(a => a.type === 'Expense');
   const assetAccounts = accounts?.filter(a => a.type === 'Asset');
   const apAccounts = accounts?.filter(a => a.type === 'Liability');
@@ -99,12 +126,12 @@ const BillForm = ({ isOpen, setIsOpen }: BillFormProps) => {
 
   const mutation = useMutation({
     mutationFn: async (values: BillFormValues) => {
-      if (!user) throw new Error('User not authenticated');
+      if (!user || !activeCompany) throw new Error('User not authenticated or no active company');
       const description = values.description || `Bill from ${vendors?.find(v => v.id === values.vendor_id)?.name}`;
       const itemsPayload = values.items.map(item => ({ ...item, product_id: item.product_id || null }));
 
       const { error } = await supabase.rpc('record_bill_with_inventory', {
-        p_user_id: user.id,
+        p_company_id: activeCompany.id,
         p_vendor_id: values.vendor_id,
         p_bill_date: values.bill_date,
         p_due_date: values.due_date,
@@ -115,9 +142,9 @@ const BillForm = ({ isOpen, setIsOpen }: BillFormProps) => {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['bills'] });
-      queryClient.invalidateQueries({ queryKey: ['journal_entries'] });
-      queryClient.invalidateQueries({ queryKey: ['products'] });
+      queryClient.invalidateQueries({ queryKey: ['bills', activeCompany?.id] });
+      queryClient.invalidateQueries({ queryKey: ['journal_entries', activeCompany?.id] });
+      queryClient.invalidateQueries({ queryKey: ['products', activeCompany?.id] });
       showSuccess('Bill recorded and inventory updated.');
       setIsOpen(false);
     },

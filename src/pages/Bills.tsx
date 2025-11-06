@@ -17,6 +17,7 @@ import JournalEntryDetail from '../components/JournalEntryDetail';
 import JournalEntryForm from '../components/JournalEntryForm';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '../components/ui/dropdown-menu';
 import { showError, showSuccess } from '../utils/toast';
+import { useAuth } from '../contexts/AuthContext';
 
 type BillEntry = {
   id: string;
@@ -31,9 +32,11 @@ const Bills = () => {
   const [isEditFormOpen, setIsEditFormOpen] = useState(false);
   const [selectedEntryIdForDetail, setSelectedEntryIdForDetail] = useState<string | null>(null);
   const [selectedEntryIdForEdit, setSelectedEntryIdForEdit] = useState<string | undefined>(undefined);
+  const { activeCompany } = useAuth();
   const queryClient = useQueryClient();
 
   const fetchBills = async () => {
+    if (!activeCompany) return [];
     const { data, error } = await supabase
       .from('journal_entries')
       .select(`
@@ -43,6 +46,7 @@ const Bills = () => {
         vendors ( name ),
         journal_entry_items ( type, amount )
       `)
+      .eq('company_id', activeCompany.id)
       .not('vendor_id', 'is', null)
       .order('entry_date', { ascending: false });
 
@@ -58,8 +62,9 @@ const Bills = () => {
   };
 
   const { data: bills, isLoading } = useQuery<BillEntry[]>({
-    queryKey: ['bills'],
+    queryKey: ['bills', activeCompany?.id],
     queryFn: fetchBills,
+    enabled: !!activeCompany,
   });
 
   const deleteMutation = useMutation({
@@ -68,7 +73,7 @@ const Bills = () => {
       if (error) throw new Error(error.message);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['bills'] });
+      queryClient.invalidateQueries({ queryKey: ['bills', activeCompany?.id] });
       showSuccess('Bill deleted successfully.');
     },
     onError: (error) => {

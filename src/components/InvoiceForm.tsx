@@ -47,7 +47,7 @@ interface InvoiceFormProps {
 }
 
 const InvoiceForm = ({ isOpen, setIsOpen, invoiceId }: InvoiceFormProps) => {
-  const { user } = useAuth();
+  const { user, activeCompany } = useAuth();
   const queryClient = useQueryClient();
   const isEditing = !!invoiceId;
 
@@ -69,13 +69,13 @@ const InvoiceForm = ({ isOpen, setIsOpen, invoiceId }: InvoiceFormProps) => {
   // This form currently only supports creating new invoices.
 
   const { data: nextInvoiceNumber } = useQuery({
-    queryKey: ['next_invoice_number'],
+    queryKey: ['next_invoice_number', activeCompany?.id],
     queryFn: async () => {
       const { data, error } = await supabase.rpc('get_next_invoice_number_for_user');
       if (error) throw error;
       return data;
     },
-    enabled: isOpen && !isEditing,
+    enabled: isOpen && !isEditing && !!activeCompany,
   });
 
   useEffect(() => {
@@ -86,9 +86,36 @@ const InvoiceForm = ({ isOpen, setIsOpen, invoiceId }: InvoiceFormProps) => {
 
   const { fields, append, remove } = useFieldArray({ control: form.control, name: "items" });
 
-  const { data: customers } = useQuery<Customer[]>({ queryKey: ['customers'] });
-  const { data: products } = useQuery<Product[]>({ queryKey: ['products'] });
-  const { data: accounts } = useQuery<Account[]>({ queryKey: ['accounts'] });
+  const { data: customers } = useQuery<Customer[]>({
+    queryKey: ['customers', activeCompany?.id],
+    queryFn: async () => {
+      if (!activeCompany) return [];
+      const { data, error } = await supabase.from('customers').select('*').eq('company_id', activeCompany.id);
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!activeCompany
+  });
+  const { data: products } = useQuery<Product[]>({
+    queryKey: ['products', activeCompany?.id],
+    queryFn: async () => {
+      if (!activeCompany) return [];
+      const { data, error } = await supabase.from('products').select('*').eq('company_id', activeCompany.id);
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!activeCompany
+  });
+  const { data: accounts } = useQuery<Account[]>({
+    queryKey: ['accounts', activeCompany?.id],
+    queryFn: async () => {
+      if (!activeCompany) return [];
+      const { data, error } = await supabase.from('chart_of_accounts').select('*').eq('company_id', activeCompany.id);
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!activeCompany
+  });
   const incomeAccounts = accounts?.filter(a => a.type === 'Income');
   const assetAccounts = accounts?.filter(a => a.type === 'Asset');
 
@@ -105,11 +132,11 @@ const InvoiceForm = ({ isOpen, setIsOpen, invoiceId }: InvoiceFormProps) => {
 
   const mutation = useMutation({
     mutationFn: async (values: InvoiceFormValues) => {
-      if (!user) throw new Error('User not authenticated');
+      if (!user || !activeCompany) throw new Error('User not authenticated or no active company');
       const description = values.description || `Invoice ${values.invoice_number}`;
       
       const { error } = await supabase.rpc('create_invoice_with_inventory', {
-        p_user_id: user.id,
+        p_company_id: activeCompany.id,
         p_customer_id: values.customer_id,
         p_invoice_date: values.invoice_date,
         p_due_date: values.due_date,
@@ -122,9 +149,9 @@ const InvoiceForm = ({ isOpen, setIsOpen, invoiceId }: InvoiceFormProps) => {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['invoices'] });
-      queryClient.invalidateQueries({ queryKey: ['journal_entries'] });
-      queryClient.invalidateQueries({ queryKey: ['products'] });
+      queryClient.invalidateQueries({ queryKey: ['invoices', activeCompany?.id] });
+      queryClient.invalidateQueries({ queryKey: ['journal_entries', activeCompany?.id] });
+      queryClient.invalidateQueries({ queryKey: ['products', activeCompany?.id] });
       showSuccess('Invoice created successfully.');
       setIsOpen(false);
     },
