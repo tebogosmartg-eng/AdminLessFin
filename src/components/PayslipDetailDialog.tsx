@@ -57,7 +57,8 @@ const PayslipDetailDialog = ({ isOpen, setIsOpen, payslipId }: PayslipDetailDial
           <div className="text-sm">
             <div className="grid grid-cols-2 gap-4 mb-4">
               <div>
-                <h3 className="font-bold text-lg">{profile?.company_name || 'Your Company'}</h3>
+                <img src="/logo.png" alt="SmaAcc Logo" className="h-12 w-auto mb-2" />
+                <h3 className="font-bold text-base">{profile?.company_name || 'Your Company'}</h3>
                 <p className="text-muted-foreground">{profile?.company_address}</p>
               </div>
               <div className="text-right">

@@ -25,7 +25,9 @@ const Layout = () => {
   return (
     <div className="flex min-h-screen w-full bg-gray-100 dark:bg-gray-900 print:bg-white">
       <aside className="w-64 flex-shrink-0 border-r bg-white dark:bg-gray-800 p-4 flex flex-col print:hidden">
-        <h1 className="text-2xl font-bold mb-8 text-gray-900 dark:text-white">SmaAcc</h1>
+        <div className="mb-8 px-2">
+          <img src="/logo.png" alt="SmaAcc Logo" className="h-12 w-auto" />
+        </div>
         <SidebarNav />
         <div className="mt-auto">
            <NavLink to="/settings" className={navLinkClasses}>

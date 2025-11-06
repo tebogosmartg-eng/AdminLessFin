@@ -143,7 +143,8 @@ const InvoiceDetail = () => {
         <Card className="print:shadow-none print:border-none">
           <CardHeader className="grid grid-cols-2 gap-4">
             <div>
-              <CardTitle>{profile?.company_name || 'Your Company'}</CardTitle>
+              <img src="/logo.png" alt="SmaAcc Logo" className="h-12 w-auto mb-2" />
+              <CardTitle className="text-base">{profile?.company_name || 'Your Company'}</CardTitle>
               <p className="text-sm text-muted-foreground">{profile?.company_address || 'Your Company Address'}</p>
             </div>
             <div className="text-right">
