@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -18,6 +18,8 @@ import { Product } from '../pages/Products';
 import { Trash2 } from 'lucide-react';
 import { addDays, format } from 'date-fns';
 import { formatCurrency } from '../lib/utils';
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from './ui/sheet';
+import InvoicePreview from './InvoicePreview';
 
 const invoiceItemSchema = z.object({
   product_id: z.string().optional(),
@@ -50,6 +52,7 @@ const InvoiceForm = ({ isOpen, setIsOpen, invoiceId }: InvoiceFormProps) => {
   const { user, activeCompany } = useAuth();
   const queryClient = useQueryClient();
   const isEditing = !!invoiceId;
+  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
 
   const form = useForm<InvoiceFormValues>({
     resolver: zodResolver(invoiceSchema),
@@ -64,6 +67,8 @@ const InvoiceForm = ({ isOpen, setIsOpen, invoiceId }: InvoiceFormProps) => {
       items: [{ product_id: '', description: '', quantity: 1, unit_price: 0, income_account_id: '' }],
     },
   });
+
+  const watchedValues = form.watch();
 
   // Note: Editing logic is complex and has been omitted for this implementation.
   // This form currently only supports creating new invoices.
@@ -167,70 +172,100 @@ const InvoiceForm = ({ isOpen, setIsOpen, invoiceId }: InvoiceFormProps) => {
     },
   });
 
-  const onSubmit = (values: InvoiceFormValues) => mutation.mutate(values);
+  const onSubmit = (values: InvoiceFormValues) => {
+    const hasInventoryItem = values.items.some(item => {
+        const product = products?.find(p => p.id === item.product_id);
+        return product?.type === 'inventory';
+    });
+
+    if (hasInventoryItem && !values.inventory_asset_account_id) {
+        form.setError("inventory_asset_account_id", {
+            type: "manual",
+            message: "An Inventory Asset account is required when selling inventory items.",
+        });
+        return;
+    }
+    mutation.mutate(values);
+  };
   
-  const watchedItems = form.watch('items');
-  const hasInventoryItem = watchedItems.some(item => products?.find(p => p.id === item.product_id)?.type === 'inventory');
+  const hasInventoryItem = watchedValues.items.some(item => products?.find(p => p.id === item.product_id)?.type === 'inventory');
 
   return (
-    <Dialog open={isOpen} onOpenChange={setIsOpen}>
-      <DialogContent className="sm:max-w-4xl">
-        <DialogHeader>
-          <DialogTitle>{isEditing ? 'Edit Invoice' : 'New Invoice'}</DialogTitle>
-          <DialogDescription>Fill out the details below to create a new invoice.</DialogDescription>
-        </DialogHeader>
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <FormField control={form.control} name="invoice_number" render={({ field }) => (
-                <FormItem><FormLabel>Invoice #</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
-              )} />
-              <FormField control={form.control} name="customer_id" render={({ field }) => (
-                <FormItem><FormLabel>Customer</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select customer" /></SelectTrigger></FormControl><SelectContent>{customers?.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem>
-              )} />
-              <FormField control={form.control} name="invoice_date" render={({ field }) => (
-                <FormItem><FormLabel>Invoice Date</FormLabel><FormControl><Input type="date" {...field} /></FormControl><FormMessage /></FormItem>
-              )} />
-              <FormField control={form.control} name="due_date" render={({ field }) => (
-                <FormItem><FormLabel>Due Date</FormLabel><FormControl><Input type="date" {...field} /></FormControl><FormMessage /></FormItem>
-              )} />
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <FormField control={form.control} name="accounts_receivable_id" render={({ field }) => (
-                  <FormItem><FormLabel>Deposit To (A/R Account)</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select A/R Account" /></SelectTrigger></FormControl><SelectContent>{assetAccounts?.map(acc => <SelectItem key={acc.id} value={acc.id}>{acc.name}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem>
-              )} />
-              {hasInventoryItem && (
-                <FormField control={form.control} name="inventory_asset_account_id" render={({ field }) => (<FormItem><FormLabel>Inventory Asset Account</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select Inventory Account" /></SelectTrigger></FormControl><SelectContent>{assetAccounts?.map(acc => <SelectItem key={acc.id} value={acc.id}>{acc.name}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem>)} />
-              )}
-            </div>
-            <div className="space-y-2 pt-4">
-              <FormLabel>Line Items</FormLabel>
-              {fields.map((field, index) => {
-                const quantity = form.watch(`items.${index}.quantity`);
-                const unitPrice = form.watch(`items.${index}.unit_price`);
-                const lineTotal = quantity * unitPrice;
-                return (
-                  <div key={field.id} className="grid grid-cols-12 gap-2 items-start">
-                    <FormField control={form.control} name={`items.${index}.product_id`} render={({ field }) => (<FormItem className="col-span-3"><Select onValueChange={(value) => { field.onChange(value); handleProductSelect(value, index); }} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select an item" /></SelectTrigger></FormControl><SelectContent>{products?.map(p => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}</SelectContent></Select></FormItem>)} />
-                    <FormField control={form.control} name={`items.${index}.description`} render={({ field }) => (<FormItem className="col-span-3"><FormControl><Textarea placeholder="Description" {...field} rows={1} /></FormControl></FormItem>)} />
-                    <FormField control={form.control} name={`items.${index}.quantity`} render={({ field }) => (<FormItem className="col-span-1"><FormControl><Input type="number" placeholder="Qty" {...field} /></FormControl></FormItem>)} />
-                    <FormField control={form.control} name={`items.${index}.unit_price`} render={({ field }) => (<FormItem className="col-span-1"><FormControl><Input type="number" step="0.01" placeholder="Price" {...field} /></FormControl></FormItem>)} />
-                    <div className="col-span-1 pt-2 text-right font-mono">{formatCurrency(lineTotal)}</div>
-                    <FormField control={form.control} name={`items.${index}.income_account_id`} render={({ field }) => (<FormItem className="col-span-2"><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Income Account" /></SelectTrigger></FormControl><SelectContent>{incomeAccounts?.map(acc => <SelectItem key={acc.id} value={acc.id}>{acc.name}</SelectItem>)}</SelectContent></Select></FormItem>)} />
-                    <div className="col-span-1 pt-2"><Button type="button" variant="ghost" size="icon" onClick={() => remove(index)} disabled={fields.length <= 1}><Trash2 className="h-4 w-4" /></Button></div>
-                  </div>
-                )
-              })}
-              <Button type="button" variant="outline" size="sm" onClick={() => append({ product_id: '', description: '', quantity: 1, unit_price: 0, income_account_id: '' })}>Add Line</Button>
-            </div>
-            <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setIsOpen(false)}>Cancel</Button>
-              <Button type="submit" disabled={mutation.isPending}>{mutation.isPending ? 'Saving...' : 'Save Invoice'}</Button>
-            </DialogFooter>
-          </form>
-        </Form>
-      </DialogContent>
-    </Dialog>
+    <>
+      <Dialog open={isOpen} onOpenChange={setIsOpen}>
+        <DialogContent className="sm:max-w-4xl">
+          <DialogHeader>
+            <DialogTitle>{isEditing ? 'Edit Invoice' : 'New Invoice'}</DialogTitle>
+            <DialogDescription>Fill out the details below to create a new invoice.</DialogDescription>
+          </DialogHeader>
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <FormField control={form.control} name="invoice_number" render={({ field }) => (
+                  <FormItem><FormLabel>Invoice #</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
+                )} />
+                <FormField control={form.control} name="customer_id" render={({ field }) => (
+                  <FormItem><FormLabel>Customer</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select customer" /></SelectTrigger></FormControl><SelectContent>{customers?.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem>
+                )} />
+                <FormField control={form.control} name="invoice_date" render={({ field }) => (
+                  <FormItem><FormLabel>Invoice Date</FormLabel><FormControl><Input type="date" {...field} /></FormControl><FormMessage /></FormItem>
+                )} />
+                <FormField control={form.control} name="due_date" render={({ field }) => (
+                  <FormItem><FormLabel>Due Date</FormLabel><FormControl><Input type="date" {...field} /></FormControl><FormMessage /></FormItem>
+                )} />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <FormField control={form.control} name="accounts_receivable_id" render={({ field }) => (
+                    <FormItem><FormLabel>Deposit To (A/R Account)</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select A/R Account" /></SelectTrigger></FormControl><SelectContent>{assetAccounts?.map(acc => <SelectItem key={acc.id} value={acc.id}>{acc.name}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem>
+                )} />
+                {hasInventoryItem && (
+                  <FormField control={form.control} name="inventory_asset_account_id" render={({ field }) => (<FormItem><FormLabel>Inventory Asset Account</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select Inventory Account" /></SelectTrigger></FormControl><SelectContent>{assetAccounts?.map(acc => <SelectItem key={acc.id} value={acc.id}>{acc.name}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem>)} />
+                )}
+              </div>
+              <div className="space-y-2 pt-4">
+                <FormLabel>Line Items</FormLabel>
+                {fields.map((field, index) => {
+                  const quantity = form.watch(`items.${index}.quantity`);
+                  const unitPrice = form.watch(`items.${index}.unit_price`);
+                  const lineTotal = quantity * unitPrice;
+                  return (
+                    <div key={field.id} className="grid grid-cols-12 gap-2 items-start">
+                      <FormField control={form.control} name={`items.${index}.product_id`} render={({ field }) => (<FormItem className="col-span-3"><Select onValueChange={(value) => { field.onChange(value); handleProductSelect(value, index); }} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select an item" /></SelectTrigger></FormControl><SelectContent>{products?.map(p => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}</SelectContent></Select></FormItem>)} />
+                      <FormField control={form.control} name={`items.${index}.description`} render={({ field }) => (<FormItem className="col-span-3"><FormControl><Textarea placeholder="Description" {...field} rows={1} /></FormControl></FormItem>)} />
+                      <FormField control={form.control} name={`items.${index}.quantity`} render={({ field }) => (<FormItem className="col-span-1"><FormControl><Input type="number" placeholder="Qty" {...field} /></FormControl></FormItem>)} />
+                      <FormField control={form.control} name={`items.${index}.unit_price`} render={({ field }) => (<FormItem className="col-span-1"><FormControl><Input type="number" step="0.01" placeholder="Price" {...field} /></FormControl></FormItem>)} />
+                      <div className="col-span-1 pt-2 text-right font-mono">{formatCurrency(lineTotal)}</div>
+                      <FormField control={form.control} name={`items.${index}.income_account_id`} render={({ field }) => (<FormItem className="col-span-2"><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Income Account" /></SelectTrigger></FormControl><SelectContent>{incomeAccounts?.map(acc => <SelectItem key={acc.id} value={acc.id}>{acc.name}</SelectItem>)}</SelectContent></Select></FormItem>)} />
+                      <div className="col-span-1 pt-2"><Button type="button" variant="ghost" size="icon" onClick={() => remove(index)} disabled={fields.length <= 1}><Trash2 className="h-4 w-4" /></Button></div>
+                    </div>
+                  )
+                })}
+                <Button type="button" variant="outline" size="sm" onClick={() => append({ product_id: '', description: '', quantity: 1, unit_price: 0, income_account_id: '' })}>Add Line</Button>
+              </div>
+              <DialogFooter className="pt-4">
+                <Button type="button" variant="outline" onClick={() => setIsPreviewOpen(true)}>Preview</Button>
+                <div className="flex-grow" />
+                <Button type="button" variant="outline" onClick={() => setIsOpen(false)}>Cancel</Button>
+                <Button type="submit" disabled={mutation.isPending}>{mutation.isPending ? 'Saving...' : 'Save Invoice'}</Button>
+              </DialogFooter>
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
+      <Sheet open={isPreviewOpen} onOpenChange={setIsPreviewOpen}>
+        <SheetContent className="sm:max-w-3xl w-full">
+            <SheetHeader>
+                <SheetTitle>Invoice Preview</SheetTitle>
+                <SheetDescription>This is a preview of what your invoice will look like.</SheetDescription>
+            </SheetHeader>
+            <InvoicePreview
+                formData={watchedValues}
+                customers={customers}
+                company={activeCompany}
+            />
+        </SheetContent>
+      </Sheet>
+    </>
   );
 };
 
