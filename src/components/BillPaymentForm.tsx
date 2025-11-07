@@ -60,27 +60,24 @@ const BillPaymentForm = ({ isOpen, setIsOpen, vendorId, vendorName, amountDue }:
     }
   }, [isOpen, amountDue, vendorName, form]);
 
-  const { data: assetAccounts } = useQuery<Account[]>({
-    queryKey: ['asset_accounts', activeCompany?.id],
+  const { data: accounts } = useQuery<Account[]>({
+    queryKey: ['accounts', activeCompany?.id],
     queryFn: async () => {
       if (!activeCompany) return [];
-      const { data, error } = await supabase.from('chart_of_accounts').select('*').eq('type', 'Asset').eq('company_id', activeCompany.id);
-      if (error) throw error;
+      const { data, error } = await supabase.functions.invoke('chart-of-accounts', {
+        body: {
+          method: 'GET',
+          company_id: activeCompany.id,
+        },
+      });
+      if (error) throw new Error(error.message);
       return data;
     },
     enabled: !!activeCompany,
   });
 
-  const { data: apAccounts } = useQuery<Account[]>({
-    queryKey: ['ap_accounts', activeCompany?.id],
-    queryFn: async () => {
-      if (!activeCompany) return [];
-      const { data, error } = await supabase.from('chart_of_accounts').select('*').eq('type', 'Liability').eq('company_id', activeCompany.id);
-      if (error) throw error;
-      return data;
-    },
-    enabled: !!activeCompany,
-  });
+  const assetAccounts = accounts?.filter(acc => acc.type === 'Asset');
+  const apAccounts = accounts?.filter(acc => acc.type === 'Liability');
 
   const mutation = useMutation({
     mutationFn: async (values: PaymentFormValues) => {
