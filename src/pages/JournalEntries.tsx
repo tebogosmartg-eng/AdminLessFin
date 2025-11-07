@@ -64,84 +64,48 @@ const JournalEntries = () => {
 
   const { data: accounts } = useQuery<Account[]>({
     queryKey: ['accounts', activeCompany?.id],
-    queryFn: async () => {
-      if (!activeCompany) return [];
-      const { data, error } = await supabase.from('chart_of_accounts').select('*').eq('company_id', activeCompany.id).order('name');
-      if (error) throw error;
-      return data;
-    },
     enabled: !!activeCompany,
   });
 
   const { data: vendors } = useQuery<Vendor[]>({
     queryKey: ['vendors', activeCompany?.id],
-    queryFn: async () => {
-      if (!activeCompany) return [];
-      const { data, error } = await supabase.from('vendors').select('*').eq('company_id', activeCompany.id).order('name');
-      if (error) throw error;
-      return data;
-    },
     enabled: !!activeCompany,
   });
 
   const { data: customers } = useQuery<Customer[]>({
     queryKey: ['customers', activeCompany?.id],
-    queryFn: async () => {
-      if (!activeCompany) return [];
-      const { data, error } = await supabase.from('customers').select('*').eq('company_id', activeCompany.id).order('name');
-      if (error) throw error;
-      return data;
-    },
     enabled: !!activeCompany,
   });
 
   const fetchJournalEntries = async () => {
     if (!activeCompany) return [];
-    let entryIdsFromAccountFilter: string[] | null = null;
-    if (filterAccount !== 'all') {
-      const { data: items, error: itemsError } = await supabase
-        .from('journal_entry_items')
-        .select('journal_entry_id')
-        .eq('account_id', filterAccount);
-      if (itemsError) throw new Error(itemsError.message);
-      entryIdsFromAccountFilter = items.map(item => item.journal_entry_id);
-      if (entryIdsFromAccountFilter.length === 0) return [];
-    }
+    
+    const { data, error } = await supabase.functions.invoke('journal-entries', {
+      body: {
+        method: 'GET',
+        company_id: activeCompany.id,
+        select: `
+          id,
+          entry_date,
+          description,
+          attachment_url,
+          vendors ( name ),
+          customers ( name ),
+          journal_entry_items (
+            type,
+            amount
+          )
+        `,
+        filters: {
+          date_from: date?.from ? format(date.from, 'yyyy-MM-dd') : null,
+          date_to: date?.to ? format(date.to, 'yyyy-MM-dd') : null,
+          account_id: filterAccount,
+          vendor_id: filterVendor,
+          customer_id: filterCustomer,
+        },
+      },
+    });
 
-    let query = supabase
-      .from('journal_entries')
-      .select(`
-        id,
-        entry_date,
-        description,
-        attachment_url,
-        vendors ( name ),
-        customers ( name ),
-        journal_entry_items (
-          type,
-          amount
-        )
-      `)
-      .eq('company_id', activeCompany.id)
-      .order('entry_date', { ascending: false });
-
-    if (entryIdsFromAccountFilter) {
-      query = query.in('id', entryIdsFromAccountFilter);
-    }
-    if (date?.from) {
-      query = query.gte('entry_date', format(date.from, 'yyyy-MM-dd'));
-    }
-    if (date?.to) {
-      query = query.lte('entry_date', format(date.to, 'yyyy-MM-dd'));
-    }
-    if (filterVendor !== 'all') {
-      query = query.eq('vendor_id', filterVendor);
-    }
-    if (filterCustomer !== 'all') {
-      query = query.eq('customer_id', filterCustomer);
-    }
-
-    const { data, error } = await query;
     if (error) throw new Error(error.message);
     return data;
   };
@@ -154,7 +118,14 @@ const JournalEntries = () => {
 
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from('journal_entries').delete().eq('id', id);
+      if (!activeCompany) throw new Error("No active company");
+      const { error } = await supabase.functions.invoke('journal-entries', {
+        body: {
+          method: 'DELETE',
+          company_id: activeCompany.id,
+          entryId: id,
+        },
+      });
       if (error) throw new Error(error.message);
     },
     onSuccess: () => {

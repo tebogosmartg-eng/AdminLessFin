@@ -92,15 +92,18 @@ const JournalEntryForm = ({ isOpen, setIsOpen, entryId }: JournalEntryFormProps)
   const { data: entryToEdit } = useQuery({
     queryKey: ['journal_entry_edit', entryId],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('journal_entries')
-        .select('entry_date, description, attachment_url, vendor_id, customer_id, journal_entry_items(account_id, type, amount)')
-        .eq('id', entryId)
-        .single();
+      const { data, error } = await supabase.functions.invoke('journal-entries', {
+        body: {
+          method: 'GET',
+          company_id: activeCompany!.id,
+          select: 'entry_date, description, attachment_url, vendor_id, customer_id, journal_entry_items(account_id, type, amount)',
+          filters: { id: entryId },
+        }
+      });
       if (error) throw new Error(error.message);
       return data;
     },
-    enabled: isEditing && isOpen,
+    enabled: isEditing && isOpen && !!activeCompany,
   });
 
   useEffect(() => {
@@ -135,75 +138,20 @@ const JournalEntryForm = ({ isOpen, setIsOpen, entryId }: JournalEntryFormProps)
     name: "items",
   });
 
-  const { data: accounts } = useQuery<Account[]>({ 
-    queryKey: ['accounts', activeCompany?.id],
-    queryFn: async () => {
-        if (!activeCompany) return [];
-        const { data, error } = await supabase.from('chart_of_accounts').select('*').eq('company_id', activeCompany.id).order('name');
-        if (error) throw error;
-        return data;
-    },
-    enabled: !!activeCompany
-  });
-  const { data: vendors } = useQuery<Vendor[]>({ 
-    queryKey: ['vendors', activeCompany?.id],
-    queryFn: async () => {
-        if (!activeCompany) return [];
-        const { data, error } = await supabase.from('vendors').select('*').eq('company_id', activeCompany.id).order('name');
-        if (error) throw error;
-        return data;
-    },
-    enabled: !!activeCompany
-  });
-  const { data: customers } = useQuery<Customer[]>({ 
-    queryKey: ['customers', activeCompany?.id],
-    queryFn: async () => {
-        if (!activeCompany) return [];
-        const { data, error } = await supabase.from('customers').select('*').eq('company_id', activeCompany.id).order('name');
-        if (error) throw error;
-        return data;
-    },
-    enabled: !!activeCompany
-  });
+  const { data: accounts } = useQuery<Account[]>({ queryKey: ['accounts', activeCompany?.id], enabled: !!activeCompany });
+  const { data: vendors } = useQuery<Vendor[]>({ queryKey: ['vendors', activeCompany?.id], enabled: !!activeCompany });
+  const { data: customers } = useQuery<Customer[]>({ queryKey: ['customers', activeCompany?.id], enabled: !!activeCompany });
 
   const mutation = useMutation({
     mutationFn: async (values: JournalEntryFormValues) => {
       if (!user || !activeCompany) throw new Error('User not authenticated or no active company');
 
-      // 1. Upsert the core journal entry data (without attachment URL)
-      let upsertedEntryId: string;
-      const entryCoreData = {
-        entry_date: values.entry_date,
-        description: values.description,
-        vendor_id: values.vendor_id || null,
-        customer_id: values.customer_id || null,
-      };
-
-      if (isEditing) {
-        upsertedEntryId = entryId!;
-        const { error } = await supabase.from('journal_entries').update(entryCoreData).eq('id', upsertedEntryId);
-        if (error) throw error;
-      } else {
-        const { data, error } = await supabase.from('journal_entries').insert({ ...entryCoreData, company_id: activeCompany.id }).select('id').single();
-        if (error) throw error;
-        upsertedEntryId = data.id;
-      }
-
-      // 2. Sync the journal entry items
-      await supabase.from('journal_entry_items').delete().eq('journal_entry_id', upsertedEntryId);
-      const itemsToInsert = values.items.map(item => ({ ...item, journal_entry_id: upsertedEntryId }));
-      const { error: itemsError } = await supabase.from('journal_entry_items').insert(itemsToInsert);
-      if (itemsError) throw itemsError;
-
-      // 3. Handle the attachment file logic
-      let newAttachmentUrl: string | null = existingAttachmentUrl;
-      let needsUrlUpdate = false;
+      let finalAttachmentUrl = existingAttachmentUrl;
 
       if (removeAttachment && existingAttachmentUrl) {
         const oldFilePath = existingAttachmentUrl.split('/attachments/')[1];
         await supabase.storage.from('attachments').remove([oldFilePath]);
-        newAttachmentUrl = null;
-        needsUrlUpdate = true;
+        finalAttachmentUrl = null;
       }
 
       if (attachmentFile) {
@@ -213,21 +161,26 @@ const JournalEntryForm = ({ isOpen, setIsOpen, entryId }: JournalEntryFormProps)
         }
         const fileExt = attachmentFile.name.split('.').pop();
         const fileName = `${Date.now()}.${fileExt}`;
-        const filePath = `${user.id}/${upsertedEntryId}/${fileName}`;
+        const tempEntryId = entryId || crypto.randomUUID();
+        const filePath = `${user.id}/${tempEntryId}/${fileName}`;
         
         const { error: uploadError } = await supabase.storage.from('attachments').upload(filePath, attachmentFile);
         if (uploadError) throw new Error(`Storage Error: ${uploadError.message}`);
         
         const { data: urlData } = supabase.storage.from('attachments').getPublicUrl(filePath);
-        newAttachmentUrl = urlData.publicUrl;
-        needsUrlUpdate = true;
+        finalAttachmentUrl = urlData.publicUrl;
       }
 
-      // 4. If the attachment URL has changed, update the journal entry
-      if (needsUrlUpdate) {
-        const { error } = await supabase.from('journal_entries').update({ attachment_url: newAttachmentUrl }).eq('id', upsertedEntryId);
-        if (error) throw error;
-      }
+      const method = isEditing ? 'PUT' : 'POST';
+      const body = {
+        method,
+        company_id: activeCompany.id,
+        entryData: { ...values, attachment_url: finalAttachmentUrl },
+        ...(isEditing && { entryId: entryId }),
+      };
+
+      const { error } = await supabase.functions.invoke('journal-entries', { body });
+      if (error) throw error;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['journal_entries'] });

@@ -20,6 +20,7 @@ import { Button } from './ui/button';
 import { Paperclip } from 'lucide-react';
 import { formatCurrency } from '../lib/utils';
 import { Link } from 'react-router-dom';
+import { useAuth } from '../contexts/AuthContext';
 
 type JournalEntryDetailProps = {
   entryId: string | null;
@@ -45,27 +46,33 @@ type EntryDetail = {
 };
 
 const JournalEntryDetail = ({ entryId, isOpen, setIsOpen }: JournalEntryDetailProps) => {
+  const { activeCompany } = useAuth();
+
   const fetchEntryDetail = async (id: string) => {
-    const { data, error } = await supabase
-      .from('journal_entries')
-      .select(`
-        id,
-        entry_date,
-        description,
-        attachment_url,
-        vendors ( name ),
-        customers ( name ),
-        invoices ( id, invoice_number ),
-        journal_entry_items (
-          type,
-          amount,
-          chart_of_accounts (
-            name
+    if (!activeCompany) return null;
+    const { data, error } = await supabase.functions.invoke('journal-entries', {
+      body: {
+        method: 'GET',
+        company_id: activeCompany.id,
+        select: `
+          id,
+          entry_date,
+          description,
+          attachment_url,
+          vendors ( name ),
+          customers ( name ),
+          invoices ( id, invoice_number ),
+          journal_entry_items (
+            type,
+            amount,
+            chart_of_accounts (
+              name
+            )
           )
-        )
-      `)
-      .eq('id', id)
-      .single();
+        `,
+        filters: { id },
+      },
+    });
     
     if (error) throw new Error(error.message);
     return data as EntryDetail;
@@ -74,7 +81,7 @@ const JournalEntryDetail = ({ entryId, isOpen, setIsOpen }: JournalEntryDetailPr
   const { data: entry, isLoading } = useQuery({
     queryKey: ['journal_entry_detail', entryId],
     queryFn: () => fetchEntryDetail(entryId!),
-    enabled: !!entryId,
+    enabled: !!entryId && !!activeCompany,
   });
 
   return (
