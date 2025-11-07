@@ -60,16 +60,23 @@ const ReceivePaymentForm = ({ isOpen, setIsOpen, customerId, customerName, amoun
     }
   }, [isOpen, amountDue, customerName, form]);
 
-  const { data: assetAccounts } = useQuery<Account[]>({
-    queryKey: ['asset_accounts', activeCompany?.id],
+  const { data: accounts } = useQuery<Account[]>({
+    queryKey: ['accounts', activeCompany?.id],
     queryFn: async () => {
       if (!activeCompany) return [];
-      const { data, error } = await supabase.from('chart_of_accounts').select('*').eq('type', 'Asset').eq('company_id', activeCompany.id);
-      if (error) throw error;
+      const { data, error } = await supabase.functions.invoke('chart-of-accounts', {
+        body: {
+          method: 'GET',
+          company_id: activeCompany.id,
+        },
+      });
+      if (error) throw new Error(error.message);
       return data;
     },
     enabled: !!activeCompany,
   });
+
+  const assetAccounts = accounts?.filter(a => a.type === 'Asset');
 
   const mutation = useMutation({
     mutationFn: async (values: PaymentFormValues) => {
