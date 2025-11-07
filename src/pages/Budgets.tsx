@@ -57,7 +57,14 @@ const Budgets = () => {
 
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from('budgets').delete().eq('id', id);
+      if (!activeCompany) throw new Error("No active company");
+      const { error } = await supabase.functions.invoke('budgets', {
+        body: {
+          method: 'DELETE',
+          company_id: activeCompany.id,
+          budgetId: id,
+        },
+      });
       if (error) throw new Error(error.message);
     },
     onSuccess: () => {

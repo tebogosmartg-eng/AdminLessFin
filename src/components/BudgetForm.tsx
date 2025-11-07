@@ -101,14 +101,15 @@ const BudgetForm = ({ isOpen, setIsOpen, budget }: BudgetFormProps) => {
     mutationFn: async (values: BudgetFormValues) => {
       if (!activeCompany) throw new Error('No active company selected');
 
-      const budgetData = {
-        ...values,
+      const method = budget ? 'PUT' : 'POST';
+      const body = {
+        method,
         company_id: activeCompany.id,
+        budgetData: values,
+        ...(budget && { budgetId: budget.id }),
       };
 
-      const { error } = budget
-        ? await supabase.from('budgets').update(budgetData).eq('id', budget.id)
-        : await supabase.from('budgets').insert(budgetData);
+      const { error } = await supabase.functions.invoke('budgets', { body });
 
       if (error) throw new Error(error.message);
     },
