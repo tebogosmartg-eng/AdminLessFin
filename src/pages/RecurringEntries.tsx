@@ -29,11 +29,12 @@ const RecurringEntries = () => {
     queryKey: ['recurring_entries', activeCompany?.id],
     queryFn: async () => {
       if (!activeCompany) return [];
-      const { data, error } = await supabase
-        .from('recurring_journal_entries')
-        .select('id, description, frequency, next_run_date')
-        .eq('company_id', activeCompany.id)
-        .order('created_at', { ascending: false });
+      const { data, error } = await supabase.functions.invoke('recurring-entries', {
+        body: {
+          method: 'GET_ALL',
+          company_id: activeCompany.id,
+        },
+      });
       if (error) throw new Error(error.message);
       return data;
     },
@@ -42,7 +43,14 @@ const RecurringEntries = () => {
 
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from('recurring_journal_entries').delete().eq('id', id);
+      if (!activeCompany) throw new Error("No active company");
+      const { error } = await supabase.functions.invoke('recurring-entries', {
+        body: {
+          method: 'DELETE',
+          company_id: activeCompany.id,
+          entryId: id,
+        },
+      });
       if (error) throw new Error(error.message);
     },
     onSuccess: () => {

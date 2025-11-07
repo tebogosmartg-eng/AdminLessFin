@@ -68,15 +68,17 @@ const RecurringEntryForm = ({ isOpen, setIsOpen, entryId }: RecurringEntryFormPr
   const { data: entryToEdit } = useQuery({
     queryKey: ['recurring_entry_edit', entryId],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('recurring_journal_entries')
-        .select('*, recurring_journal_entry_items(*)')
-        .eq('id', entryId)
-        .single();
+      const { data, error } = await supabase.functions.invoke('recurring-entries', {
+        body: {
+          method: 'GET_ONE',
+          company_id: activeCompany!.id,
+          entryId: entryId,
+        },
+      });
       if (error) throw new Error(error.message);
       return data;
     },
-    enabled: isEditing && isOpen,
+    enabled: isEditing && isOpen && !!activeCompany,
   });
 
   useEffect(() => {
@@ -86,7 +88,7 @@ const RecurringEntryForm = ({ isOpen, setIsOpen, entryId }: RecurringEntryFormPr
         frequency: entryToEdit.frequency as any,
         start_date: entryToEdit.start_date,
         end_date: entryToEdit.end_date || '',
-        items: entryToEdit.recurring_journal_entry_items.map(({ account_id, type, amount }) => ({ account_id, type, amount })),
+        items: entryToEdit.recurring_journal_entry_items.map(({ account_id, type, amount }: any) => ({ account_id, type, amount })),
       });
     } else {
       form.reset({
@@ -107,7 +109,12 @@ const RecurringEntryForm = ({ isOpen, setIsOpen, entryId }: RecurringEntryFormPr
     queryKey: ['accounts', activeCompany?.id], 
     queryFn: async () => {
         if (!activeCompany) return [];
-        const { data, error } = await supabase.from('chart_of_accounts').select('*').eq('company_id', activeCompany.id).order('account_number');
+        const { data, error } = await supabase.functions.invoke('chart-of-accounts', {
+          body: {
+            method: 'GET',
+            company_id: activeCompany.id,
+          },
+        });
         if (error) throw new Error(error.message);
         return data;
     },
@@ -119,7 +126,6 @@ const RecurringEntryForm = ({ isOpen, setIsOpen, entryId }: RecurringEntryFormPr
       if (!user || !activeCompany) throw new Error('User not authenticated or no active company');
       
       const entryPayload = {
-        company_id: activeCompany.id,
         description: values.description,
         frequency: values.frequency,
         start_date: values.start_date,
@@ -127,21 +133,16 @@ const RecurringEntryForm = ({ isOpen, setIsOpen, entryId }: RecurringEntryFormPr
         next_run_date: values.start_date,
       };
 
-      if (isEditing) {
-        const { error: updateError } = await supabase.from('recurring_journal_entries').update(entryPayload).eq('id', entryId);
-        if (updateError) throw updateError;
-        const { error: deleteError } = await supabase.from('recurring_journal_entry_items').delete().eq('recurring_journal_entry_id', entryId);
-        if (deleteError) throw deleteError;
-        const itemsToInsert = values.items.map(item => ({ ...item, recurring_journal_entry_id: entryId }));
-        const { error: insertError } = await supabase.from('recurring_journal_entry_items').insert(itemsToInsert);
-        if (insertError) throw insertError;
-      } else {
-        const { data: entry, error: entryError } = await supabase.from('recurring_journal_entries').insert(entryPayload).select('id').single();
-        if (entryError) throw entryError;
-        const itemsToInsert = values.items.map(item => ({ ...item, recurring_journal_entry_id: entry.id }));
-        const { error: itemsError } = await supabase.from('recurring_journal_entry_items').insert(itemsToInsert);
-        if (itemsError) throw itemsError;
-      }
+      const method = isEditing ? 'PUT' : 'POST';
+      const body = {
+        method,
+        company_id: activeCompany.id,
+        entryData: { ...entryPayload, items: values.items },
+        ...(isEditing && { entryId: entryId }),
+      };
+
+      const { error } = await supabase.functions.invoke('recurring-entries', { body });
+      if (error) throw error;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['recurring_entries', activeCompany?.id] });
