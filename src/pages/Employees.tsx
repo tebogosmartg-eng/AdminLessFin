@@ -51,11 +51,12 @@ const Employees = () => {
 
   const fetchEmployees = async () => {
     if (!activeCompany) return [];
-    const { data, error } = await supabase
-      .from('employees')
-      .select('*')
-      .eq('company_id', activeCompany.id)
-      .order('last_name', { ascending: true });
+    const { data, error } = await supabase.functions.invoke('employees', {
+      body: {
+        method: 'GET',
+        company_id: activeCompany.id,
+      },
+    });
     if (error) throw new Error(error.message);
     return data;
   };
@@ -68,7 +69,14 @@ const Employees = () => {
 
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from('employees').delete().eq('id', id);
+      if (!activeCompany) throw new Error("No active company");
+      const { error } = await supabase.functions.invoke('employees', {
+        body: {
+          method: 'DELETE',
+          company_id: activeCompany.id,
+          employeeId: id,
+        },
+      });
       if (error) throw new Error(error.message);
     },
     onSuccess: () => {

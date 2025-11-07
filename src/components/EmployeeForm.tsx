@@ -109,15 +109,20 @@ const EmployeeForm = ({ isOpen, setIsOpen, employee }: EmployeeFormProps) => {
 
       const employeeData = {
         ...values,
-        company_id: activeCompany.id,
         end_date: values.end_date || null,
         salary_amount: values.salary_amount || null,
         salary_period: values.salary_period || null,
       };
 
-      const { error } = employee
-        ? await supabase.from('employees').update(employeeData).eq('id', employee.id)
-        : await supabase.from('employees').insert(employeeData);
+      const method = employee ? 'PUT' : 'POST';
+      const body = {
+        method,
+        company_id: activeCompany.id,
+        employeeData,
+        ...(employee && { employeeId: employee.id }),
+      };
+
+      const { error } = await supabase.functions.invoke('employees', { body });
 
       if (error) throw new Error(error.message);
     },
