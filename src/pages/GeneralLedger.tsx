@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Skeleton } from '../components/ui/skeleton';
 import { Account } from './ChartOfAccounts';
 import { formatCurrency } from '../lib/utils';
+import { useAuth } from '../contexts/AuthContext';
 
 type LedgerEntry = {
   entry_date: string;
@@ -18,45 +19,47 @@ type LedgerEntry = {
 
 const GeneralLedger = () => {
   const [selectedAccountId, setSelectedAccountId] = useState<string | null>(null);
+  const { activeCompany } = useAuth();
 
   const { data: accounts, isLoading: isLoadingAccounts } = useQuery<Account[]>({
-    queryKey: ['accounts'],
+    queryKey: ['accounts', activeCompany?.id],
     queryFn: async () => {
-      const { data, error } = await supabase.from('chart_of_accounts').select('*').order('account_number');
+      if (!activeCompany) return [];
+      const { data, error } = await supabase.functions.invoke('chart-of-accounts', {
+        body: {
+          method: 'GET',
+          company_id: activeCompany.id,
+        },
+      });
       if (error) throw new Error(error.message);
       return data;
     },
+    enabled: !!activeCompany,
   });
 
   const { data: ledgerEntries, isLoading: isLoadingEntries } = useQuery<LedgerEntry[]>({
-    queryKey: ['ledger', selectedAccountId],
+    queryKey: ['ledger', selectedAccountId, activeCompany?.id],
     queryFn: async () => {
-      if (!selectedAccountId) return [];
-      const { data, error } = await supabase
-        .from('journal_entry_items')
-        .select(`
-          amount,
-          type,
-          journal_entries (
-            id,
-            entry_date,
-            description
-          )
-        `)
-        .eq('account_id', selectedAccountId)
-        .order('entry_date', { foreignTable: 'journal_entries', ascending: true });
+      if (!selectedAccountId || !activeCompany) return [];
+      const { data, error } = await supabase.functions.invoke('accounting', {
+        body: {
+          method: 'GET_LEDGER_ENTRIES',
+          company_id: activeCompany.id,
+          account_id: selectedAccountId,
+        },
+      });
 
       if (error) throw new Error(error.message);
       
-      return data.map(item => ({
+      return data.map((item: any) => ({
         amount: item.amount,
         type: item.type,
-        entry_date: (item.journal_entries as any).entry_date,
-        description: (item.journal_entries as any).description,
-        journal_entry_id: (item.journal_entries as any).id,
+        entry_date: item.journal_entries.entry_date,
+        description: item.journal_entries.description,
+        journal_entry_id: item.journal_entries.id,
       }));
     },
-    enabled: !!selectedAccountId,
+    enabled: !!selectedAccountId && !!activeCompany,
   });
 
   const selectedAccount = accounts?.find(acc => acc.id === selectedAccountId);

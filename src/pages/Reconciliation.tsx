@@ -13,6 +13,7 @@ import { format } from 'date-fns';
 import { cn } from '../lib/utils';
 import { showError, showSuccess } from '../utils/toast';
 import { formatCurrency } from '../lib/utils';
+import { useAuth } from '../contexts/AuthContext';
 
 type Transaction = {
   id: string;
@@ -28,71 +29,81 @@ const Reconciliation = () => {
   const [statementEndBalance, setStatementEndBalance] = useState('');
   const [clearedItemIds, setClearedItemIds] = useState<Set<string>>(new Set());
   const queryClient = useQueryClient();
+  const { activeCompany } = useAuth();
 
   const isSetupComplete = !!selectedAccountId && !!statementEndDate && !!statementEndBalance;
 
   const { data: bankAccounts } = useQuery<Account[]>({
-    queryKey: ['bank_accounts'],
+    queryKey: ['bank_accounts', activeCompany?.id],
     queryFn: async () => {
-      const { data, error } = await supabase.from('chart_of_accounts').select('*').eq('type', 'Asset').order('name');
+      if (!activeCompany) return [];
+      const { data, error } = await supabase.functions.invoke('accounting', {
+        body: {
+          method: 'GET_BANK_ACCOUNTS',
+          company_id: activeCompany.id,
+        },
+      });
       if (error) throw new Error(error.message);
-      return data.filter(acc => 
+      return data.filter((acc: Account) => 
         acc.name.toLowerCase().includes('bank') || 
         acc.name.toLowerCase().includes('checking') || 
         acc.name.toLowerCase().includes('cash')
       );
     },
+    enabled: !!activeCompany,
   });
 
   const { data: transactions, isLoading: isLoadingTransactions } = useQuery<Transaction[]>({
-    queryKey: ['reconciliation_transactions', selectedAccountId, statementEndDate],
+    queryKey: ['reconciliation_transactions', selectedAccountId, statementEndDate, activeCompany?.id],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('journal_entry_items')
-        .select(`
-          id,
-          amount,
-          type,
-          journal_entries (
-            entry_date,
-            description
-          )
-        `)
-        .eq('account_id', selectedAccountId!)
-        .eq('reconciled', false)
-        .lte('journal_entries.entry_date', statementEndDate);
+      const { data, error } = await supabase.functions.invoke('accounting', {
+        body: {
+          method: 'GET_RECONCILIATION_TRANSACTIONS',
+          company_id: activeCompany!.id,
+          account_id: selectedAccountId!,
+          statement_end_date: statementEndDate,
+        },
+      });
 
       if (error) throw new Error(error.message);
       
-      return data.map(item => ({
+      return data.map((item: any) => ({
         id: item.id,
         amount: item.amount,
         type: item.type,
-        entry_date: (item.journal_entries as any).entry_date,
-        description: (item.journal_entries as any).description,
+        entry_date: item.journal_entries.entry_date,
+        description: item.journal_entries.description,
       }));
     },
-    enabled: isSetupComplete,
+    enabled: isSetupComplete && !!activeCompany,
   });
 
   const { data: bookBalanceData, isLoading: isLoadingBookBalance } = useQuery({
-    queryKey: ['book_balance_as_of', selectedAccountId, statementEndDate],
+    queryKey: ['book_balance_as_of', selectedAccountId, statementEndDate, activeCompany?.id],
     queryFn: async () => {
-      const { data, error } = await supabase.rpc('get_balances_as_of_date', {
-        p_end_date: statementEndDate,
+      const { data, error } = await supabase.functions.invoke('accounting', {
+        body: {
+          method: 'GET_BOOK_BALANCE',
+          company_id: activeCompany!.id,
+          account_id: selectedAccountId!,
+          statement_end_date: statementEndDate,
+        },
       });
       if (error) throw new Error(error.message);
-      return data.find((acc: any) => acc.id === selectedAccountId);
+      return data;
     },
-    enabled: isSetupComplete,
+    enabled: isSetupComplete && !!activeCompany,
   });
 
   const finishReconciliationMutation = useMutation({
     mutationFn: async (clearedIds: string[]) => {
-      const { error } = await supabase
-        .from('journal_entry_items')
-        .update({ reconciled: true, reconciled_at: new Date().toISOString() })
-        .in('id', clearedIds);
+      const { error } = await supabase.functions.invoke('accounting', {
+        body: {
+          method: 'FINISH_RECONCILIATION',
+          company_id: activeCompany!.id,
+          cleared_ids: clearedIds,
+        },
+      });
       if (error) throw error;
     },
     onSuccess: () => {

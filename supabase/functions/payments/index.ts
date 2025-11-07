@@ -106,6 +106,15 @@ serve(async (req) => {
         ({ data, error } = await supabaseAdmin.from('journal_entry_items').insert(vendorJournalItems));
         break;
 
+      case 'RECORD_INVOICE_PAYMENT':
+        ({ data, error } = await userSupabase.rpc('record_invoice_payment', {
+          p_invoice_id: body.invoice_id,
+          p_payment_date: body.payment_date,
+          p_asset_account_id: body.asset_account_id,
+          p_ar_account_id: body.ar_account_id,
+        }));
+        break;
+
       default:
         throw new Error(`Unsupported method: ${method}`);
     }

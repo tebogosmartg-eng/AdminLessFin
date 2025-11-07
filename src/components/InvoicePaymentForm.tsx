@@ -13,6 +13,7 @@ import { showError, showSuccess } from '../utils/toast';
 import { Account } from '../pages/ChartOfAccounts';
 import { format } from 'date-fns';
 import { formatCurrency } from '../lib/utils';
+import { useAuth } from '../contexts/AuthContext';
 
 const paymentSchema = z.object({
   payment_date: z.string().min(1, "Date is required."),
@@ -30,6 +31,7 @@ interface InvoicePaymentFormProps {
 
 const InvoicePaymentForm = ({ isOpen, setIsOpen, invoice }: InvoicePaymentFormProps) => {
   const queryClient = useQueryClient();
+  const { activeCompany } = useAuth();
   const form = useForm<PaymentFormValues>({
     resolver: zodResolver(paymentSchema),
     defaultValues: {
@@ -39,7 +41,7 @@ const InvoicePaymentForm = ({ isOpen, setIsOpen, invoice }: InvoicePaymentFormPr
     },
   });
 
-  const { data: accounts } = useQuery<Account[]>({ queryKey: ['accounts'] });
+  const { data: accounts } = useQuery<Account[]>({ queryKey: ['accounts', activeCompany?.id] });
   const assetAccounts = accounts?.filter(a => a.type === 'Asset');
   const arAccounts = assetAccounts?.filter(a => a.name.toLowerCase().includes('receivable'));
   const cashAccounts = assetAccounts?.filter(a => !a.name.toLowerCase().includes('receivable'));
@@ -52,11 +54,16 @@ const InvoicePaymentForm = ({ isOpen, setIsOpen, invoice }: InvoicePaymentFormPr
 
   const mutation = useMutation({
     mutationFn: async (values: PaymentFormValues) => {
-      const { error } = await supabase.rpc('record_invoice_payment', {
-        p_invoice_id: invoice.id,
-        p_payment_date: values.payment_date,
-        p_asset_account_id: values.deposit_account_id,
-        p_ar_account_id: values.ar_account_id,
+      if (!activeCompany) throw new Error("No active company");
+      const { error } = await supabase.functions.invoke('payments', {
+        body: {
+          method: 'RECORD_INVOICE_PAYMENT',
+          company_id: activeCompany.id,
+          invoice_id: invoice.id,
+          payment_date: values.payment_date,
+          asset_account_id: values.deposit_account_id,
+          ar_account_id: values.ar_account_id,
+        },
       });
       if (error) throw error;
     },
