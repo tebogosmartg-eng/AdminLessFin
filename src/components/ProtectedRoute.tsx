@@ -1,10 +1,15 @@
 import { useAuth } from '../contexts/AuthContext';
 import { Navigate, useLocation } from 'react-router-dom';
 import Layout from './Layout';
+import FullScreenLoader from './FullScreenLoader';
 
 const ProtectedRoute = () => {
-  const { session, activeCompany } = useAuth();
+  const { session, activeCompany, loading } = useAuth();
   const location = useLocation();
+
+  if (loading) {
+    return <FullScreenLoader />;
+  }
 
   if (!session) {
     return <Navigate to="/auth" replace />;

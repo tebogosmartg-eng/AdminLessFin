@@ -1,7 +1,6 @@
 import { createContext, useContext, useEffect, useState } from 'react';
 import { supabase } from '../integrations/supabase/client';
 import { Session, User } from '@supabase/supabase-js';
-import { getYear, set, isAfter, addDays, format } from 'date-fns';
 
 type Profile = {
   full_name: string;
@@ -26,6 +25,7 @@ type AuthContextType = {
   profile: Profile | null;
   companies: Company[] | null;
   activeCompany: Company | null;
+  loading: boolean;
   signOut: () => void;
   refreshProfile: () => Promise<void>;
   switchCompany: (companyId: string) => Promise<void>;
@@ -49,7 +49,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         .eq('id', user.id)
         .single();
       
-      // Gracefully handle if profile doesn't exist yet (e.g., right after signup)
       if (profileError && profileError.code === 'PGRST116') {
         userProfile = null;
       } else if (profileError) {
@@ -154,6 +153,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     profile,
     companies,
     activeCompany,
+    loading,
     signOut,
     refreshProfile,
     switchCompany,
@@ -161,7 +161,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   return (
     <AuthContext.Provider value={value}>
-      {!loading && children}
+      {children}
     </AuthContext.Provider>
   );
 };
