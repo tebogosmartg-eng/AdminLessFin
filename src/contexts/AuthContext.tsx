@@ -42,54 +42,78 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [loading, setLoading] = useState(true);
 
   const fetchUserAndCompanyData = async (user: User | null) => {
-    if (user) {
-      let { data: userProfile, error: profileError } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', user.id)
-        .single();
-      
-      if (profileError && profileError.code === 'PGRST116') {
-        userProfile = null;
-      } else if (profileError) {
-        throw new Error(`Failed to fetch profile: ${profileError.message}`);
-      }
-
-      setProfile(userProfile);
-
-      if (!userProfile) {
-        setCompanies([]);
-        setActiveCompany(null);
-        return;
-      }
-
-      const { data: companyUsers, error: companyUsersError } = await supabase
-        .from('company_users')
-        .select('company_id')
-        .eq('user_id', user.id);
-      if (companyUsersError) throw new Error(`Failed to fetch company memberships: ${companyUsersError.message}`);
-      
-      const companyIds = companyUsers.map(c => c.company_id);
-
-      if (companyIds.length > 0) {
-        const { data: userCompanies, error: companiesError } = await supabase
-          .from('companies')
+    console.log('[AuthContext] fetchUserAndCompanyData started for user:', user?.id || 'null');
+    try {
+      if (user) {
+        console.log('[AuthContext] Fetching profile...');
+        let { data: userProfile, error: profileError } = await supabase
+          .from('profiles')
           .select('*')
-          .in('id', companyIds);
-        if (companiesError) throw new Error(`Failed to fetch companies: ${companiesError.message}`);
-        setCompanies(userCompanies);
-
-        let active = userCompanies?.find(c => c.id === userProfile.active_company_id) || null;
-        if (!active && userCompanies && userCompanies.length > 0) {
-          active = userCompanies[0];
-          await supabase.from('profiles').update({ active_company_id: active.id }).eq('id', user.id);
+          .eq('id', user.id)
+          .single();
+        
+        if (profileError) {
+          console.warn('[AuthContext] Profile fetch error:', profileError);
+          if (profileError.code === 'PGRST116') {
+            console.log('[AuthContext] Profile not found, likely a new user.');
+            userProfile = null;
+          } else {
+            throw new Error(`Failed to fetch profile: ${profileError.message}`);
+          }
         }
-        setActiveCompany(active);
+        console.log('[AuthContext] Profile data:', userProfile);
+        setProfile(userProfile);
+
+        if (!userProfile) {
+          console.log('[AuthContext] No profile, setting companies to empty.');
+          setCompanies([]);
+          setActiveCompany(null);
+          return;
+        }
+
+        console.log('[AuthContext] Fetching company memberships...');
+        const { data: companyUsers, error: companyUsersError } = await supabase
+          .from('company_users')
+          .select('company_id')
+          .eq('user_id', user.id);
+        if (companyUsersError) throw new Error(`Failed to fetch company memberships: ${companyUsersError.message}`);
+        console.log('[AuthContext] Company memberships:', companyUsers);
+        
+        const companyIds = companyUsers.map(c => c.company_id);
+
+        if (companyIds.length > 0) {
+          console.log('[AuthContext] Fetching companies with IDs:', companyIds);
+          const { data: userCompanies, error: companiesError } = await supabase
+            .from('companies')
+            .select('*')
+            .in('id', companyIds);
+          if (companiesError) throw new Error(`Failed to fetch companies: ${companiesError.message}`);
+          console.log('[AuthContext] Companies data:', userCompanies);
+          setCompanies(userCompanies);
+
+          let active = userCompanies?.find(c => c.id === userProfile.active_company_id) || null;
+          console.log('[AuthContext] Found active company based on profile:', active?.id);
+          if (!active && userCompanies && userCompanies.length > 0) {
+            active = userCompanies[0];
+            console.log(`[AuthContext] No active company set, defaulting to first one: ${active.id}. Updating profile.`);
+            await supabase.from('profiles').update({ active_company_id: active.id }).eq('id', user.id);
+          }
+          setActiveCompany(active);
+          console.log('[AuthContext] Final active company:', active?.id);
+        } else {
+          console.log('[AuthContext] User has no companies.');
+          setCompanies([]);
+          setActiveCompany(null);
+        }
       } else {
-        setCompanies([]);
+        console.log('[AuthContext] No user, clearing all data.');
+        setProfile(null);
+        setCompanies(null);
         setActiveCompany(null);
       }
-    } else {
+    } catch (error) {
+      console.error('[AuthContext] CRITICAL ERROR in fetchUserAndCompanyData:', error);
+      // Set states to a stable, logged-out-like state on error
       setProfile(null);
       setCompanies(null);
       setActiveCompany(null);
@@ -97,29 +121,27 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   useEffect(() => {
+    console.log('[AuthContext] useEffect started. Setting loading to true.');
     setLoading(true);
 
     const { data: authListener } = supabase.auth.onAuthStateChange(
       async (event, session) => {
+        console.log(`[AuthContext] onAuthStateChange event: ${event}`);
         setSession(session);
         const currentUser = session?.user ?? null;
         setUser(currentUser);
         
-        try {
-          await fetchUserAndCompanyData(currentUser);
-        } catch (error) {
-          console.error("Error handling auth state change:", error);
-        }
+        await fetchUserAndCompanyData(currentUser);
 
-        // The 'INITIAL_SESSION' event is fired when the listener is first attached.
-        // This is our signal that the initial authentication check is complete.
-        if (event === 'INITIAL_SESSION') {
+        if (event === 'INITIAL_SESSION' || event === 'SIGNED_OUT') {
+          console.log(`[AuthContext] Event is ${event}, setting loading to false.`);
           setLoading(false);
         }
       }
     );
 
     return () => {
+      console.log('[AuthContext] Unsubscribing from auth listener.');
       authListener.subscription.unsubscribe();
     };
   }, []);

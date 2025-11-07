@@ -36,6 +36,7 @@ import AssetCategories from "./pages/AssetCategories";
 import AssetDetail from "./pages/AssetDetail";
 import FinancialStatements from "./pages/FinancialStatements";
 import CreateCompany from "./pages/CreateCompany";
+import ErrorBoundary from "./components/ErrorBoundary";
 
 const queryClient = new QueryClient();
 
@@ -46,42 +47,44 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <AuthProvider>
-          <Routes>
-            <Route path="/auth" element={<AuthPage />} />
-            <Route element={<ProtectedRoute />}>
-              <Route path="/" element={<Dashboard />} />
-              <Route path="/create-company" element={<CreateCompany />} />
-              <Route path="/invoices" element={<Invoices />} />
-              <Route path="/invoices/:id" element={<InvoiceDetail />} />
-              <Route path="/bills" element={<Bills />} />
-              <Route path="/pay-bills" element={<PayBills />} />
-              <Route path="/receive-payments" element={<ReceivePayments />} />
-              <Route path="/chart-of-accounts" element={<ChartOfAccounts />} />
-              <Route path="/journal-entries" element={<JournalEntries />} />
-              <Route path="/recurring-entries" element={<RecurringEntries />} />
-              <Route path="/general-ledger" element={<GeneralLedger />} />
-              <Route path="/reconciliation" element={<Reconciliation />} />
-              <Route path="/budgets" element={<Budgets />} />
-              <Route path="/reports" element={<Reports />} />
-              <Route path="/financial-statements" element={<FinancialStatements />} />
-              <Route path="/settings" element={<Settings />} />
-              <Route path="/vendors" element={<Vendors />} />
-              <Route path="/customers" element={<Customers />} />
-              <Route path="/products" element={<Products />} />
-              <Route path="/import" element={<Import />} />
-              <Route path="/employees" element={<Employees />} />
-              <Route path="/payroll-runs" element={<PayrollRuns />} />
-              <Route path="/payroll-runs/:id" element={<PayrollRunDetail />} />
-              <Route path="/payroll-reports" element={<PayrollReports />} />
-              <Route path="/loans" element={<Loans />} />
-              <Route path="/loans/:id" element={<LoanDetail />} />
-              <Route path="/fixed-assets" element={<FixedAssets />} />
-              <Route path="/fixed-assets/:id" element={<AssetDetail />} />
-              <Route path="/asset-categories" element={<AssetCategories />} />
-            </Route>
-            {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-            <Route path="*" element={<NotFound />} />
-          </Routes>
+          <ErrorBoundary>
+            <Routes>
+              <Route path="/auth" element={<AuthPage />} />
+              <Route element={<ProtectedRoute />}>
+                <Route path="/" element={<Dashboard />} />
+                <Route path="/create-company" element={<CreateCompany />} />
+                <Route path="/invoices" element={<Invoices />} />
+                <Route path="/invoices/:id" element={<InvoiceDetail />} />
+                <Route path="/bills" element={<Bills />} />
+                <Route path="/pay-bills" element={<PayBills />} />
+                <Route path="/receive-payments" element={<ReceivePayments />} />
+                <Route path="/chart-of-accounts" element={<ChartOfAccounts />} />
+                <Route path="/journal-entries" element={<JournalEntries />} />
+                <Route path="/recurring-entries" element={<RecurringEntries />} />
+                <Route path="/general-ledger" element={<GeneralLedger />} />
+                <Route path="/reconciliation" element={<Reconciliation />} />
+                <Route path="/budgets" element={<Budgets />} />
+                <Route path="/reports" element={<Reports />} />
+                <Route path="/financial-statements" element={<FinancialStatements />} />
+                <Route path="/settings" element={<Settings />} />
+                <Route path="/vendors" element={<Vendors />} />
+                <Route path="/customers" element={<Customers />} />
+                <Route path="/products" element={<Products />} />
+                <Route path="/import" element={<Import />} />
+                <Route path="/employees" element={<Employees />} />
+                <Route path="/payroll-runs" element={<PayrollRuns />} />
+                <Route path="/payroll-runs/:id" element={<PayrollRunDetail />} />
+                <Route path="/payroll-reports" element={<PayrollReports />} />
+                <Route path="/loans" element={<Loans />} />
+                <Route path="/loans/:id" element={<LoanDetail />} />
+                <Route path="/fixed-assets" element={<FixedAssets />} />
+                <Route path="/fixed-assets/:id" element={<AssetDetail />} />
+                <Route path="/asset-categories" element={<AssetCategories />} />
+              </Route>
+              {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+          </ErrorBoundary>
         </AuthProvider>
       </BrowserRouter>
     </TooltipProvider>
