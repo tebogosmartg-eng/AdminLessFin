@@ -47,6 +47,13 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
+    
+    // User-impersonated client for RPC calls
+    const userSupabase = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
+      { auth: { autoRefreshToken: false, persistSession: false }, global: { headers: { Authorization: req.headers.get('Authorization')! } } }
+    );
 
     let data, error;
 
@@ -108,6 +115,10 @@ serve(async (req) => {
       case 'VOID':
         ({ error } = await supabaseAdmin.rpc('void_invoice', { p_invoice_id: body.invoiceId }));
         data = { message: 'Invoice voided successfully' };
+        break;
+
+      case 'GET_NEXT_INVOICE_NUMBER':
+        ({ data, error } = await userSupabase.rpc('get_next_invoice_number_for_user'));
         break;
 
       default:

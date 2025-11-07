@@ -78,7 +78,9 @@ const BillForm = ({ isOpen, setIsOpen }: BillFormProps) => {
     queryKey: ['vendors', activeCompany?.id],
     queryFn: async () => {
       if (!activeCompany) return [];
-      const { data, error } = await supabase.from('vendors').select('*').eq('company_id', activeCompany.id);
+      const { data, error } = await supabase.functions.invoke('vendors', {
+        body: { method: 'GET', company_id: activeCompany.id },
+      });
       if (error) throw error;
       return data;
     },
@@ -88,7 +90,9 @@ const BillForm = ({ isOpen, setIsOpen }: BillFormProps) => {
     queryKey: ['products', activeCompany?.id],
     queryFn: async () => {
       if (!activeCompany) return [];
-      const { data, error } = await supabase.from('products').select('*').eq('company_id', activeCompany.id);
+      const { data, error } = await supabase.functions.invoke('products', {
+        body: { method: 'GET', company_id: activeCompany.id },
+      });
       if (error) throw error;
       return data;
     },
@@ -98,7 +102,9 @@ const BillForm = ({ isOpen, setIsOpen }: BillFormProps) => {
     queryKey: ['accounts', activeCompany?.id],
     queryFn: async () => {
       if (!activeCompany) return [];
-      const { data, error } = await supabase.from('chart_of_accounts').select('*').eq('company_id', activeCompany.id);
+      const { data, error } = await supabase.functions.invoke('chart-of-accounts', {
+        body: { method: 'GET', company_id: activeCompany.id },
+      });
       if (error) throw error;
       return data;
     },

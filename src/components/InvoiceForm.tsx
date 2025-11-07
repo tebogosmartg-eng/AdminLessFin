@@ -76,7 +76,12 @@ const InvoiceForm = ({ isOpen, setIsOpen, invoiceId }: InvoiceFormProps) => {
   const { data: nextInvoiceNumber } = useQuery({
     queryKey: ['next_invoice_number', activeCompany?.id],
     queryFn: async () => {
-      const { data, error } = await supabase.rpc('get_next_invoice_number_for_user');
+      const { data, error } = await supabase.functions.invoke('invoices', {
+        body: {
+          method: 'GET_NEXT_INVOICE_NUMBER',
+          company_id: activeCompany!.id,
+        },
+      });
       if (error) throw error;
       return data;
     },
@@ -95,7 +100,9 @@ const InvoiceForm = ({ isOpen, setIsOpen, invoiceId }: InvoiceFormProps) => {
     queryKey: ['customers', activeCompany?.id],
     queryFn: async () => {
       if (!activeCompany) return [];
-      const { data, error } = await supabase.from('customers').select('*').eq('company_id', activeCompany.id);
+      const { data, error } = await supabase.functions.invoke('customers', {
+        body: { method: 'GET', company_id: activeCompany.id },
+      });
       if (error) throw error;
       return data;
     },
@@ -105,7 +112,9 @@ const InvoiceForm = ({ isOpen, setIsOpen, invoiceId }: InvoiceFormProps) => {
     queryKey: ['products', activeCompany?.id],
     queryFn: async () => {
       if (!activeCompany) return [];
-      const { data, error } = await supabase.from('products').select('*').eq('company_id', activeCompany.id);
+      const { data, error } = await supabase.functions.invoke('products', {
+        body: { method: 'GET', company_id: activeCompany.id },
+      });
       if (error) throw error;
       return data;
     },
@@ -115,7 +124,9 @@ const InvoiceForm = ({ isOpen, setIsOpen, invoiceId }: InvoiceFormProps) => {
     queryKey: ['accounts', activeCompany?.id],
     queryFn: async () => {
       if (!activeCompany) return [];
-      const { data, error } = await supabase.from('chart_of_accounts').select('*').eq('company_id', activeCompany.id);
+      const { data, error } = await supabase.functions.invoke('chart-of-accounts', {
+        body: { method: 'GET', company_id: activeCompany.id },
+      });
       if (error) throw error;
       return data;
     },
