@@ -97,31 +97,24 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   useEffect(() => {
-    const initializeAuth = async () => {
-      try {
-        const { data: { session } } = await supabase.auth.getSession();
-        setSession(session);
-        const currentUser = session?.user ?? null;
-        setUser(currentUser);
-        await fetchUserAndCompanyData(currentUser);
-      } catch (error) {
-        console.error("Error initializing auth:", error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    initializeAuth();
+    setLoading(true);
 
     const { data: authListener } = supabase.auth.onAuthStateChange(
-      async (_event, session) => {
+      async (event, session) => {
         setSession(session);
         const currentUser = session?.user ?? null;
         setUser(currentUser);
+        
         try {
           await fetchUserAndCompanyData(currentUser);
         } catch (error) {
-          console.error("Error on auth state change:", error);
+          console.error("Error handling auth state change:", error);
+        }
+
+        // The 'INITIAL_SESSION' event is fired when the listener is first attached.
+        // This is our signal that the initial authentication check is complete.
+        if (event === 'INITIAL_SESSION') {
+          setLoading(false);
         }
       }
     );
