@@ -14,7 +14,7 @@ const AuthPage = () => {
   return (
     <div className="flex justify-center items-center min-h-screen bg-gray-100">
       <div className="w-full max-w-md p-8 space-y-8 bg-white rounded-lg shadow-md">
-        <img src="/logo.png" alt="SmaAcc Logo" className="mx-auto h-20 w-auto" />
+        <img src="/logo.png" alt="SmaAcc Logo" className="mx-auto h-32 w-auto" />
         <Auth
           supabaseClient={supabase}
           appearance={{ theme: ThemeSupa }}
