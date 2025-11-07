@@ -31,11 +31,12 @@ const Loans = () => {
     queryKey: ['loans', activeCompany?.id],
     queryFn: async () => {
       if (!activeCompany) return [];
-      const { data, error } = await supabase
-        .from('loans')
-        .select('id, principal_amount, interest_rate, status, loan_agreement_url, vendors ( name )')
-        .eq('company_id', activeCompany.id)
-        .order('created_at', { ascending: false });
+      const { data, error } = await supabase.functions.invoke('loans', {
+        body: {
+          method: 'GET_ALL',
+          company_id: activeCompany.id,
+        },
+      });
       if (error) throw new Error(error.message);
       return data;
     },

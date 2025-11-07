@@ -13,6 +13,7 @@ import { showError, showSuccess } from '../utils/toast';
 import { Account } from '../pages/ChartOfAccounts';
 import { format } from 'date-fns';
 import { formatCurrency } from '../lib/utils';
+import { useAuth } from '../contexts/AuthContext';
 
 const paymentSchema = z.object({
   payment_date: z.string().min(1, "Date is required."),
@@ -35,6 +36,7 @@ interface LoanPaymentFormProps {
 }
 
 const LoanPaymentForm = ({ isOpen, setIsOpen, scheduleItem }: LoanPaymentFormProps) => {
+  const { activeCompany } = useAuth();
   const queryClient = useQueryClient();
   const form = useForm<PaymentFormValues>({
     resolver: zodResolver(paymentSchema),
@@ -55,22 +57,27 @@ const LoanPaymentForm = ({ isOpen, setIsOpen, scheduleItem }: LoanPaymentFormPro
     }
   }, [isOpen, scheduleItem, form]);
 
-  const { data: accounts } = useQuery<Account[]>({ queryKey: ['accounts'] });
+  const { data: accounts } = useQuery<Account[]>({ queryKey: ['accounts', activeCompany?.id], enabled: !!activeCompany });
   const assetAccounts = accounts?.filter(a => a.type === 'Asset');
   const expenseAccounts = accounts?.filter(a => a.type === 'Expense');
 
   const mutation = useMutation({
     mutationFn: async (values: PaymentFormValues) => {
-      const { error } = await supabase.rpc('record_loan_payment', {
-        p_schedule_item_id: scheduleItem.id,
-        p_payment_date: values.payment_date,
-        p_bank_account_id: values.bank_account_id,
-        p_interest_expense_account_id: values.interest_expense_account_id,
+      if (!activeCompany) throw new Error("No active company");
+      const { error } = await supabase.functions.invoke('loans', {
+        body: {
+          method: 'RECORD_PAYMENT',
+          company_id: activeCompany.id,
+          schedule_item_id: scheduleItem.id,
+          payment_date: values.payment_date,
+          bank_account_id: values.bank_account_id,
+          interest_expense_account_id: values.interest_expense_account_id,
+        },
       });
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['loan_schedule'] });
+      queryClient.invalidateQueries({ queryKey: ['loan_detail_and_schedule'] });
       queryClient.invalidateQueries({ queryKey: ['journal_entries'] });
       showSuccess('Loan payment recorded successfully.');
       setIsOpen(false);

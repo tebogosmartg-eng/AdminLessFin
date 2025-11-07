@@ -66,60 +66,33 @@ const LoanForm = ({ isOpen, setIsOpen, loanId }: LoanFormProps) => {
     mutationFn: async (values: LoanFormValues) => {
       if (!user || !activeCompany) throw new Error('User not authenticated or no active company');
 
-      // 1. Insert loan record
-      const { data: loan, error: loanError } = await supabase
-        .from('loans')
-        .insert({
+      const { deposit_account_id, ...loanData } = values;
+      const lender_name = vendors?.find(v => v.id === values.lender_id)?.name || 'Lender';
+
+      const { data: newLoan, error } = await supabase.functions.invoke('loans', {
+        body: {
+          method: 'POST',
           company_id: activeCompany.id,
-          lender_id: values.lender_id,
-          principal_amount: values.principal_amount,
-          interest_rate: values.interest_rate,
-          term_months: values.term_months,
-          repayment_frequency: values.repayment_frequency,
-          start_date: values.start_date,
-          liability_account_id: values.liability_account_id,
-        })
-        .select('id')
-        .single();
-      if (loanError) throw loanError;
+          loanData,
+          deposit_account_id,
+          lender_name,
+        },
+      });
 
-      // 2. Create journal entry for loan proceeds
-      const lenderName = vendors?.find(v => v.id === values.lender_id)?.name || 'Lender';
-      const { data: entry, error: entryError } = await supabase
-        .from('journal_entries')
-        .insert({
-          company_id: activeCompany.id,
-          entry_date: values.start_date,
-          description: `Loan received from ${lenderName}`,
-          vendor_id: values.lender_id,
-        })
-        .select('id')
-        .single();
-      if (entryError) throw entryError;
+      if (error) throw error;
 
-      const journalItems = [
-        { journal_entry_id: entry.id, account_id: values.deposit_account_id, type: 'debit', amount: values.principal_amount },
-        { journal_entry_id: entry.id, account_id: values.liability_account_id, type: 'credit', amount: values.principal_amount },
-      ];
-      const { error: itemsError } = await supabase.from('journal_entry_items').insert(journalItems);
-      if (itemsError) throw itemsError;
-
-      // 3. Generate amortization schedule
-      const { error: rpcError } = await supabase.rpc('generate_amortization_schedule', { p_loan_id: loan.id });
-      if (rpcError) throw rpcError;
-
-      // 4. Handle file upload
+      // Handle file upload after successful loan creation
       if (attachmentFile) {
         const fileExt = attachmentFile.name.split('.').pop();
         const fileName = `agreement.${fileExt}`;
-        const filePath = `${activeCompany.id}/loans/${loan.id}/${fileName}`;
+        const filePath = `${activeCompany.id}/loans/${newLoan.id}/${fileName}`;
         
         const { error: uploadError } = await supabase.storage.from('attachments').upload(filePath, attachmentFile, { upsert: true });
         if (uploadError) throw new Error(`Storage Error: ${uploadError.message}`);
         
         const { data: urlData } = supabase.storage.from('attachments').getPublicUrl(filePath);
         
-        const { error: updateError } = await supabase.from('loans').update({ loan_agreement_url: urlData.publicUrl }).eq('id', loan.id);
+        const { error: updateError } = await supabase.from('loans').update({ loan_agreement_url: urlData.publicUrl }).eq('id', newLoan.id);
         if (updateError) throw updateError;
       }
     },

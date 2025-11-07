@@ -11,6 +11,7 @@ import { format } from 'date-fns';
 import { formatCurrency, downloadCSV } from '../lib/utils';
 import { Download } from 'lucide-react';
 import LoanPaymentForm from '../components/LoanPaymentForm';
+import { useAuth } from '../contexts/AuthContext';
 
 type LoanDetailData = {
   id: string;
@@ -35,34 +36,29 @@ type AmortizationScheduleItem = {
 
 const LoanDetail = () => {
   const { id } = useParams();
+  const { activeCompany } = useAuth();
   const [isPaymentFormOpen, setIsPaymentFormOpen] = useState(false);
   const [selectedScheduleItem, setSelectedScheduleItem] = useState<AmortizationScheduleItem | null>(null);
 
-  const { data: loan, isLoading: isLoadingLoan } = useQuery<LoanDetailData>({
-    queryKey: ['loan_detail', id],
+  const { data, isLoading } = useQuery({
+    queryKey: ['loan_detail_and_schedule', id, activeCompany?.id],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('loans')
-        .select('*, vendors(name)')
-        .eq('id', id!)
-        .single();
+      if (!activeCompany) return null;
+      const { data, error } = await supabase.functions.invoke('loans', {
+        body: {
+          method: 'GET_ONE',
+          company_id: activeCompany.id,
+          loanId: id,
+        },
+      });
       if (error) throw error;
-      return data;
+      return data as { loan: LoanDetailData, schedule: AmortizationScheduleItem[] };
     },
+    enabled: !!id && !!activeCompany,
   });
 
-  const { data: schedule, isLoading: isLoadingSchedule } = useQuery<AmortizationScheduleItem[]>({
-    queryKey: ['loan_schedule', id],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('loan_amortization_schedule')
-        .select('*')
-        .eq('loan_id', id!)
-        .order('payment_number', { ascending: true });
-      if (error) throw error;
-      return data;
-    },
-  });
+  const loan = data?.loan;
+  const schedule = data?.schedule;
 
   const handleDownload = () => {
     if (!schedule) return;
@@ -83,7 +79,7 @@ const LoanDetail = () => {
     setIsPaymentFormOpen(true);
   };
 
-  if (isLoadingLoan) {
+  if (isLoading) {
     return <Skeleton className="h-96 w-full" />;
   }
 
@@ -137,7 +133,7 @@ const LoanDetail = () => {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {isLoadingSchedule ? (
+                {isLoading ? (
                   [...Array(5)].map((_, i) => <TableRow key={i}><TableCell colSpan={8}><Skeleton className="h-6 w-full" /></TableCell></TableRow>)
                 ) : schedule && schedule.length > 0 ? (
                   schedule.map(item => (
