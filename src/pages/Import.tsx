@@ -9,11 +9,9 @@ import { Download, Upload, AlertCircle, CheckCircle, Loader2 } from 'lucide-reac
 import Papa from 'papaparse';
 import { useAuth } from '../contexts/AuthContext';
 import { showError, showSuccess, showLoading, dismissToast } from '../utils/toast';
-import { Account } from './ChartOfAccounts';
-import { Vendor } from './Vendors';
-import { Customer } from './Customers';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
 import { ScrollArea } from '../components/ui/scroll-area';
+import { Skeleton } from '../components/ui/skeleton';
 
 type CsvRow = {
   Date: string;
@@ -37,6 +35,12 @@ type ValidatedEntry = {
   }[];
 };
 
+type ReferenceData = {
+  accounts: { id: string; name: string }[];
+  vendors: { id: string; name: string }[];
+  customers: { id: string; name: string }[];
+};
+
 const Import = () => {
   const { activeCompany } = useAuth();
   const queryClient = useQueryClient();
@@ -44,9 +48,21 @@ const Import = () => {
   const [parsedData, setParsedData] = useState<ValidatedEntry[]>([]);
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
 
-  const { data: accounts } = useQuery<Account[]>({ queryKey: ['accounts', activeCompany?.id], enabled: !!activeCompany });
-  const { data: vendors } = useQuery<Vendor[]>({ queryKey: ['vendors', activeCompany?.id], enabled: !!activeCompany });
-  const { data: customers } = useQuery<Customer[]>({ queryKey: ['customers', activeCompany?.id], enabled: !!activeCompany });
+  const { data: referenceData, isLoading: isLoadingReferences } = useQuery<ReferenceData>({
+    queryKey: ['import_references', activeCompany?.id],
+    queryFn: async () => {
+      if (!activeCompany) return { accounts: [], vendors: [], customers: [] };
+      const { data, error } = await supabase.functions.invoke('data-import', {
+        body: {
+          method: 'GET_REFERENCES',
+          company_id: activeCompany.id,
+        },
+      });
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!activeCompany,
+  });
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = event.target.files?.[0];
@@ -66,12 +82,13 @@ const Import = () => {
         const rows = results.data as CsvRow[];
         const errors: string[] = [];
         
-        if (!accounts || !vendors || !customers) {
+        if (!referenceData) {
           errors.push("Could not load required data (accounts, vendors, customers). Please refresh and try again.");
           setValidationErrors(errors);
           return;
         }
 
+        const { accounts, vendors, customers } = referenceData;
         const accountMap = new Map(accounts.map(a => [a.name.toLowerCase(), a.id]));
         const vendorMap = new Map(vendors.map(v => [v.name.toLowerCase(), v.id]));
         const customerMap = new Map(customers.map(c => [c.name.toLowerCase(), c.id]));
@@ -151,29 +168,14 @@ const Import = () => {
       const toastId = showLoading("Importing entries...");
 
       try {
-        for (const entry of entries) {
-          const { data: newEntry, error: entryError } = await supabase
-            .from('journal_entries')
-            .insert({
-              company_id: activeCompany.id,
-              entry_date: entry.entry_date,
-              description: entry.description,
-              vendor_id: entry.vendor_id,
-              customer_id: entry.customer_id,
-            })
-            .select('id')
-            .single();
-
-          if (entryError) throw entryError;
-
-          const itemsToInsert = entry.items.map(item => ({
-            ...item,
-            journal_entry_id: newEntry.id,
-          }));
-
-          const { error: itemsError } = await supabase.from('journal_entry_items').insert(itemsToInsert);
-          if (itemsError) throw itemsError;
-        }
+        const { error } = await supabase.functions.invoke('data-import', {
+          body: {
+            method: 'IMPORT_ENTRIES',
+            company_id: activeCompany.id,
+            entries: entries,
+          },
+        });
+        if (error) throw error;
         dismissToast(toastId);
       } catch (error) {
         dismissToast(toastId);
@@ -234,7 +236,7 @@ const Import = () => {
             <CardDescription>Select your CSV file to begin the process.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <Input type="file" accept=".csv" onChange={handleFileChange} />
+            <Input type="file" accept=".csv" onChange={handleFileChange} disabled={isLoadingReferences} />
             {validationErrors.length > 0 && (
               <Alert variant="destructive">
                 <AlertCircle className="h-4 w-4" />
@@ -273,34 +275,36 @@ const Import = () => {
           <CardDescription>Use these exact names in your CSV file to ensure a successful import.</CardDescription>
         </CardHeader>
         <CardContent>
-          <Tabs defaultValue="accounts">
-            <TabsList>
-              <TabsTrigger value="accounts">Accounts</TabsTrigger>
-              <TabsTrigger value="vendors">Vendors</TabsTrigger>
-              <TabsTrigger value="customers">Customers</TabsTrigger>
-            </TabsList>
-            <TabsContent value="accounts">
-              <ScrollArea className="h-72 rounded-md border p-4">
-                <ul className="space-y-1">
-                  {accounts?.map(a => <li key={a.id} className="text-sm">{a.name}</li>)}
-                </ul>
-              </ScrollArea>
-            </TabsContent>
-            <TabsContent value="vendors">
-              <ScrollArea className="h-72 rounded-md border p-4">
-                <ul className="space-y-1">
-                  {vendors?.map(v => <li key={v.id} className="text-sm">{v.name}</li>)}
-                </ul>
-              </ScrollArea>
-            </TabsContent>
-            <TabsContent value="customers">
-              <ScrollArea className="h-72 rounded-md border p-4">
-                <ul className="space-y-1">
-                  {customers?.map(c => <li key={c.id} className="text-sm">{c.name}</li>)}
-                </ul>
-              </ScrollArea>
-            </TabsContent>
-          </Tabs>
+          {isLoadingReferences ? <Skeleton className="h-72 w-full" /> : (
+            <Tabs defaultValue="accounts">
+              <TabsList>
+                <TabsTrigger value="accounts">Accounts</TabsTrigger>
+                <TabsTrigger value="vendors">Vendors</TabsTrigger>
+                <TabsTrigger value="customers">Customers</TabsTrigger>
+              </TabsList>
+              <TabsContent value="accounts">
+                <ScrollArea className="h-72 rounded-md border p-4">
+                  <ul className="space-y-1">
+                    {referenceData?.accounts?.map(a => <li key={a.id} className="text-sm">{a.name}</li>)}
+                  </ul>
+                </ScrollArea>
+              </TabsContent>
+              <TabsContent value="vendors">
+                <ScrollArea className="h-72 rounded-md border p-4">
+                  <ul className="space-y-1">
+                    {referenceData?.vendors?.map(v => <li key={v.id} className="text-sm">{v.name}</li>)}
+                  </ul>
+                </ScrollArea>
+              </TabsContent>
+              <TabsContent value="customers">
+                <ScrollArea className="h-72 rounded-md border p-4">
+                  <ul className="space-y-1">
+                    {referenceData?.customers?.map(c => <li key={c.id} className="text-sm">{c.name}</li>)}
+                  </ul>
+                </ScrollArea>
+              </TabsContent>
+            </Tabs>
+          )}
         </CardContent>
       </Card>
     </div>
