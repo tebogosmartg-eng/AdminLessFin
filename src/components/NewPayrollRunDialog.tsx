@@ -54,9 +54,12 @@ const NewPayrollRunDialog = ({ isOpen, setIsOpen }: NewPayrollRunDialogProps) =>
     mutationFn: async (values: PayrollRunFormValues) => {
       if (!activeCompany) throw new Error('No active company selected');
 
-      const { error } = await supabase.from('payroll_runs').insert({
-        ...values,
-        company_id: activeCompany.id,
+      const { error } = await supabase.functions.invoke('payroll', {
+        body: {
+          method: 'CREATE_RUN',
+          company_id: activeCompany.id,
+          runData: values,
+        },
       });
 
       if (error) throw new Error(error.message);

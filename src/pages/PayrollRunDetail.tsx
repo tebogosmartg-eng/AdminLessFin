@@ -46,25 +46,25 @@ const PayrollRunDetail = () => {
   const [isPayslipDetailOpen, setIsPayslipDetailOpen] = useState(false);
   const [selectedPayslipIdForDetail, setSelectedPayslipIdForDetail] = useState<string | null>(null);
 
-  const { data: run, isLoading: isLoadingRun } = useQuery({
-    queryKey: ['payroll_run', id],
+  const { data, isLoading: isLoadingRun } = useQuery({
+    queryKey: ['payroll_run_detail', id, activeCompany?.id],
     queryFn: async () => {
-      const { data, error } = await supabase.from('payroll_runs').select('*').eq('id', id!).single();
-      if (error) throw error;
-      return data;
-    },
-  });
-
-  const { data: payslips, isLoading: isLoadingPayslips } = useQuery<Payslip[]>({
-    queryKey: ['payslips', id, activeCompany?.id],
-    queryFn: async () => {
-      if (!activeCompany) return [];
-      const { data, error } = await supabase.from('payslips').select('*, employees(first_name, last_name)').eq('payroll_run_id', id!).eq('company_id', activeCompany.id);
+      if (!activeCompany) return null;
+      const { data, error } = await supabase.functions.invoke('payroll', {
+        body: {
+          method: 'GET_RUN_DETAIL',
+          company_id: activeCompany.id,
+          runId: id,
+        },
+      });
       if (error) throw error;
       return data;
     },
     enabled: !!activeCompany,
   });
+
+  const run = data?.run;
+  const payslips = data?.payslips;
 
   const { data: accounts } = useQuery<Account[]>({ 
     queryKey: ['accounts', activeCompany?.id],
@@ -87,34 +87,17 @@ const PayrollRunDetail = () => {
   const generatePayslipsMutation = useMutation({
     mutationFn: async () => {
       if (!activeCompany) throw new Error('No active company selected');
-      const { data: employees, error: empError } = await supabase.from('employees').select('*').eq('company_id', activeCompany.id).not('salary_amount', 'is', null);
-      if (empError) throw empError;
-
-      const newPayslips = employees.map((emp: Employee) => ({
-        payroll_run_id: id!,
-        employee_id: emp.id,
-        company_id: activeCompany.id,
-        basic_salary: emp.salary_amount!,
-        total_earnings: emp.salary_amount!,
-        total_deductions: 0,
-        net_pay: emp.salary_amount!,
-      }));
-
-      const { data: insertedPayslips, error: payslipError } = await supabase.from('payslips').insert(newPayslips).select();
-      if (payslipError) throw payslipError;
-
-      const payslipItems = insertedPayslips.map(p => ({
-        payslip_id: p.id,
-        description: 'Basic Salary',
-        type: 'earning',
-        amount: p.basic_salary,
-      }));
-      
-      const { error: itemsError } = await supabase.from('payslip_items').insert(payslipItems);
-      if (itemsError) throw itemsError;
+      const { error } = await supabase.functions.invoke('payroll', {
+        body: {
+          method: 'GENERATE_PAYSLIPS',
+          company_id: activeCompany.id,
+          runId: id,
+        },
+      });
+      if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['payslips', id, activeCompany?.id] });
+      queryClient.invalidateQueries({ queryKey: ['payroll_run_detail', id, activeCompany?.id] });
       showSuccess('Payslips generated successfully!');
     },
     onError: (error: any) => showError(error.message),
@@ -124,33 +107,20 @@ const PayrollRunDetail = () => {
     mutationFn: async () => {
       if (!activeCompany || !payslips || payslips.length === 0) throw new Error('Prerequisites not met.');
       
-      const totalNetPay = payslips.reduce((sum, p) => sum + p.net_pay, 0);
-      const totalWages = payslips.reduce((sum, p) => sum + p.total_earnings, 0);
-      const totalDeductions = payslips.reduce((sum, p) => sum + p.total_deductions, 0);
-
-      const { data: entry, error: entryError } = await supabase.from('journal_entries').insert({
-        company_id: activeCompany.id,
-        entry_date: run.pay_date,
-        description: `Payroll for period ${format(new Date(run.pay_period_start), 'P')} to ${format(new Date(run.pay_period_end), 'P')}`,
-      }).select('id').single();
-      if (entryError) throw entryError;
-
-      const journalItems = [
-        { journal_entry_id: entry.id, account_id: wageAccountId, type: 'debit', amount: totalWages },
-        { journal_entry_id: entry.id, account_id: bankAccountId, type: 'credit', amount: totalNetPay },
-      ];
-      if (totalDeductions > 0) {
-        journalItems.push({ journal_entry_id: entry.id, account_id: liabilityAccountId, type: 'credit', amount: totalDeductions });
-      }
-
-      const { error: itemsError } = await supabase.from('journal_entry_items').insert(journalItems);
-      if (itemsError) throw itemsError;
-
-      const { error: runError } = await supabase.from('payroll_runs').update({ status: 'processed' }).eq('id', id!);
-      if (runError) throw runError;
+      const { error } = await supabase.functions.invoke('payroll', {
+        body: {
+          method: 'FINALIZE_RUN',
+          company_id: activeCompany.id,
+          run: run,
+          wageAccountId,
+          bankAccountId,
+          liabilityAccountId,
+        },
+      });
+      if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['payroll_run', id] });
+      queryClient.invalidateQueries({ queryKey: ['payroll_run_detail', id] });
       queryClient.invalidateQueries({ queryKey: ['journal_entries', activeCompany?.id] });
       showSuccess('Payroll run finalized and journal entry posted.');
     },
@@ -162,6 +132,7 @@ const PayrollRunDetail = () => {
   const totalNetPay = payslips?.reduce((sum, p) => sum + p.net_pay, 0) || 0;
 
   if (isLoadingRun) return <Skeleton className="h-96 w-full" />;
+  if (!run) return <div>Payroll run not found.</div>;
 
   return (
     <>
@@ -210,8 +181,7 @@ const PayrollRunDetail = () => {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {isLoadingPayslips ? <TableRow><TableCell colSpan={5}><Skeleton className="h-8 w-full" /></TableCell></TableRow> :
-                    payslips.map(p => (
+                  {payslips.map(p => (
                       <TableRow key={p.id}>
                         <TableCell>{p.employees.first_name} {p.employees.last_name}</TableCell>
                         <TableCell className="text-right font-mono">{formatCurrency(p.total_earnings)}</TableCell>

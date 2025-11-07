@@ -13,6 +13,7 @@ import { showError, showSuccess } from '../utils/toast';
 import { Trash2 } from 'lucide-react';
 import { Skeleton } from './ui/skeleton';
 import { formatCurrency } from '../lib/utils';
+import { useAuth } from '../contexts/AuthContext';
 
 const payslipItemSchema = z.object({
   description: z.string().min(1, "Description is required."),
@@ -33,6 +34,7 @@ interface PayslipDialogProps {
 }
 
 const PayslipDialog = ({ isOpen, setIsOpen, payslipId }: PayslipDialogProps) => {
+  const { activeCompany } = useAuth();
   const queryClient = useQueryClient();
   const form = useForm<PayslipFormValues>({
     resolver: zodResolver(payslipSchema),
@@ -42,15 +44,18 @@ const PayslipDialog = ({ isOpen, setIsOpen, payslipId }: PayslipDialogProps) => 
   const { data: payslipData, isLoading } = useQuery({
     queryKey: ['payslip_detail', payslipId],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('payslips')
-        .select('*, employees(first_name, last_name), payslip_items(*)')
-        .eq('id', payslipId)
-        .single();
+      if (!activeCompany) return null;
+      const { data, error } = await supabase.functions.invoke('payroll', {
+        body: {
+          method: 'GET_PAYSLIP_DETAIL',
+          company_id: activeCompany.id,
+          payslipId: payslipId,
+        },
+      });
       if (error) throw error;
       return data;
     },
-    enabled: isOpen,
+    enabled: isOpen && !!activeCompany,
   });
 
   useEffect(() => {
@@ -65,21 +70,19 @@ const PayslipDialog = ({ isOpen, setIsOpen, payslipId }: PayslipDialogProps) => 
 
   const mutation = useMutation({
     mutationFn: async (values: PayslipFormValues) => {
-      const earnings = values.items.filter(i => i.type === 'earning').reduce((sum, i) => sum + i.amount, 0);
-      const deductions = values.items.filter(i => i.type === 'deduction').reduce((sum, i) => sum + i.amount, 0);
-      const netPay = earnings - deductions;
-
-      await supabase.from('payslip_items').delete().eq('payslip_id', payslipId);
-      const itemsToInsert = values.items.map(item => ({ ...item, payslip_id: payslipId }));
-      await supabase.from('payslip_items').insert(itemsToInsert);
-      await supabase.from('payslips').update({
-        total_earnings: earnings,
-        total_deductions: deductions,
-        net_pay: netPay,
-      }).eq('id', payslipId);
+      if (!activeCompany) throw new Error('No active company');
+      const { error } = await supabase.functions.invoke('payroll', {
+        body: {
+          method: 'UPDATE_PAYSLIP',
+          company_id: activeCompany.id,
+          payslipId: payslipId,
+          items: values.items,
+        },
+      });
+      if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['payslips', payslipData.payroll_run_id] });
+      queryClient.invalidateQueries({ queryKey: ['payroll_run_detail', payslipData.payroll_run_id] });
       queryClient.invalidateQueries({ queryKey: ['payslip_detail', payslipId] });
       showSuccess('Payslip updated successfully.');
       setIsOpen(false);

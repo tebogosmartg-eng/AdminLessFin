@@ -21,20 +21,18 @@ const PayslipDetailDialog = ({ isOpen, setIsOpen, payslipId }: PayslipDetailDial
   const { data: payslipData, isLoading } = useQuery({
     queryKey: ['payslip_detail_view', payslipId],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('payslips')
-        .select(`
-          *,
-          employees ( * ),
-          payroll_runs ( * ),
-          payslip_items ( * )
-        `)
-        .eq('id', payslipId)
-        .single();
+      if (!activeCompany) return null;
+      const { data, error } = await supabase.functions.invoke('payroll', {
+        body: {
+          method: 'GET_PAYSLIP_DETAIL',
+          company_id: activeCompany.id,
+          payslipId: payslipId,
+        },
+      });
       if (error) throw error;
       return data;
     },
-    enabled: isOpen,
+    enabled: isOpen && !!activeCompany,
   });
 
   const earnings = payslipData?.payslip_items.filter(i => i.type === 'earning') || [];

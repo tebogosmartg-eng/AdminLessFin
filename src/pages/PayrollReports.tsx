@@ -33,9 +33,14 @@ const PayrollReports = () => {
   const { data: summaryData, isLoading } = useQuery<PayrollSummaryItem[]>({
     queryKey: ['payrollSummary', fromDate, toDate, activeCompany?.id],
     queryFn: async () => {
-      const { data, error } = await supabase.rpc('get_payroll_summary_report', {
-        p_start_date: format(fromDate, 'yyyy-MM-dd'),
-        p_end_date: format(toDate, 'yyyy-MM-dd'),
+      if (!activeCompany) return [];
+      const { data, error } = await supabase.functions.invoke('payroll', {
+        body: {
+          method: 'GET_SUMMARY_REPORT',
+          company_id: activeCompany.id,
+          start_date: format(fromDate, 'yyyy-MM-dd'),
+          end_date: format(toDate, 'yyyy-MM-dd'),
+        },
       });
       if (error) throw new Error(error.message);
       return data;

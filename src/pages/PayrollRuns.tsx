@@ -35,11 +35,12 @@ const PayrollRuns = () => {
     queryKey: ['payroll_runs', activeCompany?.id],
     queryFn: async () => {
       if (!activeCompany) return [];
-      const { data, error } = await supabase
-        .from('payroll_runs')
-        .select('*')
-        .eq('company_id', activeCompany.id)
-        .order('pay_period_start', { ascending: false });
+      const { data, error } = await supabase.functions.invoke('payroll', {
+        body: {
+          method: 'GET_RUNS',
+          company_id: activeCompany.id,
+        },
+      });
       if (error) throw new Error(error.message);
       return data;
     },
