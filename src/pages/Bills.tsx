@@ -38,27 +38,21 @@ const Bills = () => {
 
   const fetchBills = async () => {
     if (!activeCompany) return [];
-    const { data, error } = await supabase
-      .from('journal_entries')
-      .select(`
-        id,
-        entry_date,
-        description,
-        vendors ( name ),
-        journal_entry_items ( type, amount )
-      `)
-      .eq('company_id', activeCompany.id)
-      .not('vendor_id', 'is', null)
-      .order('entry_date', { ascending: false });
+    const { data, error } = await supabase.functions.invoke('bills', {
+      body: {
+        method: 'GET',
+        company_id: activeCompany.id,
+      },
+    });
 
     if (error) throw new Error(error.message);
     if (!data) return [];
 
-    return data.map(entry => ({
+    return data.map((entry: any) => ({
       ...entry,
       total: entry.journal_entry_items
-        .filter(item => item.type === 'credit')
-        .reduce((sum, item) => sum + item.amount, 0),
+        .filter((item: any) => item.type === 'credit')
+        .reduce((sum: number, item: any) => sum + item.amount, 0),
     }));
   };
 
@@ -70,7 +64,14 @@ const Bills = () => {
 
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from('journal_entries').delete().eq('id', id);
+      if (!activeCompany) throw new Error("No active company");
+      const { error } = await supabase.functions.invoke('bills', {
+        body: {
+          method: 'DELETE',
+          company_id: activeCompany.id,
+          billId: id,
+        },
+      });
       if (error) throw new Error(error.message);
     },
     onSuccess: () => {
