@@ -45,15 +45,12 @@ const Products = () => {
 
   const fetchProducts = async () => {
     if (!activeCompany) return [];
-    const { data, error } = await supabase
-      .from('products')
-      .select(`
-        *,
-        income_account:income_account_id ( name ),
-        cogs_account:cogs_account_id ( name )
-      `)
-      .eq('company_id', activeCompany.id)
-      .order('name', { ascending: true });
+    const { data, error } = await supabase.functions.invoke('products', {
+      body: {
+        method: 'GET',
+        company_id: activeCompany.id,
+      },
+    });
     if (error) throw new Error(error.message);
     return data;
   };
@@ -66,7 +63,14 @@ const Products = () => {
 
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from('products').delete().eq('id', id);
+      if (!activeCompany) throw new Error("No active company");
+      const { error } = await supabase.functions.invoke('products', {
+        body: {
+          method: 'DELETE',
+          company_id: activeCompany.id,
+          productId: id,
+        },
+      });
       if (error) throw new Error(error.message);
     },
     onSuccess: () => {

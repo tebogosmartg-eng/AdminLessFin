@@ -104,18 +104,23 @@ const ProductForm = ({ isOpen, setIsOpen, product }: ProductFormProps) => {
     mutationFn: async (values: ProductFormValues) => {
       if (!activeCompany) throw new Error('No active company selected');
 
+      const method = product ? 'PUT' : 'POST';
       const productData = {
         ...values,
-        company_id: activeCompany.id,
         price: values.price || 0,
         cost: values.cost || 0,
         income_account_id: values.income_account_id || null,
         cogs_account_id: values.cogs_account_id || null,
       };
+      
+      const body = {
+        method,
+        company_id: activeCompany.id,
+        productData,
+        ...(product && { productId: product.id }),
+      };
 
-      const { error } = product
-        ? await supabase.from('products').update(productData).eq('id', product.id).select().single()
-        : await supabase.from('products').insert(productData).select().single();
+      const { error } = await supabase.functions.invoke('products', { body });
 
       if (error) throw new Error(error.message);
     },
