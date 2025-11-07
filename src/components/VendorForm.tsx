@@ -77,18 +77,21 @@ const VendorForm = ({ isOpen, setIsOpen, vendor }: VendorFormProps) => {
     }
   }, [vendor, form, isOpen]);
 
+  // This mutation creates or updates data by calling a secure Supabase Edge Function.
+  // Direct database access from the client is prohibited.
   const mutation = useMutation({
     mutationFn: async (values: VendorFormValues) => {
       if (!activeCompany) throw new Error('No active company selected');
 
-      const vendorData = {
-        ...values,
+      const method = vendor ? 'PUT' : 'POST';
+      const body = {
+        method,
         company_id: activeCompany.id,
+        vendorData: values,
+        ...(vendor && { vendorId: vendor.id }),
       };
 
-      const { error } = vendor
-        ? await supabase.from('vendors').update(vendorData).eq('id', vendor.id)
-        : await supabase.from('vendors').insert(vendorData);
+      const { error } = await supabase.functions.invoke('vendors', { body });
 
       if (error) throw new Error(error.message);
     },
