@@ -17,7 +17,17 @@ const AuthPage = () => {
         <img src="/logo.png" alt="SmaAcc Logo" className="mx-auto h-32 w-auto" />
         <Auth
           supabaseClient={supabase}
-          appearance={{ theme: ThemeSupa }}
+          appearance={{
+            theme: ThemeSupa,
+            variables: {
+              default: {
+                colors: {
+                  brand: 'hsl(222.2 47.4% 11.2%)',
+                  brandAccent: 'hsl(222.2 47.4% 21.2%)',
+                },
+              },
+            },
+          }}
           providers={[]}
           theme="light"
         />
