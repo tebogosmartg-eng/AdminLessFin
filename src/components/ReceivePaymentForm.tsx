@@ -35,7 +35,7 @@ interface ReceivePaymentFormProps {
 }
 
 const ReceivePaymentForm = ({ isOpen, setIsOpen, customerId, customerName, amountDue }: ReceivePaymentFormProps) => {
-  const { user, activeCompany } = useAuth();
+  const { activeCompany } = useAuth();
   const queryClient = useQueryClient();
   const form = useForm<PaymentFormValues>({
     resolver: zodResolver(paymentSchema),
@@ -73,40 +73,16 @@ const ReceivePaymentForm = ({ isOpen, setIsOpen, customerId, customerName, amoun
 
   const mutation = useMutation({
     mutationFn: async (values: PaymentFormValues) => {
-      if (!user || !activeCompany) throw new Error('User not authenticated or no active company');
-
-      const { data: entry, error: entryError } = await supabase
-        .from('journal_entries')
-        .insert({
+      if (!activeCompany) throw new Error('No active company');
+      const { error } = await supabase.functions.invoke('payments', {
+        body: {
+          method: 'RECORD_CUSTOMER_PAYMENT',
           company_id: activeCompany.id,
-          entry_date: values.payment_date,
-          description: values.description,
-          customer_id: customerId,
-        })
-        .select('id')
-        .single();
-
-      if (entryError) throw entryError;
-
-      const journalItems = [
-        // Debit Cash/Asset Account
-        {
-          journal_entry_id: entry.id,
-          account_id: values.deposit_account_id,
-          type: 'debit',
-          amount: values.amount,
+          customerId: customerId,
+          paymentData: values,
         },
-        // Credit Accounts Receivable
-        {
-          journal_entry_id: entry.id,
-          account_id: values.accounts_receivable_id,
-          type: 'credit',
-          amount: values.amount,
-        },
-      ];
-
-      const { error: itemsError } = await supabase.from('journal_entry_items').insert(journalItems);
-      if (itemsError) throw itemsError;
+      });
+      if (error) throw error;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['customer_ar_balances'] });

@@ -13,6 +13,7 @@ import {
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/card';
 import BillPaymentForm from '../components/BillPaymentForm';
 import { formatCurrency } from '../lib/utils';
+import { useAuth } from '../contexts/AuthContext';
 
 type VendorBalance = {
   vendor_id: string;
@@ -29,16 +30,24 @@ type SelectedPayment = {
 const PayBills = () => {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [selectedPayment, setSelectedPayment] = useState<SelectedPayment | null>(null);
+  const { activeCompany } = useAuth();
 
   const fetchVendorBalances = async () => {
-    const { data, error } = await supabase.rpc('get_vendor_ap_balances');
+    if (!activeCompany) return [];
+    const { data, error } = await supabase.functions.invoke('payments', {
+      body: {
+        method: 'GET_AP_BALANCES',
+        company_id: activeCompany.id,
+      },
+    });
     if (error) throw new Error(error.message);
     return data;
   };
 
   const { data: vendors, isLoading } = useQuery<VendorBalance[]>({
-    queryKey: ['vendor_ap_balances'],
+    queryKey: ['vendor_ap_balances', activeCompany?.id],
     queryFn: fetchVendorBalances,
+    enabled: !!activeCompany,
   });
 
   const handleRecordPayment = (vendor: VendorBalance) => {
