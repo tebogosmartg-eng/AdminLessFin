@@ -7,6 +7,7 @@ import { Button } from './ui/button';
 import { Link } from 'react-router-dom';
 import { formatCurrency } from '../lib/utils';
 import { cn } from '../lib/utils';
+import { useAuth } from '../contexts/AuthContext';
 
 type Budget = {
   id: string;
@@ -16,13 +17,16 @@ type Budget = {
 };
 
 const BudgetStatus = () => {
+  const { activeCompany } = useAuth();
+
   const { data: budgets, isLoading } = useQuery<Budget[]>({
-    queryKey: ['budgets_with_activity'],
+    queryKey: ['budgets_with_activity', activeCompany?.id],
     queryFn: async () => {
       const { data, error } = await supabase.rpc('get_budgets_with_activity');
       if (error) throw new Error(error.message);
       return data;
     },
+    enabled: !!activeCompany,
   });
 
   return (
