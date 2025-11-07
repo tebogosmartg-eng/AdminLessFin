@@ -25,8 +25,8 @@ serve(async (req) => {
     const { method, body } = await req.json();
     const { company_id } = body;
 
-    // Security Check: Verify user membership if a company_id is provided
-    if (company_id) {
+    // Security Check: Verify user membership if a company_id is provided for most operations
+    if (company_id && method !== 'SWITCH_COMPANY') {
         const { data: companyMember, error: memberError } = await supabase
             .from('company_users')
             .select('user_id')
@@ -78,6 +78,24 @@ serve(async (req) => {
           .select('*')
           .eq('company_id', company_id)
           .order('end_date', { ascending: false }));
+        break;
+
+      case 'SWITCH_COMPANY':
+        const { target_company_id } = body;
+        // Security check for switching company
+        const { data: targetMember, error: targetMemberError } = await supabase
+            .from('company_users')
+            .select('user_id')
+            .eq('user_id', user.id)
+            .eq('company_id', target_company_id)
+            .single();
+        if (targetMemberError || !targetMember) {
+            throw new Error("Permission denied: User is not a member of the target company.");
+        }
+        ({ data, error } = await supabaseAdmin
+            .from('profiles')
+            .update({ active_company_id: target_company_id })
+            .eq('id', user.id));
         break;
 
       default:

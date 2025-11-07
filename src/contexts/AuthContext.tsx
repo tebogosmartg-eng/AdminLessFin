@@ -50,47 +50,17 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         return;
       }
 
-      // 1. Fetch user profile
-      const { data: userProfile, error: profileError } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', user.id)
-        .single();
+      const { data, error } = await supabase.functions.invoke('user-session', {
+        body: { method: 'GET' },
+      });
 
-      if (profileError && profileError.code !== 'PGRST116') {
-        throw new Error(`Failed to fetch profile: ${profileError.message}`);
-      }
-      setProfile(userProfile || null);
-
-      // 2. Fetch all companies the user is a member of
-      const { data: companyUsers, error: companyUsersError } = await supabase
-        .from('company_users')
-        .select('companies(*)')
-        .eq('user_id', user.id);
-      
-      if (companyUsersError) {
-        throw new Error(`Failed to fetch companies: ${companyUsersError.message}`);
+      if (error) {
+        throw new Error(`Failed to fetch user session: ${error.message}`);
       }
 
-      const userCompanies = companyUsers?.map(cu => cu.companies).flat().filter(Boolean) as Company[] || [];
-      setCompanies(userCompanies);
-
-      // 3. Determine the active company
-      let newActiveCompany: Company | null = null;
-      if (userCompanies.length > 0) {
-        // Try to find the active company from the profile in the user's list of valid companies
-        newActiveCompany = userCompanies.find(c => c.id === userProfile?.active_company_id) || null;
-
-        // If not found (or if profile had no active company), default to the first one
-        if (!newActiveCompany) {
-          newActiveCompany = userCompanies[0];
-          // And update the profile to correct it for next time
-          if (userProfile) {
-            await supabase.from('profiles').update({ active_company_id: newActiveCompany.id }).eq('id', user.id);
-          }
-        }
-      }
-      setActiveCompany(newActiveCompany);
+      setProfile(data.profile);
+      setCompanies(data.companies);
+      setActiveCompany(data.activeCompany);
 
     } catch (error) {
       console.error('[AuthContext] Error fetching user data:', error);
@@ -127,7 +97,12 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   const switchCompany = async (companyId: string) => {
     if (user) {
-      const { error } = await supabase.from('profiles').update({ active_company_id: companyId }).eq('id', user.id);
+      const { error } = await supabase.functions.invoke('settings', {
+        body: {
+          method: 'SWITCH_COMPANY',
+          target_company_id: companyId,
+        },
+      });
       if (error) throw new Error(`Failed to switch company: ${error.message}`);
       await refreshProfile();
     }
