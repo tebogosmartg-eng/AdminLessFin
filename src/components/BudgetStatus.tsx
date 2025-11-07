@@ -22,7 +22,13 @@ const BudgetStatus = () => {
   const { data: budgets, isLoading } = useQuery<Budget[]>({
     queryKey: ['budgets_with_activity', activeCompany?.id],
     queryFn: async () => {
-      const { data, error } = await supabase.rpc('get_budgets_with_activity');
+      if (!activeCompany) return [];
+      const { data, error } = await supabase.functions.invoke('budgets', {
+        body: {
+          method: 'GET_ALL',
+          company_id: activeCompany.id,
+        },
+      });
       if (error) throw new Error(error.message);
       return data;
     },

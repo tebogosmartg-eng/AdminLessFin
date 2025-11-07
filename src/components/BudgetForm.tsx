@@ -81,21 +81,22 @@ const BudgetForm = ({ isOpen, setIsOpen, budget }: BudgetFormProps) => {
     }
   }, [budget, form, isOpen]);
 
-  const { data: expenseAccounts } = useQuery<Account[]>({
-    queryKey: ['expense_accounts', activeCompany?.id],
+  const { data: accounts } = useQuery<Account[]>({
+    queryKey: ['accounts', activeCompany?.id],
     queryFn: async () => {
       if (!activeCompany) return [];
-      const { data, error } = await supabase
-        .from('chart_of_accounts')
-        .select('*')
-        .eq('type', 'Expense')
-        .eq('company_id', activeCompany.id)
-        .order('account_number');
+      const { data, error } = await supabase.functions.invoke('chart-of-accounts', {
+        body: {
+          method: 'GET',
+          company_id: activeCompany.id,
+        },
+      });
       if (error) throw new Error(error.message);
       return data;
     },
     enabled: !!activeCompany,
   });
+  const expenseAccounts = accounts?.filter(acc => acc.type === 'Expense');
 
   const mutation = useMutation({
     mutationFn: async (values: BudgetFormValues) => {

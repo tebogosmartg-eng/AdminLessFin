@@ -96,7 +96,14 @@ const FinancialYearSettings = () => {
 
   const closeYearMutation = useMutation({
     mutationFn: async (endDate: Date) => {
-      const { error } = await supabase.rpc('close_financial_year', { p_end_date: format(endDate, 'yyyy-MM-dd') });
+      if (!activeCompany) throw new Error("No active company");
+      const { error } = await supabase.functions.invoke('financial-year', {
+        body: {
+          method: 'CLOSE',
+          company_id: activeCompany.id,
+          end_date: format(endDate, 'yyyy-MM-dd'),
+        },
+      });
       if (error) throw error;
     },
     onSuccess: async () => {
@@ -110,7 +117,14 @@ const FinancialYearSettings = () => {
 
   const reopenYearMutation = useMutation({
     mutationFn: async (closedYearId: string) => {
-      const { error } = await supabase.rpc('reopen_financial_year', { p_closed_year_id: closedYearId });
+      if (!activeCompany) throw new Error("No active company");
+      const { error } = await supabase.functions.invoke('financial-year', {
+        body: {
+          method: 'REOPEN',
+          company_id: activeCompany.id,
+          closed_year_id: closedYearId,
+        },
+      });
       if (error) throw error;
     },
     onSuccess: async () => {
