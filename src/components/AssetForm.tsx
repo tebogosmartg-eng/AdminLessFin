@@ -72,29 +72,14 @@ const AssetForm = ({ isOpen, setIsOpen, assetId }: AssetFormProps) => {
     mutationFn: async (values: AssetFormValues) => {
       if (!user || !activeCompany) throw new Error('User not authenticated or no active company');
 
-      const { payment_account_id, ...assetData } = values;
-
-      const { data: asset, error: assetError } = await supabase
-        .from('fixed_assets')
-        .insert({ ...assetData, company_id: activeCompany.id })
-        .select('id')
-        .single();
-      if (assetError) throw assetError;
-
-      const { data: entry, error: entryError } = await supabase.from('journal_entries').insert({
-        company_id: activeCompany.id,
-        entry_date: values.purchase_date,
-        description: `Acquisition of asset: ${values.description}`,
-        vendor_id: values.vendor_id || null,
-      }).select('id').single();
-
-      if (entryError) throw entryError;
-
-      const { error: itemsError } = await supabase.from('journal_entry_items').insert([
-        { journal_entry_id: entry.id, account_id: values.asset_account_id, type: 'debit', amount: values.purchase_cost },
-        { journal_entry_id: entry.id, account_id: payment_account_id, type: 'credit', amount: values.purchase_cost },
-      ]);
-      if (itemsError) throw itemsError;
+      const { error } = await supabase.functions.invoke('fixed-assets', {
+        body: {
+          method: 'POST',
+          company_id: activeCompany.id,
+          assetData: values,
+        },
+      });
+      if (error) throw error;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['fixed_assets'] });

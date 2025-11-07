@@ -37,13 +37,14 @@ const FixedAssets = () => {
     queryKey: ['fixed_assets', activeCompany?.id],
     queryFn: async () => {
       if (!activeCompany) return [];
-      const { data, error } = await supabase
-        .from('fixed_assets')
-        .select('*, asset_categories(name)')
-        .eq('company_id', activeCompany.id)
-        .order('purchase_date', { ascending: false });
+      const { data, error } = await supabase.functions.invoke('fixed-assets', {
+        body: {
+          method: 'GET_ALL',
+          company_id: activeCompany.id,
+        },
+      });
       if (error) throw new Error(error.message);
-      return data.map(asset => ({
+      return data.map((asset: any) => ({
         ...asset,
         net_book_value: asset.purchase_cost - asset.accumulated_depreciation,
       }));

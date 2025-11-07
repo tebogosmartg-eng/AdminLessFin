@@ -10,30 +10,28 @@ import { formatCurrency } from '../lib/utils';
 import { Building2, Ban } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import AssetDisposalForm from '../components/AssetDisposalForm';
+import { useAuth } from '../contexts/AuthContext';
 
 const AssetDetail = () => {
   const { id } = useParams();
+  const { activeCompany } = useAuth();
   const [isDisposalFormOpen, setIsDisposalFormOpen] = useState(false);
 
   const { data: asset, isLoading } = useQuery({
     queryKey: ['asset_detail', id],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('fixed_assets')
-        .select(`
-          *,
-          asset_categories ( name ),
-          vendors ( name ),
-          employees ( first_name, last_name ),
-          asset_account:asset_account_id ( name ),
-          accum_depr_account:accumulated_depreciation_account_id ( name ),
-          depr_expense_account:depreciation_expense_account_id ( name )
-        `)
-        .eq('id', id!)
-        .single();
+      if (!activeCompany) return null;
+      const { data, error } = await supabase.functions.invoke('fixed-assets', {
+        body: {
+          method: 'GET_ONE',
+          company_id: activeCompany.id,
+          assetId: id,
+        },
+      });
       if (error) throw error;
       return data;
     },
+    enabled: !!id && !!activeCompany,
   });
 
   if (isLoading) {

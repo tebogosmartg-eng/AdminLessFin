@@ -14,6 +14,7 @@ import { Account } from '../pages/ChartOfAccounts';
 import { format } from 'date-fns';
 import { formatCurrency } from '../lib/utils';
 import { Alert, AlertDescription } from './ui/alert';
+import { useAuth } from '../contexts/AuthContext';
 
 const disposalSchema = z.object({
   disposal_date: z.string().min(1, "Disposal date is required."),
@@ -36,6 +37,7 @@ interface AssetDisposalFormProps {
 }
 
 const AssetDisposalForm = ({ isOpen, setIsOpen, asset }: AssetDisposalFormProps) => {
+  const { activeCompany } = useAuth();
   const queryClient = useQueryClient();
   const form = useForm<DisposalFormValues>({
     resolver: zodResolver(disposalSchema),
@@ -62,12 +64,17 @@ const AssetDisposalForm = ({ isOpen, setIsOpen, asset }: AssetDisposalFormProps)
 
   const mutation = useMutation({
     mutationFn: async (values: DisposalFormValues) => {
-      const { error } = await supabase.rpc('dispose_asset', {
-        p_asset_id: asset.id,
-        p_disposal_date: values.disposal_date,
-        p_proceeds: values.proceeds,
-        p_cash_account_id: values.cash_account_id,
-        p_gain_loss_account_id: values.gain_loss_account_id,
+      if (!activeCompany) throw new Error("No active company");
+      const { error } = await supabase.functions.invoke('fixed-assets', {
+        body: {
+          method: 'DISPOSE',
+          company_id: activeCompany.id,
+          asset_id: asset.id,
+          disposal_date: values.disposal_date,
+          proceeds: values.proceeds,
+          cash_account_id: values.cash_account_id,
+          gain_loss_account_id: values.gain_loss_account_id,
+        },
       });
       if (error) throw error;
     },
