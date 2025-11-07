@@ -8,6 +8,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel,
 import { SidebarNav } from './SidebarNav';
 import { ThemeToggle } from './ThemeToggle';
 import CompanySwitcher from './CompanySwitcher';
+import NotificationBell from './NotificationBell';
 
 const Layout = () => {
   const { signOut, profile } = useAuth();
@@ -46,6 +47,7 @@ const Layout = () => {
           <CompanySwitcher />
           <div className="flex items-center gap-4">
             <ThemeToggle />
+            <NotificationBell />
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="ghost" className="relative h-10 w-10 rounded-full">
