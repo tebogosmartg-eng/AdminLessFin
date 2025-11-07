@@ -26,13 +26,13 @@ export type Invoice = {
   invoice_date: string;
   due_date: string;
   status: 'draft' | 'sent' | 'paid' | 'void';
-  customers: { name: string }[] | null;
+  customers: { name: string } | null;
   journal_entries: {
     journal_entry_items: {
       type: 'debit' | 'credit';
       amount: number;
     }[];
-  }[] | null;
+  } | null;
 };
 
 const Invoices = () => {
@@ -44,24 +44,12 @@ const Invoices = () => {
 
   const fetchInvoices = async () => {
     if (!activeCompany) return [];
-    const { data, error } = await supabase
-      .from('invoices')
-      .select(`
-        id,
-        invoice_number,
-        invoice_date,
-        due_date,
-        status,
-        customers ( name ),
-        journal_entries (
-          journal_entry_items (
-            type,
-            amount
-          )
-        )
-      `)
-      .eq('company_id', activeCompany.id)
-      .order('invoice_date', { ascending: false });
+    const { data, error } = await supabase.functions.invoke('invoices', {
+      body: {
+        method: 'GET_ALL',
+        company_id: activeCompany.id,
+      },
+    });
     if (error) throw new Error(error.message);
     return data as Invoice[];
   };
@@ -74,7 +62,15 @@ const Invoices = () => {
 
   const updateStatusMutation = useMutation({
     mutationFn: async ({ id, status }: { id: string, status: string }) => {
-      const { error } = await supabase.from('invoices').update({ status }).eq('id', id);
+      if (!activeCompany) throw new Error("No active company");
+      const { error } = await supabase.functions.invoke('invoices', {
+        body: {
+          method: 'PUT',
+          company_id: activeCompany.id,
+          invoiceId: id,
+          invoiceData: { status },
+        },
+      });
       if (error) throw error;
     },
     onSuccess: () => {
@@ -145,7 +141,7 @@ const Invoices = () => {
                 invoices.map((invoice) => (
                   <TableRow key={invoice.id}>
                     <TableCell className="font-medium">{invoice.invoice_number}</TableCell>
-                    <TableCell>{invoice.customers?.[0]?.name || 'N/A'}</TableCell>
+                    <TableCell>{invoice.customers?.name || 'N/A'}</TableCell>
                     <TableCell>{new Date(invoice.invoice_date).toLocaleDateString()}</TableCell>
                     <TableCell>{new Date(invoice.due_date).toLocaleDateString()}</TableCell>
                     <TableCell className="text-right font-mono">{formatCurrency(getTotal(invoice))}</TableCell>

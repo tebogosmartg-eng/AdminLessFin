@@ -25,7 +25,7 @@ type InvoiceDetailData = {
     name: string;
     address: string | null;
     email: string | null;
-  }[] | null;
+  } | null;
   journal_entries: {
     journal_entry_items: {
       amount: number;
@@ -46,33 +46,22 @@ const InvoiceDetail = () => {
   const [selectedEntryId, setSelectedEntryId] = useState<string | null>(null);
 
   const fetchInvoiceDetail = async () => {
-    const { data, error } = await supabase
-      .from('invoices')
-      .select(`
-        id,
-        invoice_number,
-        invoice_date,
-        due_date,
-        status,
-        customers ( name, address, email ),
-        journal_entries (
-          journal_entry_items (
-            amount,
-            type,
-            chart_of_accounts ( name )
-          )
-        )
-      `)
-      .eq('id', id!)
-      .single();
-    if (error) throw error;
+    if (!activeCompany) return null;
+    const { data, error } = await supabase.functions.invoke('invoices', {
+      body: {
+        method: 'GET_ONE',
+        company_id: activeCompany.id,
+        invoiceId: id,
+      },
+    });
+    if (error) throw new Error(error.message);
     return data as InvoiceDetailData;
   };
 
   const { data: invoice, isLoading } = useQuery({
     queryKey: ['invoice_detail', id],
     queryFn: fetchInvoiceDetail,
-    enabled: !!id,
+    enabled: !!id && !!activeCompany,
   });
 
   const { data: relatedEntries, isLoading: isLoadingRelatedEntries } = useQuery({
@@ -156,9 +145,9 @@ const InvoiceDetail = () => {
             <div className="grid grid-cols-2 gap-4 mb-8">
               <div>
                 <h3 className="font-semibold mb-1">Bill To:</h3>
-                <p>{invoice.customers?.[0]?.name}</p>
-                <p>{invoice.customers?.[0]?.address}</p>
-                <p>{invoice.customers?.[0]?.email}</p>
+                <p>{invoice.customers?.name}</p>
+                <p>{invoice.customers?.address}</p>
+                <p>{invoice.customers?.email}</p>
               </div>
               <div className="text-right">
                 <p><span className="font-semibold">Invoice Date:</span> {new Date(invoice.invoice_date).toLocaleDateString()}</p>
@@ -224,7 +213,7 @@ const InvoiceDetail = () => {
         invoice={{
           id: invoice.id,
           invoice_number: invoice.invoice_number,
-          customer_email: invoice.customers?.[0]?.email || null,
+          customer_email: invoice.customers?.email || null,
         }}
       />
       <InvoicePaymentForm 
@@ -233,7 +222,7 @@ const InvoiceDetail = () => {
         invoice={{
           id: invoice.id,
           totalAmount: totalAmount,
-          customerName: invoice.customers?.[0]?.name || 'Customer'
+          customerName: invoice.customers?.name || 'Customer'
         }}
       />
       <JournalEntryDetail
