@@ -52,9 +52,20 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
+    // User-impersonated client for RPC calls
+    const userSupabase = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
+      { auth: { autoRefreshToken: false, persistSession: false }, global: { headers: { Authorization: req.headers.get('Authorization')! } } }
+    );
+
     let data, error;
 
     switch (method) {
+      case 'GET_ALL':
+        ({ data, error } = await userSupabase.rpc('get_budgets_with_activity'));
+        break;
+
       case 'POST':
         ({ data, error } = await supabaseAdmin
           .from('budgets')
