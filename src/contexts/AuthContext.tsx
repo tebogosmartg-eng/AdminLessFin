@@ -48,9 +48,21 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         .select('*')
         .eq('id', user.id)
         .single();
-      if (profileError) throw new Error(`Failed to fetch profile: ${profileError.message}`);
+      
+      // Gracefully handle if profile doesn't exist yet (e.g., right after signup)
+      if (profileError && profileError.code === 'PGRST116') {
+        userProfile = null;
+      } else if (profileError) {
+        throw new Error(`Failed to fetch profile: ${profileError.message}`);
+      }
 
       setProfile(userProfile);
+
+      if (!userProfile) {
+        setCompanies([]);
+        setActiveCompany(null);
+        return;
+      }
 
       const { data: companyUsers, error: companyUsersError } = await supabase
         .from('company_users')
@@ -86,23 +98,32 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   useEffect(() => {
-    const getSession = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      setSession(session);
-      const currentUser = session?.user ?? null;
-      setUser(currentUser);
-      await fetchUserAndCompanyData(currentUser);
-      setLoading(false);
+    const initializeAuth = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        setSession(session);
+        const currentUser = session?.user ?? null;
+        setUser(currentUser);
+        await fetchUserAndCompanyData(currentUser);
+      } catch (error) {
+        console.error("Error initializing auth:", error);
+      } finally {
+        setLoading(false);
+      }
     };
 
-    getSession();
+    initializeAuth();
 
     const { data: authListener } = supabase.auth.onAuthStateChange(
       async (_event, session) => {
         setSession(session);
         const currentUser = session?.user ?? null;
         setUser(currentUser);
-        await fetchUserAndCompanyData(currentUser);
+        try {
+          await fetchUserAndCompanyData(currentUser);
+        } catch (error) {
+          console.error("Error on auth state change:", error);
+        }
       }
     );
 
