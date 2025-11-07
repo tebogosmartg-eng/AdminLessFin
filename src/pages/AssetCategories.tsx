@@ -25,7 +25,12 @@ const AssetCategories = () => {
     queryKey: ['asset_categories', activeCompany?.id],
     queryFn: async () => {
       if (!activeCompany) return [];
-      const { data, error } = await supabase.from('asset_categories').select('*').eq('company_id', activeCompany.id).order('name');
+      const { data, error } = await supabase.functions.invoke('asset-categories', {
+        body: {
+          method: 'GET',
+          company_id: activeCompany.id,
+        },
+      });
       if (error) throw error;
       return data;
     },
@@ -34,7 +39,14 @@ const AssetCategories = () => {
 
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from('asset_categories').delete().eq('id', id);
+      if (!activeCompany) throw new Error("No active company");
+      const { error } = await supabase.functions.invoke('asset-categories', {
+        body: {
+          method: 'DELETE',
+          company_id: activeCompany.id,
+          categoryId: id,
+        },
+      });
       if (error) throw error;
     },
     onSuccess: () => {

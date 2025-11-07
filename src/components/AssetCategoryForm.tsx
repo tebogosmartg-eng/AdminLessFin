@@ -54,10 +54,16 @@ const AssetCategoryForm = ({ isOpen, setIsOpen, category }: AssetCategoryFormPro
   const mutation = useMutation({
     mutationFn: async (values: CategoryFormValues) => {
       if (!activeCompany) throw new Error('No active company selected');
-      const categoryData = { ...values, company_id: activeCompany.id };
-      const { error } = category
-        ? await supabase.from('asset_categories').update(categoryData).eq('id', category.id)
-        : await supabase.from('asset_categories').insert(categoryData);
+      
+      const method = category ? 'PUT' : 'POST';
+      const body = {
+        method,
+        company_id: activeCompany.id,
+        categoryData: values,
+        ...(category && { categoryId: category.id }),
+      };
+
+      const { error } = await supabase.functions.invoke('asset-categories', { body });
       if (error) throw error;
     },
     onSuccess: () => {
