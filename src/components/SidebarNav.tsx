@@ -4,7 +4,7 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible"
-import { Book, LayoutDashboard, BookText, FileText, Library, Target, Repeat, Building2, Users, TrendingUp, Receipt, Banknote, HandCoins, ChevronRight, Package, Scale, Upload, FileSignature, Briefcase, Landmark } from 'lucide-react';
+import { Book, LayoutDashboard, BookText, FileText, Library, Target, Repeat, Building2, Users, TrendingUp, Receipt, Banknote, HandCoins, ChevronRight, Package, Scale, Upload, FileSignature, Briefcase, Landmark, MessageSquare } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { Button } from './ui/button';
 
@@ -85,6 +85,11 @@ export const SidebarNav = () => {
       <NavLink to="/" end className={navLinkClasses}>
         <LayoutDashboard className="mr-3 h-5 w-5" />
         Dashboard
+      </NavLink>
+      
+      <NavLink to="/chat" className={navLinkClasses}>
+        <MessageSquare className="mr-3 h-5 w-5" />
+        Chat
       </NavLink>
 
       <NavGroup 
