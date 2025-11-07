@@ -1,15 +1,15 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../integrations/supabase/client';
 import { useAuth } from '../contexts/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '../components/ui/card';
-import { Input } from '../components/ui/input';
 import { Button } from '../components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '../components/ui/avatar';
 import { Send, User } from 'lucide-react';
 import { Skeleton } from '../components/ui/skeleton';
 import { formatDistanceToNow } from 'date-fns';
 import { cn } from '../lib/utils';
+import { MentionsInput, Mention } from 'react-mentions';
 
 type Message = {
   id: string;
@@ -51,7 +51,6 @@ const Chat = () => {
     const channel = supabase
       .channel(`public:messages:company_id=eq.${activeCompany.id}`)
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, async (payload) => {
-        // We need to fetch the profile data for the new message
         const { data: profileData, error } = await supabase
           .from('profiles')
           .select('full_name, avatar_url')
@@ -76,6 +75,30 @@ const Chat = () => {
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
+
+  const { data: teamMembers } = useQuery<any[]>({
+    queryKey: ['company_members', activeCompany?.id],
+    queryFn: async () => {
+      if (!activeCompany) return [];
+      const { data, error } = await supabase.functions.invoke('settings', {
+        body: {
+          method: 'GET_TEAM_MEMBERS',
+          company_id: activeCompany.id,
+        },
+      });
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!activeCompany,
+  });
+
+  const mentionUsers = useMemo(() => {
+    if (!teamMembers) return [];
+    return teamMembers.map((member) => ({
+      id: member.user_id,
+      display: member.profiles?.[0]?.full_name || 'Unknown User',
+    }));
+  }, [teamMembers]);
 
   const sendMessageMutation = useMutation({
     mutationFn: async (content: string) => {
@@ -167,12 +190,24 @@ const Chat = () => {
       </CardContent>
       <CardFooter>
         <form onSubmit={handleSendMessage} className="flex w-full items-center space-x-2">
-          <Input
+          <MentionsInput
             value={newMessage}
             onChange={(e) => setNewMessage(e.target.value)}
-            placeholder="Type a message..."
-            autoComplete="off"
-          />
+            placeholder="Type a message, use @ to mention someone..."
+            className="mentions-input"
+            a11ySuggestionsListLabel={"Suggested users for mention"}
+          >
+            <Mention
+              trigger="@"
+              data={mentionUsers}
+              markup="@[__display__](__id__)"
+              style={{
+                backgroundColor: 'hsl(var(--accent))',
+                color: 'hsl(var(--accent-foreground))',
+              }}
+              appendSpaceOnAdd
+            />
+          </MentionsInput>
           <Button type="submit" disabled={sendMessageMutation.isPending}>
             <Send className="h-4 w-4" />
           </Button>

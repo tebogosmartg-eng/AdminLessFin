@@ -99,3 +99,36 @@
     @apply bg-background text-foreground;
   }
 }
+
+@layer components {
+  .mentions-input {
+    @apply w-full;
+  }
+
+  .mentions-input__control {
+    @apply flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50;
+    min-height: 40px;
+  }
+
+  .mentions-input__highlighter {
+    padding: 9px;
+    min-height: 40px;
+  }
+
+  .mentions-input__input {
+    padding: 9px !important; /* Override inline styles */
+    @apply bg-transparent focus:outline-none;
+  }
+
+  .mentions-input__suggestions__list {
+    @apply bg-card border rounded-md shadow-md p-1 mt-1;
+  }
+
+  .mentions-input__suggestions__item {
+    @apply px-2 py-1.5 text-sm rounded-sm cursor-pointer;
+  }
+
+  .mentions-input__suggestions__item--focused {
+    @apply bg-accent text-accent-foreground;
+  }
+}
