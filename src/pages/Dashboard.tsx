@@ -9,7 +9,7 @@ import IncomeExpenseChart from '../components/IncomeExpenseChart';
 import { Link } from 'react-router-dom';
 import { Button } from '../components/ui/button';
 import QuickActions from '../components/QuickActions';
-import { formatDistanceToNow, startOfMonth, endOfMonth, format } from 'date-fns';
+import { formatDistanceToNow } from 'date-fns';
 import { formatCurrency } from '../lib/utils';
 import BudgetStatus from '../components/BudgetStatus';
 import TopExpensesChart from '../components/TopExpensesChart';
@@ -25,74 +25,27 @@ type OverdueInvoice = {
 const Dashboard = () => {
   const { user, profile, activeCompany } = useAuth();
 
-  const { data: accounts, isLoading: isLoadingAccounts } = useQuery({
-    queryKey: ['accounts', activeCompany?.id],
+  const { data: dashboardData, isLoading } = useQuery({
+    queryKey: ['dashboardData', activeCompany?.id],
     queryFn: async () => {
-      if (!activeCompany) return [];
-      const { data, error } = await supabase
-        .from('chart_of_accounts')
-        .select('*')
-        .eq('company_id', activeCompany.id);
-      if (error) throw new Error(error.message);
-      return data as Account[];
-    },
-    enabled: !!activeCompany,
-  });
-
-  const { data: monthlySummary, isLoading: isLoadingSummary } = useQuery({
-    queryKey: ['monthlySummary', activeCompany?.id],
-    queryFn: async () => {
-      const { data, error } = await supabase.rpc('get_monthly_summary', { p_months: 6 });
-      if (error) throw new Error(error.message);
-      return data;
-    },
-    enabled: !!activeCompany,
-  });
-
-  const { data: arBalances, isLoading: isLoadingAr } = useQuery({
-    queryKey: ['customer_ar_balances', activeCompany?.id],
-    queryFn: async () => {
-      const { data, error } = await supabase.rpc('get_customer_ar_balances');
-      if (error) throw new Error(error.message);
-      return data;
-    },
-    enabled: !!activeCompany,
-  });
-
-  const { data: apBalances, isLoading: isLoadingAp } = useQuery({
-    queryKey: ['vendor_ap_balances', activeCompany?.id],
-    queryFn: async () => {
-      const { data, error } = await supabase.rpc('get_vendor_ap_balances');
-      if (error) throw new Error(error.message);
-      return data;
-    },
-    enabled: !!activeCompany,
-  });
-
-  const { data: overdueInvoices, isLoading: isLoadingOverdue } = useQuery<OverdueInvoice[]>({
-    queryKey: ['overdue_invoices', activeCompany?.id],
-    queryFn: async () => {
-      const { data, error } = await supabase.rpc('get_overdue_invoices');
-      if (error) throw new Error(error.message);
-      return data;
-    },
-    enabled: !!activeCompany,
-  });
-
-  const { data: topExpenses, isLoading: isLoadingTopExpenses } = useQuery({
-    queryKey: ['top_expenses_current_month', activeCompany?.id],
-    queryFn: async () => {
-      const startDate = format(startOfMonth(new Date()), 'yyyy-MM-dd');
-      const endDate = format(endOfMonth(new Date()), 'yyyy-MM-dd');
-      const { data, error } = await supabase.rpc('get_top_expenses', {
-        p_start_date: startDate,
-        p_end_date: endDate,
+      if (!activeCompany) return null;
+      const { data, error } = await supabase.functions.invoke('dashboard-data', {
+        body: { company_id: activeCompany.id },
       });
       if (error) throw new Error(error.message);
       return data;
     },
     enabled: !!activeCompany,
   });
+
+  const {
+    accounts,
+    monthlySummary,
+    arBalances,
+    apBalances,
+    overdueInvoices,
+    topExpenses,
+  } = dashboardData || {};
 
   const calculateTotals = (accounts: Account[] | undefined) => {
     if (!accounts) return { assets: 0, liabilities: 0, netIncome: 0, cash: 0 };
@@ -119,8 +72,8 @@ const Dashboard = () => {
   };
 
   const totals = calculateTotals(accounts);
-  const totalAr = arBalances?.reduce((sum, item) => sum + item.balance, 0) || 0;
-  const totalAp = apBalances?.reduce((sum, item) => sum + item.balance, 0) || 0;
+  const totalAr = arBalances?.reduce((sum: number, item: { balance: number }) => sum + item.balance, 0) || 0;
+  const totalAp = apBalances?.reduce((sum: number, item: { balance: number }) => sum + item.balance, 0) || 0;
 
   const summaryCards = [
     { title: 'Cash Balance', value: totals.cash, icon: DollarSign },
@@ -146,7 +99,7 @@ const Dashboard = () => {
                 <card.icon className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
-                {isLoadingAccounts ? <Skeleton className="h-8 w-3/4" /> : <div className={`text-2xl font-bold ${card.color || ''}`}>{formatCurrency(card.value)}</div>}
+                {isLoading ? <Skeleton className="h-8 w-3/4" /> : <div className={`text-2xl font-bold ${card.color || ''}`}>{formatCurrency(card.value)}</div>}
               </CardContent>
             </Card>
           ))}
@@ -159,13 +112,13 @@ const Dashboard = () => {
               <CardDescription>Money owed to you by customers.</CardDescription>
             </CardHeader>
             <CardContent>
-              {isLoadingAr ? <Skeleton className="h-24 w-full" /> : (
+              {isLoading ? <Skeleton className="h-24 w-full" /> : (
                 <>
                   <div className="text-2xl font-bold">{formatCurrency(totalAr)}</div>
                   <p className="text-xs text-muted-foreground">Total outstanding balance</p>
                   <div className="mt-4 space-y-2">
                     {arBalances && arBalances.length > 0 ? (
-                      arBalances.slice(0, 3).map(item => (
+                      arBalances.slice(0, 3).map((item: { customer_id: string, customer_name: string, balance: number }) => (
                         <div key={item.customer_id} className="flex justify-between items-center text-sm"><span>{item.customer_name}</span><span className="font-mono">{formatCurrency(item.balance)}</span></div>
                       ))
                     ) : <p className="text-sm text-muted-foreground">No outstanding invoices.</p>}
@@ -181,13 +134,13 @@ const Dashboard = () => {
               <CardDescription>Money you owe to vendors.</CardDescription>
             </CardHeader>
             <CardContent>
-              {isLoadingAp ? <Skeleton className="h-24 w-full" /> : (
+              {isLoading ? <Skeleton className="h-24 w-full" /> : (
                 <>
                   <div className="text-2xl font-bold">{formatCurrency(totalAp)}</div>
                   <p className="text-xs text-muted-foreground">Total outstanding balance</p>
                   <div className="mt-4 space-y-2">
                     {apBalances && apBalances.length > 0 ? (
-                      apBalances.slice(0, 3).map(item => (
+                      apBalances.slice(0, 3).map((item: { vendor_id: string, vendor_name: string, balance: number }) => (
                         <div key={item.vendor_id} className="flex justify-between items-center text-sm"><span>{item.vendor_name}</span><span className="font-mono">{formatCurrency(item.balance)}</span></div>
                       ))
                     ) : <p className="text-sm text-muted-foreground">No outstanding bills.</p>}
@@ -204,10 +157,10 @@ const Dashboard = () => {
               <CardDescription>Invoices past their due date.</CardDescription>
             </CardHeader>
             <CardContent>
-              {isLoadingOverdue ? <Skeleton className="h-24 w-full" /> : (
+              {isLoading ? <Skeleton className="h-24 w-full" /> : (
                 overdueInvoices && overdueInvoices.length > 0 ? (
                   <ul className="space-y-3">
-                    {overdueInvoices.map(invoice => (
+                    {overdueInvoices.map((invoice: OverdueInvoice) => (
                       <li key={invoice.id}>
                         <Link to={`/invoices/${invoice.id}`} className="block p-2 -m-2 rounded-md hover:bg-gray-100 dark:hover:bg-gray-800">
                           <div className="flex justify-between items-center text-sm">
@@ -237,7 +190,7 @@ const Dashboard = () => {
               <CardDescription>Income vs. Expenses for the last 6 months.</CardDescription>
             </CardHeader>
             <CardContent>
-              {isLoadingSummary ? <Skeleton className="h-[300px] w-full" /> : monthlySummary && monthlySummary.length > 0 ? <IncomeExpenseChart data={monthlySummary} /> : <p className="text-md text-gray-600 dark:text-gray-400">Not enough data to display a chart.</p>}
+              {isLoading ? <Skeleton className="h-[300px] w-full" /> : monthlySummary && monthlySummary.length > 0 ? <IncomeExpenseChart data={monthlySummary} /> : <p className="text-md text-gray-600 dark:text-gray-400">Not enough data to display a chart.</p>}
             </CardContent>
           </Card>
           <Card>
@@ -246,7 +199,7 @@ const Dashboard = () => {
               <CardDescription>Your biggest spending categories for the current month.</CardDescription>
             </CardHeader>
             <CardContent>
-              {isLoadingTopExpenses ? <Skeleton className="h-[300px] w-full" /> : <TopExpensesChart data={topExpenses} />}
+              {isLoading ? <Skeleton className="h-[300px] w-full" /> : <TopExpensesChart data={topExpenses} />}
             </CardContent>
           </Card>
         </div>
