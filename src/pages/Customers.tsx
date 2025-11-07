@@ -37,13 +37,16 @@ const Customers = () => {
   const { activeCompany } = useAuth();
   const queryClient = useQueryClient();
 
+  // This function fetches data by calling a secure Supabase Edge Function.
+  // Direct database access from the client is prohibited.
   const fetchCustomers = async () => {
     if (!activeCompany) return [];
-    const { data, error } = await supabase
-      .from('customers')
-      .select('*')
-      .eq('company_id', activeCompany.id)
-      .order('name', { ascending: true });
+    const { data, error } = await supabase.functions.invoke('customers', {
+      body: {
+        method: 'GET',
+        company_id: activeCompany.id,
+      },
+    });
     if (error) throw new Error(error.message);
     return data;
   };
@@ -54,9 +57,17 @@ const Customers = () => {
     enabled: !!activeCompany,
   });
 
+  // This mutation deletes data by calling a secure Supabase Edge Function.
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from('customers').delete().eq('id', id);
+      if (!activeCompany) throw new Error("No active company");
+      const { error } = await supabase.functions.invoke('customers', {
+        body: {
+          method: 'DELETE',
+          company_id: activeCompany.id,
+          customerId: id,
+        },
+      });
       if (error) throw new Error(error.message);
     },
     onSuccess: () => {

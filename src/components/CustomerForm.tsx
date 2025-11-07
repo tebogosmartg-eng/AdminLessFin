@@ -77,18 +77,21 @@ const CustomerForm = ({ isOpen, setIsOpen, customer }: CustomerFormProps) => {
     }
   }, [customer, form, isOpen]);
 
+  // This mutation creates or updates data by calling a secure Supabase Edge Function.
+  // Direct database access from the client is prohibited.
   const mutation = useMutation({
     mutationFn: async (values: CustomerFormValues) => {
       if (!activeCompany) throw new Error('No active company selected');
 
-      const customerData = {
-        ...values,
+      const method = customer ? 'PUT' : 'POST';
+      const body = {
+        method,
         company_id: activeCompany.id,
+        customerData: values,
+        ...(customer && { customerId: customer.id }),
       };
 
-      const { error } = customer
-        ? await supabase.from('customers').update(customerData).eq('id', customer.id)
-        : await supabase.from('customers').insert(customerData);
+      const { error } = await supabase.functions.invoke('customers', { body });
 
       if (error) throw new Error(error.message);
     },
