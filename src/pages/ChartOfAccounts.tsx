@@ -48,13 +48,15 @@ const ChartOfAccounts = () => {
   const queryClient = useQueryClient();
   const { activeCompany } = useAuth();
 
+  // This function fetches data by calling a secure Supabase Edge Function.
   const fetchAccounts = async () => {
     if (!activeCompany) return [];
-    const { data, error } = await supabase
-      .from('chart_of_accounts')
-      .select('*')
-      .eq('company_id', activeCompany.id)
-      .order('account_number', { ascending: true });
+    const { data, error } = await supabase.functions.invoke('chart-of-accounts', {
+      body: {
+        method: 'GET',
+        company_id: activeCompany.id,
+      },
+    });
     if (error) throw new Error(error.message);
     return data;
   };
@@ -77,9 +79,17 @@ const ChartOfAccounts = () => {
     });
   }, [accounts, searchTerm, filterType]);
 
+  // This mutation deletes data by calling a secure Supabase Edge Function.
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from('chart_of_accounts').delete().eq('id', id);
+      if (!activeCompany) throw new Error("No active company");
+      const { error } = await supabase.functions.invoke('chart-of-accounts', {
+        body: {
+          method: 'DELETE',
+          company_id: activeCompany.id,
+          accountId: id,
+        },
+      });
       if (error) throw new Error(error.message);
     },
     onSuccess: () => {

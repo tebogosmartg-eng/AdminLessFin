@@ -75,18 +75,20 @@ const AccountForm = ({ isOpen, setIsOpen, account }: AccountFormProps) => {
     }
   }, [account, form, isOpen]);
 
+  // This mutation creates or updates data by calling a secure Supabase Edge Function.
   const mutation = useMutation({
     mutationFn: async (values: AccountFormValues) => {
       if (!activeCompany) throw new Error('No active company selected');
 
-      const accountData = {
-        ...values,
+      const method = account ? 'PUT' : 'POST';
+      const body = {
+        method,
         company_id: activeCompany.id,
+        accountData: values,
+        ...(account && { accountId: account.id }),
       };
 
-      const { error } = account
-        ? await supabase.from('chart_of_accounts').update(accountData).eq('id', account.id).select().single()
-        : await supabase.from('chart_of_accounts').insert(accountData).select().single();
+      const { error } = await supabase.functions.invoke('chart-of-accounts', { body });
 
       if (error) throw new Error(error.message);
     },
