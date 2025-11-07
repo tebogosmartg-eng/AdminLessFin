@@ -60,52 +60,27 @@ const Reports = () => {
   const fromDate = date?.from ?? new Date();
   const toDate = date?.to ?? new Date();
 
-  const { data: pointInTimeAccounts, isLoading: isLoadingPointInTime } = useQuery<AccountBalance[]>({
-    queryKey: ['pointInTimeBalances', toDate, activeCompany?.id],
+  const { data: reportData, isLoading } = useQuery({
+    queryKey: ['reports', fromDate, toDate, activeCompany?.id],
     queryFn: async () => {
-      const { data, error } = await supabase.rpc('get_balances_as_of_date', {
-        p_end_date: format(toDate, 'yyyy-MM-dd'),
+      if (!activeCompany) return null;
+      const { data, error } = await supabase.functions.invoke('reports', {
+        body: {
+          company_id: activeCompany.id,
+          start_date: format(fromDate, 'yyyy-MM-dd'),
+          end_date: format(toDate, 'yyyy-MM-dd'),
+        },
       });
-      if (error) throw new Error(error.message);
-      return data;
-    },
-    enabled: !!toDate && !!activeCompany,
-  });
-
-  const { data: periodActivityAccounts, isLoading: isLoadingPeriodActivity } = useQuery<AccountActivity[]>({
-    queryKey: ['periodActivity', fromDate, toDate, activeCompany?.id],
-    queryFn: async () => {
-      const { data, error } = await supabase.rpc('get_period_activity', {
-        p_start_date: format(fromDate, 'yyyy-MM-dd'),
-        p_end_date: format(toDate, 'yyyy-MM-dd'),
-      });
-      if (error) throw new Error(error.message);
-      return data;
-    },
-    enabled: !!fromDate && !!toDate && !!activeCompany,
-  });
-
-  const { data: agedReceivables, isLoading: isLoadingAgedReceivables } = useQuery<AgedReceivable[]>({
-    queryKey: ['aged_receivables', activeCompany?.id],
-    queryFn: async () => {
-      const { data, error } = await supabase.rpc('get_aged_receivables');
       if (error) throw new Error(error.message);
       return data;
     },
     enabled: !!activeCompany,
   });
 
-  const { data: agedPayables, isLoading: isLoadingAgedPayables } = useQuery<AgedPayable[]>({
-    queryKey: ['aged_payables', activeCompany?.id],
-    queryFn: async () => {
-      const { data, error } = await supabase.rpc('get_aged_payables');
-      if (error) throw new Error(error.message);
-      return data;
-    },
-    enabled: !!activeCompany,
-  });
-
-  const isLoading = isLoadingPointInTime || isLoadingPeriodActivity || isLoadingAgedReceivables || isLoadingAgedPayables;
+  const pointInTimeAccounts: AccountBalance[] = reportData?.balancesAsOf || [];
+  const periodActivityAccounts: AccountActivity[] = reportData?.periodActivity || [];
+  const agedReceivables: AgedReceivable[] = reportData?.agedReceivables || [];
+  const agedPayables: AgedPayable[] = reportData?.agedPayables || [];
 
   const incomeAccounts = periodActivityAccounts?.filter(acc => acc.type === 'Income') || [];
   const expenseAccounts = periodActivityAccounts?.filter(acc => acc.type === 'Expense') || [];

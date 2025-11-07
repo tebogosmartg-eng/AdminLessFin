@@ -38,7 +38,7 @@ type CashFlowItem = {
 };
 
 const FinancialStatements = () => {
-  const { profile } = useAuth();
+  const { profile, activeCompany } = useAuth();
   const [date, setDate] = useState<DateRange | undefined>();
 
   useEffect(() => {
@@ -59,53 +59,28 @@ const FinancialStatements = () => {
   const toDate = date?.to;
   const priorDate = fromDate ? subDays(fromDate, 1) : undefined;
 
-  const { data: balancesAsOf, isLoading: isLoadingBalances } = useQuery<AccountBalance[]>({
-    queryKey: ['balancesAsOf', toDate],
+  const { data: reportData, isLoading } = useQuery({
+    queryKey: ['financial_statements', fromDate, toDate, activeCompany?.id],
     queryFn: async () => {
-      const { data, error } = await supabase.rpc('get_balances_as_of_date', { p_end_date: format(toDate!, 'yyyy-MM-dd') });
-      if (error) throw new Error(error.message);
-      return data;
-    },
-    enabled: !!toDate,
-  });
-
-  const { data: openingBalances, isLoading: isLoadingOpeningBalances } = useQuery<AccountBalance[]>({
-    queryKey: ['balancesAsOf', priorDate],
-    queryFn: async () => {
-      const { data, error } = await supabase.rpc('get_balances_as_of_date', { p_end_date: format(priorDate!, 'yyyy-MM-dd') });
-      if (error) throw new Error(error.message);
-      return data;
-    },
-    enabled: !!priorDate,
-  });
-
-  const { data: periodActivity, isLoading: isLoadingActivity } = useQuery<AccountActivity[]>({
-    queryKey: ['periodActivity', fromDate, toDate],
-    queryFn: async () => {
-      const { data, error } = await supabase.rpc('get_period_activity', {
-        p_start_date: format(fromDate!, 'yyyy-MM-dd'),
-        p_end_date: format(toDate!, 'yyyy-MM-dd'),
+      if (!activeCompany || !fromDate || !toDate || !priorDate) return null;
+      const { data, error } = await supabase.functions.invoke('reports', {
+        body: {
+          company_id: activeCompany.id,
+          start_date: format(fromDate, 'yyyy-MM-dd'),
+          end_date: format(toDate, 'yyyy-MM-dd'),
+          prior_date: format(priorDate, 'yyyy-MM-dd'),
+        },
       });
       if (error) throw new Error(error.message);
       return data;
     },
-    enabled: !!fromDate && !!toDate,
+    enabled: !!activeCompany && !!fromDate && !!toDate && !!priorDate,
   });
 
-  const { data: cashFlowData, isLoading: isLoadingCashFlow } = useQuery<CashFlowItem[]>({
-    queryKey: ['cashFlow', fromDate, toDate],
-    queryFn: async () => {
-      const { data, error } = await supabase.rpc('get_cash_flow_statement', {
-        p_start_date: format(fromDate!, 'yyyy-MM-dd'),
-        p_end_date: format(toDate!, 'yyyy-MM-dd'),
-      });
-      if (error) throw new Error(error.message);
-      return data;
-    },
-    enabled: !!fromDate && !!toDate,
-  });
-
-  const isLoading = isLoadingBalances || isLoadingActivity || isLoadingOpeningBalances || isLoadingCashFlow;
+  const balancesAsOf: AccountBalance[] = reportData?.balancesAsOf || [];
+  const openingBalances: AccountBalance[] = reportData?.openingBalances || [];
+  const periodActivity: AccountActivity[] = reportData?.periodActivity || [];
+  const cashFlowData: CashFlowItem[] = reportData?.cashFlowData || [];
 
   // Income Statement Calculations
   const incomeAccounts = periodActivity?.filter(acc => acc.type === 'Income') || [];
