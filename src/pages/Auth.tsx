@@ -12,22 +12,25 @@ const AuthPage = () => {
   }
 
   return (
-    <div className="grid min-h-screen w-full lg:grid-cols-2">
-      <div className="hidden bg-primary lg:flex flex-col items-center justify-center p-12 text-primary-foreground">
-        <div className="text-center">
-          <img src="/logo.png" alt="SmaAcc Logo" className="mx-auto h-40 w-auto mb-6" />
-          <h1 className="text-4xl font-bold">Welcome to SmaAcc</h1>
-          <p className="mt-2 text-lg text-primary-foreground/80">
-            Smart Accounting, Simplified.
-          </p>
+    <div className="flex items-center justify-center min-h-screen bg-gray-100 dark:bg-gray-900 p-4">
+      <div className="w-full max-w-md overflow-hidden bg-white rounded-lg shadow-lg dark:bg-gray-800">
+        <div className="bg-primary p-8 text-center">
+          <img src="/logo.png" alt="SmaAcc Logo" className="mx-auto h-24 w-auto" />
         </div>
-      </div>
-      <div className="flex items-center justify-center bg-background p-8">
-        <div className="w-full max-w-md space-y-6">
-           <img src="/logo.png" alt="SmaAcc Logo" className="mx-auto h-32 w-auto lg:hidden" />
+        <div className="p-8">
           <Auth
             supabaseClient={supabase}
-            appearance={{ theme: ThemeSupa }}
+            appearance={{
+              theme: ThemeSupa,
+              variables: {
+                default: {
+                  colors: {
+                    brand: 'hsl(222.2 47.4% 11.2%)',
+                    brandAccent: 'hsl(222.2 47.4% 21.2%)',
+                  },
+                },
+              },
+            }}
             providers={[]}
             theme="light"
           />
