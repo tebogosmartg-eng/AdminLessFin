@@ -38,10 +38,13 @@ const CompanySettings = () => {
   const mutation = useMutation({
     mutationFn: async (values: CompanyFormValues) => {
       if (!user || !activeCompany) throw new Error('User not authenticated or no active company');
-      const { error } = await supabase
-        .from('companies')
-        .update({ name: values.name, address: values.address || null })
-        .eq('id', activeCompany.id);
+      const { error } = await supabase.functions.invoke('settings', {
+        body: {
+          method: 'UPDATE_COMPANY',
+          company_id: activeCompany.id,
+          companyData: { name: values.name, address: values.address || null },
+        },
+      });
       if (error) throw error;
     },
     onSuccess: async () => {

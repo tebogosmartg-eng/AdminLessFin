@@ -27,10 +27,12 @@ const TeamMembersSettings = () => {
     queryKey: ['company_members', activeCompany?.id],
     queryFn: async () => {
       if (!activeCompany) return [];
-      const { data, error } = await supabase
-        .from('company_users')
-        .select('user_id, role, profiles(full_name, email)')
-        .eq('company_id', activeCompany.id);
+      const { data, error } = await supabase.functions.invoke('settings', {
+        body: {
+          method: 'GET_TEAM_MEMBERS',
+          company_id: activeCompany.id,
+        },
+      });
       if (error) throw error;
       return data as CompanyMember[];
     },

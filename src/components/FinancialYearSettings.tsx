@@ -53,11 +53,12 @@ const FinancialYearSettings = () => {
     queryKey: ['closed_financial_years', activeCompany?.id],
     queryFn: async () => {
       if (!activeCompany) return [];
-      const { data, error } = await supabase
-        .from('closed_financial_years')
-        .select('*')
-        .eq('company_id', activeCompany.id)
-        .order('end_date', { ascending: false });
+      const { data, error } = await supabase.functions.invoke('settings', {
+        body: {
+          method: 'GET_CLOSED_YEARS',
+          company_id: activeCompany.id,
+        },
+      });
       if (error) throw error;
       return data;
     },
@@ -77,7 +78,13 @@ const FinancialYearSettings = () => {
       }
       const newStartDate = addDays(lastYearEnd, 1);
       const updatePayload = { ...values, current_financial_year_start: format(newStartDate, 'yyyy-MM-dd') };
-      const { error } = await supabase.from('profiles').update(updatePayload).eq('id', user.id);
+      
+      const { error } = await supabase.functions.invoke('settings', {
+        body: {
+          method: 'UPDATE_PROFILE',
+          profileData: updatePayload,
+        },
+      });
       if (error) throw error;
     },
     onSuccess: async () => {
@@ -142,7 +149,13 @@ const FinancialYearSettings = () => {
       const endDate = set(new Date(0), { year, month: endMonth, date: endDay });
       const newStartDate = addDays(endDate, 1);
       newStartDate.setFullYear(newStartDate.getFullYear() - 1);
-      const { error } = await supabase.from('profiles').update({ current_financial_year_start: format(newStartDate, 'yyyy-MM-dd') }).eq('id', user.id);
+      
+      const { error } = await supabase.functions.invoke('settings', {
+        body: {
+          method: 'UPDATE_PROFILE',
+          profileData: { current_financial_year_start: format(newStartDate, 'yyyy-MM-dd') },
+        },
+      });
       if (error) throw error;
     },
     onSuccess: async () => {

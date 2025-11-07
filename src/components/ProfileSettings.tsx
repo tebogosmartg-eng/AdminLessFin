@@ -33,10 +33,12 @@ const ProfileSettings = () => {
   const mutation = useMutation({
     mutationFn: async (values: ProfileFormValues) => {
       if (!user) throw new Error('User not authenticated');
-      const { error } = await supabase
-        .from('profiles')
-        .update({ full_name: values.full_name })
-        .eq('id', user.id);
+      const { error } = await supabase.functions.invoke('settings', {
+        body: {
+          method: 'UPDATE_PROFILE',
+          profileData: { full_name: values.full_name },
+        },
+      });
       if (error) throw error;
     },
     onSuccess: async () => {

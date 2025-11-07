@@ -40,10 +40,12 @@ const AvatarUploader = () => {
         .from('avatars')
         .getPublicUrl(filePath);
 
-      const { error: updateError } = await supabase
-        .from('profiles')
-        .update({ avatar_url: publicUrl })
-        .eq('id', user.id);
+      const { error: updateError } = await supabase.functions.invoke('settings', {
+        body: {
+          method: 'UPDATE_PROFILE',
+          profileData: { avatar_url: publicUrl },
+        },
+      });
 
       if (updateError) throw updateError;
 
