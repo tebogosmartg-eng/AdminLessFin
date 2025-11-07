@@ -66,6 +66,19 @@ serve(async (req) => {
           .order('entry_date', { ascending: false }));
         break;
       
+      case 'POST':
+        const { p_items, ...billData } = body.billData;
+        ({ data, error } = await supabaseAdmin.rpc('record_bill_with_inventory', {
+          p_company_id: company_id,
+          p_vendor_id: billData.vendor_id,
+          p_bill_date: billData.bill_date,
+          p_due_date: billData.due_date,
+          p_accounts_payable_id: billData.accounts_payable_id,
+          p_description: billData.description,
+          p_items: p_items,
+        }));
+        break;
+
       case 'DELETE':
         ({ data, error } = await supabaseAdmin
           .from('journal_entries')

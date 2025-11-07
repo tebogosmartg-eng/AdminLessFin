@@ -135,14 +135,21 @@ const BillForm = ({ isOpen, setIsOpen }: BillFormProps) => {
         expense_account_id: item.expense_account_id,
       }));
 
-      const { error } = await supabase.rpc('record_bill_with_inventory', {
-        p_company_id: activeCompany.id,
-        p_vendor_id: values.vendor_id,
-        p_bill_date: values.bill_date,
-        p_due_date: values.due_date,
-        p_accounts_payable_id: values.accounts_payable_id,
-        p_description: values.description || `Bill from ${vendors?.find(v => v.id === values.vendor_id)?.name}`,
+      const billData = {
+        vendor_id: values.vendor_id,
+        bill_date: values.bill_date,
+        due_date: values.due_date,
+        accounts_payable_id: values.accounts_payable_id,
+        description: values.description || `Bill from ${vendors?.find(v => v.id === values.vendor_id)?.name}`,
         p_items: p_items,
+      };
+
+      const { error } = await supabase.functions.invoke('bills', {
+        body: {
+          method: 'POST',
+          company_id: activeCompany.id,
+          billData: billData,
+        },
       });
 
       if (error) throw error;
