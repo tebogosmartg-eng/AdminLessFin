@@ -105,6 +105,11 @@ serve(async (req) => {
           .single());
         break;
 
+      case 'VOID':
+        ({ error } = await supabaseAdmin.rpc('void_invoice', { p_invoice_id: body.invoiceId }));
+        data = { message: 'Invoice voided successfully' };
+        break;
+
       default:
         throw new Error(`Unsupported method: ${method}`);
     }

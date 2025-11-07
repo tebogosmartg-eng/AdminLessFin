@@ -65,22 +65,32 @@ const InvoiceDetail = () => {
   });
 
   const { data: relatedEntries, isLoading: isLoadingRelatedEntries } = useQuery({
-    queryKey: ['related_journal_entries', id],
+    queryKey: ['related_journal_entries', id, activeCompany?.id],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('journal_entries')
-        .select('id, entry_date, description')
-        .eq('invoice_id', id!)
-        .order('entry_date', { ascending: true });
+      if (!activeCompany || !id) return [];
+      const { data, error } = await supabase.functions.invoke('journal-entries', {
+        body: {
+          method: 'GET_RELATED_TO_INVOICE',
+          company_id: activeCompany.id,
+          invoiceId: id,
+        },
+      });
       if (error) throw error;
       return data;
     },
-    enabled: !!id,
+    enabled: !!id && !!activeCompany,
   });
 
   const voidMutation = useMutation({
     mutationFn: async () => {
-      const { error } = await supabase.rpc('void_invoice', { p_invoice_id: id! });
+      if (!activeCompany) throw new Error("No active company");
+      const { error } = await supabase.functions.invoke('invoices', {
+        body: {
+          method: 'VOID',
+          company_id: activeCompany.id,
+          invoiceId: id,
+        },
+      });
       if (error) throw error;
     },
     onSuccess: () => {
@@ -189,7 +199,7 @@ const InvoiceDetail = () => {
               <Skeleton className="h-24 w-full" />
             ) : relatedEntries && relatedEntries.length > 0 ? (
               <ul className="space-y-2">
-                {relatedEntries.map(entry => (
+                {relatedEntries.map((entry: any) => (
                   <li key={entry.id} className="flex justify-between items-center text-sm">
                     <div>
                       <p className="font-medium">{entry.description}</p>

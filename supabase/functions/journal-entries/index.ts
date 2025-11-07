@@ -93,6 +93,15 @@ serve(async (req) => {
         ({ data, error } = await query);
         break;
       
+      case 'GET_RELATED_TO_INVOICE':
+        ({ data, error } = await supabaseAdmin
+          .from('journal_entries')
+          .select('id, entry_date, description')
+          .eq('company_id', company_id)
+          .eq('invoice_id', body.invoiceId)
+          .order('entry_date', { ascending: true }));
+        break;
+
       case 'POST':
         const { items: postItems, ...postEntryData } = body.entryData;
         const { data: newEntry, error: postError } = await supabaseAdmin
