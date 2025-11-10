@@ -10,6 +10,7 @@ import { Skeleton } from '../components/ui/skeleton';
 import { formatDistanceToNow } from 'date-fns';
 import { cn } from '../lib/utils';
 import { MentionsInput, Mention } from 'react-mentions';
+import { RealtimeChannel } from '@supabase/supabase-js';
 
 type Message = {
   id: string;
@@ -22,10 +23,17 @@ type Message = {
   } | null;
 };
 
+type Presence = {
+  user_id: string;
+  full_name: string;
+  avatar_url: string | null;
+};
+
 const Chat = () => {
-  const { user, activeCompany } = useAuth();
+  const { user, profile, activeCompany } = useAuth();
   const queryClient = useQueryClient();
   const [newMessage, setNewMessage] = useState('');
+  const [onlineUsers, setOnlineUsers] = useState<Record<string, Presence[]>>({});
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
 
   const fetchMessages = async () => {
@@ -44,6 +52,47 @@ const Chat = () => {
     queryFn: fetchMessages,
     enabled: !!activeCompany,
   });
+
+  useEffect(() => {
+    if (!user || !activeCompany || !profile) return;
+
+    const channel: RealtimeChannel = supabase.channel(`company-chat:${activeCompany.id}`, {
+      config: {
+        presence: {
+          key: user.id,
+        },
+      },
+    });
+
+    channel
+      .on('presence', { event: 'sync' }, () => {
+        const presenceState = channel.presenceState() as Record<string, Presence[]>;
+        setOnlineUsers(presenceState);
+      })
+      .on('presence', { event: 'join' }, ({ key, newPresences }) => {
+        setOnlineUsers(prev => ({ ...prev, [key]: newPresences as unknown as Presence[] }));
+      })
+      .on('presence', { event: 'leave' }, ({ key, leftPresences }) => {
+        setOnlineUsers(prev => {
+          const newState = { ...prev };
+          delete newState[key];
+          return newState;
+        });
+      })
+      .subscribe(async (status) => {
+        if (status === 'SUBSCRIBED') {
+          await channel.track({ 
+            user_id: user.id, 
+            full_name: profile.full_name, 
+            avatar_url: profile.avatar_url 
+          });
+        }
+      });
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user, activeCompany, profile]);
 
   useEffect(() => {
     if (!activeCompany) return;
@@ -130,90 +179,115 @@ const Chat = () => {
     return name.split(' ').map(n => n[0]).join('').toUpperCase();
   };
 
+  const onlineUsersList = useMemo(() => {
+    return Object.values(onlineUsers).map(presences => presences[0]).filter(Boolean);
+  }, [onlineUsers]);
+
   return (
-    <Card className="h-[calc(100vh-7rem)] flex flex-col">
-      <CardHeader>
-        <CardTitle>Company Chat</CardTitle>
-      </CardHeader>
-      <CardContent className="flex-1 overflow-y-auto p-4 space-y-4">
-        {isLoading ? (
-          <div className="space-y-4">
-            <Skeleton className="h-12 w-3/4" />
-            <Skeleton className="h-12 w-3/4 ml-auto" />
-            <Skeleton className="h-12 w-3/4" />
-          </div>
-        ) : messages.length > 0 ? (
-          messages.map(message => (
-            <div
-              key={message.id}
-              className={cn(
-                "flex items-start gap-3",
-                message.user_id === user?.id && "justify-end"
-              )}
-            >
-              {message.user_id !== user?.id && (
-                <Avatar className="h-8 w-8">
-                  <AvatarImage src={message.profiles?.avatar_url || undefined} />
-                  <AvatarFallback>
-                    {message.profiles?.full_name ? getInitials(message.profiles.full_name) : <User className="h-4 w-4" />}
-                  </AvatarFallback>
-                </Avatar>
-              )}
-              <div className={cn(
-                "max-w-xs md:max-w-md p-3 rounded-lg",
-                message.user_id === user?.id
-                  ? "bg-primary text-primary-foreground"
-                  : "bg-muted"
-              )}>
-                <p className="font-semibold text-sm">{message.profiles?.full_name || 'Unknown User'}</p>
-                <p className="text-sm">{message.content}</p>
-                <p className="text-xs opacity-70 mt-1 text-right">
-                  {formatDistanceToNow(new Date(message.created_at), { addSuffix: true })}
-                </p>
-              </div>
-              {message.user_id === user?.id && (
-                <Avatar className="h-8 w-8">
-                  <AvatarImage src={message.profiles?.avatar_url || undefined} />
-                  <AvatarFallback>
-                    {message.profiles?.full_name ? getInitials(message.profiles.full_name) : <User className="h-4 w-4" />}
-                  </AvatarFallback>
-                </Avatar>
-              )}
+    <div className="flex gap-4 h-[calc(100vh-7rem)]">
+      <Card className="flex-1 flex flex-col">
+        <CardHeader>
+          <CardTitle>Company Chat</CardTitle>
+        </CardHeader>
+        <CardContent className="flex-1 overflow-y-auto p-4 space-y-4">
+          {isLoading ? (
+            <div className="space-y-4">
+              <Skeleton className="h-12 w-3/4" />
+              <Skeleton className="h-12 w-3/4 ml-auto" />
+              <Skeleton className="h-12 w-3/4" />
             </div>
-          ))
-        ) : (
-          <div className="flex items-center justify-center h-full">
-            <p className="text-muted-foreground">No messages yet. Start the conversation!</p>
-          </div>
-        )}
-        <div ref={messagesEndRef} />
-      </CardContent>
-      <CardFooter>
-        <form onSubmit={handleSendMessage} className="flex w-full items-center space-x-2">
-          <MentionsInput
-            value={newMessage}
-            onChange={(e) => setNewMessage(e.target.value)}
-            placeholder="Type a message, use @ to mention someone..."
-            className="mentions-input"
-            a11ySuggestionsListLabel={"Suggested users for mention"}
-          >
-            <Mention
-              trigger="@"
-              data={mentionUsers}
-              markup="@[__display__](__id__)"
-              style={{
-                backgroundColor: 'hsl(var(--accent))',
-                color: 'hsl(var(--accent-foreground))',
-              }}
-              appendSpaceOnAdd
-            />
-          </MentionsInput>
-          <Button type="submit" disabled={sendMessageMutation.isPending}>
-            <Send className="h-4 w-4" />
-          </Button>
-        </form>
-      </CardFooter>
-    </Card>
+          ) : messages.length > 0 ? (
+            messages.map(message => (
+              <div
+                key={message.id}
+                className={cn(
+                  "flex items-start gap-3",
+                  message.user_id === user?.id && "justify-end"
+                )}
+              >
+                {message.user_id !== user?.id && (
+                  <Avatar className="h-8 w-8">
+                    <AvatarImage src={message.profiles?.avatar_url || undefined} />
+                    <AvatarFallback>
+                      {message.profiles?.full_name ? getInitials(message.profiles.full_name) : <User className="h-4 w-4" />}
+                    </AvatarFallback>
+                  </Avatar>
+                )}
+                <div className={cn(
+                  "max-w-xs md:max-w-md p-3 rounded-lg",
+                  message.user_id === user?.id
+                    ? "bg-primary text-primary-foreground"
+                    : "bg-muted"
+                )}>
+                  <p className="font-semibold text-sm">{message.profiles?.full_name || 'Unknown User'}</p>
+                  <p className="text-sm whitespace-pre-wrap break-words">{message.content}</p>
+                  <p className="text-xs opacity-70 mt-1 text-right">
+                    {formatDistanceToNow(new Date(message.created_at), { addSuffix: true })}
+                  </p>
+                </div>
+                {message.user_id === user?.id && (
+                  <Avatar className="h-8 w-8">
+                    <AvatarImage src={message.profiles?.avatar_url || undefined} />
+                    <AvatarFallback>
+                      {message.profiles?.full_name ? getInitials(message.profiles.full_name) : <User className="h-4 w-4" />}
+                    </AvatarFallback>
+                  </Avatar>
+                )}
+              </div>
+            ))
+          ) : (
+            <div className="flex items-center justify-center h-full">
+              <p className="text-muted-foreground">No messages yet. Start the conversation!</p>
+            </div>
+          )}
+          <div ref={messagesEndRef} />
+        </CardContent>
+        <CardFooter>
+          <form onSubmit={handleSendMessage} className="flex w-full items-center space-x-2">
+            <MentionsInput
+              value={newMessage}
+              onChange={(e) => setNewMessage(e.target.value)}
+              placeholder="Type a message, use @ to mention someone..."
+              className="mentions-input"
+              a11ySuggestionsListLabel={"Suggested users for mention"}
+            >
+              <Mention
+                trigger="@"
+                data={mentionUsers}
+                markup="@[__display__](__id__)"
+                style={{
+                  backgroundColor: 'hsl(var(--accent))',
+                  color: 'hsl(var(--accent-foreground))',
+                }}
+                appendSpaceOnAdd
+              />
+            </MentionsInput>
+            <Button type="submit" disabled={sendMessageMutation.isPending}>
+              <Send className="h-4 w-4" />
+            </Button>
+          </form>
+        </CardFooter>
+      </Card>
+      <Card className="w-64 hidden lg:block">
+        <CardHeader>
+          <CardTitle>Online ({onlineUsersList.length})</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {onlineUsersList.map(onlineUser => (
+            <div key={onlineUser.user_id} className="flex items-center gap-3">
+              <div className="relative">
+                <Avatar className="h-8 w-8">
+                  <AvatarImage src={onlineUser.avatar_url || undefined} />
+                  <AvatarFallback>{getInitials(onlineUser.full_name)}</AvatarFallback>
+                </Avatar>
+                <div className="absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full bg-green-500 border-2 border-card" />
+              </div>
+              <span className="text-sm font-medium truncate">{onlineUser.full_name}</span>
+            </div>
+          ))}
+        </CardContent>
+      </Card>
+    </div>
   );
 };
 
