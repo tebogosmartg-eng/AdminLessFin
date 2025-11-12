@@ -13,6 +13,7 @@ import { formatDistanceToNow } from 'date-fns';
 import { formatCurrency } from '../lib/utils';
 import BudgetStatus from '../components/BudgetStatus';
 import TopExpensesChart from '../components/TopExpensesChart';
+import BankAccountsSummary from '../components/BankAccountsSummary';
 
 type OverdueInvoice = {
   id: string;
@@ -105,7 +106,7 @@ const Dashboard = () => {
           ))}
         </div>
 
-        <div className="grid gap-4 md:grid-cols-2">
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           <Card>
             <CardHeader>
               <CardTitle>Accounts Receivable</CardTitle>
@@ -150,6 +151,7 @@ const Dashboard = () => {
               )}
             </CardContent>
           </Card>
+          <BankAccountsSummary accounts={accounts} isLoading={isLoading} />
           <BudgetStatus />
           <Card>
             <CardHeader>
@@ -181,19 +183,7 @@ const Dashboard = () => {
               )}
             </CardContent>
           </Card>
-        </div>
-
-        <div className="grid gap-4 lg:grid-cols-2">
-          <Card>
-            <CardHeader>
-              <CardTitle>Financial Overview</CardTitle>
-              <CardDescription>Income vs. Expenses for the last 6 months.</CardDescription>
-            </CardHeader>
-            <CardContent>
-              {isLoading ? <Skeleton className="h-[300px] w-full" /> : monthlySummary && monthlySummary.length > 0 ? <IncomeExpenseChart data={monthlySummary} /> : <p className="text-md text-gray-600 dark:text-gray-400">Not enough data to display a chart.</p>}
-            </CardContent>
-          </Card>
-          <Card>
+          <Card className="lg:col-span-1">
             <CardHeader>
               <CardTitle>Top Expenses This Month</CardTitle>
               <CardDescription>Your biggest spending categories for the current month.</CardDescription>
@@ -203,6 +193,16 @@ const Dashboard = () => {
             </CardContent>
           </Card>
         </div>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Financial Overview</CardTitle>
+            <CardDescription>Income vs. Expenses for the last 6 months.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {isLoading ? <Skeleton className="h-[300px] w-full" /> : monthlySummary && monthlySummary.length > 0 ? <IncomeExpenseChart data={monthlySummary} /> : <p className="text-md text-gray-600 dark:text-gray-400">Not enough data to display a chart.</p>}
+          </CardContent>
+        </Card>
       </main>
     </div>
   );
