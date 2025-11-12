@@ -22,7 +22,8 @@ serve(async (req) => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error("User not authenticated.");
 
-    const { method, body } = await req.json();
+    const body = await req.json();
+    const { method } = body;
 
     const supabaseAdmin = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',

@@ -22,8 +22,8 @@ serve(async (req) => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error("User not authenticated.");
 
-    const { method, body } = await req.json();
-    const { company_id } = body;
+    const body = await req.json();
+    const { method, company_id, target_company_id } = body;
 
     const supabaseAdmin = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
@@ -81,7 +81,6 @@ serve(async (req) => {
         break;
 
       case 'SWITCH_COMPANY':
-        const { target_company_id } = body;
         // Security check for switching company
         const { data: targetMember, error: targetMemberError } = await supabaseAdmin
             .from('company_users')

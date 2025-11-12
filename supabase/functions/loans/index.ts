@@ -24,8 +24,8 @@ serve(async (req) => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error("User not authenticated.");
 
-    const { method, body } = await req.json();
-    const { company_id } = body;
+    const body = await req.json();
+    const { method, company_id } = body;
 
     if (!company_id) {
       throw new Error("Company ID is required.");
@@ -79,11 +79,11 @@ serve(async (req) => {
         break;
 
       case 'POST':
-        const { loanData, deposit_account_id, lender_name } = body;
+        const { loanData: postLoanData, deposit_account_id, lender_name } = body;
         
         const { data: newLoan, error: loanInsertError } = await supabaseAdmin
           .from('loans')
-          .insert({ ...loanData, company_id })
+          .insert({ ...postLoanData, company_id })
           .select('id')
           .single();
         if (loanInsertError) throw loanInsertError;
@@ -92,17 +92,17 @@ serve(async (req) => {
           .from('journal_entries')
           .insert({
             company_id: company_id,
-            entry_date: loanData.start_date,
+            entry_date: postLoanData.start_date,
             description: `Loan received from ${lender_name}`,
-            vendor_id: loanData.lender_id,
+            vendor_id: postLoanData.lender_id,
           })
           .select('id')
           .single();
         if (entryError) throw entryError;
 
         const journalItems = [
-          { journal_entry_id: entry.id, account_id: deposit_account_id, type: 'debit', amount: loanData.principal_amount },
-          { journal_entry_id: entry.id, account_id: loanData.liability_account_id, type: 'credit', amount: loanData.principal_amount },
+          { journal_entry_id: entry.id, account_id: deposit_account_id, type: 'debit', amount: postLoanData.principal_amount },
+          { journal_entry_id: entry.id, account_id: postLoanData.liability_account_id, type: 'credit', amount: postLoanData.principal_amount },
         ];
         const { error: itemsError } = await supabaseAdmin.from('journal_entry_items').insert(journalItems);
         if (itemsError) throw itemsError;

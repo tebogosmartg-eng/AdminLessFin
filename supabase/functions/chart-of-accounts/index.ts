@@ -25,8 +25,8 @@ serve(async (req) => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error("User not authenticated.");
 
-    const { method, body } = await req.json();
-    const { company_id } = body;
+    const body = await req.json();
+    const { method, company_id } = body;
 
     if (!company_id) {
       throw new Error("Company ID is required.");
