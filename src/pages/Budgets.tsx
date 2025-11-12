@@ -24,6 +24,7 @@ import {
 import { cn } from '../lib/utils';
 import { formatCurrency } from '../lib/utils';
 import { useAuth } from '../contexts/AuthContext';
+import { budgetsQuery } from '../lib/queries';
 
 export type Budget = {
   id: string;
@@ -43,21 +44,8 @@ const Budgets = () => {
   const queryClient = useQueryClient();
   const { activeCompany } = useAuth();
 
-  const fetchBudgets = async () => {
-    if (!activeCompany) return [];
-    const { data, error } = await supabase.functions.invoke('budgets', {
-      body: {
-        method: 'GET_ALL',
-        company_id: activeCompany.id,
-      },
-    });
-    if (error) throw new Error(error.message);
-    return data;
-  };
-
   const { data: budgets, isLoading } = useQuery<Budget[]>({
-    queryKey: ['budgets_with_activity', activeCompany?.id],
-    queryFn: fetchBudgets,
+    ...budgetsQuery(activeCompany?.id!),
     enabled: !!activeCompany,
   });
 

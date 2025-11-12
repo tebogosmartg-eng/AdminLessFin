@@ -22,6 +22,7 @@ import {
 } from "../components/ui/dropdown-menu";
 import { formatCurrency } from '../lib/utils';
 import { useAuth } from '../contexts/AuthContext';
+import { productsQuery } from '../lib/queries';
 
 export type Product = {
   id: string;
@@ -43,21 +44,8 @@ const Products = () => {
   const { activeCompany } = useAuth();
   const queryClient = useQueryClient();
 
-  const fetchProducts = async () => {
-    if (!activeCompany) return [];
-    const { data, error } = await supabase.functions.invoke('products', {
-      body: {
-        method: 'GET',
-        company_id: activeCompany.id,
-      },
-    });
-    if (error) throw new Error(error.message);
-    return data;
-  };
-
   const { data: products, isLoading } = useQuery<Product[]>({
-    queryKey: ['products', activeCompany?.id],
-    queryFn: fetchProducts,
+    ...productsQuery(activeCompany?.id!),
     enabled: !!activeCompany,
   });
 

@@ -23,6 +23,7 @@ import {
 import { Badge } from '../components/ui/badge';
 import { formatCurrency } from '../lib/utils';
 import { useAuth } from '../contexts/AuthContext';
+import { employeesQuery } from '../lib/queries';
 
 export type Employee = {
   id: string;
@@ -49,21 +50,8 @@ const Employees = () => {
   const queryClient = useQueryClient();
   const { activeCompany } = useAuth();
 
-  const fetchEmployees = async () => {
-    if (!activeCompany) return [];
-    const { data, error } = await supabase.functions.invoke('employees', {
-      body: {
-        method: 'GET',
-        company_id: activeCompany.id,
-      },
-    });
-    if (error) throw new Error(error.message);
-    return data;
-  };
-
   const { data: employees, isLoading } = useQuery<Employee[]>({
-    queryKey: ['employees', activeCompany?.id],
-    queryFn: fetchEmployees,
+    ...employeesQuery(activeCompany?.id!),
     enabled: !!activeCompany,
   });
 

@@ -19,6 +19,7 @@ import { useNavigate } from 'react-router-dom';
 import InvoiceForm from '../components/InvoiceForm';
 import { formatCurrency } from '../lib/utils';
 import { useAuth } from '../contexts/AuthContext';
+import { invoicesQuery } from '../lib/queries';
 
 export type Invoice = {
   id: string;
@@ -42,21 +43,8 @@ const Invoices = () => {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
 
-  const fetchInvoices = async () => {
-    if (!activeCompany) return [];
-    const { data, error } = await supabase.functions.invoke('invoices', {
-      body: {
-        method: 'GET_ALL',
-        company_id: activeCompany.id,
-      },
-    });
-    if (error) throw new Error(error.message);
-    return data as Invoice[];
-  };
-
-  const { data: invoices, isLoading } = useQuery({
-    queryKey: ['invoices', activeCompany?.id],
-    queryFn: fetchInvoices,
+  const { data: invoices, isLoading } = useQuery<Invoice[]>({
+    ...invoicesQuery(activeCompany?.id!),
     enabled: !!activeCompany,
   });
 

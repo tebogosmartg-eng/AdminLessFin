@@ -11,6 +11,7 @@ import RecurringEntryForm from '../components/RecurringEntryForm';
 import { format } from 'date-fns';
 import { Alert, AlertDescription, AlertTitle } from '../components/ui/alert';
 import { useAuth } from '../contexts/AuthContext';
+import { recurringEntriesQuery } from '../lib/queries';
 
 type RecurringEntry = {
   id: string;
@@ -26,18 +27,7 @@ const RecurringEntries = () => {
   const { activeCompany } = useAuth();
 
   const { data: entries, isLoading } = useQuery<RecurringEntry[]>({
-    queryKey: ['recurring_entries', activeCompany?.id],
-    queryFn: async () => {
-      if (!activeCompany) return [];
-      const { data, error } = await supabase.functions.invoke('recurring-entries', {
-        body: {
-          method: 'GET_ALL',
-          company_id: activeCompany.id,
-        },
-      });
-      if (error) throw new Error(error.message);
-      return data;
-    },
+    ...recurringEntriesQuery(activeCompany?.id!),
     enabled: !!activeCompany,
   });
 

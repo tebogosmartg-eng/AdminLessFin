@@ -14,6 +14,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../co
 import BillPaymentForm from '../components/BillPaymentForm';
 import { formatCurrency } from '../lib/utils';
 import { useAuth } from '../contexts/AuthContext';
+import { vendorBalancesQuery } from '../lib/queries';
 
 type VendorBalance = {
   vendor_id: string;
@@ -32,21 +33,8 @@ const PayBills = () => {
   const [selectedPayment, setSelectedPayment] = useState<SelectedPayment | null>(null);
   const { activeCompany } = useAuth();
 
-  const fetchVendorBalances = async () => {
-    if (!activeCompany) return [];
-    const { data, error } = await supabase.functions.invoke('payments', {
-      body: {
-        method: 'GET_AP_BALANCES',
-        company_id: activeCompany.id,
-      },
-    });
-    if (error) throw new Error(error.message);
-    return data;
-  };
-
   const { data: vendors, isLoading } = useQuery<VendorBalance[]>({
-    queryKey: ['vendor_ap_balances', activeCompany?.id],
-    queryFn: fetchVendorBalances,
+    ...vendorBalancesQuery(activeCompany?.id!),
     enabled: !!activeCompany,
   });
 

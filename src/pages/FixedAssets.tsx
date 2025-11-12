@@ -13,6 +13,7 @@ import { useNavigate } from 'react-router-dom';
 import { Alert, AlertDescription, AlertTitle } from '../components/ui/alert';
 import AssetDisposalForm from '../components/AssetDisposalForm';
 import { useAuth } from '../contexts/AuthContext';
+import { fixedAssetsQuery } from '../lib/queries';
 
 type FixedAsset = {
   id: string;
@@ -34,21 +35,7 @@ const FixedAssets = () => {
   const { activeCompany } = useAuth();
 
   const { data: assets, isLoading } = useQuery<FixedAsset[]>({
-    queryKey: ['fixed_assets', activeCompany?.id],
-    queryFn: async () => {
-      if (!activeCompany) return [];
-      const { data, error } = await supabase.functions.invoke('fixed-assets', {
-        body: {
-          method: 'GET_ALL',
-          company_id: activeCompany.id,
-        },
-      });
-      if (error) throw new Error(error.message);
-      return data.map((asset: any) => ({
-        ...asset,
-        net_book_value: asset.purchase_cost - asset.accumulated_depreciation,
-      }));
-    },
+    ...fixedAssetsQuery(activeCompany?.id!),
     enabled: !!activeCompany,
   });
 

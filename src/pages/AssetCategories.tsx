@@ -9,6 +9,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { showError, showSuccess } from '../utils/toast';
 import AssetCategoryForm from '../components/AssetCategoryForm';
 import { useAuth } from '../contexts/AuthContext';
+import { assetCategoriesQuery } from '../lib/queries';
 
 type AssetCategory = {
   id: string;
@@ -22,18 +23,7 @@ const AssetCategories = () => {
   const { activeCompany } = useAuth();
 
   const { data: categories, isLoading } = useQuery<AssetCategory[]>({
-    queryKey: ['asset_categories', activeCompany?.id],
-    queryFn: async () => {
-      if (!activeCompany) return [];
-      const { data, error } = await supabase.functions.invoke('asset-categories', {
-        body: {
-          method: 'GET',
-          company_id: activeCompany.id,
-        },
-      });
-      if (error) throw error;
-      return data;
-    },
+    ...assetCategoriesQuery(activeCompany?.id!),
     enabled: !!activeCompany,
   });
 

@@ -17,6 +17,7 @@ import { Badge } from '../components/ui/badge';
 import { format } from 'date-fns';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { payrollRunsQuery } from '../lib/queries';
 
 type PayrollRun = {
   id: string;
@@ -32,18 +33,7 @@ const PayrollRuns = () => {
   const { activeCompany } = useAuth();
 
   const { data: payrollRuns, isLoading } = useQuery<PayrollRun[]>({
-    queryKey: ['payroll_runs', activeCompany?.id],
-    queryFn: async () => {
-      if (!activeCompany) return [];
-      const { data, error } = await supabase.functions.invoke('payroll', {
-        body: {
-          method: 'GET_RUNS',
-          company_id: activeCompany.id,
-        },
-      });
-      if (error) throw new Error(error.message);
-      return data;
-    },
+    ...payrollRunsQuery(activeCompany?.id!),
     enabled: !!activeCompany,
   });
 

@@ -11,6 +11,7 @@ import LoanForm from '../components/LoanForm';
 import { formatCurrency } from '../lib/utils';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { loansQuery } from '../lib/queries';
 
 type Loan = {
   id: string;
@@ -28,18 +29,7 @@ const Loans = () => {
   const { activeCompany } = useAuth();
 
   const { data: loans, isLoading } = useQuery<Loan[]>({
-    queryKey: ['loans', activeCompany?.id],
-    queryFn: async () => {
-      if (!activeCompany) return [];
-      const { data, error } = await supabase.functions.invoke('loans', {
-        body: {
-          method: 'GET_ALL',
-          company_id: activeCompany.id,
-        },
-      });
-      if (error) throw new Error(error.message);
-      return data;
-    },
+    ...loansQuery(activeCompany?.id!),
     enabled: !!activeCompany,
   });
 

@@ -14,6 +14,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../co
 import ReceivePaymentForm from '../components/ReceivePaymentForm';
 import { formatCurrency } from '../lib/utils';
 import { useAuth } from '../contexts/AuthContext';
+import { customerBalancesQuery } from '../lib/queries';
 
 type CustomerBalance = {
   customer_id: string;
@@ -32,21 +33,8 @@ const ReceivePayments = () => {
   const [selectedPayment, setSelectedPayment] = useState<SelectedPayment | null>(null);
   const { activeCompany } = useAuth();
 
-  const fetchCustomerBalances = async () => {
-    if (!activeCompany) return [];
-    const { data, error } = await supabase.functions.invoke('payments', {
-      body: {
-        method: 'GET_AR_BALANCES',
-        company_id: activeCompany.id,
-      },
-    });
-    if (error) throw new Error(error.message);
-    return data;
-  };
-
   const { data: customers, isLoading } = useQuery<CustomerBalance[]>({
-    queryKey: ['customer_ar_balances', activeCompany?.id],
-    queryFn: fetchCustomerBalances,
+    ...customerBalancesQuery(activeCompany?.id!),
     enabled: !!activeCompany,
   });
 

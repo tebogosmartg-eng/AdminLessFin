@@ -21,6 +21,7 @@ import {
   DropdownMenuTrigger,
 } from "../components/ui/dropdown-menu";
 import { useAuth } from '../contexts/AuthContext';
+import { customersQuery } from '../lib/queries';
 
 export type Customer = {
   id: string;
@@ -37,23 +38,8 @@ const Customers = () => {
   const { activeCompany } = useAuth();
   const queryClient = useQueryClient();
 
-  // This function fetches data by calling a secure Supabase Edge Function.
-  // Direct database access from the client is prohibited.
-  const fetchCustomers = async () => {
-    if (!activeCompany) return [];
-    const { data, error } = await supabase.functions.invoke('customers', {
-      body: {
-        method: 'GET',
-        company_id: activeCompany.id,
-      },
-    });
-    if (error) throw new Error(error.message);
-    return data;
-  };
-
   const { data: customers, isLoading } = useQuery<Customer[]>({
-    queryKey: ['customers', activeCompany?.id],
-    queryFn: fetchCustomers,
+    ...customersQuery(activeCompany?.id!),
     enabled: !!activeCompany,
   });
 

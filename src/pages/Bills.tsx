@@ -19,6 +19,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { showError, showSuccess } from '../utils/toast';
 import { useAuth } from '../contexts/AuthContext';
 import { formatCurrency } from '../lib/utils';
+import { billsQuery } from '../lib/queries';
 
 type BillEntry = {
   id: string;
@@ -36,29 +37,8 @@ const Bills = () => {
   const { activeCompany } = useAuth();
   const queryClient = useQueryClient();
 
-  const fetchBills = async () => {
-    if (!activeCompany) return [];
-    const { data, error } = await supabase.functions.invoke('bills', {
-      body: {
-        method: 'GET',
-        company_id: activeCompany.id,
-      },
-    });
-
-    if (error) throw new Error(error.message);
-    if (!data) return [];
-
-    return data.map((entry: any) => ({
-      ...entry,
-      total: entry.journal_entry_items
-        .filter((item: any) => item.type === 'credit')
-        .reduce((sum: number, item: any) => sum + item.amount, 0),
-    }));
-  };
-
   const { data: bills, isLoading } = useQuery<BillEntry[]>({
-    queryKey: ['bills', activeCompany?.id],
-    queryFn: fetchBills,
+    ...billsQuery(activeCompany?.id!),
     enabled: !!activeCompany,
   });
 

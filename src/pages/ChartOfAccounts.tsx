@@ -30,6 +30,7 @@ import {
 } from "../components/ui/dropdown-menu"
 import { formatCurrency } from '../lib/utils';
 import { useAuth } from '../contexts/AuthContext';
+import { accountsQuery } from '../lib/queries';
 
 export type Account = {
   id: string;
@@ -48,22 +49,8 @@ const ChartOfAccounts = () => {
   const queryClient = useQueryClient();
   const { activeCompany } = useAuth();
 
-  // This function fetches data by calling a secure Supabase Edge Function.
-  const fetchAccounts = async () => {
-    if (!activeCompany) return [];
-    const { data, error } = await supabase.functions.invoke('chart-of-accounts', {
-      body: {
-        method: 'GET',
-        company_id: activeCompany.id,
-      },
-    });
-    if (error) throw new Error(error.message);
-    return data;
-  };
-
   const { data: accounts, isLoading } = useQuery<Account[]>({
-    queryKey: ['accounts', activeCompany?.id],
-    queryFn: fetchAccounts,
+    ...accountsQuery(activeCompany?.id!),
     enabled: !!activeCompany,
   });
 

@@ -21,6 +21,7 @@ import {
   DropdownMenuTrigger,
 } from "../components/ui/dropdown-menu";
 import { useAuth } from '../contexts/AuthContext';
+import { vendorsQuery } from '../lib/queries';
 
 export type Vendor = {
   id: string;
@@ -37,23 +38,8 @@ const Vendors = () => {
   const { activeCompany } = useAuth();
   const queryClient = useQueryClient();
 
-  // This function fetches data by calling a secure Supabase Edge Function.
-  // Direct database access from the client is prohibited.
-  const fetchVendors = async () => {
-    if (!activeCompany) return [];
-    const { data, error } = await supabase.functions.invoke('vendors', {
-      body: {
-        method: 'GET',
-        company_id: activeCompany.id,
-      },
-    });
-    if (error) throw new Error(error.message);
-    return data;
-  };
-
   const { data: vendors, isLoading } = useQuery<Vendor[]>({
-    queryKey: ['vendors', activeCompany?.id],
-    queryFn: fetchVendors,
+    ...vendorsQuery(activeCompany?.id!),
     enabled: !!activeCompany,
   });
 
