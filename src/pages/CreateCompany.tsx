@@ -27,19 +27,15 @@ const CreateCompany = () => {
     mutationFn: async (values: CompanyFormValues) => {
       if (!user) throw new Error('User not authenticated');
 
-      const { data: company, error: companyError } = await supabase
-        .from('companies')
-        .insert({ name: values.name, owner_id: user.id })
-        .select('id')
-        .single();
-      if (companyError) throw companyError;
+      const { data, error } = await supabase.functions.invoke('company-management', {
+        body: {
+          method: 'CREATE',
+          companyData: { name: values.name },
+        },
+      });
 
-      const { error: linkError } = await supabase
-        .from('company_users')
-        .insert({ company_id: company.id, user_id: user.id, role: 'owner' });
-      if (linkError) throw linkError;
-
-      return company.id;
+      if (error) throw error;
+      return data.id;
     },
     onSuccess: async (newCompanyId) => {
       await switchCompany(newCompanyId);

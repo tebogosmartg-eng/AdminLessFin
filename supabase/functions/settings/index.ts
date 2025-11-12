@@ -25,9 +25,14 @@ serve(async (req) => {
     const { method, body } = await req.json();
     const { company_id } = body;
 
+    const supabaseAdmin = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+    );
+
     // Security Check: Verify user membership if a company_id is provided for most operations
     if (company_id && method !== 'SWITCH_COMPANY') {
-        const { data: companyMember, error: memberError } = await supabase
+        const { data: companyMember, error: memberError } = await supabaseAdmin
             .from('company_users')
             .select('user_id')
             .eq('user_id', user.id)
@@ -38,11 +43,6 @@ serve(async (req) => {
             throw new Error("Permission denied: User is not a member of this company.");
         }
     }
-
-    const supabaseAdmin = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-    );
 
     let data, error;
 
@@ -83,7 +83,7 @@ serve(async (req) => {
       case 'SWITCH_COMPANY':
         const { target_company_id } = body;
         // Security check for switching company
-        const { data: targetMember, error: targetMemberError } = await supabase
+        const { data: targetMember, error: targetMemberError } = await supabaseAdmin
             .from('company_users')
             .select('user_id')
             .eq('user_id', user.id)
