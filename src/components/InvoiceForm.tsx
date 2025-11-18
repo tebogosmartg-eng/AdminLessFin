@@ -16,20 +16,22 @@ import { Account } from '../pages/ChartOfAccounts';
 import { Customer } from '../pages/Customers';
 import { Product } from '../pages/Products';
 import { TaxRate } from '../pages/TaxRates';
-import { Trash2 } from 'lucide-react';
+import { Trash2, Clock } from 'lucide-react';
 import { addDays, format } from 'date-fns';
 import { formatCurrency } from '../lib/utils';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from './ui/sheet';
 import InvoicePreview from './InvoicePreview';
 import { taxRatesQuery } from '../lib/queries';
+import AddUnbilledTimeDialog from './AddUnbilledTimeDialog';
 
 const invoiceItemSchema = z.object({
   product_id: z.string().optional(),
   description: z.string().min(1, "Description is required."),
-  quantity: z.coerce.number().min(1, "Qty must be at least 1."),
-  unit_price: z.coerce.number().min(0.01, "Price must be positive."),
+  quantity: z.coerce.number().min(0.01, "Qty must be positive."),
+  unit_price: z.coerce.number().min(0, "Price must be non-negative."),
   income_account_id: z.string().min(1, "Income account is required."),
   tax_rate_id: z.string().optional(),
+  timesheet_ids: z.array(z.string()).optional(), // To track which timesheets this line item came from
 });
 
 const invoiceSchema = z.object({
@@ -57,6 +59,7 @@ const InvoiceForm = ({ isOpen, setIsOpen, invoiceId }: InvoiceFormProps) => {
   const queryClient = useQueryClient();
   const isEditing = !!invoiceId;
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
+  const [isUnbilledTimeOpen, setIsUnbilledTimeOpen] = useState(false);
 
   const form = useForm<InvoiceFormValues>({
     resolver: zodResolver(invoiceSchema),
@@ -64,28 +67,18 @@ const InvoiceForm = ({ isOpen, setIsOpen, invoiceId }: InvoiceFormProps) => {
       invoice_number: '',
       invoice_date: format(new Date(), 'yyyy-MM-dd'),
       due_date: format(addDays(new Date(), 30), 'yyyy-MM-dd'),
-      customer_id: '',
-      accounts_receivable_id: '',
-      inventory_asset_account_id: '',
-      tax_payable_account_id: '',
-      description: '',
       items: [{ product_id: '', description: '', quantity: 1, unit_price: 0, income_account_id: '', tax_rate_id: '' }],
     },
   });
 
   const watchedValues = form.watch();
-
-  // Note: Editing logic is complex and has been omitted for this implementation.
-  // This form currently only supports creating new invoices.
+  const customerId = form.watch('customer_id');
 
   const { data: nextInvoiceNumber } = useQuery({
     queryKey: ['next_invoice_number', activeCompany?.id],
     queryFn: async () => {
       const { data, error } = await supabase.functions.invoke('invoices', {
-        body: {
-          method: 'GET_NEXT_INVOICE_NUMBER',
-          company_id: activeCompany!.id,
-        },
+        body: { method: 'GET_NEXT_INVOICE_NUMBER', company_id: activeCompany!.id },
       });
       if (error) throw error;
       return data;
@@ -94,12 +87,12 @@ const InvoiceForm = ({ isOpen, setIsOpen, invoiceId }: InvoiceFormProps) => {
   });
 
   useEffect(() => {
-    if (nextInvoiceNumber) {
+    if (nextInvoiceNumber && !isEditing) {
       form.setValue('invoice_number', nextInvoiceNumber);
     }
-  }, [nextInvoiceNumber, form]);
+  }, [nextInvoiceNumber, isEditing, form]);
 
-  const { fields, append, remove } = useFieldArray({ control: form.control, name: "items" });
+  const { fields, append, remove, replace } = useFieldArray({ control: form.control, name: "items" });
 
   const { data: customers } = useQuery<Customer[]>({ queryKey: ['customers', activeCompany?.id] });
   const { data: products } = useQuery<Product[]>({ queryKey: ['products', activeCompany?.id] });
@@ -121,9 +114,31 @@ const InvoiceForm = ({ isOpen, setIsOpen, invoiceId }: InvoiceFormProps) => {
     }
   };
 
+  const handleAddUnbilledTime = (timeEntries: any[]) => {
+    const newItems = timeEntries.map(entry => ({
+      product_id: '',
+      description: `${entry.projects.name} - ${entry.notes || 'Work performed on ' + format(new Date(entry.date), 'PPP')}`,
+      quantity: entry.hours,
+      unit_price: entry.projects.billable_rate || 0,
+      income_account_id: '', // User should select this
+      tax_rate_id: '',
+      timesheet_ids: [entry.id],
+    }));
+
+    // Remove placeholder if it's empty
+    const existingItems = watchedValues.items;
+    if (existingItems.length === 1 && !existingItems[0].description && existingItems[0].unit_price === 0) {
+      replace(newItems);
+    } else {
+      append(newItems);
+    }
+  };
+
   const mutation = useMutation({
     mutationFn: async (values: InvoiceFormValues) => {
-      if (!user || !activeCompany) throw new Error('User not authenticated or no active company');
+      if (!user || !activeCompany) throw new Error('User not authenticated');
+      
+      const timesheetIds = values.items.flatMap(item => item.timesheet_ids || []);
       
       const p_items = values.items.map(item => ({
         product_id: item.product_id || null,
@@ -133,17 +148,13 @@ const InvoiceForm = ({ isOpen, setIsOpen, invoiceId }: InvoiceFormProps) => {
         tax_rate_id: (item.tax_rate_id === 'none' || !item.tax_rate_id) ? null : item.tax_rate_id,
       }));
 
-      const { error } = await supabase.rpc('create_invoice_with_taxes', {
-        p_company_id: activeCompany.id,
-        p_customer_id: values.customer_id,
-        p_invoice_date: values.invoice_date,
-        p_due_date: values.due_date,
-        p_invoice_number: values.invoice_number,
-        p_ar_account_id: values.accounts_receivable_id,
-        p_inventory_asset_account_id: values.inventory_asset_account_id || null,
-        p_tax_payable_account_id: values.tax_payable_account_id || null,
-        p_description: values.description || `Invoice ${values.invoice_number}`,
-        p_items: p_items,
+      const { error } = await supabase.functions.invoke('invoices', {
+        body: {
+          method: 'CREATE_WITH_TIMESHEETS',
+          company_id: activeCompany.id,
+          invoiceData: { ...values, p_items },
+          timesheetIds,
+        },
       });
 
       if (error) throw error;
@@ -152,6 +163,7 @@ const InvoiceForm = ({ isOpen, setIsOpen, invoiceId }: InvoiceFormProps) => {
       queryClient.invalidateQueries({ queryKey: ['invoices', activeCompany?.id] });
       queryClient.invalidateQueries({ queryKey: ['journal_entries', activeCompany?.id] });
       queryClient.invalidateQueries({ queryKey: ['products', activeCompany?.id] });
+      queryClient.invalidateQueries({ queryKey: ['unbilled_time', customerId, activeCompany?.id] });
       showSuccess('Invoice created successfully.');
       setIsOpen(false);
     },
@@ -160,35 +172,10 @@ const InvoiceForm = ({ isOpen, setIsOpen, invoiceId }: InvoiceFormProps) => {
     },
   });
 
-  const onSubmit = (values: InvoiceFormValues) => {
-    for (const [index, item] of values.items.entries()) {
-      if (item.product_id) {
-        const product = products?.find(p => p.id === item.product_id);
-        if (product?.type === 'inventory' && !product.cogs_account_id) {
-          const errorMessage = `Inventory item "${product.name}" is missing a COGS account. Please edit it in Products & Services.`;
-          form.setError(`items.${index}.product_id`, { type: 'manual', message: errorMessage });
-          showError(errorMessage);
-          return;
-        }
-      }
-    }
-
-    const hasInventoryItem = values.items.some(item => products?.find(p => p.id === item.product_id)?.type === 'inventory');
-    if (hasInventoryItem && !values.inventory_asset_account_id) {
-        form.setError("inventory_asset_account_id", { type: "manual", message: "An Inventory Asset account is required when selling inventory items." });
-        return;
-    }
-
-    const hasTax = values.items.some(item => item.tax_rate_id);
-    if (hasTax && !values.tax_payable_account_id) {
-        form.setError("tax_payable_account_id", { type: "manual", message: "A Tax Payable account is required when applying taxes." });
-        return;
-    }
-    mutation.mutate(values);
-  };
+  const onSubmit = (values: InvoiceFormValues) => mutation.mutate(values);
   
   const hasInventoryItem = watchedValues.items.some(item => products?.find(p => p.id === item.product_id)?.type === 'inventory');
-  const hasTax = watchedValues.items.some(item => item.tax_rate_id);
+  const hasTax = watchedValues.items.some(item => item.tax_rate_id && item.tax_rate_id !== 'none');
 
   return (
     <>
@@ -212,6 +199,12 @@ const InvoiceForm = ({ isOpen, setIsOpen, invoiceId }: InvoiceFormProps) => {
                 {hasTax && (<FormField control={form.control} name="tax_payable_account_id" render={({ field }) => (<FormItem><FormLabel>Tax Payable Account</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select Tax Liability Account" /></SelectTrigger></FormControl><SelectContent>{liabilityAccounts?.map(acc => <SelectItem key={acc.id} value={acc.id}>{acc.name}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem>)} />)}
               </div>
               <div className="space-y-2 pt-4">
+                <div className="flex justify-between items-center">
+                  <FormLabel>Items</FormLabel>
+                  <Button type="button" variant="outline" size="sm" onClick={() => setIsUnbilledTimeOpen(true)} disabled={!customerId}>
+                    <Clock className="mr-2 h-4 w-4" /> Add Unbilled Time
+                  </Button>
+                </div>
                 <div className="grid grid-cols-12 gap-2 px-2 text-xs font-medium text-muted-foreground">
                   <div className="col-span-3">Item</div>
                   <div className="col-span-3">Description</div>
@@ -264,6 +257,14 @@ const InvoiceForm = ({ isOpen, setIsOpen, invoiceId }: InvoiceFormProps) => {
             />
         </SheetContent>
       </Sheet>
+      {customerId && (
+        <AddUnbilledTimeDialog
+          isOpen={isUnbilledTimeOpen}
+          setIsOpen={setIsUnbilledTimeOpen}
+          customerId={customerId}
+          onAdd={handleAddUnbilledTime}
+        />
+      )}
     </>
   );
 };
