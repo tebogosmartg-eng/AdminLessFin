@@ -30,6 +30,7 @@ export type Project = {
   status: string;
   customer_id: string | null;
   customers: { name: string } | null;
+  billable_rate?: number | null;
 };
 
 const Projects = () => {

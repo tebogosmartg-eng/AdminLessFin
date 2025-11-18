@@ -67,6 +67,16 @@ serve(async (req) => {
         ({ data, error } = await query);
         break;
       
+      case 'GET_UNBILLED_TIME':
+        ({ data, error } = await supabaseAdmin
+            .from('timesheets')
+            .select('*, projects!inner(name, billable_rate)')
+            .eq('company_id', company_id)
+            .eq('projects.customer_id', body.customer_id)
+            .eq('is_billed', false)
+            .order('date', { ascending: true }));
+        break;
+      
       case 'POST':
         ({ data, error } = await supabaseAdmin
           .from('timesheets')

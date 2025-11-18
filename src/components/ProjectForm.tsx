@@ -40,6 +40,7 @@ const projectSchema = z.object({
   description: z.string().optional(),
   customer_id: z.string().optional(),
   status: z.enum(['active', 'completed', 'archived']),
+  billable_rate: z.coerce.number().min(0, "Rate must be positive.").optional(),
 });
 
 type ProjectFormValues = z.infer<typeof projectSchema>;
@@ -64,6 +65,7 @@ const ProjectForm = ({ isOpen, setIsOpen, project }: ProjectFormProps) => {
         description: project.description || '',
         customer_id: project.customer_id || '',
         status: project.status as any,
+        billable_rate: project.billable_rate || undefined,
       });
     } else {
       form.reset({
@@ -71,6 +73,7 @@ const ProjectForm = ({ isOpen, setIsOpen, project }: ProjectFormProps) => {
         description: '',
         customer_id: '',
         status: 'active',
+        billable_rate: undefined,
       });
     }
   }, [project, form, isOpen]);
@@ -145,26 +148,41 @@ const ProjectForm = ({ isOpen, setIsOpen, project }: ProjectFormProps) => {
                 </FormItem>
               )}
             />
-            <FormField
-              control={form.control}
-              name="customer_id"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Customer (Optional)</FormLabel>
-                  <Select onValueChange={field.onChange} value={field.value}>
+            <div className="grid grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="customer_id"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Customer (Optional)</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Link to a customer" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {customers?.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="billable_rate"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Billable Rate (/hr)</FormLabel>
                     <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Link to a customer" />
-                      </SelectTrigger>
+                      <Input type="number" step="0.01" placeholder="e.g., 150.00" {...field} />
                     </FormControl>
-                    <SelectContent>
-                      {customers?.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
             <FormField
               control={form.control}
               name="status"

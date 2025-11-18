@@ -106,6 +106,40 @@ serve(async (req) => {
           .single());
         break;
 
+      case 'CREATE_WITH_TIMESHEETS':
+        const { invoiceData, timesheetIds } = body;
+        const { p_items, ...rpcParams } = invoiceData;
+
+        const { data: newInvoiceId, error: rpcError } = await supabaseAdmin.rpc('create_invoice_with_taxes', {
+            p_company_id: company_id,
+            p_customer_id: rpcParams.customer_id,
+            p_invoice_date: rpcParams.invoice_date,
+            p_due_date: rpcParams.due_date,
+            p_invoice_number: rpcParams.invoice_number,
+            p_ar_account_id: rpcParams.accounts_receivable_id,
+            p_inventory_asset_account_id: rpcParams.inventory_asset_account_id || null,
+            p_tax_payable_account_id: rpcParams.tax_payable_account_id || null,
+            p_description: rpcParams.description || `Invoice ${rpcParams.invoice_number}`,
+            p_items: p_items,
+            p_quote_id: null,
+        });
+
+        if (rpcError) throw rpcError;
+
+        if (newInvoiceId && timesheetIds && timesheetIds.length > 0) {
+            const { error: updateTimesheetsError } = await supabaseAdmin
+                .from('timesheets')
+                .update({ is_billed: true, invoice_id: newInvoiceId })
+                .in('id', timesheetIds);
+
+            if (updateTimesheetsError) {
+                console.error(`Failed to mark timesheets as billed for invoice ${newInvoiceId}:`, updateTimesheetsError);
+            }
+        }
+        
+        data = { id: newInvoiceId };
+        break;
+
       case 'PUT':
         ({ data, error } = await supabaseAdmin
           .from('invoices')
@@ -126,7 +160,7 @@ serve(async (req) => {
         break;
 
       case 'CREATE_FROM_QUOTE':
-        const { quoteId, invoiceData, percentage } = body;
+        const { quoteId, invoiceData: quoteInvoiceData, percentage } = body;
 
         const { data: quote, error: quoteError } = await supabaseAdmin
           .from('quotes')
@@ -139,7 +173,7 @@ serve(async (req) => {
         if (!quote) throw new Error("Quote not found.");
         if (quote.status !== 'accepted') throw new Error("Can only create invoices from accepted quotes.");
 
-        const p_items = quote.quote_items.map(item => ({
+        const quote_p_items = quote.quote_items.map(item => ({
           product_id: item.product_id || null,
           quantity: item.quantity,
           unit_price: item.unit_price * (percentage / 100.0),
@@ -150,14 +184,14 @@ serve(async (req) => {
         ({ error } = await supabaseAdmin.rpc('create_invoice_with_taxes', {
           p_company_id: company_id,
           p_customer_id: quote.customer_id,
-          p_invoice_date: invoiceData.invoice_date,
-          p_due_date: invoiceData.due_date,
-          p_invoice_number: invoiceData.invoice_number,
-          p_ar_account_id: invoiceData.accounts_receivable_id,
-          p_inventory_asset_account_id: invoiceData.inventory_asset_account_id || null,
-          p_tax_payable_account_id: invoiceData.tax_payable_account_id || null,
-          p_description: invoiceData.description || `Invoice for Quote #${quote.quote_number} (${percentage}%)`,
-          p_items: p_items,
+          p_invoice_date: quoteInvoiceData.invoice_date,
+          p_due_date: quoteInvoiceData.due_date,
+          p_invoice_number: quoteInvoiceData.invoice_number,
+          p_ar_account_id: quoteInvoiceData.accounts_receivable_id,
+          p_inventory_asset_account_id: quoteInvoiceData.inventory_asset_account_id || null,
+          p_tax_payable_account_id: quoteInvoiceData.tax_payable_account_id || null,
+          p_description: quoteInvoiceData.description || `Invoice for Quote #${quote.quote_number} (${percentage}%)`,
+          p_items: quote_p_items,
           p_quote_id: quoteId,
         }));
         data = { message: 'Invoice created from quote successfully.' };
