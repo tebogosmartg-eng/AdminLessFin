@@ -5,7 +5,7 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible"
-import { Book, LayoutDashboard, BookText, FileText, Library, Target, Repeat, Building2, Users, TrendingUp, Receipt, Banknote, HandCoins, ChevronRight, Package, Scale, Upload, FileSignature, Briefcase, Landmark, MessageSquare } from 'lucide-react';
+import { Book, LayoutDashboard, BookText, FileText, Library, Target, Repeat, Building2, Users, TrendingUp, Receipt, Banknote, HandCoins, ChevronRight, Package, Scale, Upload, FileSignature, Briefcase, Landmark, MessageSquare, MessageCircle } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { Button } from './ui/button';
 import { useAuth } from '../contexts/AuthContext';
@@ -54,6 +54,7 @@ export const SidebarNav = () => {
   };
 
   const salesLinks = [
+    { to: '/quotes', label: 'Quotes', icon: MessageCircle, prefetch: () => prefetch(queries.quotesQuery) },
     { to: '/invoices', label: 'Invoices', icon: FileSignature, prefetch: () => prefetch(queries.invoicesQuery) },
     { to: '/receive-payments', label: 'Receive Payments', icon: HandCoins, prefetch: () => prefetch(queries.customerBalancesQuery) },
     { to: '/customers', label: 'Customers', icon: Users, prefetch: () => prefetch(queries.customersQuery) },

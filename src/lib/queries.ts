@@ -48,6 +48,17 @@ export const invoicesQuery = (companyId: string) => ({
   },
 });
 
+export const quotesQuery = (companyId: string) => ({
+  queryKey: ['quotes', companyId],
+  queryFn: async () => {
+    const { data, error } = await supabase.functions.invoke('quotes', {
+      body: { method: 'GET_ALL', company_id: companyId },
+    });
+    if (error) throw new Error(error.message);
+    return data;
+  },
+});
+
 export const billsQuery = (companyId: string) => ({
   queryKey: ['bills', companyId],
   queryFn: async () => {

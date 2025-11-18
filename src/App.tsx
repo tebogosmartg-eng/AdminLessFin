@@ -38,6 +38,8 @@ import FinancialStatements from "./pages/FinancialStatements";
 import CreateCompany from "./pages/CreateCompany";
 import ErrorBoundary from "./components/ErrorBoundary";
 import Chat from "./pages/Chat";
+import Quotes from "./pages/Quotes";
+import QuoteDetail from "./pages/QuoteDetail";
 
 const queryClient = new QueryClient();
 
@@ -54,6 +56,8 @@ const App = () => (
               <Route element={<ProtectedRoute />}>
                 <Route path="/" element={<Dashboard />} />
                 <Route path="/create-company" element={<CreateCompany />} />
+                <Route path="/quotes" element={<Quotes />} />
+                <Route path="/quotes/:id" element={<QuoteDetail />} />
                 <Route path="/invoices" element={<Invoices />} />
                 <Route path="/invoices/:id" element={<InvoiceDetail />} />
                 <Route path="/bills" element={<Bills />} />
