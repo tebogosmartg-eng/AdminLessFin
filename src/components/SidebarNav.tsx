@@ -5,7 +5,7 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible"
-import { Book, LayoutDashboard, BookText, FileText, Library, Target, Repeat, Building2, Users, TrendingUp, Receipt, Banknote, HandCoins, ChevronRight, Package, Scale, Upload, FileSignature, Briefcase, Landmark, MessageSquare, MessageCircle } from 'lucide-react';
+import { Book, LayoutDashboard, BookText, FileText, Library, Target, Repeat, Building2, Users, TrendingUp, Receipt, Banknote, HandCoins, ChevronRight, Package, Scale, Upload, FileSignature, Briefcase, Landmark, MessageSquare, MessageCircle, Clock } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { Button } from './ui/button';
 import { useAuth } from '../contexts/AuthContext';
@@ -93,6 +93,10 @@ export const SidebarNav = () => {
     { to: '/budgets', label: 'Budgets', icon: Target, prefetch: () => prefetch(queries.budgetsQuery) },
   ];
 
+  const timeTrackingLinks = [
+    { to: '/projects', label: 'Projects', icon: Briefcase, prefetch: () => {} }, // New query needed
+  ];
+
   return (
     <nav className="flex flex-col space-y-1 flex-grow">
       <NavLink to="/" end className={navLinkClasses}>
@@ -122,6 +126,12 @@ export const SidebarNav = () => {
         icon={Briefcase} 
         links={payrollLinks} 
         defaultOpen={payrollLinks.some(l => pathname.startsWith(l.to))}
+      />
+      <NavGroup 
+        title="Time Tracking" 
+        icon={Clock} 
+        links={timeTrackingLinks} 
+        defaultOpen={timeTrackingLinks.some(l => pathname.startsWith(l.to))}
       />
       <NavGroup 
         title="Accounting" 

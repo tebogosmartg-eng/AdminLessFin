@@ -41,6 +41,7 @@ import Chat from "./pages/Chat";
 import Quotes from "./pages/Quotes";
 import QuoteDetail from "./pages/QuoteDetail";
 import TaxRates from "./pages/TaxRates";
+import Projects from "./pages/Projects";
 
 const queryClient = new QueryClient();
 
@@ -88,6 +89,7 @@ const App = () => (
                 <Route path="/asset-categories" element={<AssetCategories />} />
                 <Route path="/chat" element={<Chat />} />
                 <Route path="/tax-rates" element={<TaxRates />} />
+                <Route path="/projects" element={<Projects />} />
               </Route>
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
               <Route path="*" element={<NotFound />} />
