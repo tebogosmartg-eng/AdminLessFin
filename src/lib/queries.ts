@@ -199,3 +199,25 @@ export const taxRatesQuery = (companyId: string) => ({
     return data;
   },
 });
+
+export const projectsQuery = (companyId: string) => ({
+  queryKey: ['projects', companyId],
+  queryFn: async () => {
+    const { data, error } = await supabase.functions.invoke('projects', {
+      body: { method: 'GET', company_id: companyId },
+    });
+    if (error) throw new Error(error.message);
+    return data;
+  },
+});
+
+export const timesheetsQuery = (companyId: string) => ({
+  queryKey: ['timesheets', companyId],
+  queryFn: async () => {
+    const { data, error } = await supabase.functions.invoke('timesheets', {
+      body: { method: 'GET', company_id: companyId },
+    });
+    if (error) throw new Error(error.message);
+    return data;
+  },
+});

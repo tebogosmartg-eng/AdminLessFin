@@ -94,7 +94,8 @@ export const SidebarNav = () => {
   ];
 
   const timeTrackingLinks = [
-    { to: '/projects', label: 'Projects', icon: Briefcase, prefetch: () => {} }, // New query needed
+    { to: '/projects', label: 'Projects', icon: Briefcase, prefetch: () => prefetch(queries.projectsQuery) },
+    { to: '/time-tracking', label: 'Log Time', icon: Clock, prefetch: () => prefetch(queries.timesheetsQuery) },
   ];
 
   return (
