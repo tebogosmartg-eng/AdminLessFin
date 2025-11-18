@@ -3,14 +3,24 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFoo
 import { formatCurrency } from '../lib/utils';
 import { format } from 'date-fns';
 
-const InvoicePreview = ({ formData, customers, company }) => {
+const InvoicePreview = ({ formData, customers, company, taxRates }) => {
   const customer = customers?.find(c => c.id === formData.customer_id);
-  const lineItems = formData.items?.map(item => ({
-    ...item,
-    description: item.description,
-    total: (item.quantity || 0) * (item.unit_price || 0),
-  })) || [];
-  const totalAmount = lineItems.reduce((sum, item) => sum + item.total, 0);
+  
+  const lineItems = formData.items?.map(item => {
+    const subtotal = (item.quantity || 0) * (item.unit_price || 0);
+    const taxRate = taxRates?.find(t => t.id === item.tax_rate_id);
+    const taxAmount = taxRate ? subtotal * (taxRate.rate / 100) : 0;
+    return {
+      ...item,
+      subtotal,
+      taxAmount,
+      total: subtotal + taxAmount,
+    };
+  }) || [];
+
+  const subtotal = lineItems.reduce((sum, item) => sum + item.subtotal, 0);
+  const totalTax = lineItems.reduce((sum, item) => sum + item.taxAmount, 0);
+  const totalAmount = subtotal + totalTax;
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 bg-background">
@@ -54,11 +64,21 @@ const InvoicePreview = ({ formData, customers, company }) => {
                   <TableCell>{item.description}</TableCell>
                   <TableCell className="text-center">{item.quantity}</TableCell>
                   <TableCell className="text-right font-mono">{formatCurrency(item.unit_price)}</TableCell>
-                  <TableCell className="text-right font-mono">{formatCurrency(item.total)}</TableCell>
+                  <TableCell className="text-right font-mono">{formatCurrency(item.subtotal)}</TableCell>
                 </TableRow>
               ))}
             </TableBody>
             <TableFooter>
+              <TableRow>
+                <TableCell colSpan={3} className="text-right">Subtotal</TableCell>
+                <TableCell className="text-right font-mono">{formatCurrency(subtotal)}</TableCell>
+              </TableRow>
+              {totalTax > 0 && (
+                <TableRow>
+                  <TableCell colSpan={3} className="text-right">Tax</TableCell>
+                  <TableCell className="text-right font-mono">{formatCurrency(totalTax)}</TableCell>
+                </TableRow>
+              )}
               <TableRow className="text-lg font-bold bg-gray-50 dark:bg-gray-800">
                 <TableCell colSpan={3}>Total</TableCell>
                 <TableCell className="text-right font-mono">{formatCurrency(totalAmount)}</TableCell>

@@ -91,9 +91,13 @@ serve(async (req) => {
             customers ( name, address, email ),
             journal_entries (
               journal_entry_items (
+                id,
                 amount,
                 type,
-                chart_of_accounts ( name )
+                chart_of_accounts ( name ),
+                journal_entry_item_tax_rates (
+                  tax_rates ( rate )
+                )
               )
             )
           `)

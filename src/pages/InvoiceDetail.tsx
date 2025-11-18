@@ -28,11 +28,17 @@ type InvoiceDetailData = {
   } | null;
   journal_entries: {
     journal_entry_items: {
+      id: string;
       amount: number;
       type: 'debit' | 'credit';
       chart_of_accounts: {
         name: string;
       } | null;
+      journal_entry_item_tax_rates: {
+        tax_rates: {
+          rate: number;
+        } | null;
+      }[];
     }[];
   }[] | null;
 };
@@ -101,8 +107,11 @@ const InvoiceDetail = () => {
     onError: (error: any) => showError(error.message),
   });
 
-  const lineItems = invoice?.journal_entries?.[0]?.journal_entry_items.filter(item => item.type === 'credit') || [];
-  const totalAmount = lineItems.reduce((sum, item) => sum + item.amount, 0);
+  const lineItems = invoice?.journal_entries?.[0]?.journal_entry_items.filter(item => item.type === 'credit' && !item.chart_of_accounts?.name.toLowerCase().includes('tax')) || [];
+  const taxItems = invoice?.journal_entries?.[0]?.journal_entry_items.filter(item => item.type === 'credit' && item.chart_of_accounts?.name.toLowerCase().includes('tax')) || [];
+  const totalAmount = invoice?.journal_entries?.[0]?.journal_entry_items.filter(item => item.type === 'debit').reduce((sum, item) => sum + item.amount, 0) || 0;
+  const subtotal = lineItems.reduce((sum, item) => sum + item.amount, 0);
+  const totalTax = taxItems.reduce((sum, item) => sum + item.amount, 0);
 
   if (isLoading) {
     return <div className="space-y-4"><Skeleton className="h-96 w-full" /></div>;
@@ -180,6 +189,16 @@ const InvoiceDetail = () => {
                 ))}
               </TableBody>
               <TableFooter>
+                <TableRow>
+                  <TableCell className="text-right">Subtotal</TableCell>
+                  <TableCell className="text-right font-mono">{formatCurrency(subtotal)}</TableCell>
+                </TableRow>
+                {totalTax > 0 && (
+                  <TableRow>
+                    <TableCell className="text-right">Tax</TableCell>
+                    <TableCell className="text-right font-mono">{formatCurrency(totalTax)}</TableCell>
+                  </TableRow>
+                )}
                 <TableRow className="text-lg font-bold bg-gray-50 dark:bg-gray-800">
                   <TableCell>Total</TableCell>
                   <TableCell className="text-right font-mono">{formatCurrency(totalAmount)}</TableCell>
