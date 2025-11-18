@@ -76,6 +76,7 @@ export const SidebarNav = () => {
     { to: '/journal-entries', label: 'Journal Entries', icon: BookText, prefetch: () => {} }, // Complex filters, skip prefetch
     { to: '/recurring-entries', label: 'Recurring Entries', icon: Repeat, prefetch: () => prefetch(queries.recurringEntriesQuery) },
     { to: '/reconciliation', label: 'Reconcile', icon: Scale, prefetch: () => prefetch(queries.accountsQuery) },
+    { to: '/tax-rates', label: 'Tax Rates', icon: Scale, prefetch: () => prefetch(queries.taxRatesQuery) },
   ];
 
   const assetsAndLoansLinks = [

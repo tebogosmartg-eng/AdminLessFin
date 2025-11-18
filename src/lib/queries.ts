@@ -188,3 +188,14 @@ export const vendorBalancesQuery = (companyId: string) => ({
     return data;
   },
 });
+
+export const taxRatesQuery = (companyId: string) => ({
+  queryKey: ['tax_rates', companyId],
+  queryFn: async () => {
+    const { data, error } = await supabase.functions.invoke('tax-rates', {
+      body: { method: 'GET', company_id: companyId },
+    });
+    if (error) throw new Error(error.message);
+    return data;
+  },
+});

@@ -40,6 +40,7 @@ import ErrorBoundary from "./components/ErrorBoundary";
 import Chat from "./pages/Chat";
 import Quotes from "./pages/Quotes";
 import QuoteDetail from "./pages/QuoteDetail";
+import TaxRates from "./pages/TaxRates";
 
 const queryClient = new QueryClient();
 
@@ -86,6 +87,7 @@ const App = () => (
                 <Route path="/fixed-assets/:id" element={<AssetDetail />} />
                 <Route path="/asset-categories" element={<AssetCategories />} />
                 <Route path="/chat" element={<Chat />} />
+                <Route path="/tax-rates" element={<TaxRates />} />
               </Route>
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
               <Route path="*" element={<NotFound />} />
