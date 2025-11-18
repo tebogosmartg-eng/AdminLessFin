@@ -125,6 +125,44 @@ serve(async (req) => {
         ({ data, error } = await userSupabase.rpc('get_next_invoice_number_for_user'));
         break;
 
+      case 'CREATE_FROM_QUOTE':
+        const { quoteId, invoiceData, percentage } = body;
+
+        const { data: quote, error: quoteError } = await supabaseAdmin
+          .from('quotes')
+          .select('*, quote_items(*)')
+          .eq('id', quoteId)
+          .eq('company_id', company_id)
+          .single();
+        
+        if (quoteError) throw quoteError;
+        if (!quote) throw new Error("Quote not found.");
+        if (quote.status !== 'accepted') throw new Error("Can only create invoices from accepted quotes.");
+
+        const p_items = quote.quote_items.map(item => ({
+          product_id: item.product_id || null,
+          quantity: item.quantity,
+          unit_price: item.unit_price * (percentage / 100.0),
+          income_account_id: item.income_account_id,
+          tax_rate_id: item.tax_rate_id || null,
+        }));
+
+        ({ error } = await supabaseAdmin.rpc('create_invoice_with_taxes', {
+          p_company_id: company_id,
+          p_customer_id: quote.customer_id,
+          p_invoice_date: invoiceData.invoice_date,
+          p_due_date: invoiceData.due_date,
+          p_invoice_number: invoiceData.invoice_number,
+          p_ar_account_id: invoiceData.accounts_receivable_id,
+          p_inventory_asset_account_id: invoiceData.inventory_asset_account_id || null,
+          p_tax_payable_account_id: invoiceData.tax_payable_account_id || null,
+          p_description: invoiceData.description || `Invoice for Quote #${quote.quote_number} (${percentage}%)`,
+          p_items: p_items,
+          p_quote_id: quoteId,
+        }));
+        data = { message: 'Invoice created from quote successfully.' };
+        break;
+
       default:
         throw new Error(`Unsupported method: ${method}`);
     }
