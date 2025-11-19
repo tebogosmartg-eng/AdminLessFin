@@ -42,13 +42,6 @@ serve(async (req) => {
       throw new Error("Permission denied: User is not a member of this company.");
     }
 
-    // Use the admin client for database operations to bypass RLS,
-    // as we have already performed our security check.
-    const supabaseAdmin = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-    );
-
     // We need to impersonate the user to call RPC functions that use auth.uid()
     const userSupabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
@@ -75,7 +68,7 @@ serve(async (req) => {
       overdueInvoicesRes,
       topExpensesRes,
     ] = await Promise.all([
-      supabaseAdmin.from('chart_of_accounts').select('*').eq('company_id', company_id),
+      userSupabase.rpc('get_balances_as_of_date', { p_end_date: new Date().toISOString().split('T')[0] }),
       userSupabase.rpc('get_monthly_summary', { p_months: 6 }),
       userSupabase.rpc('get_customer_ar_balances'),
       userSupabase.rpc('get_vendor_ap_balances'),
