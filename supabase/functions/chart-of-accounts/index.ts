@@ -48,16 +48,23 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
+    
+    const userSupabase = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
+      { auth: { autoRefreshToken: false, persistSession: false }, global: { headers: { Authorization: req.headers.get('Authorization')! } } }
+    );
 
     let data, error;
 
     switch (method) {
       case 'GET':
-        ({ data, error } = await supabaseAdmin
-          .from('chart_of_accounts')
-          .select('*')
-          .eq('company_id', company_id)
-          .order('account_number', { ascending: true }));
+        ({ data, error } = await userSupabase.rpc('get_balances_as_of_date', {
+          p_end_date: new Date().toISOString().split('T')[0],
+        }));
+        if (!error) {
+          data.sort((a, b) => a.account_number - b.account_number);
+        }
         break;
       
       case 'POST':
