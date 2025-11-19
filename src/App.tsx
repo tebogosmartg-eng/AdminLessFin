@@ -43,6 +43,7 @@ import QuoteDetail from "./pages/QuoteDetail";
 import TaxRates from "./pages/TaxRates";
 import Projects from "./pages/Projects";
 import TimeTracking from "./pages/TimeTracking";
+import SeedData from "./pages/SeedData";
 
 const queryClient = new QueryClient();
 
@@ -58,6 +59,7 @@ const App = () => (
               <Route path="/auth" element={<AuthPage />} />
               <Route element={<ProtectedRoute />}>
                 <Route path="/" element={<Dashboard />} />
+                <Route path="/seed-data" element={<SeedData />} />
                 <Route path="/create-company" element={<CreateCompany />} />
                 <Route path="/quotes" element={<Quotes />} />
                 <Route path="/quotes/:id" element={<QuoteDetail />} />
