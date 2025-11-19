@@ -164,7 +164,7 @@ serve(async (req) => {
 
         const { data: quote, error: quoteError } = await supabaseAdmin
           .from('quotes')
-          .select('*, quote_items(*)')
+          .select('*, quote_items(*, products(type))')
           .eq('id', quoteId)
           .eq('company_id', company_id)
           .single();
