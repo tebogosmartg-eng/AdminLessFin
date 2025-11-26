@@ -56,6 +56,49 @@ serve(async (req) => {
         data = newCompany;
         break;
 
+      case 'DELETE':
+        const { company_id: companyIdToDelete } = body;
+        if (!companyIdToDelete) throw new Error("Company ID is required for deletion.");
+
+        // Security Check: Verify user is the owner
+        const { data: company, error: ownerCheckError } = await supabaseAdmin
+          .from('companies')
+          .select('owner_id')
+          .eq('id', companyIdToDelete)
+          .single();
+        
+        if (ownerCheckError) throw ownerCheckError;
+        if (!company || company.owner_id !== user.id) {
+          throw new Error("Permission denied: Only the company owner can delete it.");
+        }
+
+        // Delete the company (cascading deletes will handle related data)
+        const { error: deleteError } = await supabaseAdmin
+          .from('companies')
+          .delete()
+          .eq('id', companyIdToDelete);
+        if (deleteError) throw deleteError;
+
+        // Find another company to set as active
+        const { data: otherCompanies, error: findError } = await supabaseAdmin
+          .from('company_users')
+          .select('company_id')
+          .eq('user_id', user.id)
+          .neq('company_id', companyIdToDelete)
+          .limit(1);
+        if (findError) throw findError;
+
+        const newActiveCompanyId = otherCompanies && otherCompanies.length > 0 ? otherCompanies[0].company_id : null;
+
+        // Update user's active company
+        await supabaseAdmin
+          .from('profiles')
+          .update({ active_company_id: newActiveCompanyId })
+          .eq('id', user.id);
+        
+        data = { message: "Company deleted successfully." };
+        break;
+
       default:
         throw new Error(`Unsupported method: ${method}`);
     }
