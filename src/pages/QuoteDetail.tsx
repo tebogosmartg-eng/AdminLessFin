@@ -12,6 +12,7 @@ import { showError, showSuccess } from '../utils/toast';
 import { useAuth } from '../contexts/AuthContext';
 import { formatCurrency } from '../lib/utils';
 import CreateInvoiceFromQuoteDialog from '../components/CreateInvoiceFromQuoteDialog';
+import SendQuoteDialog from '../components/SendQuoteDialog';
 
 const QuoteDetail = () => {
   const { id } = useParams();
@@ -19,6 +20,7 @@ const QuoteDetail = () => {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const [isCreateInvoiceOpen, setIsCreateInvoiceOpen] = useState(false);
+  const [isSendDialogOpen, setIsSendDialogOpen] = useState(false);
 
   const { data: quote, isLoading } = useQuery({
     queryKey: ['quote_detail', id],
@@ -69,8 +71,8 @@ const QuoteDetail = () => {
             <Badge className="mt-2 capitalize">{quote.status}</Badge>
           </div>
           <div className="flex gap-2">
-            {quote.status === 'draft' && (
-              <Button onClick={() => updateStatusMutation.mutate('sent')}><Send className="mr-2 h-4 w-4" /> Mark as Sent</Button>
+            {(quote.status === 'draft' || quote.status === 'sent') && (
+              <Button onClick={() => setIsSendDialogOpen(true)}><Send className="mr-2 h-4 w-4" /> Send Quote</Button>
             )}
             {quote.status === 'sent' && (
               <>
@@ -89,7 +91,7 @@ const QuoteDetail = () => {
         <Card className="print:shadow-none print:border-none">
           <CardHeader className="grid grid-cols-2 gap-4">
             <div>
-              <img src="/logo.png" alt="SmaAcc Logo" className="h-12 w-auto mb-2" />
+              <img src={activeCompany?.logo_url || "/logo.png"} alt="Company Logo" className="h-12 w-auto mb-2 object-contain" />
               <CardTitle className="text-base">{activeCompany?.name || 'Your Company'}</CardTitle>
               <p className="text-sm text-muted-foreground">{activeCompany?.address || 'Your Company Address'}</p>
             </div>
@@ -144,6 +146,15 @@ const QuoteDetail = () => {
         isOpen={isCreateInvoiceOpen}
         setIsOpen={setIsCreateInvoiceOpen}
         quote={quote}
+      />
+      <SendQuoteDialog
+        isOpen={isSendDialogOpen}
+        setIsOpen={setIsSendDialogOpen}
+        quote={{
+          id: quote.id,
+          quote_number: quote.quote_number,
+          customer_email: quote.customers?.email || null,
+        }}
       />
     </>
   );

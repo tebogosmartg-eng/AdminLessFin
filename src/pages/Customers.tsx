@@ -11,7 +11,7 @@ import {
   TableRow,
 } from '../components/ui/table';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/card';
-import { PlusCircle, MoreHorizontal } from 'lucide-react';
+import { PlusCircle, MoreHorizontal, Download } from 'lucide-react';
 import { showError, showSuccess } from '../utils/toast';
 import CustomerForm from '../components/CustomerForm';
 import {
@@ -22,6 +22,7 @@ import {
 } from "../components/ui/dropdown-menu";
 import { useAuth } from '../contexts/AuthContext';
 import { customersQuery } from '../lib/queries';
+import { downloadCSV } from '../lib/utils';
 
 export type Customer = {
   id: string;
@@ -43,7 +44,6 @@ const Customers = () => {
     enabled: !!activeCompany,
   });
 
-  // This mutation deletes data by calling a secure Supabase Edge Function.
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
       if (!activeCompany) throw new Error("No active company");
@@ -81,6 +81,18 @@ const Customers = () => {
     }
   };
 
+  const handleExport = () => {
+    if (!customers) return;
+    const data = customers.map(c => ({
+      Name: c.name,
+      Contact: c.contact_name,
+      Email: c.email,
+      Phone: c.phone,
+      Address: c.address,
+    }));
+    downloadCSV(data, 'customers.csv');
+  };
+
   return (
     <>
       <Card>
@@ -90,10 +102,15 @@ const Customers = () => {
               <CardTitle>Customers</CardTitle>
               <CardDescription>Manage your list of customers.</CardDescription>
             </div>
-            <Button onClick={handleAddNew}>
-              <PlusCircle className="mr-2 h-4 w-4" />
-              New Customer
-            </Button>
+            <div className="flex gap-2">
+                <Button variant="outline" onClick={handleExport} disabled={!customers || customers.length === 0}>
+                    <Download className="mr-2 h-4 w-4" /> Export CSV
+                </Button>
+                <Button onClick={handleAddNew}>
+                    <PlusCircle className="mr-2 h-4 w-4" />
+                    New Customer
+                </Button>
+            </div>
           </div>
         </CardHeader>
         <CardContent>

@@ -11,7 +11,7 @@ import {
   TableRow,
 } from '../components/ui/table';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/card';
-import { PlusCircle, MoreHorizontal } from 'lucide-react';
+import { PlusCircle, MoreHorizontal, Download } from 'lucide-react';
 import { showError, showSuccess } from '../utils/toast';
 import ProductForm from '../components/ProductForm';
 import {
@@ -23,6 +23,7 @@ import {
 import { formatCurrency } from '../lib/utils';
 import { useAuth } from '../contexts/AuthContext';
 import { productsQuery } from '../lib/queries';
+import { downloadCSV } from '../lib/utils';
 
 export type Product = {
   id: string;
@@ -86,6 +87,19 @@ const Products = () => {
     }
   };
 
+  const handleExport = () => {
+    if (!products) return;
+    const data = products.map(p => ({
+      Name: p.name,
+      Type: p.type,
+      'Qty on Hand': p.type === 'inventory' ? p.quantity_on_hand : '',
+      Price: p.price ? p.price.toFixed(2) : '',
+      Cost: p.cost ? p.cost.toFixed(2) : '',
+      Description: p.description,
+    }));
+    downloadCSV(data, 'products-services.csv');
+  };
+
   return (
     <>
       <Card>
@@ -95,10 +109,15 @@ const Products = () => {
               <CardTitle>Products and Services</CardTitle>
               <CardDescription>Manage items you frequently buy or sell.</CardDescription>
             </div>
-            <Button onClick={handleAddNew}>
-              <PlusCircle className="mr-2 h-4 w-4" />
-              New Item
-            </Button>
+            <div className="flex gap-2">
+                <Button variant="outline" onClick={handleExport} disabled={!products || products.length === 0}>
+                    <Download className="mr-2 h-4 w-4" /> Export CSV
+                </Button>
+                <Button onClick={handleAddNew}>
+                    <PlusCircle className="mr-2 h-4 w-4" />
+                    New Item
+                </Button>
+            </div>
           </div>
         </CardHeader>
         <CardContent>

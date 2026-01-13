@@ -11,7 +11,7 @@ import {
   TableRow,
 } from '../components/ui/table';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/card';
-import { PlusCircle, MoreHorizontal } from 'lucide-react';
+import { PlusCircle, MoreHorizontal, Download } from 'lucide-react';
 import { showError, showSuccess } from '../utils/toast';
 import VendorForm from '../components/VendorForm';
 import {
@@ -22,6 +22,7 @@ import {
 } from "../components/ui/dropdown-menu";
 import { useAuth } from '../contexts/AuthContext';
 import { vendorsQuery } from '../lib/queries';
+import { downloadCSV } from '../lib/utils';
 
 export type Vendor = {
   id: string;
@@ -43,7 +44,6 @@ const Vendors = () => {
     enabled: !!activeCompany,
   });
 
-  // This mutation deletes data by calling a secure Supabase Edge Function.
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
       if (!activeCompany) throw new Error("No active company");
@@ -81,6 +81,18 @@ const Vendors = () => {
     }
   };
 
+  const handleExport = () => {
+    if (!vendors) return;
+    const data = vendors.map(v => ({
+      Name: v.name,
+      Contact: v.contact_name,
+      Email: v.email,
+      Phone: v.phone,
+      Address: v.address,
+    }));
+    downloadCSV(data, 'vendors.csv');
+  };
+
   return (
     <>
       <Card>
@@ -90,10 +102,15 @@ const Vendors = () => {
               <CardTitle>Vendors</CardTitle>
               <CardDescription>Manage your list of suppliers and service providers.</CardDescription>
             </div>
-            <Button onClick={handleAddNew}>
-              <PlusCircle className="mr-2 h-4 w-4" />
-              New Vendor
-            </Button>
+            <div className="flex gap-2">
+                <Button variant="outline" onClick={handleExport} disabled={!vendors || vendors.length === 0}>
+                    <Download className="mr-2 h-4 w-4" /> Export CSV
+                </Button>
+                <Button onClick={handleAddNew}>
+                    <PlusCircle className="mr-2 h-4 w-4" />
+                    New Vendor
+                </Button>
+            </div>
           </div>
         </CardHeader>
         <CardContent>
