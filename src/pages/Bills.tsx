@@ -11,7 +11,7 @@ import {
   TableRow,
 } from '../components/ui/table';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/card';
-import { PlusCircle, MoreHorizontal, Search, X } from 'lucide-react';
+import { PlusCircle, MoreHorizontal, Search, X, Paperclip } from 'lucide-react';
 import BillForm from '../components/BillForm';
 import JournalEntryDetail from '../components/JournalEntryDetail';
 import JournalEntryForm from '../components/JournalEntryForm';
@@ -35,6 +35,7 @@ type BillEntry = {
   vendors: { name: string }[] | null;
   total: number;
   bill_number: string | null;
+  attachment_url: string | null;
 };
 
 const Bills = () => {
@@ -247,7 +248,12 @@ const Bills = () => {
                     <TableCell>{new Date(bill.entry_date).toLocaleDateString()}</TableCell>
                     <TableCell>{bill.vendors?.[0]?.name || 'N/A'}</TableCell>
                     <TableCell>{bill.bill_number || '-'}</TableCell>
-                    <TableCell className="truncate max-w-[200px]">{bill.description}</TableCell>
+                    <TableCell className="max-w-[200px]">
+                        <div className="flex items-center gap-2 truncate">
+                            {bill.description}
+                            {bill.attachment_url && <Paperclip className="h-3 w-3 text-muted-foreground" />}
+                        </div>
+                    </TableCell>
                     <TableCell className="text-right font-mono">{formatCurrency(bill.total)}</TableCell>
                     <TableCell>
                       <Badge variant={getStatusVariant(bill.status)} className="capitalize">{bill.status}</Badge>
@@ -262,8 +268,12 @@ const Bills = () => {
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
                           <DropdownMenuItem onClick={() => setSelectedEntryIdForDetail(bill.id)}>View Details</DropdownMenuItem>
-                          {/* <DropdownMenuItem onClick={() => handleEdit(bill.id)} disabled={bill.status === 'paid' || bill.status === 'void'}>Edit</DropdownMenuItem> */}
                           <DropdownMenuItem onClick={() => handleDuplicate(bill.id)}>Duplicate</DropdownMenuItem>
+                          {bill.attachment_url && (
+                             <DropdownMenuItem asChild>
+                                 <a href={bill.attachment_url} target="_blank" rel="noopener noreferrer">View Attachment</a>
+                             </DropdownMenuItem>
+                          )}
                           {bill.status !== 'paid' && bill.status !== 'void' && (
                             <>
                                 <DropdownMenuItem onClick={() => handlePay(bill)}>Record Payment</DropdownMenuItem>

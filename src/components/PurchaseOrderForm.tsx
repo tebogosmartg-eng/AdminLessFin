@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -15,7 +15,7 @@ import { showError, showSuccess } from '../utils/toast';
 import { Vendor } from '../pages/Vendors';
 import { Product } from '../pages/Products';
 import { Project } from '../pages/Projects';
-import { Trash2 } from 'lucide-react';
+import { Trash2, X } from 'lucide-react';
 import { addDays, format } from 'date-fns';
 import { formatCurrency } from '../lib/utils';
 import { projectsQuery } from '../lib/queries';
@@ -49,6 +49,9 @@ const PurchaseOrderForm = ({ isOpen, setIsOpen, poId }: Props) => {
   const { activeCompany } = useAuth();
   const queryClient = useQueryClient();
   const isEditing = !!poId;
+  const [attachmentFile, setAttachmentFile] = useState<File | null>(null);
+  const [existingAttachmentUrl, setExistingAttachmentUrl] = useState<string | null>(null);
+  const [removeAttachment, setRemoveAttachment] = useState(false);
 
   const form = useForm<POFormValues>({
     resolver: zodResolver(poSchema),
@@ -108,6 +111,7 @@ const PurchaseOrderForm = ({ isOpen, setIsOpen, poId }: Props) => {
           project_id: i.project_id || '',
         })),
       });
+      setExistingAttachmentUrl(existingPO.attachment_url);
     } else if (!isEditing) {
       form.reset({
         po_number: '',
@@ -117,7 +121,10 @@ const PurchaseOrderForm = ({ isOpen, setIsOpen, poId }: Props) => {
         notes: '',
         items: [{ description: '', quantity: 1, unit_cost: 0, project_id: '' }],
       });
+      setExistingAttachmentUrl(null);
     }
+    setAttachmentFile(null);
+    setRemoveAttachment(false);
   }, [existingPO, isEditing, isOpen, form]);
 
   const { fields, append, remove } = useFieldArray({ control: form.control, name: "items" });
@@ -137,18 +144,32 @@ const PurchaseOrderForm = ({ isOpen, setIsOpen, poId }: Props) => {
   const mutation = useMutation({
     mutationFn: async (values: POFormValues) => {
       if (!activeCompany) throw new Error('No active company');
+      
+      let finalAttachmentUrl = existingAttachmentUrl;
+      if (removeAttachment) finalAttachmentUrl = null;
+
+      if (attachmentFile) {
+         const fileExt = attachmentFile.name.split('.').pop();
+         const fileName = `${Date.now()}.${fileExt}`;
+         const filePath = `${activeCompany.id}/po/${fileName}`;
+         const { error: uploadError } = await supabase.storage.from('attachments').upload(filePath, attachmentFile);
+         if (uploadError) throw new Error(`Upload Error: ${uploadError.message}`);
+         const { data: urlData } = supabase.storage.from('attachments').getPublicUrl(filePath);
+         finalAttachmentUrl = urlData.publicUrl;
+      }
+
       const method = isEditing ? 'PUT' : 'POST';
       
       const items = values.items.map(item => ({
         ...item,
-        project_id: item.project_id || null, // Handle optional field properly
+        project_id: item.project_id || null, 
       }));
 
       const body = {
         method,
         company_id: activeCompany.id,
         poId,
-        poData: { ...values, items },
+        poData: { ...values, items, attachment_url: finalAttachmentUrl },
       };
       const { error } = await supabase.functions.invoke('purchase-orders', { body });
       if (error) throw error;
@@ -166,7 +187,7 @@ const PurchaseOrderForm = ({ isOpen, setIsOpen, poId }: Props) => {
 
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
-      <DialogContent className="sm:max-w-6xl">
+      <DialogContent className="sm:max-w-6xl h-[80vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{isEditing ? 'Edit Purchase Order' : 'New Purchase Order'}</DialogTitle>
           <DialogDescription>Create an official order for a vendor.</DialogDescription>
@@ -181,6 +202,34 @@ const PurchaseOrderForm = ({ isOpen, setIsOpen, poId }: Props) => {
             </div>
             <FormField control={form.control} name="notes" render={({ field }) => (<FormItem><FormLabel>Notes (Optional)</FormLabel><FormControl><Textarea placeholder="Delivery instructions, terms, etc." {...field} /></FormControl><FormMessage /></FormItem>)} />
             
+            <FormItem>
+              <FormLabel>Attachment (Optional)</FormLabel>
+              {existingAttachmentUrl && !attachmentFile && !removeAttachment && (
+                <div className="flex items-center justify-between p-2 border rounded-md">
+                  <a href={existingAttachmentUrl} target="_blank" rel="noopener noreferrer" className="text-sm underline truncate text-blue-600">
+                    View Existing Attachment
+                  </a>
+                  <Button type="button" variant="ghost" size="icon" className="h-6 w-6" onClick={() => setRemoveAttachment(true)}>
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
+              )}
+              {removeAttachment && (
+                <div className="text-sm text-muted-foreground p-2 border rounded-md border-dashed">
+                  Attachment will be removed. <Button type="button" variant="link" className="p-0 h-auto" onClick={() => setRemoveAttachment(false)}>Undo</Button>
+                </div>
+              )}
+              <FormControl>
+                <Input 
+                  type="file" 
+                  onChange={(e) => {
+                    setAttachmentFile(e.target.files?.[0] || null);
+                    setRemoveAttachment(false);
+                  }} 
+                />
+              </FormControl>
+            </FormItem>
+
             <div className="space-y-2 pt-4">
               <div className="grid grid-cols-12 gap-2 px-2 text-xs font-medium text-muted-foreground">
                 <div className="col-span-2">Item</div>

@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -15,7 +15,7 @@ import { showError, showSuccess } from '../utils/toast';
 import { Employee } from '../pages/Employees';
 import { Account } from '../pages/ChartOfAccounts';
 import { Project } from '../pages/Projects';
-import { Trash2 } from 'lucide-react';
+import { Trash2, X } from 'lucide-react';
 import { format } from 'date-fns';
 import { formatCurrency } from '../lib/utils';
 import { projectsQuery } from '../lib/queries';
@@ -48,6 +48,9 @@ const ExpenseClaimForm = ({ isOpen, setIsOpen, claimId }: Props) => {
   const { activeCompany } = useAuth();
   const queryClient = useQueryClient();
   const isEditing = !!claimId;
+  const [attachmentFile, setAttachmentFile] = useState<File | null>(null);
+  const [existingAttachmentUrl, setExistingAttachmentUrl] = useState<string | null>(null);
+  const [removeAttachment, setRemoveAttachment] = useState(false);
 
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
@@ -105,7 +108,12 @@ const ExpenseClaimForm = ({ isOpen, setIsOpen, claimId }: Props) => {
           project_id: i.project_id || '',
         })),
       });
+      setExistingAttachmentUrl(existingClaim.attachment_url);
+    } else {
+      setExistingAttachmentUrl(null);
     }
+    setAttachmentFile(null);
+    setRemoveAttachment(false);
   }, [existingClaim, isEditing, isOpen, form]);
 
   const { fields, append, remove } = useFieldArray({ control: form.control, name: "items" });
@@ -128,6 +136,20 @@ const ExpenseClaimForm = ({ isOpen, setIsOpen, claimId }: Props) => {
   const mutation = useMutation({
     mutationFn: async (values: FormValues) => {
       if (!activeCompany) throw new Error('No active company');
+
+      let finalAttachmentUrl = existingAttachmentUrl;
+      if (removeAttachment) finalAttachmentUrl = null;
+
+      if (attachmentFile) {
+         const fileExt = attachmentFile.name.split('.').pop();
+         const fileName = `${Date.now()}.${fileExt}`;
+         const filePath = `${activeCompany.id}/expenses/${fileName}`;
+         const { error: uploadError } = await supabase.storage.from('attachments').upload(filePath, attachmentFile);
+         if (uploadError) throw new Error(`Upload Error: ${uploadError.message}`);
+         const { data: urlData } = supabase.storage.from('attachments').getPublicUrl(filePath);
+         finalAttachmentUrl = urlData.publicUrl;
+      }
+
       const method = isEditing ? 'PUT' : 'POST';
       
       const items = values.items.map(item => ({
@@ -140,7 +162,7 @@ const ExpenseClaimForm = ({ isOpen, setIsOpen, claimId }: Props) => {
           method,
           company_id: activeCompany.id,
           claimId,
-          claimData: { ...values, items },
+          claimData: { ...values, items, attachment_url: finalAttachmentUrl },
         },
       });
       if (error) throw error;
@@ -160,7 +182,7 @@ const ExpenseClaimForm = ({ isOpen, setIsOpen, claimId }: Props) => {
 
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
-      <DialogContent className="sm:max-w-5xl">
+      <DialogContent className="sm:max-w-5xl h-[80vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{isEditing ? 'Edit Claim' : 'New Expense Claim'}</DialogTitle>
           <DialogDescription>Submit expenses for reimbursement.</DialogDescription>
@@ -174,6 +196,34 @@ const ExpenseClaimForm = ({ isOpen, setIsOpen, claimId }: Props) => {
             </div>
             <FormField control={form.control} name="description" render={({ field }) => (<FormItem><FormLabel>Memo</FormLabel><FormControl><Input placeholder="e.g. Travel to Client Site" {...field} /></FormControl><FormMessage /></FormItem>)} />
             
+            <FormItem>
+              <FormLabel>Attachment (Optional)</FormLabel>
+              {existingAttachmentUrl && !attachmentFile && !removeAttachment && (
+                <div className="flex items-center justify-between p-2 border rounded-md">
+                  <a href={existingAttachmentUrl} target="_blank" rel="noopener noreferrer" className="text-sm underline truncate text-blue-600">
+                    View Existing Attachment
+                  </a>
+                  <Button type="button" variant="ghost" size="icon" className="h-6 w-6" onClick={() => setRemoveAttachment(true)}>
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
+              )}
+              {removeAttachment && (
+                <div className="text-sm text-muted-foreground p-2 border rounded-md border-dashed">
+                  Attachment will be removed. <Button type="button" variant="link" className="p-0 h-auto" onClick={() => setRemoveAttachment(false)}>Undo</Button>
+                </div>
+              )}
+              <FormControl>
+                <Input 
+                  type="file" 
+                  onChange={(e) => {
+                    setAttachmentFile(e.target.files?.[0] || null);
+                    setRemoveAttachment(false);
+                  }} 
+                />
+              </FormControl>
+            </FormItem>
+
             <div className="space-y-2 pt-2">
               <div className="grid grid-cols-12 gap-2 px-2 text-xs font-medium text-muted-foreground">
                 <div className="col-span-2">Date</div>

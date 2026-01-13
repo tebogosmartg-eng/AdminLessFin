@@ -59,6 +59,7 @@ serve(async (req) => {
             status,
             description:journal_entries(description),
             bill_number,
+            attachment_url,
             vendors!inner ( name ),
             journal_entries (
               id,
@@ -101,6 +102,7 @@ serve(async (req) => {
             vendor_id: bill.vendor_id,
             vendors: [bill.vendors], 
             bill_number: bill.bill_number,
+            attachment_url: bill.attachment_url,
             journal_entry_items: bill.journal_entries?.journal_entry_items
           }));
         }
@@ -117,6 +119,7 @@ serve(async (req) => {
             status,
             bill_number,
             vendor_id,
+            attachment_url,
             description:journal_entries(description),
             vendors ( name ),
             journal_entries (
@@ -163,6 +166,29 @@ serve(async (req) => {
           p_description: billData.description,
           p_items: itemsWithProjectAndTax,
         }));
+        
+        // If there's an attachment, we need to update the newly created bill with the URL
+        // The RPC doesn't accept attachment_url directly to the bills table insertion currently,
+        // and modifying the huge RPC is risky. Safer to update after creation.
+        // We need the Bill ID. The RPC returns VOID. 
+        // We can fetch the latest bill for this vendor/number to update it.
+        // Or better, update RPC to return UUID.
+        // For now, let's look up the bill we just created.
+        if (!error && billData.attachment_url) {
+             const { data: newBill } = await supabaseAdmin
+                .from('bills')
+                .select('id')
+                .eq('company_id', company_id)
+                .eq('bill_number', billData.bill_number)
+                .eq('vendor_id', billData.vendor_id)
+                .order('created_at', { ascending: false })
+                .limit(1)
+                .single();
+             
+             if (newBill) {
+                 await supabaseAdmin.from('bills').update({ attachment_url: billData.attachment_url }).eq('id', newBill.id);
+             }
+        }
         break;
 
       case 'DELETE':

@@ -4,7 +4,7 @@ import { supabase } from '../integrations/supabase/client';
 import { Button } from '../components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/table';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/card';
-import { PlusCircle, MoreHorizontal, CheckCircle, DollarSign } from 'lucide-react';
+import { PlusCircle, MoreHorizontal, CheckCircle, DollarSign, Paperclip } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "../components/ui/dropdown-menu";
 import { Badge } from '../components/ui/badge';
 import { useAuth } from '../contexts/AuthContext';
@@ -151,7 +151,10 @@ const ExpenseClaims = () => {
                     <TableCell className="font-medium">{claim.claim_number}</TableCell>
                     <TableCell>{format(new Date(claim.submission_date), 'PPP')}</TableCell>
                     <TableCell>{claim.employees?.first_name} {claim.employees?.last_name}</TableCell>
-                    <TableCell>{claim.description}</TableCell>
+                    <TableCell className="flex items-center gap-2">
+                        {claim.description}
+                        {claim.attachment_url && <Paperclip className="h-3 w-3 text-muted-foreground" />}
+                    </TableCell>
                     <TableCell className="text-right font-mono">{formatCurrency(claim.total_amount)}</TableCell>
                     <TableCell><Badge variant={getStatusBadge(claim.status)} className="capitalize">{claim.status}</Badge></TableCell>
                     <TableCell>
@@ -159,6 +162,11 @@ const ExpenseClaims = () => {
                         <DropdownMenuTrigger asChild><Button variant="ghost" className="h-8 w-8 p-0"><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
                           <DropdownMenuItem onClick={() => handleEdit(claim.id)} disabled={claim.status !== 'draft'}>Edit</DropdownMenuItem>
+                          {claim.attachment_url && (
+                             <DropdownMenuItem asChild>
+                                 <a href={claim.attachment_url} target="_blank" rel="noopener noreferrer">View Attachment</a>
+                             </DropdownMenuItem>
+                          )}
                           {claim.status === 'draft' && (
                              <DropdownMenuItem onClick={() => handleApproveClick(claim.id)}><CheckCircle className="mr-2 h-4 w-4 text-green-600" /> Approve</DropdownMenuItem>
                           )}

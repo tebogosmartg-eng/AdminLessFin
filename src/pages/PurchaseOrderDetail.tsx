@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../co
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from '../components/ui/table';
 import { Skeleton } from '../components/ui/skeleton';
 import { Button } from '../components/ui/button';
-import { Printer, FileCheck, Send } from 'lucide-react';
+import { Printer, FileCheck, Send, Paperclip } from 'lucide-react';
 import { Badge } from '../components/ui/badge';
 import { showError, showSuccess } from '../utils/toast';
 import { useAuth } from '../contexts/AuthContext';
@@ -67,6 +67,13 @@ const PurchaseOrderDetail = () => {
           <div>
             <h1 className="text-3xl font-bold">Purchase Order {po.po_number}</h1>
             <Badge className="mt-2 capitalize">{po.status}</Badge>
+            {po.attachment_url && (
+               <Button asChild variant="link" className="block p-0 h-auto mt-1">
+                   <a href={po.attachment_url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1">
+                       <Paperclip className="h-3 w-3" /> View Attachment
+                   </a>
+               </Button>
+            )}
           </div>
           <div className="flex gap-2">
             {(po.status === 'draft' || po.status === 'sent') && (
