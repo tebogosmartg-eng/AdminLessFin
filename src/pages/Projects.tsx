@@ -32,6 +32,7 @@ export type Project = {
   customer_id: string | null;
   customers: { name: string } | null;
   billable_rate?: number | null;
+  budget_amount?: number | null;
 };
 
 const Projects = () => {
@@ -137,8 +138,8 @@ const Projects = () => {
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
                           <DropdownMenuItem onClick={() => navigate(`/projects/${project.id}`)}>View Details</DropdownMenuItem>
-                          <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleEdit(project); }}>Edit</DropdownMenuItem>
-                          <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleDelete(project.id); }} className="text-red-600">Delete</DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleEdit(project)}>Edit</DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleDelete(project.id)} className="text-red-600">Delete</DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </TableCell>

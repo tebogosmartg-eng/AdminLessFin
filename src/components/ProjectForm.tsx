@@ -41,6 +41,7 @@ const projectSchema = z.object({
   customer_id: z.string().optional(),
   status: z.enum(['active', 'completed', 'archived']),
   billable_rate: z.coerce.number().min(0, "Rate must be positive.").optional(),
+  budget_amount: z.coerce.number().min(0, "Budget must be positive.").optional(),
 });
 
 type ProjectFormValues = z.infer<typeof projectSchema>;
@@ -66,6 +67,7 @@ const ProjectForm = ({ isOpen, setIsOpen, project }: ProjectFormProps) => {
         customer_id: project.customer_id || '',
         status: project.status as any,
         billable_rate: project.billable_rate || undefined,
+        budget_amount: project.budget_amount || undefined,
       });
     } else {
       form.reset({
@@ -74,6 +76,7 @@ const ProjectForm = ({ isOpen, setIsOpen, project }: ProjectFormProps) => {
         customer_id: '',
         status: 'active',
         billable_rate: undefined,
+        budget_amount: undefined,
       });
     }
   }, [project, form, isOpen]);
@@ -171,6 +174,30 @@ const ProjectForm = ({ isOpen, setIsOpen, project }: ProjectFormProps) => {
               />
               <FormField
                 control={form.control}
+                name="status"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Status</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="active">Active</SelectItem>
+                        <SelectItem value="completed">Completed</SelectItem>
+                        <SelectItem value="archived">Archived</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
                 name="billable_rate"
                 render={({ field }) => (
                   <FormItem>
@@ -182,29 +209,21 @@ const ProjectForm = ({ isOpen, setIsOpen, project }: ProjectFormProps) => {
                   </FormItem>
                 )}
               />
-            </div>
-            <FormField
-              control={form.control}
-              name="status"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Status</FormLabel>
-                  <Select onValueChange={field.onChange} value={field.value}>
+              <FormField
+                control={form.control}
+                name="budget_amount"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Budget Amount</FormLabel>
                     <FormControl>
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
+                      <Input type="number" step="0.01" placeholder="e.g., 5000.00" {...field} />
                     </FormControl>
-                    <SelectContent>
-                      <SelectItem value="active">Active</SelectItem>
-                      <SelectItem value="completed">Completed</SelectItem>
-                      <SelectItem value="archived">Archived</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+            
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setIsOpen(false)}>
                 Cancel

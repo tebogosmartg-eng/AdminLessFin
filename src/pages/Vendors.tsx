@@ -32,6 +32,7 @@ export type Vendor = {
   email: string | null;
   phone: string | null;
   address: string | null;
+  tax_id?: string | null;
 };
 
 const Vendors = () => {
@@ -91,6 +92,7 @@ const Vendors = () => {
       Email: v.email,
       Phone: v.phone,
       Address: v.address,
+      'Tax ID': v.tax_id || '',
     }));
     downloadCSV(data, 'vendors.csv');
   };
@@ -148,8 +150,8 @@ const Vendors = () => {
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
                           <DropdownMenuItem onClick={() => navigate(`/vendors/${vendor.id}`)}>View Details</DropdownMenuItem>
-                          <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleEdit(vendor); }}>Edit</DropdownMenuItem>
-                          <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleDelete(vendor.id); }} className="text-red-600">Delete</DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleEdit(vendor)}>Edit</DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleDelete(vendor.id)} className="text-red-600">Delete</DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </TableCell>

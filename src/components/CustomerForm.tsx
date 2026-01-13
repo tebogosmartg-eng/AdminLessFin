@@ -33,6 +33,7 @@ const customerSchema = z.object({
   email: z.string().email('Invalid email address.').optional().or(z.literal('')),
   phone: z.string().optional(),
   address: z.string().optional(),
+  tax_id: z.string().optional(),
 });
 
 type CustomerFormValues = z.infer<typeof customerSchema>;
@@ -54,6 +55,7 @@ const CustomerForm = ({ isOpen, setIsOpen, customer }: CustomerFormProps) => {
       email: '',
       phone: '',
       address: '',
+      tax_id: '',
     },
   });
 
@@ -65,6 +67,7 @@ const CustomerForm = ({ isOpen, setIsOpen, customer }: CustomerFormProps) => {
         email: customer.email || '',
         phone: customer.phone || '',
         address: customer.address || '',
+        tax_id: customer.tax_id || '',
       });
     } else {
       form.reset({
@@ -73,12 +76,11 @@ const CustomerForm = ({ isOpen, setIsOpen, customer }: CustomerFormProps) => {
         email: '',
         phone: '',
         address: '',
+        tax_id: '',
       });
     }
   }, [customer, form, isOpen]);
 
-  // This mutation creates or updates data by calling a secure Supabase Edge Function.
-  // Direct database access from the client is prohibited.
   const mutation = useMutation({
     mutationFn: async (values: CustomerFormValues) => {
       if (!activeCompany) throw new Error('No active company selected');
@@ -131,26 +133,41 @@ const CustomerForm = ({ isOpen, setIsOpen, customer }: CustomerFormProps) => {
                 </FormItem>
               )}
             />
-            <FormField
-              control={form.control}
-              name="contact_name"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Contact Name (Optional)</FormLabel>
-                  <FormControl>
-                    <Input placeholder="e.g., John Smith" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+            <div className="grid grid-cols-2 gap-4">
+                <FormField
+                control={form.control}
+                name="contact_name"
+                render={({ field }) => (
+                    <FormItem>
+                    <FormLabel>Contact Name</FormLabel>
+                    <FormControl>
+                        <Input placeholder="e.g., John Smith" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                    </FormItem>
+                )}
+                />
+                <FormField
+                control={form.control}
+                name="tax_id"
+                render={({ field }) => (
+                    <FormItem>
+                    <FormLabel>Tax ID / VAT No.</FormLabel>
+                    <FormControl>
+                        <Input placeholder="Optional" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                    </FormItem>
+                )}
+                />
+            </div>
             <div className="grid grid-cols-2 gap-4">
               <FormField
                 control={form.control}
                 name="email"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Email (Optional)</FormLabel>
+                    <FormLabel>Email</FormLabel>
                     <FormControl>
                       <Input type="email" placeholder="e.g., contact@acme.com" {...field} />
                     </FormControl>
@@ -163,7 +180,7 @@ const CustomerForm = ({ isOpen, setIsOpen, customer }: CustomerFormProps) => {
                 name="phone"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Phone (Optional)</FormLabel>
+                    <FormLabel>Phone</FormLabel>
                     <FormControl>
                       <Input placeholder="e.g., (555) 987-6543" {...field} />
                     </FormControl>
@@ -177,7 +194,7 @@ const CustomerForm = ({ isOpen, setIsOpen, customer }: CustomerFormProps) => {
               name="address"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Address (Optional)</FormLabel>
+                  <FormLabel>Address</FormLabel>
                   <FormControl>
                     <Textarea placeholder="e.g., 456 Business Rd, Commerce City, USA" {...field} />
                   </FormControl>

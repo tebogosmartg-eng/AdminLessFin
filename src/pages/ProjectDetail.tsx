@@ -7,12 +7,13 @@ import { Button } from '../components/ui/button';
 import { Badge } from '../components/ui/badge';
 import { Skeleton } from '../components/ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/table';
-import { Clock, DollarSign, FileSignature, CheckCircle, CircleDashed, TrendingUp, TrendingDown, ArrowRight } from 'lucide-react';
+import { Clock, DollarSign, FileSignature, CheckCircle, CircleDashed, Target } from 'lucide-react';
 import { formatCurrency, cn } from '../lib/utils';
 import { useAuth } from '../contexts/AuthContext';
 import { format } from 'date-fns';
 import InvoiceForm from '../components/InvoiceForm';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
+import { Progress } from '../components/ui/progress';
 
 const ProjectDetail = () => {
   const { id } = useParams();
@@ -58,6 +59,10 @@ const ProjectDetail = () => {
     ? (financials.profit / financials.totalRevenue) * 100 
     : 0;
 
+  const budgetProgress = project.budget_amount > 0 
+    ? ((financials?.totalRevenue || 0) / project.budget_amount) * 100 
+    : 0;
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start gap-4">
@@ -91,6 +96,27 @@ const ProjectDetail = () => {
         </TabsList>
 
         <TabsContent value="overview" className="space-y-4">
+          {project.budget_amount > 0 && (
+            <Card>
+              <CardHeader className="pb-2">
+                <div className="flex justify-between">
+                  <CardTitle className="text-sm font-medium">Revenue Budget Progress</CardTitle>
+                  <Target className="h-4 w-4 text-muted-foreground" />
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="flex justify-between items-end mb-2">
+                  <div className="text-2xl font-bold">{formatCurrency(financials?.totalRevenue || 0)}</div>
+                  <div className="text-sm text-muted-foreground">Goal: {formatCurrency(project.budget_amount)}</div>
+                </div>
+                <Progress value={budgetProgress} className={cn(budgetProgress > 100 ? "bg-green-600" : "")} />
+                <p className="text-xs text-muted-foreground mt-2">
+                  {budgetProgress.toFixed(1)}% of budget achieved via invoices.
+                </p>
+              </CardContent>
+            </Card>
+          )}
+
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">

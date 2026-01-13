@@ -33,6 +33,7 @@ const vendorSchema = z.object({
   email: z.string().email('Invalid email address.').optional().or(z.literal('')),
   phone: z.string().optional(),
   address: z.string().optional(),
+  tax_id: z.string().optional(),
 });
 
 type VendorFormValues = z.infer<typeof vendorSchema>;
@@ -54,6 +55,7 @@ const VendorForm = ({ isOpen, setIsOpen, vendor }: VendorFormProps) => {
       email: '',
       phone: '',
       address: '',
+      tax_id: '',
     },
   });
 
@@ -65,6 +67,7 @@ const VendorForm = ({ isOpen, setIsOpen, vendor }: VendorFormProps) => {
         email: vendor.email || '',
         phone: vendor.phone || '',
         address: vendor.address || '',
+        tax_id: vendor.tax_id || '',
       });
     } else {
       form.reset({
@@ -73,12 +76,11 @@ const VendorForm = ({ isOpen, setIsOpen, vendor }: VendorFormProps) => {
         email: '',
         phone: '',
         address: '',
+        tax_id: '',
       });
     }
   }, [vendor, form, isOpen]);
 
-  // This mutation creates or updates data by calling a secure Supabase Edge Function.
-  // Direct database access from the client is prohibited.
   const mutation = useMutation({
     mutationFn: async (values: VendorFormValues) => {
       if (!activeCompany) throw new Error('No active company selected');
@@ -131,19 +133,34 @@ const VendorForm = ({ isOpen, setIsOpen, vendor }: VendorFormProps) => {
                 </FormItem>
               )}
             />
-            <FormField
-              control={form.control}
-              name="contact_name"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Contact Name (Optional)</FormLabel>
-                  <FormControl>
-                    <Input placeholder="e.g., Jane Doe" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+            <div className="grid grid-cols-2 gap-4">
+                <FormField
+                control={form.control}
+                name="contact_name"
+                render={({ field }) => (
+                    <FormItem>
+                    <FormLabel>Contact Name</FormLabel>
+                    <FormControl>
+                        <Input placeholder="e.g., Jane Doe" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                    </FormItem>
+                )}
+                />
+                <FormField
+                control={form.control}
+                name="tax_id"
+                render={({ field }) => (
+                    <FormItem>
+                    <FormLabel>Tax ID / VAT No.</FormLabel>
+                    <FormControl>
+                        <Input placeholder="Optional" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                    </FormItem>
+                )}
+                />
+            </div>
             <div className="grid grid-cols-2 gap-4">
               <FormField
                 control={form.control}

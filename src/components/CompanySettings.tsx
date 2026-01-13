@@ -17,6 +17,7 @@ import { AlertCircle, Upload, X } from 'lucide-react';
 const companySchema = z.object({
   name: z.string().min(1, 'Company name is required.'),
   address: z.string().optional(),
+  tax_id: z.string().optional(),
 });
 type CompanyFormValues = z.infer<typeof companySchema>;
 
@@ -27,7 +28,7 @@ const CompanySettings = () => {
 
   const form = useForm<CompanyFormValues>({
     resolver: zodResolver(companySchema),
-    defaultValues: { name: '', address: '' },
+    defaultValues: { name: '', address: '', tax_id: '' },
   });
 
   useEffect(() => {
@@ -35,6 +36,7 @@ const CompanySettings = () => {
       form.reset({
         name: activeCompany.name || '',
         address: activeCompany.address || '',
+        tax_id: activeCompany.tax_id || '',
       });
       setPreviewUrl(activeCompany.logo_url || null);
     }
@@ -59,10 +61,8 @@ const CompanySettings = () => {
         const fileName = `logo-${Date.now()}.${fileExt}`;
         const filePath = `${activeCompany.id}/${fileName}`;
         
-        // Remove old logo if exists (optional cleanup)
-        
         const { error: uploadError } = await supabase.storage
-          .from('attachments') // Re-using attachments bucket for simplicity
+          .from('attachments') 
           .upload(filePath, logoFile, { upsert: true });
           
         if (uploadError) throw new Error(`Logo Upload Error: ${uploadError.message}`);
@@ -78,6 +78,7 @@ const CompanySettings = () => {
           companyData: { 
             name: values.name, 
             address: values.address || null,
+            tax_id: values.tax_id || null,
             logo_url: logoUrl 
           },
         },
@@ -181,6 +182,19 @@ const CompanySettings = () => {
                     <FormLabel>Company Address</FormLabel>
                     <FormControl>
                       <Textarea placeholder="123 Main St, Anytown, USA" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="tax_id"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Tax ID / VAT Number</FormLabel>
+                    <FormControl>
+                      <Input placeholder="e.g., VAT123456789" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>

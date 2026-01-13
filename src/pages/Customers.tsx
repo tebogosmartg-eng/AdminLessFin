@@ -32,6 +32,7 @@ export type Customer = {
   email: string | null;
   phone: string | null;
   address: string | null;
+  tax_id?: string | null;
 };
 
 const Customers = () => {
@@ -91,6 +92,7 @@ const Customers = () => {
       Email: c.email,
       Phone: c.phone,
       Address: c.address,
+      'Tax ID': c.tax_id || '',
     }));
     downloadCSV(data, 'customers.csv');
   };

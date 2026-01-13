@@ -30,6 +30,7 @@ const InvoicePreview = ({ formData, customers, company, taxRates }) => {
             <img src={company?.logo_url || "/logo.png"} alt="Company Logo" className="h-12 w-auto mb-2 object-contain" />
             <CardTitle className="text-base">{company?.name || 'Your Company'}</CardTitle>
             <p className="text-sm text-muted-foreground whitespace-pre-wrap">{company?.address || 'Your Company Address'}</p>
+            {company?.tax_id && <p className="text-sm text-muted-foreground">Tax ID: {company.tax_id}</p>}
           </div>
           <div className="text-right">
             <p className="text-3xl font-bold tracking-tight">INVOICE</p>
@@ -42,6 +43,7 @@ const InvoicePreview = ({ formData, customers, company, taxRates }) => {
               <h3 className="font-semibold mb-1">Bill To:</h3>
               <p>{customer?.name || 'Select a customer'}</p>
               <p className="whitespace-pre-wrap">{customer?.address}</p>
+              {customer?.tax_id && <p className="text-sm">Tax ID: {customer.tax_id}</p>}
               <p>{customer?.email}</p>
             </div>
             <div className="text-right">
