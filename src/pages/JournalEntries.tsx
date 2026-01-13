@@ -11,7 +11,7 @@ import {
   TableRow,
 } from '../components/ui/table';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
-import { PlusCircle, MoreHorizontal, Paperclip, Calendar as CalendarIcon } from 'lucide-react';
+import { PlusCircle, MoreHorizontal, Paperclip, Calendar as CalendarIcon, Download } from 'lucide-react';
 import JournalEntryForm from '../components/JournalEntryForm';
 import JournalEntryDetail from '../components/JournalEntryDetail';
 import {
@@ -32,7 +32,7 @@ import { DateRange } from 'react-day-picker';
 import { Popover, PopoverContent, PopoverTrigger } from '../components/ui/popover';
 import { Calendar } from '../components/ui/calendar';
 import { format, getYear } from 'date-fns';
-import { cn, formatCurrency } from '../lib/utils';
+import { cn, formatCurrency, downloadCSV } from '../lib/utils';
 import { Account } from './ChartOfAccounts';
 import { Vendor } from './Vendors';
 import { Customer } from './Customers';
@@ -159,16 +159,33 @@ const JournalEntries = () => {
       .reduce((sum, item) => sum + item.amount, 0);
   };
 
+  const handleExport = () => {
+    if (!entries) return;
+    const data = entries.map(e => ({
+      Date: new Date(e.entry_date).toLocaleDateString(),
+      Description: e.description,
+      Vendor: e.vendors?.[0]?.name || '',
+      Customer: e.customers?.[0]?.name || '',
+      Amount: calculateTotal(e.journal_entry_items).toFixed(2),
+    }));
+    downloadCSV(data, `journal-entries-${new Date().toISOString().split('T')[0]}.csv`);
+  };
+
   return (
     <>
       <Card>
         <CardHeader>
           <div className="flex flex-row items-center justify-between">
             <CardTitle>Journal Entries</CardTitle>
-            <Button onClick={handleAddNew}>
-              <PlusCircle className="mr-2 h-4 w-4" />
-              New Journal Entry
-            </Button>
+            <div className="flex gap-2">
+              <Button variant="outline" onClick={handleExport} disabled={!entries || entries.length === 0}>
+                <Download className="mr-2 h-4 w-4" /> Export CSV
+              </Button>
+              <Button onClick={handleAddNew}>
+                <PlusCircle className="mr-2 h-4 w-4" />
+                New Journal Entry
+              </Button>
+            </div>
           </div>
           <div className="flex items-center gap-2 pt-4 border-t -mx-6 px-6">
             <Popover>

@@ -93,9 +93,13 @@ const FinancialStatements = () => {
   const assetAccounts = balancesAsOf?.filter(acc => acc.type === 'Asset') || [];
   const liabilityAccounts = balancesAsOf?.filter(acc => acc.type === 'Liability') || [];
   const equityAccounts = balancesAsOf?.filter(acc => acc.type === 'Equity') || [];
+  
   const totalAssets = assetAccounts.reduce((sum, acc) => sum + acc.balance, 0);
   const totalLiabilities = liabilityAccounts.reduce((sum, acc) => sum + acc.balance, 0);
-  const totalEquity = equityAccounts.reduce((sum, acc) => sum + acc.balance, 0);
+  const totalStoredEquity = equityAccounts.reduce((sum, acc) => sum + acc.balance, 0);
+  
+  // IMPORTANT: For the Balance Sheet to balance, we must include the current period's Net Income in Equity
+  const totalEquity = totalStoredEquity + netIncome;
   const totalLiabilitiesAndEquity = totalLiabilities + totalEquity;
 
   // Statement of Changes in Equity Calculations
@@ -161,6 +165,7 @@ const FinancialStatements = () => {
         data.push({ Section: 'Total Liabilities', Account: '', Amount: totalLiabilities.toFixed(2) });
         data.push({ Section: 'Equity', Account: '', Amount: '' });
         equityAccounts.forEach(acc => data.push({ Section: '', Account: acc.name, Amount: acc.balance.toFixed(2) }));
+        data.push({ Section: '', Account: 'Current Year Earnings', Amount: netIncome.toFixed(2) });
         data.push({ Section: 'Total Equity', Account: '', Amount: totalEquity.toFixed(2) });
         data.push({ Section: 'Total Liabilities & Equity', Account: '', Amount: totalLiabilitiesAndEquity.toFixed(2) });
         filename = `balance-sheet-${format(toDate, 'yyyy-MM-dd')}.csv`;
@@ -256,6 +261,7 @@ const FinancialStatements = () => {
                       <TableRow className="font-semibold"><TableCell>Total Liabilities</TableCell><TableCell className="text-right">{formatCurrency(totalLiabilities)}</TableCell></TableRow>
                       <TableRow className="font-semibold bg-muted/50"><TableCell>Equity</TableCell><TableCell></TableCell></TableRow>
                       {equityAccounts.map(acc => (<TableRow key={acc.id}><TableCell className="pl-8">{acc.name}</TableCell><TableCell className="text-right">{formatCurrency(acc.balance)}</TableCell></TableRow>))}
+                      <TableRow><TableCell className="pl-8 italic">Current Year Earnings</TableCell><TableCell className="text-right">{formatCurrency(netIncome)}</TableCell></TableRow>
                       <TableRow className="font-semibold"><TableCell>Total Equity</TableCell><TableCell className="text-right">{formatCurrency(totalEquity)}</TableCell></TableRow>
                     </TableBody>
                     <TableFooter><TableRow className="text-lg font-bold"><TableCell>Total Liabilities & Equity</TableCell><TableCell className="text-right">{formatCurrency(totalLiabilitiesAndEquity)}</TableCell></TableRow></TableFooter>

@@ -14,6 +14,7 @@ import { useAuth } from '../contexts/AuthContext';
 import SendInvoiceDialog from '../components/SendInvoiceDialog';
 import { formatCurrency } from '../lib/utils';
 import JournalEntryDetail from '../components/JournalEntryDetail';
+import { Alert, AlertDescription, AlertTitle } from '../components/ui/alert';
 
 type InvoiceDetailData = {
   id: string;
@@ -124,6 +125,15 @@ const InvoiceDetail = () => {
   return (
     <>
       <div className="max-w-4xl mx-auto p-4 sm:p-6 lg:p-8 bg-background print:max-w-none print:p-8 print:mx-0 print:bg-white">
+        {invoice.status === 'void' && (
+          <Alert variant="destructive" className="mb-6 print:hidden">
+            <Ban className="h-4 w-4" />
+            <AlertTitle>Voided</AlertTitle>
+            <AlertDescription>
+              This invoice has been voided. All associated financial transactions have been reversed.
+            </AlertDescription>
+          </Alert>
+        )}
         <div className="flex justify-between items-start mb-6 print:hidden">
           <div>
             <h1 className="text-3xl font-bold">Invoice {invoice.invoice_number}</h1>
@@ -148,7 +158,7 @@ const InvoiceDetail = () => {
             <Button onClick={() => window.print()} variant="outline"><Printer className="mr-2 h-4 w-4" /> Print</Button>
           </div>
         </div>
-        <Card className="print:shadow-none print:border-none">
+        <Card className={`print:shadow-none print:border-none ${invoice.status === 'void' ? 'opacity-50' : ''}`}>
           <CardHeader className="grid grid-cols-2 gap-4">
             <div>
               <img src="/logo.png" alt="SmaAcc Logo" className="h-12 w-auto mb-2" />
