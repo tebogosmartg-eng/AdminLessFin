@@ -105,6 +105,20 @@ serve(async (req) => {
         .eq('type', 'inventory')
         .lte('quantity_on_hand', 5)
         .order('quantity_on_hand', { ascending: true })
+        .limit(5),
+
+      // ACTION ITEMS: Pending counts
+      supabaseAdmin.from('expense_claims').select('id', { count: 'exact', head: true }).eq('company_id', company_id).eq('status', 'draft'),
+      supabaseAdmin.from('invoices').select('id', { count: 'exact', head: true }).eq('company_id', company_id).eq('status', 'draft'),
+      supabaseAdmin.from('bills').select('id', { count: 'exact', head: true }).eq('company_id', company_id).eq('status', 'open'),
+      supabaseAdmin.from('quotes').select('id', { count: 'exact', head: true }).eq('company_id', company_id).eq('status', 'sent').lte('expiry_date', addDays(new Date(), 3).toISOString().split('T')[0]),
+      
+      // RECENT ACTIVITY: Latest Transactions
+      supabaseAdmin
+        .from('journal_entries')
+        .select('id, entry_date, description, created_at')
+        .eq('company_id', company_id)
+        .order('created_at', { ascending: false })
         .limit(5)
     ];
 
@@ -118,7 +132,12 @@ serve(async (req) => {
       futureInvoicesRes,
       futureBillsRes,
       revenueRes,
-      lowStockRes
+      lowStockRes,
+      pendingClaimsRes,
+      draftInvoicesRes,
+      openBillsRes,
+      expiringQuotesRes,
+      recentActivityRes
     ] = await Promise.all(promises);
 
     // Error Handling
@@ -128,10 +147,6 @@ serve(async (req) => {
     if (apBalancesRes.error) throw apBalancesRes.error;
     if (overdueInvoicesRes.error) throw overdueInvoicesRes.error;
     if (topExpensesRes.error) throw topExpensesRes.error;
-    if (futureInvoicesRes.error) throw futureInvoicesRes.error;
-    if (futureBillsRes.error) throw futureBillsRes.error;
-    if (revenueRes.error) throw revenueRes.error;
-    if (lowStockRes.error) throw lowStockRes.error;
 
     // --- 1. Top Customers Calculation ---
     const incomeAccountIds = new Set(
@@ -140,7 +155,7 @@ serve(async (req) => {
 
     const customerRevenue: Record<string, { name: string, amount: number }> = {};
     
-    revenueRes.data.forEach((entry: any) => {
+    (revenueRes.data || []).forEach((entry: any) => {
       const customerName = entry.customers?.name || 'Unknown';
       entry.journal_entry_items.forEach((item: any) => {
         if (item.type === 'credit' && incomeAccountIds.has(item.account_id)) {
@@ -170,14 +185,14 @@ serve(async (req) => {
     
     forecast.push({ date: format(today, 'yyyy-MM-dd'), balance: runningBalance, type: 'actual' });
 
-    futureInvoicesRes.data.forEach((inv: any) => {
+    (futureInvoicesRes.data || []).forEach((inv: any) => {
       const amount = inv.journal_entries?.journal_entry_items
         .filter((i: any) => i.type === 'debit') 
         .reduce((sum: number, i: any) => sum + i.amount, 0) || 0;
       changesByDate[inv.due_date] = (changesByDate[inv.due_date] || 0) + amount;
     });
 
-    futureBillsRes.data.forEach((bill: any) => {
+    (futureBillsRes.data || []).forEach((bill: any) => {
       const amount = bill.journal_entries?.journal_entry_items
         .filter((i: any) => i.type === 'credit')
         .reduce((sum: number, i: any) => sum + i.amount, 0) || 0;
@@ -202,6 +217,13 @@ serve(async (req) => {
       topCustomers: topCustomers,
       cashFlowForecast: forecast,
       lowStockItems: lowStockRes.data,
+      actions: {
+          pendingClaims: pendingClaimsRes.count || 0,
+          draftInvoices: draftInvoicesRes.count || 0,
+          openBills: openBillsRes.count || 0,
+          expiringQuotes: expiringQuotesRes.count || 0
+      },
+      recentActivity: recentActivityRes.data || []
     };
 
     return new Response(JSON.stringify(responseData), {
