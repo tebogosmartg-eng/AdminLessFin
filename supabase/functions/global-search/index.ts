@@ -55,7 +55,9 @@ serve(async (req) => {
       projects,
       products,
       purchaseOrders,
-      recurringBills
+      recurringBills,
+      creditNotes,
+      vendorCredits
     ] = await Promise.all([
       supabaseAdmin.from('customers').select('id, name, email').eq('company_id', company_id).ilike('name', searchTerm).limit(3),
       supabaseAdmin.from('vendors').select('id, name, email').eq('company_id', company_id).ilike('name', searchTerm).limit(3),
@@ -66,11 +68,13 @@ serve(async (req) => {
       supabaseAdmin.from('products').select('id, name').eq('company_id', company_id).ilike('name', searchTerm).limit(3),
       supabaseAdmin.from('purchase_orders').select('id, po_number, vendors(name)').eq('company_id', company_id).ilike('po_number', searchTerm).limit(3),
       supabaseAdmin.from('recurring_bills').select('id, profile_name, vendors(name)').eq('company_id', company_id).ilike('profile_name', searchTerm).limit(3),
+      supabaseAdmin.from('credit_notes').select('id, credit_note_number, customers(name)').eq('company_id', company_id).ilike('credit_note_number', searchTerm).limit(3),
+      supabaseAdmin.from('vendor_credits').select('id, credit_number, vendors(name)').eq('company_id', company_id).ilike('credit_number', searchTerm).limit(3),
     ]);
 
     const results = [
-      ...(customers.data || []).map(i => ({ type: 'Customer', id: i.id, title: i.name, subtitle: i.email, url: '/customers' })),
-      ...(vendors.data || []).map(i => ({ type: 'Vendor', id: i.id, title: i.name, subtitle: i.email, url: '/vendors' })),
+      ...(customers.data || []).map(i => ({ type: 'Customer', id: i.id, title: i.name, subtitle: i.email, url: `/customers/${i.id}` })),
+      ...(vendors.data || []).map(i => ({ type: 'Vendor', id: i.id, title: i.name, subtitle: i.email, url: `/vendors/${i.id}` })),
       ...(invoices.data || []).map(i => ({ type: 'Invoice', id: i.id, title: i.invoice_number, subtitle: i.customers?.name, url: `/invoices/${i.id}` })),
       ...(bills.data || []).map(i => ({ type: 'Bill', id: i.id, title: i.bill_number || 'Bill', subtitle: i.vendors?.name, url: '/bills' })),
       ...(accounts.data || []).map(i => ({ type: 'Account', id: i.id, title: `${i.account_number} - ${i.name}`, subtitle: 'Chart of Accounts', url: '/chart-of-accounts' })),
@@ -78,6 +82,8 @@ serve(async (req) => {
       ...(products.data || []).map(i => ({ type: 'Product', id: i.id, title: i.name, subtitle: 'Product/Service', url: '/products' })),
       ...(purchaseOrders.data || []).map(i => ({ type: 'Purchase Order', id: i.id, title: i.po_number, subtitle: i.vendors?.name, url: `/purchase-orders/${i.id}` })),
       ...(recurringBills.data || []).map(i => ({ type: 'Recurring Bill', id: i.id, title: i.profile_name, subtitle: i.vendors?.name, url: '/recurring-bills' })),
+      ...(creditNotes.data || []).map(i => ({ type: 'Credit Note', id: i.id, title: i.credit_note_number, subtitle: i.customers?.name, url: '/credit-notes' })),
+      ...(vendorCredits.data || []).map(i => ({ type: 'Vendor Credit', id: i.id, title: i.credit_number, subtitle: i.vendors?.name, url: '/vendor-credits' })),
     ];
 
     return new Response(JSON.stringify(results), {

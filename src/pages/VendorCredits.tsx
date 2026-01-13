@@ -4,18 +4,21 @@ import { supabase } from '../integrations/supabase/client';
 import { Button } from '../components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/table';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/card';
-import { PlusCircle, MoreHorizontal } from 'lucide-react';
+import { PlusCircle, MoreHorizontal, ArrowRightLeft } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "../components/ui/dropdown-menu";
 import { Badge } from '../components/ui/badge';
 import { useAuth } from '../contexts/AuthContext';
 import { format } from 'date-fns';
 import { showError, showSuccess } from '../utils/toast';
 import VendorCreditForm from '../components/VendorCreditForm';
+import AllocateVendorCreditDialog from '../components/AllocateVendorCreditDialog';
 
 const VendorCredits = () => {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const { activeCompany } = useAuth();
   const queryClient = useQueryClient();
+  const [selectedVC, setSelectedVC] = useState<any>(null);
+  const [isAllocateOpen, setIsAllocateOpen] = useState(false);
 
   const { data: vendorCredits, isLoading } = useQuery({
     queryKey: ['vendor_credits', activeCompany?.id],
@@ -43,6 +46,11 @@ const VendorCredits = () => {
     },
     onError: (e: any) => showError(e.message),
   });
+
+  const handleAllocate = (vc: any) => {
+    setSelectedVC(vc);
+    setIsAllocateOpen(true);
+  };
 
   return (
     <>
@@ -86,6 +94,9 @@ const VendorCredits = () => {
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild><Button variant="ghost" className="h-8 w-8 p-0"><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={() => handleAllocate(vc)}>
+                             <ArrowRightLeft className="mr-2 h-4 w-4" /> Allocate to Bill
+                          </DropdownMenuItem>
                           <DropdownMenuItem onClick={() => deleteMutation.mutate(vc.id)} className="text-red-600">Delete</DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
@@ -100,6 +111,13 @@ const VendorCredits = () => {
         </CardContent>
       </Card>
       <VendorCreditForm isOpen={isFormOpen} setIsOpen={setIsFormOpen} />
+      {selectedVC && (
+        <AllocateVendorCreditDialog
+          isOpen={isAllocateOpen}
+          setIsOpen={setIsAllocateOpen}
+          vendorCredit={selectedVC}
+        />
+      )}
     </>
   );
 };
