@@ -65,6 +65,7 @@ export const SidebarNav = () => {
   const purchasesLinks = [
     { to: '/purchase-orders', label: 'Purchase Orders', icon: ShoppingBag, prefetch: () => prefetch(queries.purchaseOrdersQuery) },
     { to: '/bills', label: 'Bills', icon: Receipt, prefetch: () => prefetch(queries.billsQuery) },
+    { to: '/vendor-credits', label: 'Vendor Credits', icon: TicketMinus, prefetch: () => {} },
     { to: '/recurring-bills', label: 'Recurring Bills', icon: Repeat, prefetch: () => {} },
     { to: '/pay-bills', label: 'Pay Bills', icon: Banknote, prefetch: () => prefetch(queries.vendorBalancesQuery) },
     { to: '/vendors', label: 'Vendors', icon: Building2, prefetch: () => prefetch(queries.vendorsQuery) },
