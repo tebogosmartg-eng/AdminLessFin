@@ -42,6 +42,7 @@ const Bills = () => {
   const [isEditFormOpen, setIsEditFormOpen] = useState(false);
   const [selectedEntryIdForDetail, setSelectedEntryIdForDetail] = useState<string | null>(null);
   const [selectedEntryIdForEdit, setSelectedEntryIdForEdit] = useState<string | undefined>(undefined);
+  const [duplicateFromId, setDuplicateFromId] = useState<string | undefined>(undefined);
   
   // Payment State
   const [isPaymentFormOpen, setIsPaymentFormOpen] = useState(false);
@@ -94,9 +95,35 @@ const Bills = () => {
     },
   });
 
+  const voidMutation = useMutation({
+    mutationFn: async (id: string) => {
+      if (!activeCompany) throw new Error("No active company");
+      const { error } = await supabase.functions.invoke('bills', {
+        body: {
+          method: 'VOID',
+          company_id: activeCompany.id,
+          billId: id,
+        },
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['bills', activeCompany?.id] });
+      showSuccess('Bill voided.');
+    },
+    onError: (error) => showError(`Error voiding bill: ${error.message}`),
+  });
+
   const handleEdit = (id: string) => {
+    // Note: Full editing of bills created via JE is limited. We typically only allow editing non-financials
+    // or deleting/re-creating. For now, we open the JE edit form which allows full control but is technical.
     setSelectedEntryIdForEdit(id);
     setIsEditFormOpen(true);
+  };
+
+  const handleDuplicate = (id: string) => {
+    setDuplicateFromId(id);
+    setIsBillFormOpen(true);
   };
 
   const handleDelete = (id: string) => {
@@ -118,6 +145,15 @@ const Bills = () => {
     setDateTo('');
   };
 
+  const getStatusVariant = (status: string) => {
+    switch (status) {
+      case 'paid': return 'default';
+      case 'open': return 'outline';
+      case 'void': return 'destructive';
+      default: return 'secondary';
+    }
+  };
+
   return (
     <>
       <Card>
@@ -127,7 +163,7 @@ const Bills = () => {
               <CardTitle>Bills</CardTitle>
               <CardDescription>A record of all bills received from vendors.</CardDescription>
             </div>
-            <Button onClick={() => setIsBillFormOpen(true)}>
+            <Button onClick={() => { setDuplicateFromId(undefined); setIsBillFormOpen(true); }}>
               <PlusCircle className="mr-2 h-4 w-4" />
               Record New Bill
             </Button>
@@ -152,6 +188,7 @@ const Bills = () => {
                 <SelectItem value="all">All Statuses</SelectItem>
                 <SelectItem value="open">Open</SelectItem>
                 <SelectItem value="paid">Paid</SelectItem>
+                <SelectItem value="void">Void</SelectItem>
               </SelectContent>
             </Select>
             <Select value={vendorFilter} onValueChange={setVendorFilter}>
@@ -192,6 +229,7 @@ const Bills = () => {
               <TableRow>
                 <TableHead>Date</TableHead>
                 <TableHead>Vendor</TableHead>
+                <TableHead>Bill #</TableHead>
                 <TableHead>Description</TableHead>
                 <TableHead className="text-right">Amount</TableHead>
                 <TableHead>Status</TableHead>
@@ -201,17 +239,18 @@ const Bills = () => {
             <TableBody>
               {isLoading ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center">Loading bills...</TableCell>
+                  <TableCell colSpan={7} className="text-center">Loading bills...</TableCell>
                 </TableRow>
               ) : bills && bills.length > 0 ? (
                 bills.map((bill) => (
                   <TableRow key={bill.id}>
                     <TableCell>{new Date(bill.entry_date).toLocaleDateString()}</TableCell>
                     <TableCell>{bill.vendors?.[0]?.name || 'N/A'}</TableCell>
-                    <TableCell>{bill.description}</TableCell>
+                    <TableCell>{bill.bill_number || '-'}</TableCell>
+                    <TableCell className="truncate max-w-[200px]">{bill.description}</TableCell>
                     <TableCell className="text-right font-mono">{formatCurrency(bill.total)}</TableCell>
                     <TableCell>
-                      <Badge variant={bill.status === 'paid' ? 'default' : 'outline'}>{bill.status}</Badge>
+                      <Badge variant={getStatusVariant(bill.status)} className="capitalize">{bill.status}</Badge>
                     </TableCell>
                     <TableCell>
                       <DropdownMenu>
@@ -223,9 +262,13 @@ const Bills = () => {
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
                           <DropdownMenuItem onClick={() => setSelectedEntryIdForDetail(bill.id)}>View Details</DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => handleEdit(bill.id)} disabled={bill.status === 'paid'}>Edit</DropdownMenuItem>
-                          {bill.status !== 'paid' && (
-                            <DropdownMenuItem onClick={() => handlePay(bill)}>Record Payment</DropdownMenuItem>
+                          {/* <DropdownMenuItem onClick={() => handleEdit(bill.id)} disabled={bill.status === 'paid' || bill.status === 'void'}>Edit</DropdownMenuItem> */}
+                          <DropdownMenuItem onClick={() => handleDuplicate(bill.id)}>Duplicate</DropdownMenuItem>
+                          {bill.status !== 'paid' && bill.status !== 'void' && (
+                            <>
+                                <DropdownMenuItem onClick={() => handlePay(bill)}>Record Payment</DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => voidMutation.mutate(bill.id)} className="text-red-600">Void</DropdownMenuItem>
+                            </>
                           )}
                           <DropdownMenuItem onClick={() => handleDelete(bill.id)} className="text-red-600">Delete</DropdownMenuItem>
                         </DropdownMenuContent>
@@ -235,7 +278,7 @@ const Bills = () => {
                 ))
               ) : (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center">No bills found matching your filters.</TableCell>
+                  <TableCell colSpan={7} className="text-center">No bills found matching your filters.</TableCell>
                 </TableRow>
               )}
             </TableBody>
@@ -245,6 +288,7 @@ const Bills = () => {
       <BillForm
         isOpen={isBillFormOpen}
         setIsOpen={setIsBillFormOpen}
+        duplicateFromId={duplicateFromId}
       />
       <JournalEntryForm
         isOpen={isEditFormOpen}

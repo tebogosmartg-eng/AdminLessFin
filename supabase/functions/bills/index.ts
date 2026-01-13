@@ -106,6 +106,40 @@ serve(async (req) => {
         }
         break;
       
+      case 'GET_ONE':
+        // Retrieve single bill details including Journal Entry items
+        ({ data, error } = await supabaseAdmin
+          .from('bills')
+          .select(`
+            id,
+            bill_date,
+            due_date,
+            status,
+            bill_number,
+            vendor_id,
+            description:journal_entries(description),
+            vendors ( name ),
+            journal_entries (
+              id,
+              journal_entry_items (
+                id,
+                amount,
+                type,
+                account_id,
+                project_id,
+                product_id:product_id, 
+                chart_of_accounts ( name ),
+                journal_entry_item_tax_rates (
+                  tax_rates ( id, rate )
+                )
+              )
+            )
+          `)
+          .eq('id', body.billId)
+          .eq('company_id', company_id)
+          .single());
+        break;
+
       case 'POST':
         const { p_items, ...billData } = body.billData;
         
@@ -137,6 +171,44 @@ serve(async (req) => {
           .delete()
           .eq('id', body.billId)
           .eq('company_id', company_id));
+        break;
+
+      case 'VOID':
+        // 1. Get Bill and JE
+        const { data: bill } = await supabaseAdmin
+          .from('bills')
+          .select('journal_entry_id, bill_number')
+          .eq('id', body.billId)
+          .single();
+        
+        if (!bill) throw new Error("Bill not found");
+        if (!bill.journal_entry_id) throw new Error("Journal Entry not found for bill");
+
+        // 2. Create Reversal JE
+        const { data: jeData } = await supabaseAdmin.from('journal_entries').select('*').eq('id', bill.journal_entry_id).single();
+        
+        const { data: reversalJe } = await supabaseAdmin.from('journal_entries').insert({
+          company_id,
+          entry_date: new Date().toISOString().split('T')[0],
+          description: `Void Reversal for Bill ${bill.bill_number}`,
+          vendor_id: jeData.vendor_id
+        }).select('id').single();
+
+        // 3. Create Reversed Items
+        const { data: originalItems } = await supabaseAdmin.from('journal_entry_items').select('*').eq('journal_entry_id', bill.journal_entry_id);
+        
+        const reversalItems = originalItems.map(item => ({
+          journal_entry_id: reversalJe.id,
+          account_id: item.account_id,
+          type: item.type === 'debit' ? 'credit' : 'debit',
+          amount: item.amount,
+          project_id: item.project_id
+        }));
+
+        await supabaseAdmin.from('journal_entry_items').insert(reversalItems);
+
+        // 4. Update Bill Status
+        ({ data, error } = await supabaseAdmin.from('bills').update({ status: 'void' }).eq('id', body.billId));
         break;
 
       default:

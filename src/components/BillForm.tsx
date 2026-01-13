@@ -12,11 +12,11 @@ import { Input } from './ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Textarea } from './ui/textarea';
 import { showError, showSuccess } from '../utils/toast';
-import { Account } from '../pages/ChartOfAccounts';
 import { Vendor } from '../pages/Vendors';
 import { Product } from '../pages/Products';
 import { Project } from '../pages/Projects';
 import { TaxRate } from '../pages/TaxRates';
+import { Account } from '../pages/ChartOfAccounts';
 import { Trash2 } from 'lucide-react';
 import { Alert, AlertDescription } from './ui/alert';
 import { addDays, format } from 'date-fns';
@@ -44,18 +44,23 @@ const billSchema = z.object({
   items: z.array(billItemSchema).min(1, "At least one line item is required."),
 });
 
-type BillFormValues = z.infer<typeof billSchema>;
+export type BillFormValues = z.infer<typeof billSchema>;
 
 interface BillFormProps {
   isOpen: boolean;
   setIsOpen: (isOpen: boolean) => void;
+  billId?: string;
+  duplicateFromId?: string;
   initialData?: Partial<BillFormValues>;
   onSuccess?: () => void;
 }
 
-const BillForm = ({ isOpen, setIsOpen, initialData, onSuccess }: BillFormProps) => {
+const BillForm = ({ isOpen, setIsOpen, billId, duplicateFromId, initialData, onSuccess }: BillFormProps) => {
   const { user, activeCompany } = useAuth();
   const queryClient = useQueryClient();
+  const isEditing = !!billId;
+  const isDuplicating = !!duplicateFromId;
+
   const form = useForm<BillFormValues>({
     resolver: zodResolver(billSchema),
     defaultValues: {
@@ -70,33 +75,94 @@ const BillForm = ({ isOpen, setIsOpen, initialData, onSuccess }: BillFormProps) 
     },
   });
 
+  const sourceId = billId || duplicateFromId;
+  const { data: sourceBill } = useQuery({
+    queryKey: ['bill_source', sourceId],
+    queryFn: async () => {
+      const { data, error } = await supabase.functions.invoke('bills', {
+        body: { method: 'GET_ONE', company_id: activeCompany!.id, billId: sourceId },
+      });
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!sourceId && isOpen && !!activeCompany,
+  });
+
+  const { data: accounts } = useQuery<Account[]>({
+    queryKey: ['accounts', activeCompany?.id],
+    queryFn: async () => {
+      if (!activeCompany) return [];
+      const { data, error } = await supabase.functions.invoke('chart-of-accounts', {
+        body: { method: 'GET', company_id: activeCompany.id },
+      });
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!activeCompany
+  });
+
+  const expenseAccounts = accounts?.filter(a => a.type === 'Expense');
+  const assetAccounts = accounts?.filter(a => a.type === 'Asset');
+  const apAccounts = accounts?.filter(a => a.type === 'Liability');
+
+  // Populate form when initialData is provided (e.g. from PO)
   useEffect(() => {
-    if (isOpen) {
-      if (initialData) {
-        form.reset({
-          bill_number: initialData.bill_number || '',
-          bill_date: initialData.bill_date || format(new Date(), 'yyyy-MM-dd'),
-          due_date: initialData.due_date || format(addDays(new Date(), 30), 'yyyy-MM-dd'),
-          vendor_id: initialData.vendor_id || '',
-          accounts_payable_id: initialData.accounts_payable_id || '',
-          tax_receivable_account_id: initialData.tax_receivable_account_id || '',
-          description: initialData.description || '',
-          items: initialData.items || [{ product_id: '', description: '', quantity: 1, unit_cost: 0, expense_account_id: '', project_id: '', tax_rate_id: '' }],
-        });
-      } else {
-        form.reset({
-          bill_number: '',
-          bill_date: format(new Date(), 'yyyy-MM-dd'),
-          due_date: format(addDays(new Date(), 30), 'yyyy-MM-dd'),
-          vendor_id: '',
-          accounts_payable_id: '',
-          tax_receivable_account_id: '',
-          description: '',
-          items: [{ product_id: '', description: '', quantity: 1, unit_cost: 0, expense_account_id: '', project_id: '', tax_rate_id: '' }],
-        });
+    if (isOpen && initialData && !billId && !duplicateFromId) {
+      form.reset({
+        bill_number: initialData.bill_number || '',
+        bill_date: initialData.bill_date || format(new Date(), 'yyyy-MM-dd'),
+        due_date: initialData.due_date || format(addDays(new Date(), 30), 'yyyy-MM-dd'),
+        vendor_id: initialData.vendor_id || '',
+        accounts_payable_id: initialData.accounts_payable_id || '',
+        tax_receivable_account_id: initialData.tax_receivable_account_id || '',
+        description: initialData.description || '',
+        items: initialData.items?.map((item: any) => ({
+          product_id: item.product_id || undefined,
+          description: item.description || '',
+          quantity: item.quantity || 1,
+          unit_cost: item.unit_cost || 0,
+          expense_account_id: item.expense_account_id || '',
+          project_id: item.project_id || '',
+          tax_rate_id: item.tax_rate_id || '',
+        })) || [{ product_id: '', description: '', quantity: 1, unit_cost: 0, expense_account_id: '', project_id: '', tax_rate_id: '' }],
+      });
+    }
+  }, [isOpen, initialData, billId, duplicateFromId, form]);
+
+  // Populate form when source data loads (Editing/Duplicating)
+  useEffect(() => {
+    if (sourceBill && isOpen) {
+      const jeItems = sourceBill.journal_entries?.[0]?.journal_entry_items || [];
+      
+      const formItems = jeItems
+        .filter((item: any) => item.type === 'debit' && !item.chart_of_accounts?.name.toLowerCase().includes('tax receivable'))
+        .map((item: any) => ({
+          product_id: item.product_id || '',
+          description: item.chart_of_accounts?.name || 'Item',
+          quantity: 1, 
+          unit_cost: item.amount,
+          expense_account_id: item.account_id,
+          project_id: item.project_id || '',
+          tax_rate_id: item.journal_entry_item_tax_rates?.[0]?.tax_rates?.id || '',
+        }));
+
+      form.reset({
+        bill_number: isDuplicating ? '' : sourceBill.bill_number,
+        bill_date: isDuplicating ? format(new Date(), 'yyyy-MM-dd') : sourceBill.bill_date,
+        due_date: isDuplicating ? format(addDays(new Date(), 30), 'yyyy-MM-dd') : sourceBill.due_date,
+        vendor_id: sourceBill.vendor_id,
+        accounts_payable_id: '',
+        tax_receivable_account_id: '',
+        description: sourceBill.description || '',
+        items: formItems.length > 0 ? formItems : [{ product_id: '', description: '', quantity: 1, unit_cost: 0, expense_account_id: '', project_id: '', tax_rate_id: '' }],
+      });
+      
+      const apItem = jeItems.find((item: any) => item.type === 'credit');
+      if (apItem) {
+          form.setValue('accounts_payable_id', apItem.account_id);
       }
     }
-  }, [isOpen, initialData, form]);
+  }, [sourceBill, isEditing, isDuplicating, isOpen, form]);
 
   const { fields, append, remove } = useFieldArray({ control: form.control, name: "items" });
 
@@ -124,24 +190,9 @@ const BillForm = ({ isOpen, setIsOpen, initialData, onSuccess }: BillFormProps) 
     },
     enabled: !!activeCompany
   });
-  const { data: accounts } = useQuery<Account[]>({
-    queryKey: ['accounts', activeCompany?.id],
-    queryFn: async () => {
-      if (!activeCompany) return [];
-      const { data, error } = await supabase.functions.invoke('chart-of-accounts', {
-        body: { method: 'GET', company_id: activeCompany.id },
-      });
-      if (error) throw error;
-      return data;
-    },
-    enabled: !!activeCompany
-  });
+  
   const { data: projects } = useQuery<Project[]>({ ...projectsQuery(activeCompany?.id!), enabled: !!activeCompany });
   const { data: taxRates } = useQuery<TaxRate[]>({ ...taxRatesQuery(activeCompany?.id!), enabled: !!activeCompany });
-
-  const expenseAccounts = accounts?.filter(a => a.type === 'Expense');
-  const assetAccounts = accounts?.filter(a => a.type === 'Asset');
-  const apAccounts = accounts?.filter(a => a.type === 'Liability');
 
   const handleProductSelect = (productId: string, index: number) => {
     const product = products?.find(p => p.id === productId);
@@ -197,7 +248,7 @@ const BillForm = ({ isOpen, setIsOpen, initialData, onSuccess }: BillFormProps) 
       queryClient.invalidateQueries({ queryKey: ['bills', activeCompany?.id] });
       queryClient.invalidateQueries({ queryKey: ['journal_entries', activeCompany?.id] });
       queryClient.invalidateQueries({ queryKey: ['products', activeCompany?.id] });
-      showSuccess('Bill recorded and inventory updated.');
+      showSuccess(`Bill ${isEditing ? 'updated' : 'recorded'} successfully.`);
       if (onSuccess) onSuccess();
       setIsOpen(false);
     },
@@ -220,8 +271,10 @@ const BillForm = ({ isOpen, setIsOpen, initialData, onSuccess }: BillFormProps) 
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogContent className="sm:max-w-6xl">
         <DialogHeader>
-          <DialogTitle>Record New Bill</DialogTitle>
-          <DialogDescription>Create a new bill record.</DialogDescription>
+          <DialogTitle>{isEditing ? 'Edit Bill' : isDuplicating ? 'Duplicate Bill' : 'Record New Bill'}</DialogTitle>
+          <DialogDescription>
+             {isDuplicating ? "Create a new bill based on an existing one." : "Create a new bill record."}
+          </DialogDescription>
         </DialogHeader>
         {!apAccounts?.some(acc => acc.name.toLowerCase().includes('accounts payable')) && (
             <Alert variant="destructive"><AlertDescription>Warning: You don't have an "Accounts Payable" account. Please create one in your Chart of Accounts (Type: Liability).</AlertDescription></Alert>
