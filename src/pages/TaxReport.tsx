@@ -51,9 +51,7 @@ const TaxReport = () => {
     enabled: !!activeCompany && !!fromDate && !!toDate,
   });
 
-  const totalSales = taxData?.reduce((sum, item) => sum + item.netSales, 0) || 0;
   const totalTaxCollected = taxData?.reduce((sum, item) => sum + item.taxCollected, 0) || 0;
-  const totalPurchases = taxData?.reduce((sum, item) => sum + item.netPurchases, 0) || 0;
   const totalTaxPaid = taxData?.reduce((sum, item) => sum + item.taxPaid, 0) || 0;
   const totalNetTax = totalTaxCollected - totalTaxPaid;
 
@@ -68,15 +66,7 @@ const TaxReport = () => {
       'Tax Paid (Input)': item.taxPaid.toFixed(2),
       'Net Tax Due': item.netTax.toFixed(2)
     }));
-    data.push({ 
-        'Tax Name': 'Total', 'Rate (%)': '', 
-        'Net Sales': totalSales.toFixed(2), 
-        'Tax Collected (Output)': totalTaxCollected.toFixed(2),
-        'Net Purchases': totalPurchases.toFixed(2),
-        'Tax Paid (Input)': totalTaxPaid.toFixed(2),
-        'Net Tax Due': totalNetTax.toFixed(2)
-    });
-    downloadCSV(data, `tax-report-${format(fromDate, 'yyyy-MM-dd')}-to-${format(toDate, 'yyyy-MM-dd')}.csv`);
+    downloadCSV(data, `tax-report-${format(fromDate, 'yyyy-MM-dd')}.csv`);
   };
 
   return (
@@ -86,18 +76,17 @@ const TaxReport = () => {
         <Popover>
           <PopoverTrigger asChild>
             <Button
-              id="date"
               variant={"outline"}
               className={cn("w-[300px] justify-start text-left font-normal", !date && "text-muted-foreground")}
             >
               <CalendarIcon className="mr-2 h-4 w-4" />
               {date?.from ? (
                 date.to ? (<>{format(date.from, "LLL dd, y")} - {format(date.to, "LLL dd, y")}</>) : (format(date.from, "LLL dd, y"))
-              ) : (<span>Pick a date</span>)}
+              ) : (<span>Pick a date range</span>)}
             </Button>
           </PopoverTrigger>
           <PopoverContent className="w-auto p-0" align="end">
-            <Calendar initialFocus mode="range" defaultMonth={date?.from} selected={date} onSelect={setDate} numberOfMonths={2} />
+            <Calendar initialFocus mode="range" selected={date} onSelect={setDate} numberOfMonths={2} />
           </PopoverContent>
         </Popover>
       </div>
