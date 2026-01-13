@@ -49,6 +49,7 @@ import PurchaseOrderDetail from "./pages/PurchaseOrderDetail";
 import FinancialCalendar from "./pages/FinancialCalendar";
 import CreditNotes from "./pages/CreditNotes";
 import VendorCredits from "./pages/VendorCredits";
+import ProjectProfitabilityReport from "./pages/ProjectProfitabilityReport";
 
 export const AppRouter = () => {
   return (
@@ -79,6 +80,7 @@ export const AppRouter = () => {
         <Route path="/budgets" element={<Budgets />} />
         <Route path="/reports" element={<Reports />} />
         <Route path="/financial-statements" element={<FinancialStatements />} />
+        <Route path="/project-profitability" element={<ProjectProfitabilityReport />} />
         <Route path="/tax-report" element={<TaxReport />} />
         <Route path="/settings" element={<Settings />} />
         <Route path="/vendors" element={<Vendors />} />

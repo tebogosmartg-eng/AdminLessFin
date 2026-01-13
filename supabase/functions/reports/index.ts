@@ -54,6 +54,83 @@ serve(async (req) => {
       }
     );
 
+    if (method === 'GET_PROJECT_PROFITABILITY') {
+        // 1. Get all projects for the company
+        const { data: projects, error: projError } = await supabaseAdmin
+            .from('projects')
+            .select('id, name, status, customers(name)')
+            .eq('company_id', company_id)
+            .order('name');
+        
+        if (projError) throw projError;
+        if (!projects || projects.length === 0) {
+            return new Response(JSON.stringify([]), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 });
+        }
+
+        const projectIds = projects.map(p => p.id);
+
+        // 2. Get all GL items tagged with these projects
+        const { data: projectItems, error: piError } = await supabaseAdmin
+            .from('journal_entry_items')
+            .select(`
+                amount,
+                type,
+                project_id,
+                chart_of_accounts ( type )
+            `)
+            .in('project_id', projectIds);
+
+        if (piError) throw piError;
+
+        // 3. Aggregate Data
+        const projectStats = {};
+        
+        // Initialize
+        projects.forEach(p => {
+            projectStats[p.id] = {
+                id: p.id,
+                name: p.name,
+                customer: p.customers?.name || '-',
+                status: p.status,
+                revenue: 0,
+                expenses: 0,
+                profit: 0,
+                margin: 0
+            };
+        });
+
+        // Sum up
+        projectItems.forEach(item => {
+            const pid = item.project_id;
+            const accType = item.chart_of_accounts?.type;
+            
+            if (projectStats[pid]) {
+                if (accType === 'Income') {
+                    // Income is Credit normal
+                    projectStats[pid].revenue += item.type === 'credit' ? item.amount : -item.amount;
+                } else if (accType === 'Expense' || accType === 'Cost of Goods Sold') {
+                    // Expense is Debit normal
+                    projectStats[pid].expenses += item.type === 'debit' ? item.amount : -item.amount;
+                }
+            }
+        });
+
+        // Calculate margins
+        const result = Object.values(projectStats).map((p: any) => {
+            p.profit = p.revenue - p.expenses;
+            p.margin = p.revenue > 0 ? (p.profit / p.revenue) * 100 : 0;
+            return p;
+        });
+
+        // Sort by Profit Descending
+        result.sort((a, b) => b.profit - a.profit);
+
+        return new Response(JSON.stringify(result), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 200,
+        });
+    }
+
     if (method === 'GET_TAX_REPORT') {
         // Fetch tax-related journal items
         const { data: taxData, error: taxError } = await supabaseAdmin

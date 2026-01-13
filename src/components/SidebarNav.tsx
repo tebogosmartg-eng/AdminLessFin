@@ -5,7 +5,7 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible"
-import { Book, LayoutDashboard, BookText, FileText, Library, Target, Repeat, Building2, Users, TrendingUp, Receipt, Banknote, HandCoins, ChevronRight, Package, Scale, Upload, FileSignature, Briefcase, Landmark, MessageSquare, MessageCircle, Clock, ShoppingBag, Calendar, TicketMinus } from 'lucide-react';
+import { Book, LayoutDashboard, BookText, FileText, Library, Target, Repeat, Building2, Users, TrendingUp, Receipt, Banknote, HandCoins, ChevronRight, Package, Scale, Upload, FileSignature, Briefcase, Landmark, MessageSquare, MessageCircle, Clock, ShoppingBag, Calendar, TicketMinus, PieChart } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { Button } from './ui/button';
 import { useAuth } from '../contexts/AuthContext';
@@ -91,11 +91,12 @@ export const SidebarNav = () => {
   ];
 
   const reportsLinks = [
-    { to: '/reports', label: 'Operational Reports', icon: FileText, prefetch: () => {} }, // Complex filters, skip prefetch
-    { to: '/financial-statements', label: 'Financial Statements', icon: FileSignature, prefetch: () => {} }, // Complex filters, skip prefetch
+    { to: '/reports', label: 'Operational Reports', icon: FileText, prefetch: () => {} },
+    { to: '/financial-statements', label: 'Financial Statements', icon: FileSignature, prefetch: () => {} },
+    { to: '/project-profitability', label: 'Project Profitability', icon: PieChart, prefetch: () => {} },
     { to: '/tax-report', label: 'Sales Tax Report', icon: Scale, prefetch: () => {} },
     { to: '/general-ledger', label: 'General Ledger', icon: Library, prefetch: () => prefetch(queries.accountsQuery) },
-    { to: '/payroll-reports', label: 'Payroll Reports', icon: FileText, prefetch: () => {} }, // Complex filters, skip prefetch
+    { to: '/payroll-reports', label: 'Payroll Reports', icon: FileText, prefetch: () => {} },
     { to: '/budgets', label: 'Budgets', icon: Target, prefetch: () => prefetch(queries.budgetsQuery) },
   ];
 
