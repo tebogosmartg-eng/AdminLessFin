@@ -55,7 +55,6 @@ serve(async (req) => {
     );
 
     if (method === 'GET_PROJECT_PROFITABILITY') {
-        // 1. Get all projects for the company
         const { data: projects, error: projError } = await supabaseAdmin
             .from('projects')
             .select('id, name, status, customers(name)')
@@ -69,7 +68,6 @@ serve(async (req) => {
 
         const projectIds = projects.map(p => p.id);
 
-        // 2. Get all GL items tagged with these projects
         const { data: projectItems, error: piError } = await supabaseAdmin
             .from('journal_entry_items')
             .select(`
@@ -82,10 +80,8 @@ serve(async (req) => {
 
         if (piError) throw piError;
 
-        // 3. Aggregate Data
         const projectStats = {};
         
-        // Initialize
         projects.forEach(p => {
             projectStats[p.id] = {
                 id: p.id,
@@ -99,30 +95,25 @@ serve(async (req) => {
             };
         });
 
-        // Sum up
         projectItems.forEach(item => {
             const pid = item.project_id;
             const accType = item.chart_of_accounts?.type;
             
             if (projectStats[pid]) {
                 if (accType === 'Income') {
-                    // Income is Credit normal
                     projectStats[pid].revenue += item.type === 'credit' ? item.amount : -item.amount;
                 } else if (accType === 'Expense' || accType === 'Cost of Goods Sold') {
-                    // Expense is Debit normal
                     projectStats[pid].expenses += item.type === 'debit' ? item.amount : -item.amount;
                 }
             }
         });
 
-        // Calculate margins
         const result = Object.values(projectStats).map((p: any) => {
             p.profit = p.revenue - p.expenses;
             p.margin = p.revenue > 0 ? (p.profit / p.revenue) * 100 : 0;
             return p;
         });
 
-        // Sort by Profit Descending
         result.sort((a, b) => b.profit - a.profit);
 
         return new Response(JSON.stringify(result), {
@@ -132,13 +123,13 @@ serve(async (req) => {
     }
 
     if (method === 'GET_TAX_REPORT') {
-        // Fetch tax-related journal items
         const { data: taxData, error: taxError } = await supabaseAdmin
           .from('journal_entry_item_tax_rates')
           .select(`
             tax_rates ( name, rate ),
             journal_entry_items!inner (
               amount,
+              type,
               journal_entries!inner (
                 entry_date,
                 company_id
@@ -151,19 +142,37 @@ serve(async (req) => {
         
         if (taxError) throw taxError;
         
-        // Aggregate data
         const report = {};
         taxData.forEach((row: any) => {
             const name = row.tax_rates?.name || 'Unknown';
             const rate = row.tax_rates?.rate || 0;
             const netAmount = row.journal_entry_items?.amount || 0;
+            const itemType = row.journal_entry_items?.type;
             const taxAmount = netAmount * (rate / 100);
             
             if (!report[name]) {
-                report[name] = { name, rate, netSales: 0, taxCollected: 0 };
+                report[name] = { 
+                    name, 
+                    rate, 
+                    netSales: 0, 
+                    taxCollected: 0, // Output Tax (Sales)
+                    netPurchases: 0,
+                    taxPaid: 0,      // Input Tax (Purchases)
+                    netTax: 0        // Collected - Paid
+                };
             }
-            report[name].netSales += netAmount;
-            report[name].taxCollected += taxAmount;
+
+            // Sales are typically Credit items (Revenue accounts)
+            // Purchases are typically Debit items (Expense/Asset accounts)
+            if (itemType === 'credit') {
+                report[name].netSales += netAmount;
+                report[name].taxCollected += taxAmount;
+            } else if (itemType === 'debit') {
+                report[name].netPurchases += netAmount;
+                report[name].taxPaid += taxAmount;
+            }
+            
+            report[name].netTax = report[name].taxCollected - report[name].taxPaid;
         });
         
         return new Response(JSON.stringify(Object.values(report)), {
@@ -172,7 +181,7 @@ serve(async (req) => {
         });
     }
 
-    // Default Reports Logic (Financial Statements)
+    // Default Reports Logic
     const promises = [];
 
     if (end_date) {

@@ -18,6 +18,9 @@ type TaxReportItem = {
   rate: number;
   netSales: number;
   taxCollected: number;
+  netPurchases: number;
+  taxPaid: number;
+  netTax: number;
 };
 
 const TaxReport = () => {
@@ -48,18 +51,31 @@ const TaxReport = () => {
     enabled: !!activeCompany && !!fromDate && !!toDate,
   });
 
-  const totalNetSales = taxData?.reduce((sum, item) => sum + item.netSales, 0) || 0;
+  const totalSales = taxData?.reduce((sum, item) => sum + item.netSales, 0) || 0;
   const totalTaxCollected = taxData?.reduce((sum, item) => sum + item.taxCollected, 0) || 0;
+  const totalPurchases = taxData?.reduce((sum, item) => sum + item.netPurchases, 0) || 0;
+  const totalTaxPaid = taxData?.reduce((sum, item) => sum + item.taxPaid, 0) || 0;
+  const totalNetTax = totalTaxCollected - totalTaxPaid;
 
   const handleDownload = () => {
     if (!taxData) return;
     const data = taxData.map(item => ({
       'Tax Name': item.name,
-      'Rate (%)': item.rate.toString(), // Converted to string to match the total row type
+      'Rate (%)': item.rate.toString(),
       'Net Sales': item.netSales.toFixed(2),
-      'Tax Collected': item.taxCollected.toFixed(2),
+      'Tax Collected (Output)': item.taxCollected.toFixed(2),
+      'Net Purchases': item.netPurchases.toFixed(2),
+      'Tax Paid (Input)': item.taxPaid.toFixed(2),
+      'Net Tax Due': item.netTax.toFixed(2)
     }));
-    data.push({ 'Tax Name': 'Total', 'Rate (%)': '', 'Net Sales': totalNetSales.toFixed(2), 'Tax Collected': totalTaxCollected.toFixed(2) });
+    data.push({ 
+        'Tax Name': 'Total', 'Rate (%)': '', 
+        'Net Sales': totalSales.toFixed(2), 
+        'Tax Collected (Output)': totalTaxCollected.toFixed(2),
+        'Net Purchases': totalPurchases.toFixed(2),
+        'Tax Paid (Input)': totalTaxPaid.toFixed(2),
+        'Net Tax Due': totalNetTax.toFixed(2)
+    });
     downloadCSV(data, `tax-report-${format(fromDate, 'yyyy-MM-dd')}-to-${format(toDate, 'yyyy-MM-dd')}.csv`);
   };
 
@@ -89,8 +105,8 @@ const TaxReport = () => {
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
           <div>
-            <CardTitle>Tax Liability</CardTitle>
-            <CardDescription>Sales tax collected for the period from {format(fromDate, "PPP")} to {format(toDate, "PPP")}</CardDescription>
+            <CardTitle>Tax Liability Summary</CardTitle>
+            <CardDescription>Net tax due (Output Tax - Input Tax) for the period {format(fromDate, "PPP")} to {format(toDate, "PPP")}</CardDescription>
           </div>
           <Button variant="outline" size="sm" onClick={handleDownload} disabled={!taxData || taxData.length === 0}>
             <Download className="mr-2 h-4 w-4" /> Download CSV
@@ -103,8 +119,9 @@ const TaxReport = () => {
                 <TableRow>
                   <TableHead>Tax Name</TableHead>
                   <TableHead className="text-right">Rate</TableHead>
-                  <TableHead className="text-right">Net Sales (Taxable)</TableHead>
-                  <TableHead className="text-right">Tax Collected</TableHead>
+                  <TableHead className="text-right">Tax Collected (Output)</TableHead>
+                  <TableHead className="text-right">Tax Paid (Input)</TableHead>
+                  <TableHead className="text-right">Net Tax Due</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -112,16 +129,22 @@ const TaxReport = () => {
                   <TableRow key={item.name}>
                     <TableCell className="font-medium">{item.name}</TableCell>
                     <TableCell className="text-right">{item.rate}%</TableCell>
-                    <TableCell className="text-right font-mono">{formatCurrency(item.netSales)}</TableCell>
-                    <TableCell className="text-right font-mono">{formatCurrency(item.taxCollected)}</TableCell>
+                    <TableCell className="text-right font-mono text-green-600">{formatCurrency(item.taxCollected)}</TableCell>
+                    <TableCell className="text-right font-mono text-amber-600">{formatCurrency(item.taxPaid)}</TableCell>
+                    <TableCell className={cn("text-right font-mono font-bold", item.netTax > 0 ? "text-red-600" : "text-green-600")}>
+                        {formatCurrency(item.netTax)}
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
               <TableFooter>
                 <TableRow className="text-lg font-bold bg-gray-100 dark:bg-gray-800">
                   <TableCell colSpan={2}>Totals</TableCell>
-                  <TableCell className="text-right font-mono">{formatCurrency(totalNetSales)}</TableCell>
-                  <TableCell className="text-right font-mono">{formatCurrency(totalTaxCollected)}</TableCell>
+                  <TableCell className="text-right font-mono text-green-700">{formatCurrency(totalTaxCollected)}</TableCell>
+                  <TableCell className="text-right font-mono text-amber-700">{formatCurrency(totalTaxPaid)}</TableCell>
+                  <TableCell className={cn("text-right font-mono", totalNetTax > 0 ? "text-red-600" : "text-green-600")}>
+                      {formatCurrency(totalNetTax)}
+                  </TableCell>
                 </TableRow>
               </TableFooter>
             </Table>

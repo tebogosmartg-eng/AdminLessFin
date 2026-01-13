@@ -109,23 +109,25 @@ serve(async (req) => {
       case 'POST':
         const { p_items, ...billData } = body.billData;
         
-        // Ensure p_items includes project_id
-        const itemsWithProject = p_items.map(item => ({
+        const itemsWithProjectAndTax = p_items.map(item => ({
             product_id: item.product_id,
             quantity: item.quantity,
             unit_cost: item.unit_cost,
             expense_account_id: item.expense_account_id,
-            project_id: item.project_id || null // Pass project_id
+            tax_rate_id: item.tax_rate_id || null,
+            project_id: item.project_id || null
         }));
 
-        ({ data, error } = await supabaseAdmin.rpc('record_bill_with_inventory', {
+        ({ data, error } = await supabaseAdmin.rpc('record_bill_with_taxes', {
           p_company_id: company_id,
           p_vendor_id: billData.vendor_id,
           p_bill_date: billData.bill_date,
           p_due_date: billData.due_date,
+          p_bill_number: billData.bill_number,
           p_accounts_payable_id: billData.accounts_payable_id,
+          p_tax_receivable_account_id: billData.tax_receivable_account_id || null,
           p_description: billData.description,
-          p_items: itemsWithProject,
+          p_items: itemsWithProjectAndTax,
         }));
         break;
 

@@ -16,11 +16,12 @@ import { Account } from '../pages/ChartOfAccounts';
 import { Vendor } from '../pages/Vendors';
 import { Product } from '../pages/Products';
 import { Project } from '../pages/Projects';
+import { TaxRate } from '../pages/TaxRates';
 import { Trash2 } from 'lucide-react';
 import { Alert, AlertDescription } from './ui/alert';
 import { addDays, format } from 'date-fns';
 import { formatCurrency } from '../lib/utils';
-import { projectsQuery } from '../lib/queries';
+import { projectsQuery, taxRatesQuery } from '../lib/queries';
 
 const billItemSchema = z.object({
   product_id: z.string().optional(),
@@ -29,13 +30,16 @@ const billItemSchema = z.object({
   unit_cost: z.coerce.number().min(0.01, "Cost must be positive."),
   expense_account_id: z.string().min(1, "Account is required."),
   project_id: z.string().optional(),
+  tax_rate_id: z.string().optional(),
 });
 
 const billSchema = z.object({
+  bill_number: z.string().optional(),
   bill_date: z.string().min(1, "Date is required."),
   due_date: z.string().min(1, "Due date is required."),
   vendor_id: z.string().min(1, "Vendor is required."),
   accounts_payable_id: z.string().min(1, "Accounts Payable account is required."),
+  tax_receivable_account_id: z.string().optional(),
   description: z.string().optional(),
   items: z.array(billItemSchema).min(1, "At least one line item is required."),
 });
@@ -55,12 +59,14 @@ const BillForm = ({ isOpen, setIsOpen, initialData, onSuccess }: BillFormProps) 
   const form = useForm<BillFormValues>({
     resolver: zodResolver(billSchema),
     defaultValues: {
+      bill_number: '',
       bill_date: format(new Date(), 'yyyy-MM-dd'),
       due_date: format(addDays(new Date(), 30), 'yyyy-MM-dd'),
       vendor_id: '',
       accounts_payable_id: '',
+      tax_receivable_account_id: '',
       description: '',
-      items: [{ product_id: '', description: '', quantity: 1, unit_cost: 0, expense_account_id: '', project_id: '' }],
+      items: [{ product_id: '', description: '', quantity: 1, unit_cost: 0, expense_account_id: '', project_id: '', tax_rate_id: '' }],
     },
   });
 
@@ -68,21 +74,25 @@ const BillForm = ({ isOpen, setIsOpen, initialData, onSuccess }: BillFormProps) 
     if (isOpen) {
       if (initialData) {
         form.reset({
+          bill_number: initialData.bill_number || '',
           bill_date: initialData.bill_date || format(new Date(), 'yyyy-MM-dd'),
           due_date: initialData.due_date || format(addDays(new Date(), 30), 'yyyy-MM-dd'),
           vendor_id: initialData.vendor_id || '',
           accounts_payable_id: initialData.accounts_payable_id || '',
+          tax_receivable_account_id: initialData.tax_receivable_account_id || '',
           description: initialData.description || '',
-          items: initialData.items || [{ product_id: '', description: '', quantity: 1, unit_cost: 0, expense_account_id: '', project_id: '' }],
+          items: initialData.items || [{ product_id: '', description: '', quantity: 1, unit_cost: 0, expense_account_id: '', project_id: '', tax_rate_id: '' }],
         });
       } else {
         form.reset({
+          bill_number: '',
           bill_date: format(new Date(), 'yyyy-MM-dd'),
           due_date: format(addDays(new Date(), 30), 'yyyy-MM-dd'),
           vendor_id: '',
           accounts_payable_id: '',
+          tax_receivable_account_id: '',
           description: '',
-          items: [{ product_id: '', description: '', quantity: 1, unit_cost: 0, expense_account_id: '', project_id: '' }],
+          items: [{ product_id: '', description: '', quantity: 1, unit_cost: 0, expense_account_id: '', project_id: '', tax_rate_id: '' }],
         });
       }
     }
@@ -127,6 +137,7 @@ const BillForm = ({ isOpen, setIsOpen, initialData, onSuccess }: BillFormProps) 
     enabled: !!activeCompany
   });
   const { data: projects } = useQuery<Project[]>({ ...projectsQuery(activeCompany?.id!), enabled: !!activeCompany });
+  const { data: taxRates } = useQuery<TaxRate[]>({ ...taxRatesQuery(activeCompany?.id!), enabled: !!activeCompany });
 
   const expenseAccounts = accounts?.filter(a => a.type === 'Expense');
   const assetAccounts = accounts?.filter(a => a.type === 'Asset');
@@ -158,13 +169,16 @@ const BillForm = ({ isOpen, setIsOpen, initialData, onSuccess }: BillFormProps) 
         unit_cost: item.unit_cost,
         expense_account_id: item.expense_account_id,
         project_id: item.project_id || null,
+        tax_rate_id: (item.tax_rate_id === 'none' || !item.tax_rate_id) ? null : item.tax_rate_id,
       }));
 
       const billData = {
+        bill_number: values.bill_number,
         vendor_id: values.vendor_id,
         bill_date: values.bill_date,
         due_date: values.due_date,
         accounts_payable_id: values.accounts_payable_id,
+        tax_receivable_account_id: values.tax_receivable_account_id || null,
         description: values.description || `Bill from ${vendors?.find(v => v.id === values.vendor_id)?.name}`,
         p_items: p_items,
       };
@@ -194,12 +208,20 @@ const BillForm = ({ isOpen, setIsOpen, initialData, onSuccess }: BillFormProps) 
 
   const onSubmit = (values: BillFormValues) => mutation.mutate(values);
 
+  const watchedItems = form.watch('items');
+  const hasTax = watchedItems.some(item => item.tax_rate_id && item.tax_rate_id !== 'none');
+  const totalAmount = watchedItems.reduce((sum, item) => {
+      const sub = (item.quantity || 0) * (item.unit_cost || 0);
+      const rate = taxRates?.find(t => t.id === item.tax_rate_id)?.rate || 0;
+      return sum + sub * (1 + rate/100);
+  }, 0);
+
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogContent className="sm:max-w-6xl">
         <DialogHeader>
           <DialogTitle>Record New Bill</DialogTitle>
-          <DialogDescription>This will create a new bill and update inventory levels for stock items.</DialogDescription>
+          <DialogDescription>Create a new bill record.</DialogDescription>
         </DialogHeader>
         {!apAccounts?.some(acc => acc.name.toLowerCase().includes('accounts payable')) && (
             <Alert variant="destructive"><AlertDescription>Warning: You don't have an "Accounts Payable" account. Please create one in your Chart of Accounts (Type: Liability).</AlertDescription></Alert>
@@ -208,17 +230,24 @@ const BillForm = ({ isOpen, setIsOpen, initialData, onSuccess }: BillFormProps) 
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <FormField control={form.control} name="vendor_id" render={({ field }) => (<FormItem><FormLabel>Vendor</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select vendor" /></SelectTrigger></FormControl><SelectContent>{vendors?.map(v => <SelectItem key={v.id} value={v.id}>{v.name}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem>)} />
+              <FormField control={form.control} name="bill_number" render={({ field }) => (<FormItem><FormLabel>Bill #</FormLabel><FormControl><Input placeholder="Vendor Inv #" {...field} /></FormControl><FormMessage /></FormItem>)} />
               <FormField control={form.control} name="bill_date" render={({ field }) => (<FormItem><FormLabel>Bill Date</FormLabel><FormControl><Input type="date" {...field} /></FormControl><FormMessage /></FormItem>)} />
               <FormField control={form.control} name="due_date" render={({ field }) => (<FormItem><FormLabel>Due Date</FormLabel><FormControl><Input type="date" {...field} /></FormControl><FormMessage /></FormItem>)} />
-              <FormField control={form.control} name="accounts_payable_id" render={({ field }) => (<FormItem><FormLabel>Credit A/P</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select A/P Account" /></SelectTrigger></FormControl><SelectContent>{apAccounts?.map(acc => <SelectItem key={acc.id} value={acc.id}>{acc.name}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem>)} />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+                <FormField control={form.control} name="accounts_payable_id" render={({ field }) => (<FormItem><FormLabel>Credit A/P</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select A/P Account" /></SelectTrigger></FormControl><SelectContent>{apAccounts?.map(acc => <SelectItem key={acc.id} value={acc.id}>{acc.name}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem>)} />
+                {hasTax && (
+                    <FormField control={form.control} name="tax_receivable_account_id" render={({ field }) => (<FormItem><FormLabel>Tax Receivable Account</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select Asset Account" /></SelectTrigger></FormControl><SelectContent>{assetAccounts?.map(acc => <SelectItem key={acc.id} value={acc.id}>{acc.name}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem>)} />
+                )}
             </div>
             <FormField control={form.control} name="description" render={({ field }) => (<FormItem><FormLabel>Memo (Optional)</FormLabel><FormControl><Textarea placeholder="A brief description of the bill" {...field} /></FormControl><FormMessage /></FormItem>)} />
             <div className="space-y-2">
               <div className="grid grid-cols-12 gap-2 px-2 text-xs font-medium text-muted-foreground">
                 <div className="col-span-2">Item</div>
-                <div className="col-span-3">Description</div>
+                <div className="col-span-2">Description</div>
                 <div className="col-span-1">Qty</div>
                 <div className="col-span-1">Cost</div>
+                <div className="col-span-1">Tax</div>
                 <div className="col-span-1 text-right">Total</div>
                 <div className="col-span-2">Account</div>
                 <div className="col-span-2">Project</div>
@@ -226,22 +255,31 @@ const BillForm = ({ isOpen, setIsOpen, initialData, onSuccess }: BillFormProps) 
               {fields.map((field, index) => {
                 const quantity = form.watch(`items.${index}.quantity`);
                 const unitCost = form.watch(`items.${index}.unit_cost`);
-                const lineTotal = quantity * unitCost;
+                const taxRateId = form.watch(`items.${index}.tax_rate_id`);
+                const rate = taxRates?.find(t => t.id === taxRateId)?.rate || 0;
+                const lineTotal = (quantity * unitCost) * (1 + rate/100);
+                
                 return (
                   <div key={field.id} className="grid grid-cols-12 gap-2 items-start">
-                    <FormField control={form.control} name={`items.${index}.product_id`} render={({ field }) => (<FormItem className="col-span-2"><Select onValueChange={(value) => { field.onChange(value); handleProductSelect(value, index); }} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select item" /></SelectTrigger></FormControl><SelectContent>{products?.map(p => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}</SelectContent></Select></FormItem>)} />
-                    <FormField control={form.control} name={`items.${index}.description`} render={({ field }) => (<FormItem className="col-span-3"><FormControl><Textarea placeholder="Description" {...field} rows={1} /></FormControl></FormItem>)} />
+                    <FormField control={form.control} name={`items.${index}.product_id`} render={({ field }) => (<FormItem className="col-span-2"><Select onValueChange={(value) => { field.onChange(value); handleProductSelect(value, index); }} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger></FormControl><SelectContent>{products?.map(p => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}</SelectContent></Select></FormItem>)} />
+                    <FormField control={form.control} name={`items.${index}.description`} render={({ field }) => (<FormItem className="col-span-2"><FormControl><Input placeholder="Desc" {...field} /></FormControl></FormItem>)} />
                     <FormField control={form.control} name={`items.${index}.quantity`} render={({ field }) => (<FormItem className="col-span-1"><FormControl><Input type="number" placeholder="Qty" {...field} /></FormControl></FormItem>)} />
                     <FormField control={form.control} name={`items.${index}.unit_cost`} render={({ field }) => (<FormItem className="col-span-1"><FormControl><Input type="number" step="0.01" placeholder="Cost" {...field} /></FormControl></FormItem>)} />
-                    <div className="col-span-1 pt-2 text-right font-mono">{formatCurrency(lineTotal)}</div>
+                    <FormField control={form.control} name={`items.${index}.tax_rate_id`} render={({ field }) => (<FormItem className="col-span-1"><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="-" /></SelectTrigger></FormControl><SelectContent><SelectItem value="none">None</SelectItem>{taxRates?.map(t => <SelectItem key={t.id} value={t.id}>{t.rate}%</SelectItem>)}</SelectContent></Select></FormItem>)} />
+                    <div className="col-span-1 pt-2 text-right font-mono text-xs">{formatCurrency(lineTotal)}</div>
                     <FormField control={form.control} name={`items.${index}.expense_account_id`} render={({ field }) => (<FormItem className="col-span-2"><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Account" /></SelectTrigger></FormControl><SelectContent>{[...(expenseAccounts || []), ...(assetAccounts || [])].map(acc => <SelectItem key={acc.id} value={acc.id}>{acc.name}</SelectItem>)}</SelectContent></Select></FormItem>)} />
                     <FormField control={form.control} name={`items.${index}.project_id`} render={({ field }) => (<FormItem className="col-span-2"><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="-" /></SelectTrigger></FormControl><SelectContent><SelectItem value="">None</SelectItem>{projects?.map(p => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}</SelectContent></Select></FormItem>)} />
-                    <div className="col-span-12 md:col-span-1 pt-2 flex justify-end md:justify-start"><Button type="button" variant="ghost" size="icon" onClick={() => remove(index)} disabled={fields.length <= 1}><Trash2 className="h-4 w-4" /></Button></div>
+                    <div className="col-span-12 md:col-span-12 pt-1 flex justify-end"><Button type="button" variant="ghost" size="icon" onClick={() => remove(index)} disabled={fields.length <= 1}><Trash2 className="h-4 w-4" /></Button></div>
                   </div>
                 )
               })}
-              <Button type="button" variant="outline" size="sm" onClick={() => append({ product_id: '', description: '', quantity: 1, unit_cost: 0, expense_account_id: '', project_id: '' })}>Add Line</Button>
+              <Button type="button" variant="outline" size="sm" onClick={() => append({ description: '', quantity: 1, unit_cost: 0, expense_account_id: '', project_id: '', tax_rate_id: '' })}>Add Line</Button>
             </div>
+            
+            <div className="flex justify-end pt-2 border-t">
+               <span className="text-lg font-bold">Total: {formatCurrency(totalAmount)}</span>
+            </div>
+
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setIsOpen(false)}>Cancel</Button>
               <Button type="submit" disabled={mutation.isPending}>{mutation.isPending ? 'Saving...' : 'Record Bill'}</Button>
