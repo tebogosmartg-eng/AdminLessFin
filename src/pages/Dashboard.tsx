@@ -7,7 +7,7 @@ import { Account } from './ChartOfAccounts';
 import { Landmark, TrendingUp, TrendingDown, Wallet, DollarSign, Calendar as CalendarIcon, AlertTriangle } from 'lucide-react';
 import { Skeleton } from '../components/ui/skeleton';
 import IncomeExpenseChart from '../components/IncomeExpenseChart';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { Button } from '../components/ui/button';
 import QuickActions from '../components/QuickActions';
 import { formatDistanceToNow, startOfMonth, endOfMonth, format } from 'date-fns';
@@ -38,6 +38,7 @@ type LowStockItem = {
 
 const Dashboard = () => {
   const { user, profile, activeCompany } = useAuth();
+  const navigate = useNavigate();
   const [date, setDate] = useState<DateRange | undefined>({
     from: startOfMonth(new Date()),
     to: endOfMonth(new Date()),
@@ -104,10 +105,10 @@ const Dashboard = () => {
   const totalAp = apBalances?.reduce((sum: number, item: { balance: number }) => sum + item.balance, 0) || 0;
 
   const summaryCards = [
-    { title: 'Cash Balance', value: totals.cash, icon: DollarSign },
-    { title: 'Total Assets', value: totals.assets, icon: Wallet },
-    { title: 'Total Liabilities', value: totals.liabilities, icon: Landmark },
-    { title: 'Net Income (YTD)', value: totals.netIncome, icon: totals.netIncome >= 0 ? TrendingUp : TrendingDown, color: totals.netIncome >= 0 ? 'text-green-600' : 'text-red-600' },
+    { title: 'Cash Balance', value: totals.cash, icon: DollarSign, link: '/chart-of-accounts' },
+    { title: 'Total Assets', value: totals.assets, icon: Wallet, link: '/financial-statements' },
+    { title: 'Total Liabilities', value: totals.liabilities, icon: Landmark, link: '/financial-statements' },
+    { title: 'Net Income (YTD)', value: totals.netIncome, icon: totals.netIncome >= 0 ? TrendingUp : TrendingDown, color: totals.netIncome >= 0 ? 'text-green-600' : 'text-red-600', link: '/reports' },
   ];
 
   return (
@@ -179,7 +180,11 @@ const Dashboard = () => {
         
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
           {summaryCards.map((card, index) => (
-            <Card key={index}>
+            <Card 
+              key={index} 
+              className="cursor-pointer transition-colors hover:bg-muted/50" 
+              onClick={() => navigate(card.link)}
+            >
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">{card.title}</CardTitle>
                 <card.icon className="h-4 w-4 text-muted-foreground" />
@@ -214,7 +219,7 @@ const Dashboard = () => {
         </div>
 
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          <Card>
+          <Card className="cursor-pointer hover:bg-muted/50 transition-colors" onClick={() => navigate('/invoices?status=unpaid')}>
             <CardHeader>
               <CardTitle>Accounts Receivable</CardTitle>
               <CardDescription>Money owed to you by customers.</CardDescription>
@@ -236,7 +241,7 @@ const Dashboard = () => {
               )}
             </CardContent>
           </Card>
-          <Card>
+          <Card className="cursor-pointer hover:bg-muted/50 transition-colors" onClick={() => navigate('/bills?status=open')}>
             <CardHeader>
               <CardTitle>Accounts Payable</CardTitle>
               <CardDescription>Money you owe to vendors.</CardDescription>
