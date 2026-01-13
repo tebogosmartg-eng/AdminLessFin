@@ -47,6 +47,7 @@ import RecurringBills from "./pages/RecurringBills";
 import PurchaseOrders from "./pages/PurchaseOrders";
 import PurchaseOrderDetail from "./pages/PurchaseOrderDetail";
 import FinancialCalendar from "./pages/FinancialCalendar";
+import CreditNotes from "./pages/CreditNotes";
 
 export const AppRouter = () => {
   return (
@@ -60,6 +61,7 @@ export const AppRouter = () => {
         <Route path="/quotes/:id" element={<QuoteDetail />} />
         <Route path="/invoices" element={<Invoices />} />
         <Route path="/invoices/:id" element={<InvoiceDetail />} />
+        <Route path="/credit-notes" element={<CreditNotes />} />
         <Route path="/recurring-invoices" element={<RecurringInvoices />} />
         <Route path="/bills" element={<Bills />} />
         <Route path="/pay-bills" element={<PayBills />} />
