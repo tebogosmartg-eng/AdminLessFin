@@ -38,6 +38,7 @@ import QuoteDetail from "./pages/QuoteDetail";
 import TaxRates from "./pages/TaxRates";
 import Projects from "./pages/Projects";
 import TimeTracking from "./pages/TimeTracking";
+import RecurringInvoices from "./pages/RecurringInvoices";
 
 export const AppRouter = () => {
   return (
@@ -50,6 +51,7 @@ export const AppRouter = () => {
         <Route path="/quotes/:id" element={<QuoteDetail />} />
         <Route path="/invoices" element={<Invoices />} />
         <Route path="/invoices/:id" element={<InvoiceDetail />} />
+        <Route path="/recurring-invoices" element={<RecurringInvoices />} />
         <Route path="/bills" element={<Bills />} />
         <Route path="/pay-bills" element={<PayBills />} />
         <Route path="/receive-payments" element={<ReceivePayments />} />

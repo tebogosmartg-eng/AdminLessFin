@@ -48,6 +48,17 @@ export const invoicesQuery = (companyId: string) => ({
   },
 });
 
+export const recurringInvoicesQuery = (companyId: string) => ({
+  queryKey: ['recurring_invoices', companyId],
+  queryFn: async () => {
+    const { data, error } = await supabase.functions.invoke('recurring-invoices', {
+      body: { method: 'GET_ALL', company_id: companyId },
+    });
+    if (error) throw new Error(error.message);
+    return data;
+  },
+});
+
 export const quotesQuery = (companyId: string) => ({
   queryKey: ['quotes', companyId],
   queryFn: async () => {
