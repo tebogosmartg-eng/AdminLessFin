@@ -10,6 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogD
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from './ui/form';
 import { Input } from './ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
+import { RadioGroup, RadioGroupItem } from './ui/radio-group';
 import { Textarea } from './ui/textarea';
 import { showError, showSuccess } from '../utils/toast';
 import { Account } from '../pages/ChartOfAccounts';
@@ -300,7 +301,8 @@ const InvoiceForm = ({ isOpen, setIsOpen, invoiceId, duplicateFromId }: InvoiceF
             </form>
           </Form>
         </DialogContent>
-      </Sheet>
+      </Dialog>
+      
       <Sheet open={isPreviewOpen} onOpenChange={setIsPreviewOpen}>
         <SheetContent className="sm:max-w-3xl w-full">
             <SheetHeader>
@@ -315,6 +317,7 @@ const InvoiceForm = ({ isOpen, setIsOpen, invoiceId, duplicateFromId }: InvoiceF
             />
         </SheetContent>
       </Sheet>
+      
       {customerId && (
         <AddUnbilledTimeDialog
           isOpen={isUnbilledTimeOpen}
