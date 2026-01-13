@@ -15,10 +15,12 @@ import { showError, showSuccess } from '../utils/toast';
 import { Account } from '../pages/ChartOfAccounts';
 import { Vendor } from '../pages/Vendors';
 import { Product } from '../pages/Products';
+import { Project } from '../pages/Projects';
 import { Trash2 } from 'lucide-react';
 import { Alert, AlertDescription } from './ui/alert';
 import { addDays, format } from 'date-fns';
 import { formatCurrency } from '../lib/utils';
+import { projectsQuery } from '../lib/queries';
 
 const billItemSchema = z.object({
   product_id: z.string().optional(),
@@ -26,6 +28,7 @@ const billItemSchema = z.object({
   quantity: z.coerce.number().min(1, "Qty must be at least 1."),
   unit_cost: z.coerce.number().min(0.01, "Cost must be positive."),
   expense_account_id: z.string().min(1, "Account is required."),
+  project_id: z.string().optional(),
 });
 
 const billSchema = z.object({
@@ -57,7 +60,7 @@ const BillForm = ({ isOpen, setIsOpen, initialData, onSuccess }: BillFormProps) 
       vendor_id: '',
       accounts_payable_id: '',
       description: '',
-      items: [{ product_id: '', description: '', quantity: 1, unit_cost: 0, expense_account_id: '' }],
+      items: [{ product_id: '', description: '', quantity: 1, unit_cost: 0, expense_account_id: '', project_id: '' }],
     },
   });
 
@@ -70,7 +73,7 @@ const BillForm = ({ isOpen, setIsOpen, initialData, onSuccess }: BillFormProps) 
           vendor_id: initialData.vendor_id || '',
           accounts_payable_id: initialData.accounts_payable_id || '',
           description: initialData.description || '',
-          items: initialData.items || [{ product_id: '', description: '', quantity: 1, unit_cost: 0, expense_account_id: '' }],
+          items: initialData.items || [{ product_id: '', description: '', quantity: 1, unit_cost: 0, expense_account_id: '', project_id: '' }],
         });
       } else {
         form.reset({
@@ -79,7 +82,7 @@ const BillForm = ({ isOpen, setIsOpen, initialData, onSuccess }: BillFormProps) 
           vendor_id: '',
           accounts_payable_id: '',
           description: '',
-          items: [{ product_id: '', description: '', quantity: 1, unit_cost: 0, expense_account_id: '' }],
+          items: [{ product_id: '', description: '', quantity: 1, unit_cost: 0, expense_account_id: '', project_id: '' }],
         });
       }
     }
@@ -123,6 +126,8 @@ const BillForm = ({ isOpen, setIsOpen, initialData, onSuccess }: BillFormProps) 
     },
     enabled: !!activeCompany
   });
+  const { data: projects } = useQuery<Project[]>({ ...projectsQuery(activeCompany?.id!), enabled: !!activeCompany });
+
   const expenseAccounts = accounts?.filter(a => a.type === 'Expense');
   const assetAccounts = accounts?.filter(a => a.type === 'Asset');
   const apAccounts = accounts?.filter(a => a.type === 'Liability');
@@ -152,6 +157,7 @@ const BillForm = ({ isOpen, setIsOpen, initialData, onSuccess }: BillFormProps) 
         quantity: item.quantity,
         unit_cost: item.unit_cost,
         expense_account_id: item.expense_account_id,
+        project_id: item.project_id || null,
       }));
 
       const billData = {
@@ -190,7 +196,7 @@ const BillForm = ({ isOpen, setIsOpen, initialData, onSuccess }: BillFormProps) 
 
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
-      <DialogContent className="sm:max-w-4xl">
+      <DialogContent className="sm:max-w-6xl">
         <DialogHeader>
           <DialogTitle>Record New Bill</DialogTitle>
           <DialogDescription>This will create a new bill and update inventory levels for stock items.</DialogDescription>
@@ -208,24 +214,33 @@ const BillForm = ({ isOpen, setIsOpen, initialData, onSuccess }: BillFormProps) 
             </div>
             <FormField control={form.control} name="description" render={({ field }) => (<FormItem><FormLabel>Memo (Optional)</FormLabel><FormControl><Textarea placeholder="A brief description of the bill" {...field} /></FormControl><FormMessage /></FormItem>)} />
             <div className="space-y-2">
-              <FormLabel>Items</FormLabel>
+              <div className="grid grid-cols-12 gap-2 px-2 text-xs font-medium text-muted-foreground">
+                <div className="col-span-2">Item</div>
+                <div className="col-span-3">Description</div>
+                <div className="col-span-1">Qty</div>
+                <div className="col-span-1">Cost</div>
+                <div className="col-span-1 text-right">Total</div>
+                <div className="col-span-2">Account</div>
+                <div className="col-span-2">Project</div>
+              </div>
               {fields.map((field, index) => {
                 const quantity = form.watch(`items.${index}.quantity`);
                 const unitCost = form.watch(`items.${index}.unit_cost`);
                 const lineTotal = quantity * unitCost;
                 return (
                   <div key={field.id} className="grid grid-cols-12 gap-2 items-start">
-                    <FormField control={form.control} name={`items.${index}.product_id`} render={({ field }) => (<FormItem className="col-span-3"><Select onValueChange={(value) => { field.onChange(value); handleProductSelect(value, index); }} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select item" /></SelectTrigger></FormControl><SelectContent>{products?.map(p => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}</SelectContent></Select></FormItem>)} />
+                    <FormField control={form.control} name={`items.${index}.product_id`} render={({ field }) => (<FormItem className="col-span-2"><Select onValueChange={(value) => { field.onChange(value); handleProductSelect(value, index); }} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select item" /></SelectTrigger></FormControl><SelectContent>{products?.map(p => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}</SelectContent></Select></FormItem>)} />
                     <FormField control={form.control} name={`items.${index}.description`} render={({ field }) => (<FormItem className="col-span-3"><FormControl><Textarea placeholder="Description" {...field} rows={1} /></FormControl></FormItem>)} />
                     <FormField control={form.control} name={`items.${index}.quantity`} render={({ field }) => (<FormItem className="col-span-1"><FormControl><Input type="number" placeholder="Qty" {...field} /></FormControl></FormItem>)} />
                     <FormField control={form.control} name={`items.${index}.unit_cost`} render={({ field }) => (<FormItem className="col-span-1"><FormControl><Input type="number" step="0.01" placeholder="Cost" {...field} /></FormControl></FormItem>)} />
                     <div className="col-span-1 pt-2 text-right font-mono">{formatCurrency(lineTotal)}</div>
                     <FormField control={form.control} name={`items.${index}.expense_account_id`} render={({ field }) => (<FormItem className="col-span-2"><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Account" /></SelectTrigger></FormControl><SelectContent>{[...(expenseAccounts || []), ...(assetAccounts || [])].map(acc => <SelectItem key={acc.id} value={acc.id}>{acc.name}</SelectItem>)}</SelectContent></Select></FormItem>)} />
-                    <div className="col-span-1 pt-2"><Button type="button" variant="ghost" size="icon" onClick={() => remove(index)} disabled={fields.length <= 1}><Trash2 className="h-4 w-4" /></Button></div>
+                    <FormField control={form.control} name={`items.${index}.project_id`} render={({ field }) => (<FormItem className="col-span-2"><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="-" /></SelectTrigger></FormControl><SelectContent><SelectItem value="">None</SelectItem>{projects?.map(p => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}</SelectContent></Select></FormItem>)} />
+                    <div className="col-span-12 md:col-span-1 pt-2 flex justify-end md:justify-start"><Button type="button" variant="ghost" size="icon" onClick={() => remove(index)} disabled={fields.length <= 1}><Trash2 className="h-4 w-4" /></Button></div>
                   </div>
                 )
               })}
-              <Button type="button" variant="outline" size="sm" onClick={() => append({ product_id: '', description: '', quantity: 1, unit_cost: 0, expense_account_id: '' })}>Add Line</Button>
+              <Button type="button" variant="outline" size="sm" onClick={() => append({ product_id: '', description: '', quantity: 1, unit_cost: 0, expense_account_id: '', project_id: '' })}>Add Line</Button>
             </div>
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setIsOpen(false)}>Cancel</Button>

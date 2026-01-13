@@ -80,6 +80,32 @@ serve(async (req) => {
         const billableAmount = totalHours * (project.billable_rate || 0);
         const unbilledAmount = unbilledHours * (project.billable_rate || 0);
 
+        // Fetch Financial Transactions
+        const { data: financialItems, error: finError } = await supabaseAdmin
+          .from('journal_entry_items')
+          .select(`
+            amount,
+            type,
+            chart_of_accounts ( name, type )
+          `)
+          .eq('project_id', body.projectId);
+
+        if (finError) throw finError;
+
+        let totalRevenue = 0;
+        let totalExpenses = 0;
+
+        financialItems.forEach(item => {
+          const accountType = item.chart_of_accounts?.type;
+          if (accountType === 'Income') {
+            // Income is Credit normal.
+            totalRevenue += item.type === 'credit' ? item.amount : -item.amount;
+          } else if (accountType === 'Expense' || accountType === 'Cost of Goods Sold') {
+            // Expense is Debit normal.
+            totalExpenses += item.type === 'debit' ? item.amount : -item.amount;
+          }
+        });
+
         data = {
           project,
           stats: {
@@ -89,7 +115,12 @@ serve(async (req) => {
             unbilledAmount,
             timesheetCount: timesheets.length
           },
-          timesheets
+          timesheets,
+          financials: {
+            totalRevenue,
+            totalExpenses,
+            profit: totalRevenue - totalExpenses
+          }
         };
         break;
 

@@ -63,7 +63,7 @@ serve(async (req) => {
             journal_entries (
               id,
               entry_date,
-              journal_entry_items ( type, amount )
+              journal_entry_items ( type, amount, project_id )
             )
           `)
           .eq('company_id', company_id)
@@ -99,7 +99,7 @@ serve(async (req) => {
             description: bill.description?.description || `Bill from ${bill.vendors?.name}`,
             status: bill.status,
             vendor_id: bill.vendor_id,
-            vendors: [bill.vendors], // Wrap in array to match previous structure expected by frontend
+            vendors: [bill.vendors], 
             bill_number: bill.bill_number,
             journal_entry_items: bill.journal_entries?.journal_entry_items
           }));
@@ -108,6 +108,16 @@ serve(async (req) => {
       
       case 'POST':
         const { p_items, ...billData } = body.billData;
+        
+        // Ensure p_items includes project_id
+        const itemsWithProject = p_items.map(item => ({
+            product_id: item.product_id,
+            quantity: item.quantity,
+            unit_cost: item.unit_cost,
+            expense_account_id: item.expense_account_id,
+            project_id: item.project_id || null // Pass project_id
+        }));
+
         ({ data, error } = await supabaseAdmin.rpc('record_bill_with_inventory', {
           p_company_id: company_id,
           p_vendor_id: billData.vendor_id,
@@ -115,7 +125,7 @@ serve(async (req) => {
           p_due_date: billData.due_date,
           p_accounts_payable_id: billData.accounts_payable_id,
           p_description: billData.description,
-          p_items: p_items,
+          p_items: itemsWithProject,
         }));
         break;
 

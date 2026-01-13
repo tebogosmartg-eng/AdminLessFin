@@ -7,11 +7,12 @@ import { Button } from '../components/ui/button';
 import { Badge } from '../components/ui/badge';
 import { Skeleton } from '../components/ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/table';
-import { Clock, DollarSign, FileSignature, CheckCircle, CircleDashed } from 'lucide-react';
-import { formatCurrency } from '../lib/utils';
+import { Clock, DollarSign, FileSignature, CheckCircle, CircleDashed, TrendingUp, TrendingDown, ArrowRight } from 'lucide-react';
+import { formatCurrency, cn } from '../lib/utils';
 import { useAuth } from '../contexts/AuthContext';
 import { format } from 'date-fns';
 import InvoiceForm from '../components/InvoiceForm';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
 
 const ProjectDetail = () => {
   const { id } = useParams();
@@ -39,6 +40,7 @@ const ProjectDetail = () => {
   const project = data?.project;
   const stats = data?.stats;
   const timesheets = data?.timesheets;
+  const financials = data?.financials;
 
   if (isLoading) {
     return <div className="space-y-4"><Skeleton className="h-48 w-full" /><Skeleton className="h-96 w-full" /></div>;
@@ -48,18 +50,13 @@ const ProjectDetail = () => {
     return <div>Project not found.</div>;
   }
 
-  // To auto-populate the invoice form, we construct a "duplicateFromId" style object
-  // essentially mimicking an existing invoice but populated with project data.
-  // However, InvoiceForm expects an ID or duplicate ID to fetch data.
-  // The better way is to pass initial data to InvoiceForm, but my InvoiceForm implementation currently fetches by ID.
-  //
-  // Workaround: I will modify InvoiceForm to accept `initialData`? 
-  // No, simpler: Use the existing "Add Unbilled Time" flow within InvoiceForm.
-  // I will open InvoiceForm with the customer pre-selected.
-
   const handleCreateInvoice = () => {
     setIsInvoiceFormOpen(true);
   };
+
+  const profitMargin = financials?.totalRevenue > 0 
+    ? (financials.profit / financials.totalRevenue) * 100 
+    : 0;
 
   return (
     <div className="space-y-6">
@@ -86,96 +83,145 @@ const ProjectDetail = () => {
         </div>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Hours</CardTitle>
-            <Clock className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{stats?.totalHours.toFixed(2)}</div>
-            <p className="text-xs text-muted-foreground">Logged across {stats?.timesheetCount} entries</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Value</CardTitle>
-            <DollarSign className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{formatCurrency(stats?.billableAmount || 0)}</div>
-            <p className="text-xs text-muted-foreground">Based on rate of {formatCurrency(project.billable_rate || 0)}/hr</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Unbilled Value</CardTitle>
-            <CircleDashed className="h-4 w-4 text-amber-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-amber-600">{formatCurrency(stats?.unbilledAmount || 0)}</div>
-            <p className="text-xs text-muted-foreground">{stats?.unbilledHours.toFixed(2)} hours pending</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Invoiced Value</CardTitle>
-            <CheckCircle className="h-4 w-4 text-green-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-green-600">{formatCurrency((stats?.billableAmount || 0) - (stats?.unbilledAmount || 0))}</div>
-            <p className="text-xs text-muted-foreground">Already billed to client</p>
-          </CardContent>
-        </Card>
-      </div>
+      <Tabs defaultValue="overview">
+        <TabsList>
+          <TabsTrigger value="overview">Overview</TabsTrigger>
+          <TabsTrigger value="financials">Profitability</TabsTrigger>
+          <TabsTrigger value="timesheets">Timesheets</TabsTrigger>
+        </TabsList>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Time Entries</CardTitle>
-          <CardDescription>History of work logged for this project.</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Date</TableHead>
-                <TableHead>Notes</TableHead>
-                <TableHead className="text-right">Hours</TableHead>
-                <TableHead className="text-right">Amount</TableHead>
-                <TableHead>Status</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {timesheets && timesheets.length > 0 ? (
-                timesheets.map((entry: any) => (
-                  <TableRow key={entry.id}>
-                    <TableCell>{format(new Date(entry.date), 'PPP')}</TableCell>
-                    <TableCell className="max-w-md truncate" title={entry.notes}>{entry.notes || '-'}</TableCell>
-                    <TableCell className="text-right font-mono">{entry.hours.toFixed(2)}</TableCell>
-                    <TableCell className="text-right font-mono">{formatCurrency(entry.hours * (project.billable_rate || 0))}</TableCell>
-                    <TableCell>
-                      <Badge variant={entry.is_billed ? 'default' : 'outline'}>
-                        {entry.is_billed ? 'Billed' : 'Unbilled'}
-                      </Badge>
-                    </TableCell>
+        <TabsContent value="overview" className="space-y-4">
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Total Hours</CardTitle>
+                <Clock className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{stats?.totalHours.toFixed(2)}</div>
+                <p className="text-xs text-muted-foreground">Logged across {stats?.timesheetCount} entries</p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Estimated Value</CardTitle>
+                <DollarSign className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{formatCurrency(stats?.billableAmount || 0)}</div>
+                <p className="text-xs text-muted-foreground">Based on rate of {formatCurrency(project.billable_rate || 0)}/hr</p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Unbilled Value</CardTitle>
+                <CircleDashed className="h-4 w-4 text-amber-500" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-amber-600">{formatCurrency(stats?.unbilledAmount || 0)}</div>
+                <p className="text-xs text-muted-foreground">{stats?.unbilledHours.toFixed(2)} hours pending</p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Invoiced Value</CardTitle>
+                <CheckCircle className="h-4 w-4 text-green-500" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-green-600">{formatCurrency((stats?.billableAmount || 0) - (stats?.unbilledAmount || 0))}</div>
+                <p className="text-xs text-muted-foreground">Already billed to client</p>
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="financials" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Project Profitability (Actuals)</CardTitle>
+              <CardDescription>Based on posted Invoices (Revenue) and Bills/Expenses (Costs) tagged to this project.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid gap-6 md:grid-cols-3">
+                <div className="space-y-1">
+                  <span className="text-sm font-medium text-muted-foreground">Total Revenue</span>
+                  <div className="text-2xl font-bold text-green-600">{formatCurrency(financials?.totalRevenue || 0)}</div>
+                </div>
+                <div className="space-y-1">
+                  <span className="text-sm font-medium text-muted-foreground">Total Costs</span>
+                  <div className="text-2xl font-bold text-red-600">{formatCurrency(financials?.totalExpenses || 0)}</div>
+                </div>
+                <div className="space-y-1">
+                  <span className="text-sm font-medium text-muted-foreground">Net Profit</span>
+                  <div className={cn("text-2xl font-bold", (financials?.profit || 0) >= 0 ? "text-green-600" : "text-red-600")}>
+                    {formatCurrency(financials?.profit || 0)}
+                  </div>
+                  <div className="text-xs text-muted-foreground">Margin: {profitMargin.toFixed(1)}%</div>
+                </div>
+              </div>
+              
+              <div className="mt-8 flex h-4 w-full rounded-full overflow-hidden bg-secondary">
+                <div 
+                  className="bg-green-500 h-full" 
+                  style={{ width: `${Math.min((financials?.totalRevenue / (financials?.totalRevenue + financials?.totalExpenses || 1)) * 100, 100)}%` }} 
+                />
+                <div 
+                  className="bg-red-500 h-full" 
+                  style={{ width: `${Math.min((financials?.totalExpenses / (financials?.totalRevenue + financials?.totalExpenses || 1)) * 100, 100)}%` }} 
+                />
+              </div>
+              <div className="flex justify-between text-xs text-muted-foreground mt-2">
+                <span>Revenue</span>
+                <span>Expenses</span>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="timesheets">
+          <Card>
+            <CardHeader>
+              <CardTitle>Time Entries</CardTitle>
+              <CardDescription>History of work logged for this project.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Date</TableHead>
+                    <TableHead>Notes</TableHead>
+                    <TableHead className="text-right">Hours</TableHead>
+                    <TableHead className="text-right">Amount</TableHead>
+                    <TableHead>Status</TableHead>
                   </TableRow>
-                ))
-              ) : (
-                <TableRow>
-                  <TableCell colSpan={5} className="text-center">No time entries found.</TableCell>
-                </TableRow>
-              )}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
+                </TableHeader>
+                <TableBody>
+                  {timesheets && timesheets.length > 0 ? (
+                    timesheets.map((entry: any) => (
+                      <TableRow key={entry.id}>
+                        <TableCell>{format(new Date(entry.date), 'PPP')}</TableCell>
+                        <TableCell className="max-w-md truncate" title={entry.notes}>{entry.notes || '-'}</TableCell>
+                        <TableCell className="text-right font-mono">{entry.hours.toFixed(2)}</TableCell>
+                        <TableCell className="text-right font-mono">{formatCurrency(entry.hours * (project.billable_rate || 0))}</TableCell>
+                        <TableCell>
+                          <Badge variant={entry.is_billed ? 'default' : 'outline'}>
+                            {entry.is_billed ? 'Billed' : 'Unbilled'}
+                          </Badge>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  ) : (
+                    <TableRow>
+                      <TableCell colSpan={5} className="text-center">No time entries found.</TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
 
-      {/* 
-        We use the standard InvoiceForm. 
-        Note: The InvoiceForm doesn't currently accept a pre-selected customer ID 
-        when opening in 'new' mode via props easily without fetching.
-        I will modify InvoiceForm in the next step to accept initialCustomerId.
-      */}
       <InvoiceForm
         isOpen={isInvoiceFormOpen}
         setIsOpen={setIsInvoiceFormOpen}
