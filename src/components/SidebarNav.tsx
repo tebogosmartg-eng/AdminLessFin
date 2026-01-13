@@ -5,7 +5,7 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible"
-import { Book, LayoutDashboard, BookText, FileText, Library, Target, Repeat, Building2, Users, TrendingUp, Receipt, Banknote, HandCoins, ChevronRight, Package, Scale, Upload, FileSignature, Briefcase, Landmark, MessageSquare, MessageCircle, Clock, Activity } from 'lucide-react';
+import { Book, LayoutDashboard, BookText, FileText, Library, Target, Repeat, Building2, Users, TrendingUp, Receipt, Banknote, HandCoins, ChevronRight, Package, Scale, Upload, FileSignature, Briefcase, Landmark, MessageSquare, MessageCircle, Clock } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { Button } from './ui/button';
 import { useAuth } from '../contexts/AuthContext';
@@ -94,7 +94,6 @@ export const SidebarNav = () => {
     { to: '/general-ledger', label: 'General Ledger', icon: Library, prefetch: () => prefetch(queries.accountsQuery) },
     { to: '/payroll-reports', label: 'Payroll Reports', icon: FileText, prefetch: () => {} }, // Complex filters, skip prefetch
     { to: '/budgets', label: 'Budgets', icon: Target, prefetch: () => prefetch(queries.budgetsQuery) },
-    { to: '/audit-logs', label: 'System Activity', icon: Activity, prefetch: () => {} },
   ];
 
   const timeTrackingLinks = [
@@ -151,7 +150,7 @@ export const SidebarNav = () => {
         defaultOpen={assetsAndLoansLinks.some(l => pathname.startsWith(l.to))}
       />
       <NavGroup 
-        title="Reports & Logs" 
+        title="Reports" 
         icon={FileText} 
         links={reportsLinks} 
         defaultOpen={reportsLinks.some(l => pathname.startsWith(l.to))}
