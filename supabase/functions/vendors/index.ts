@@ -7,23 +7,18 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-// ARCHITECTURE NOTE:
-// This function acts as a secure API gateway for all vendor-related database operations.
-// The frontend should never query the 'vendors' table directly. Instead, it should invoke this function.
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders })
   }
 
   try {
-    // Create a Supabase client with the user's auth token to verify permissions
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_ANON_KEY') ?? '',
       { global: { headers: { Authorization: req.headers.get('Authorization')! } } }
     )
 
-    // Get the authenticated user
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error("User not authenticated.");
 
@@ -34,7 +29,6 @@ serve(async (req) => {
       throw new Error("Company ID is required.");
     }
 
-    // Security Check: Verify the user is a member of the company they are trying to access.
     const { data: companyMember, error: memberError } = await supabase
       .from('company_users')
       .select('user_id')
@@ -46,8 +40,6 @@ serve(async (req) => {
       throw new Error("Permission denied: User is not a member of this company.");
     }
 
-    // Use the admin client for database operations to bypass RLS,
-    // as we have already performed our security check.
     const supabaseAdmin = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
@@ -64,6 +56,93 @@ serve(async (req) => {
           .order('name', { ascending: true }));
         break;
       
+      case 'GET_DETAILS':
+        const { vendorId, date_from, date_to } = body;
+        
+        // 1. Get Vendor
+        const { data: vendor, error: venError } = await supabaseAdmin
+          .from('vendors')
+          .select('*')
+          .eq('id', vendorId)
+          .eq('company_id', company_id)
+          .single();
+        if (venError) throw venError;
+
+        // 2. Get Transactions
+        let query = supabaseAdmin
+          .from('journal_entries')
+          .select(`
+            id,
+            entry_date,
+            description,
+            bills ( bill_number ),
+            journal_entry_items (
+              amount,
+              type,
+              account_id
+            )
+          `)
+          .eq('company_id', company_id)
+          .eq('vendor_id', vendorId)
+          .order('entry_date', { ascending: true });
+
+        if (date_from) query = query.gte('entry_date', date_from);
+        if (date_to) query = query.lte('entry_date', date_to);
+
+        const { data: transactions, error: transError } = await query;
+        if (transError) throw transError;
+
+        // 3. Identify AP Accounts
+        const { data: apAccounts } = await supabaseAdmin
+          .from('chart_of_accounts')
+          .select('id')
+          .eq('company_id', company_id)
+          .eq('type', 'Liability')
+          .ilike('name', '%payable%');
+        
+        const apAccountIds = new Set(apAccounts?.map((a: any) => a.id) || []);
+
+        const statement = transactions.map((t: any) => {
+          let amount = 0;
+          let type = 'other';
+
+          // Filter items that touch AP
+          const apItems = t.journal_entry_items.filter((item: any) => apAccountIds.has(item.account_id));
+
+          if (apItems.length > 0) {
+            const debits = apItems.filter((i: any) => i.type === 'debit').reduce((sum: number, i: any) => sum + i.amount, 0);
+            const credits = apItems.filter((i: any) => i.type === 'credit').reduce((sum: number, i: any) => sum + i.amount, 0);
+
+            // In AP (Liability):
+            // Credit increases liability (Bill)
+            // Debit decreases liability (Payment)
+            
+            if (credits > 0) {
+              amount = credits;
+              type = 'bill';
+            } else {
+              amount = debits;
+              type = 'payment';
+            }
+          } else {
+             // Fallback for direct expenses (Cash Bill)
+             amount = t.journal_entry_items.filter((i:any) => i.type === 'debit').reduce((sum:number, i:any) => sum + i.amount, 0);
+             type = 'bill';
+          }
+
+          return {
+            id: t.id,
+            date: t.entry_date,
+            description: t.description,
+            bill_number: t.bills?.[0]?.bill_number,
+            type,
+            amount,
+          };
+        });
+
+        data = { vendor, statement };
+        break;
+
       case 'POST':
         ({ data, error } = await supabaseAdmin
           .from('vendors')

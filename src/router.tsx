@@ -11,6 +11,7 @@ import GeneralLedger from "./pages/GeneralLedger";
 import Budgets from "./pages/Budgets";
 import RecurringEntries from "./pages/RecurringEntries";
 import Vendors from "./pages/Vendors";
+import VendorDetail from "./pages/VendorDetail";
 import Customers from "./pages/Customers";
 import CustomerDetail from "./pages/CustomerDetail";
 import Bills from "./pages/Bills";
@@ -77,6 +78,7 @@ export const AppRouter = () => {
         <Route path="/tax-report" element={<TaxReport />} />
         <Route path="/settings" element={<Settings />} />
         <Route path="/vendors" element={<Vendors />} />
+        <Route path="/vendors/:id" element={<VendorDetail />} />
         <Route path="/customers" element={<Customers />} />
         <Route path="/customers/:id" element={<CustomerDetail />} />
         <Route path="/products" element={<Products />} />

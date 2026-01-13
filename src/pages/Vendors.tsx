@@ -23,6 +23,7 @@ import {
 import { useAuth } from '../contexts/AuthContext';
 import { vendorsQuery } from '../lib/queries';
 import { downloadCSV } from '../lib/utils';
+import { useNavigate } from 'react-router-dom';
 
 export type Vendor = {
   id: string;
@@ -38,6 +39,7 @@ const Vendors = () => {
   const [selectedVendor, setSelectedVendor] = useState<Vendor | undefined>(undefined);
   const { activeCompany } = useAuth();
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
 
   const { data: vendors, isLoading } = useQuery<Vendor[]>({
     ...vendorsQuery(activeCompany?.id!),
@@ -131,7 +133,7 @@ const Vendors = () => {
                 </TableRow>
               ) : vendors && vendors.length > 0 ? (
                 vendors.map((vendor) => (
-                  <TableRow key={vendor.id}>
+                  <TableRow key={vendor.id} className="cursor-pointer" onClick={() => navigate(`/vendors/${vendor.id}`)}>
                     <TableCell className="font-medium">{vendor.name}</TableCell>
                     <TableCell>{vendor.contact_name}</TableCell>
                     <TableCell>{vendor.email}</TableCell>
@@ -139,14 +141,15 @@ const Vendors = () => {
                     <TableCell>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" className="h-8 w-8 p-0">
+                          <Button variant="ghost" className="h-8 w-8 p-0" onClick={(e) => e.stopPropagation()}>
                             <span className="sr-only">Open menu</span>
                             <MoreHorizontal className="h-4 w-4" />
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => handleEdit(vendor)}>Edit</DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => handleDelete(vendor.id)} className="text-red-600">Delete</DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => navigate(`/vendors/${vendor.id}`)}>View Details</DropdownMenuItem>
+                          <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleEdit(vendor); }}>Edit</DropdownMenuItem>
+                          <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleDelete(vendor.id); }} className="text-red-600">Delete</DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </TableCell>
