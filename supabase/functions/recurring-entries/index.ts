@@ -1,6 +1,7 @@
 // @ts-nocheck
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0'
+import { addDays, addWeeks, addMonths, addYears } from "https://esm.sh/date-fns@3.6.0";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -103,6 +104,68 @@ serve(async (req) => {
           .delete()
           .eq('id', body.entryId)
           .eq('company_id', company_id));
+        break;
+
+      case 'PROCESS_DUE':
+        const today = new Date().toISOString().split('T')[0];
+        const { data: dueEntries, error: fetchError } = await supabaseAdmin
+          .from('recurring_journal_entries')
+          .select('*, recurring_journal_entry_items(*)')
+          .eq('company_id', company_id)
+          .lte('next_run_date', today);
+
+        if (fetchError) throw fetchError;
+
+        let processedCount = 0;
+        for (const entry of dueEntries || []) {
+          // Create Journal Entry
+          const { data: newJournalEntry, error: journalError } = await supabaseAdmin
+            .from('journal_entries')
+            .insert({
+              company_id: entry.company_id,
+              entry_date: entry.next_run_date,
+              description: `(Recurring) ${entry.description}`,
+            })
+            .select('id')
+            .single();
+
+          if (journalError) {
+            console.error(`Failed to create JE for recurring entry ${entry.id}`, journalError);
+            continue;
+          }
+
+          const jeItems = entry.recurring_journal_entry_items.map(item => ({
+            journal_entry_id: newJournalEntry.id,
+            account_id: item.account_id,
+            type: item.type,
+            amount: item.amount,
+          }));
+
+          const { error: itemsError } = await supabaseAdmin.from('journal_entry_items').insert(jeItems);
+          if (itemsError) {
+             console.error(`Failed to create JE items for recurring entry ${entry.id}`, itemsError);
+             continue;
+          }
+
+          // Calculate next run date
+          let nextDate = new Date(entry.next_run_date);
+          switch (entry.frequency) {
+            case 'daily': nextDate = addDays(nextDate, 1); break;
+            case 'weekly': nextDate = addWeeks(nextDate, 1); break;
+            case 'monthly': nextDate = addMonths(nextDate, 1); break;
+            case 'yearly': nextDate = addYears(nextDate, 1); break;
+          }
+          
+          if (entry.end_date && nextDate > new Date(entry.end_date)) {
+             await supabaseAdmin.from('recurring_journal_entries').delete().eq('id', entry.id);
+          } else {
+             await supabaseAdmin.from('recurring_journal_entries').update({
+               next_run_date: nextDate.toISOString().split('T')[0]
+             }).eq('id', entry.id);
+          }
+          processedCount++;
+        }
+        data = { processed: processedCount };
         break;
 
       default:

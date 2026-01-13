@@ -4,7 +4,7 @@ import { supabase } from '../integrations/supabase/client';
 import { Button } from '../components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/table';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/card';
-import { PlusCircle, MoreHorizontal, Terminal } from 'lucide-react';
+import { PlusCircle, MoreHorizontal, Terminal, Play } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "../components/ui/dropdown-menu";
 import { showError, showSuccess } from '../utils/toast';
 import RecurringEntryForm from '../components/RecurringEntryForm';
@@ -52,6 +52,23 @@ const RecurringEntries = () => {
     },
   });
 
+  const runNowMutation = useMutation({
+    mutationFn: async () => {
+        if (!activeCompany) throw new Error("No active company");
+        const { data, error } = await supabase.functions.invoke('recurring-entries', {
+            body: { method: 'PROCESS_DUE', company_id: activeCompany.id }
+        });
+        if(error) throw error;
+        return data;
+    },
+    onSuccess: (data) => {
+        queryClient.invalidateQueries({ queryKey: ['recurring_entries'] });
+        queryClient.invalidateQueries({ queryKey: ['journal_entries'] });
+        showSuccess(`Processed ${data.processed} entries.`);
+    },
+    onError: (e: any) => showError(e.message)
+  });
+
   const handleAddNew = () => {
     setSelectedEntryId(undefined);
     setIsFormOpen(true);
@@ -76,8 +93,7 @@ const RecurringEntries = () => {
         <Terminal className="h-4 w-4" />
         <AlertTitle>Automate Your Bookkeeping!</AlertTitle>
         <AlertDescription>
-          To have these recurring entries post automatically, you need to set up a schedule. 
-          Go to your Supabase dashboard, find the `process-recurring-entries` Edge Function, and create a cron job to run it daily.
+          Recurring entries are processed automatically daily. You can also force a run now to process any entries due today or earlier.
         </AlertDescription>
       </Alert>
       <Card>
@@ -87,10 +103,15 @@ const RecurringEntries = () => {
               <CardTitle>Recurring Transactions</CardTitle>
               <CardDescription>Manage templates for automated journal entries.</CardDescription>
             </div>
-            <Button onClick={handleAddNew}>
-              <PlusCircle className="mr-2 h-4 w-4" />
-              New Template
-            </Button>
+            <div className="flex gap-2">
+                <Button variant="outline" onClick={() => runNowMutation.mutate()} disabled={runNowMutation.isPending}>
+                    <Play className="mr-2 h-4 w-4" /> Run Due Now
+                </Button>
+                <Button onClick={handleAddNew}>
+                    <PlusCircle className="mr-2 h-4 w-4" />
+                    New Template
+                </Button>
+            </div>
           </div>
         </CardHeader>
         <CardContent>

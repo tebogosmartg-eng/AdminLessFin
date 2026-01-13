@@ -56,7 +56,13 @@ const TimesheetForm = ({ isOpen, setIsOpen, timesheet }: TimesheetFormProps) => 
     }
   }, [timesheet, form, isOpen]);
 
-  const { data: projects } = useQuery<Project[]>({ queryKey: ['projects', activeCompany?.id] });
+  const { data: projects } = useQuery<Project[]>({ 
+    queryKey: ['projects', activeCompany?.id],
+    enabled: !!activeCompany
+  });
+
+  // Filter only active projects for new entries
+  const activeProjects = projects?.filter(p => p.status === 'active' || (timesheet && p.id === timesheet.project_id));
 
   const mutation = useMutation({
     mutationFn: async (values: TimesheetFormValues) => {
@@ -110,7 +116,7 @@ const TimesheetForm = ({ isOpen, setIsOpen, timesheet }: TimesheetFormProps) => 
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      {projects?.map(p => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
+                      {activeProjects?.map(p => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
                     </SelectContent>
                   </Select>
                   <FormMessage />

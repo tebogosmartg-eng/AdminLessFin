@@ -7,8 +7,6 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-// ARCHITECTURE NOTE:
-// This function acts as a secure API gateway for all loan-related operations.
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders })
@@ -31,7 +29,7 @@ serve(async (req) => {
       throw new Error("Company ID is required.");
     }
 
-    // Security Check: Verify user membership
+    // Security Check
     const { data: companyMember, error: memberError } = await supabase
       .from('company_users')
       .select('user_id')
@@ -40,7 +38,7 @@ serve(async (req) => {
       .single();
 
     if (memberError || !companyMember) {
-      throw new Error("Permission denied: User is not a member of this company.");
+      throw new Error("Permission denied.");
     }
 
     const supabaseAdmin = createClient(
@@ -111,6 +109,66 @@ serve(async (req) => {
         if (rpcError) throw rpcError;
         
         data = newLoan;
+        break;
+
+      case 'PUT':
+        const { loanData: putLoanData, loanId } = body;
+        
+        // Check if payments exist
+        const { count, error: countError } = await supabaseAdmin
+          .from('loan_amortization_schedule')
+          .select('*', { count: 'exact', head: true })
+          .eq('loan_id', loanId)
+          .eq('status', 'paid');
+        
+        if (countError) throw countError;
+
+        if (count && count > 0) {
+          // Payments exist: Only allow updating non-financial fields if needed, or block entirely.
+          // For now, let's block core terms.
+          // Assuming the UI might send everything, we check what changed or just throw if strictly financial.
+          // Implementation: Update the loan record, BUT skip regeneration if payments exist. 
+          // Ideally, we should validate that principal/rate/term didn't change, but that's complex here.
+          // Simplification: Allow update, but warn user via UI (handled there) and DO NOT regenerate schedule.
+          
+          // However, if the user CHANGED the rate, the schedule will be out of sync. 
+          // Strict approach: Throw error if they try to change terms with existing payments.
+          
+          const { data: currentLoan } = await supabaseAdmin.from('loans').select('principal_amount, interest_rate, term_months, start_date').eq('id', loanId).single();
+          
+          if (
+            currentLoan.principal_amount != putLoanData.principal_amount ||
+            currentLoan.interest_rate != putLoanData.interest_rate ||
+            currentLoan.term_months != putLoanData.term_months
+          ) {
+             throw new Error("Cannot update loan terms (Principal, Rate, Term) because payments have already been recorded.");
+          }
+
+          const { error: updateError } = await supabaseAdmin
+            .from('loans')
+            .update(putLoanData)
+            .eq('id', loanId)
+            .eq('company_id', company_id);
+          
+          if (updateError) throw updateError;
+
+        } else {
+          // No payments yet: Update loan AND regenerate schedule.
+          const { error: updateError } = await supabaseAdmin
+            .from('loans')
+            .update(putLoanData)
+            .eq('id', loanId)
+            .eq('company_id', company_id);
+          if (updateError) throw updateError;
+
+          // Delete existing schedule
+          await supabaseAdmin.from('loan_amortization_schedule').delete().eq('loan_id', loanId);
+          
+          // Regenerate
+          await supabaseAdmin.rpc('generate_amortization_schedule', { p_loan_id: loanId });
+        }
+        
+        data = { id: loanId };
         break;
 
       case 'RECORD_PAYMENT':
