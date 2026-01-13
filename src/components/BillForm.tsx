@@ -26,8 +26,8 @@ import { projectsQuery, taxRatesQuery } from '../lib/queries';
 const billItemSchema = z.object({
   product_id: z.string().optional(),
   description: z.string().min(1, "Description is required."),
-  quantity: z.coerce.number().min(1, "Qty must be at least 1."),
-  unit_cost: z.coerce.number().min(0.01, "Cost must be positive."),
+  quantity: z.coerce.number().min(0.01, "Qty must be positive."),
+  unit_cost: z.coerce.number().min(0, "Cost must be non-negative."),
   expense_account_id: z.string().min(1, "Account is required."),
   project_id: z.string().optional(),
   tax_rate_id: z.string().optional(),
@@ -78,9 +78,6 @@ const BillForm = ({ isOpen, setIsOpen, billId, duplicateFromId, initialData, onS
     },
   });
 
-  const vendorId = form.watch('vendor_id');
-  const billDate = form.watch('bill_date');
-
   const { data: vendors } = useQuery<Vendor[]>({
     queryKey: ['vendors', activeCompany?.id],
     queryFn: async () => {
@@ -92,34 +89,6 @@ const BillForm = ({ isOpen, setIsOpen, billId, duplicateFromId, initialData, onS
       return data;
     },
     enabled: !!activeCompany
-  });
-
-  // Auto-calculate Due Date based on Vendor Terms
-  useEffect(() => {
-    if (vendorId && billDate && !isEditing && vendors) {
-      const vendor = vendors.find(v => v.id === vendorId);
-      if (vendor) {
-        const terms = vendor.payment_terms || 30; // Default to 30 if null
-        const baseDate = new Date(billDate);
-        if (isValid(baseDate)) {
-          const newDueDate = addDays(baseDate, terms);
-          form.setValue('due_date', format(newDueDate, 'yyyy-MM-dd'));
-        }
-      }
-    }
-  }, [vendorId, billDate, vendors, isEditing, form]);
-
-  const sourceId = billId || duplicateFromId;
-  const { data: sourceBill } = useQuery({
-    queryKey: ['bill_source', sourceId],
-    queryFn: async () => {
-      const { data, error } = await supabase.functions.invoke('bills', {
-        body: { method: 'GET_ONE', company_id: activeCompany!.id, billId: sourceId },
-      });
-      if (error) throw error;
-      return data;
-    },
-    enabled: !!sourceId && isOpen && !!activeCompany,
   });
 
   const { data: accounts } = useQuery<Account[]>({
@@ -139,74 +108,6 @@ const BillForm = ({ isOpen, setIsOpen, billId, duplicateFromId, initialData, onS
   const assetAccounts = accounts?.filter(a => a.type === 'Asset');
   const apAccounts = accounts?.filter(a => a.type === 'Liability');
 
-  // Populate form when initialData is provided (e.g. from PO)
-  useEffect(() => {
-    if (isOpen && initialData && !billId && !duplicateFromId) {
-      form.reset({
-        bill_number: initialData.bill_number || '',
-        bill_date: initialData.bill_date || format(new Date(), 'yyyy-MM-dd'),
-        due_date: initialData.due_date || format(addDays(new Date(), 30), 'yyyy-MM-dd'),
-        vendor_id: initialData.vendor_id || '',
-        accounts_payable_id: initialData.accounts_payable_id || '',
-        tax_receivable_account_id: initialData.tax_receivable_account_id || '',
-        description: initialData.description || '',
-        items: initialData.items?.map((item: any) => ({
-          product_id: item.product_id || undefined,
-          description: item.description || '',
-          quantity: item.quantity || 1,
-          unit_cost: item.unit_cost || 0,
-          expense_account_id: item.expense_account_id || '',
-          project_id: item.project_id || '',
-          tax_rate_id: item.tax_rate_id || '',
-        })) || [{ product_id: '', description: '', quantity: 1, unit_cost: 0, expense_account_id: '', project_id: '', tax_rate_id: '' }],
-      });
-      setAttachmentFile(null);
-      setExistingAttachmentUrl(null);
-    }
-  }, [isOpen, initialData, billId, duplicateFromId, form]);
-
-  // Populate form when source data loads (Editing/Duplicating)
-  useEffect(() => {
-    if (sourceBill && isOpen) {
-      const jeItems = sourceBill.journal_entries?.[0]?.journal_entry_items || [];
-      
-      const formItems = jeItems
-        .filter((item: any) => item.type === 'debit' && !item.chart_of_accounts?.name.toLowerCase().includes('tax receivable'))
-        .map((item: any) => ({
-          product_id: item.product_id || '',
-          description: item.chart_of_accounts?.name || 'Item',
-          quantity: 1, 
-          unit_cost: item.amount,
-          expense_account_id: item.account_id,
-          project_id: item.project_id || '',
-          tax_rate_id: item.journal_entry_item_tax_rates?.[0]?.tax_rates?.id || '',
-        }));
-
-      form.reset({
-        bill_number: isDuplicating ? '' : sourceBill.bill_number,
-        bill_date: isDuplicating ? format(new Date(), 'yyyy-MM-dd') : sourceBill.bill_date,
-        due_date: isDuplicating ? format(addDays(new Date(), 30), 'yyyy-MM-dd') : sourceBill.due_date,
-        vendor_id: sourceBill.vendor_id,
-        accounts_payable_id: '',
-        tax_receivable_account_id: '',
-        description: sourceBill.description || '',
-        items: formItems.length > 0 ? formItems : [{ product_id: '', description: '', quantity: 1, unit_cost: 0, expense_account_id: '', project_id: '', tax_rate_id: '' }],
-      });
-      
-      const apItem = jeItems.find((item: any) => item.type === 'credit');
-      if (apItem) {
-          form.setValue('accounts_payable_id', apItem.account_id);
-      }
-      
-      setExistingAttachmentUrl(isDuplicating ? null : sourceBill.attachment_url);
-    } else if (!billId && !duplicateFromId && isOpen) {
-        // Reset for new entry
-        setAttachmentFile(null);
-        setExistingAttachmentUrl(null);
-    }
-    setRemoveAttachment(false);
-  }, [sourceBill, isEditing, isDuplicating, isOpen, form, billId, duplicateFromId]);
-
   const { fields, append, remove } = useFieldArray({ control: form.control, name: "items" });
   const { data: products } = useQuery<Product[]>({
     queryKey: ['products', activeCompany?.id],
@@ -223,6 +124,23 @@ const BillForm = ({ isOpen, setIsOpen, billId, duplicateFromId, initialData, onS
   
   const { data: projects } = useQuery<Project[]>({ ...projectsQuery(activeCompany?.id!), enabled: !!activeCompany });
   const { data: taxRates } = useQuery<TaxRate[]>({ ...taxRatesQuery(activeCompany?.id!), enabled: !!activeCompany });
+
+  const vendorId = form.watch('vendor_id');
+  const billDate = form.watch('bill_date');
+
+  useEffect(() => {
+    if (vendorId && billDate && !isEditing && vendors) {
+      const vendor = vendors.find(v => v.id === vendorId);
+      if (vendor) {
+        const terms = vendor.payment_terms || 30;
+        const baseDate = new Date(billDate);
+        if (isValid(baseDate)) {
+          const newDueDate = addDays(baseDate, terms);
+          form.setValue('due_date', format(newDueDate, 'yyyy-MM-dd'));
+        }
+      }
+    }
+  }, [vendorId, billDate, vendors, isEditing, form]);
 
   const handleProductSelect = (productId: string, index: number) => {
     const product = products?.find(p => p.id === productId);
@@ -242,28 +160,17 @@ const BillForm = ({ isOpen, setIsOpen, billId, duplicateFromId, initialData, onS
 
   const mutation = useMutation({
     mutationFn: async (values: BillFormValues) => {
-      if (!user || !activeCompany) throw new Error('User not authenticated or no active company');
+      if (!user || !activeCompany) throw new Error('Authentication required');
 
       let finalAttachmentUrl = existingAttachmentUrl;
-
-      // Handle Attachment
-      if (removeAttachment && existingAttachmentUrl) {
-        // Logic to remove file from storage if needed, or just clear URL
-        // Simple: Just don't send URL
-        finalAttachmentUrl = null;
-      }
+      if (removeAttachment) finalAttachmentUrl = null;
 
       if (attachmentFile) {
          const fileExt = attachmentFile.name.split('.').pop();
          const fileName = `${Date.now()}.${fileExt}`;
-         // Use a temporary ID if new, or real ID if editing. 
-         // Note: For new bills, we don't have ID yet. We can use a random UUID for folder or put in temp folder.
-         // Strategy: Upload to `activeCompany.id/bills/fileName`
          const filePath = `${activeCompany.id}/bills/${fileName}`;
-         
          const { error: uploadError } = await supabase.storage.from('attachments').upload(filePath, attachmentFile);
          if (uploadError) throw new Error(`Upload Error: ${uploadError.message}`);
-         
          const { data: urlData } = supabase.storage.from('attachments').getPublicUrl(filePath);
          finalAttachmentUrl = urlData.publicUrl;
       }
@@ -278,42 +185,20 @@ const BillForm = ({ isOpen, setIsOpen, billId, duplicateFromId, initialData, onS
       }));
 
       const billData = {
-        bill_number: values.bill_number,
+        bill_number: values.bill_number || null,
         vendor_id: values.vendor_id,
         bill_date: values.bill_date,
         due_date: values.due_date,
         accounts_payable_id: values.accounts_payable_id,
-        tax_receivable_account_id: values.tax_receivable_account_id || null,
-        description: values.description || `Bill from ${vendors?.find(v => v.id === values.vendor_id)?.name}`,
+        tax_receivable_account_id: (values.tax_receivable_account_id === 'none' || !values.tax_receivable_account_id) ? null : values.tax_receivable_account_id,
+        description: values.description || null,
         attachment_url: finalAttachmentUrl,
         p_items: p_items,
       };
 
       const { error } = await supabase.functions.invoke('bills', {
         body: {
-          method: 'POST', // Note: Edit (PUT) for full bills via RPC is complex/not fully implemented in backend yet for items. 
-                          // Currently bills usually just create. To edit, we often delete/recreate or update non-financials. 
-                          // The `bills` function handles POST. For PUT, it only updates basic fields unless we expand it.
-                          // Given `bills` function logic, PUT doesn't support full item update via RPC `update_invoice_full` equivalent for bills.
-                          // Ideally we should implement `update_bill_full`. 
-                          // For now, let's assume creation or basic update.
-                          // Wait, the `bills` function DOES have a 'PUT' block but it calls `update` on `bills` table then deletes/inserts items manually (not RPC).
-                          // Wait, `bills` function code I wrote earlier:
-                          // `case 'PUT': ... update bills ... delete items ... insert items ...` (Ah no, I implemented that for POs/Quotes, did I do it for Bills?)
-                          // Checking `bills/index.ts` from previous turn... 
-                          // It seems `bills` function does NOT have a full PUT implementation for items in my previous output.
-                          // It only has DELETE, VOID.
-                          // ACTUALLY, I didn't output a PUT block for bills items in the previous turn. 
-                          // So editing a bill might lose items if not handled!
-                          // I should probably stick to creating new bills for now or implement PUT.
-                          // Let's implement full PUT in the edge function later if needed.
-                          // For now, let's assume `POST` for new. 
-                          // If editing, we need that logic. 
-                          // Let's check `bills` function again.
-                          // It has `case 'POST'`. 
-                          // It does NOT have `case 'PUT'` logic for items.
-                          // So Editing a bill is risky right now.
-                          // I'll stick to POST for creation.
+          method: 'POST',
           company_id: activeCompany.id,
           billData: billData,
         },
@@ -324,14 +209,12 @@ const BillForm = ({ isOpen, setIsOpen, billId, duplicateFromId, initialData, onS
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['bills', activeCompany?.id] });
       queryClient.invalidateQueries({ queryKey: ['journal_entries', activeCompany?.id] });
-      queryClient.invalidateQueries({ queryKey: ['products', activeCompany?.id] });
       showSuccess(`Bill recorded successfully.`);
       if (onSuccess) onSuccess();
       setIsOpen(false);
+      form.reset();
     },
-    onError: (error) => {
-      showError(`Error: ${error.message}`);
-    },
+    onError: (error) => showError(`Error: ${error.message}`),
   });
 
   const onSubmit = (values: BillFormValues) => mutation.mutate(values);
@@ -346,12 +229,10 @@ const BillForm = ({ isOpen, setIsOpen, billId, duplicateFromId, initialData, onS
 
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
-      <DialogContent className="sm:max-w-6xl h-[80vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-6xl h-[85vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{isEditing ? 'Edit Bill' : isDuplicating ? 'Duplicate Bill' : 'Record New Bill'}</DialogTitle>
-          <DialogDescription>
-             {isDuplicating ? "Create a new bill based on an existing one." : "Create a new bill record."}
-          </DialogDescription>
+          <DialogDescription>Enter the supplier invoice details below.</DialogDescription>
         </DialogHeader>
         {!apAccounts?.some(acc => acc.name.toLowerCase().includes('accounts payable')) && (
             <Alert variant="destructive"><AlertDescription>Warning: You don't have an "Accounts Payable" account. Please create one in your Chart of Accounts (Type: Liability).</AlertDescription></Alert>
@@ -365,12 +246,12 @@ const BillForm = ({ isOpen, setIsOpen, billId, duplicateFromId, initialData, onS
               <FormField control={form.control} name="due_date" render={({ field }) => (<FormItem><FormLabel>Due Date</FormLabel><FormControl><Input type="date" {...field} /></FormControl><FormMessage /></FormItem>)} />
             </div>
             <div className="grid grid-cols-2 gap-4">
-                <FormField control={form.control} name="accounts_payable_id" render={({ field }) => (<FormItem><FormLabel>Credit A/P</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select A/P Account" /></SelectTrigger></FormControl><SelectContent>{apAccounts?.map(acc => <SelectItem key={acc.id} value={acc.id}>{acc.name}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem>)} />
+                <FormField control={form.control} name="accounts_payable_id" render={({ field }) => (<FormItem><FormLabel>Credit Accounts Payable</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select Account" /></SelectTrigger></FormControl><SelectContent>{apAccounts?.map(acc => <SelectItem key={acc.id} value={acc.id}>{acc.name}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem>)} />
                 {hasTax && (
                     <FormField control={form.control} name="tax_receivable_account_id" render={({ field }) => (<FormItem><FormLabel>Tax Receivable Account</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select Asset Account" /></SelectTrigger></FormControl><SelectContent>{assetAccounts?.map(acc => <SelectItem key={acc.id} value={acc.id}>{acc.name}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem>)} />
                 )}
             </div>
-            <FormField control={form.control} name="description" render={({ field }) => (<FormItem><FormLabel>Memo (Optional)</FormLabel><FormControl><Textarea placeholder="A brief description of the bill" {...field} /></FormControl><FormMessage /></FormItem>)} />
+            <FormField control={form.control} name="description" render={({ field }) => (<FormItem><FormLabel>General Description</FormLabel><FormControl><Textarea placeholder="Brief note about this bill" {...field} /></FormControl><FormMessage /></FormItem>)} />
             
             <FormItem>
               <FormLabel>Attachment (Optional)</FormLabel>
@@ -400,8 +281,8 @@ const BillForm = ({ isOpen, setIsOpen, billId, duplicateFromId, initialData, onS
               </FormControl>
             </FormItem>
 
-            <div className="space-y-2">
-              <div className="grid grid-cols-12 gap-2 px-2 text-xs font-medium text-muted-foreground">
+            <div className="space-y-2 pt-2">
+              <div className="grid grid-cols-12 gap-2 px-2 text-xs font-medium text-muted-foreground hidden md:grid">
                 <div className="col-span-2">Item</div>
                 <div className="col-span-2">Description</div>
                 <div className="col-span-1">Qty</div>
@@ -416,19 +297,19 @@ const BillForm = ({ isOpen, setIsOpen, billId, duplicateFromId, initialData, onS
                 const unitCost = form.watch(`items.${index}.unit_cost`);
                 const taxRateId = form.watch(`items.${index}.tax_rate_id`);
                 const rate = taxRates?.find(t => t.id === taxRateId)?.rate || 0;
-                const lineTotal = (quantity * unitCost) * (1 + rate/100);
+                const lineTotal = (Number(quantity) || 0) * (Number(unitCost) || 0) * (1 + rate/100);
                 
                 return (
-                  <div key={field.id} className="grid grid-cols-12 gap-2 items-start">
-                    <FormField control={form.control} name={`items.${index}.product_id`} render={({ field }) => (<FormItem className="col-span-2"><Select onValueChange={(value) => { field.onChange(value); handleProductSelect(value, index); }} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger></FormControl><SelectContent>{products?.map(p => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}</SelectContent></Select></FormItem>)} />
-                    <FormField control={form.control} name={`items.${index}.description`} render={({ field }) => (<FormItem className="col-span-2"><FormControl><Input placeholder="Desc" {...field} /></FormControl></FormItem>)} />
-                    <FormField control={form.control} name={`items.${index}.quantity`} render={({ field }) => (<FormItem className="col-span-1"><FormControl><Input type="number" placeholder="Qty" {...field} /></FormControl></FormItem>)} />
-                    <FormField control={form.control} name={`items.${index}.unit_cost`} render={({ field }) => (<FormItem className="col-span-1"><FormControl><Input type="number" step="0.01" placeholder="Cost" {...field} /></FormControl></FormItem>)} />
-                    <FormField control={form.control} name={`items.${index}.tax_rate_id`} render={({ field }) => (<FormItem className="col-span-1"><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="-" /></SelectTrigger></FormControl><SelectContent><SelectItem value="none">None</SelectItem>{taxRates?.map(t => <SelectItem key={t.id} value={t.id}>{t.rate}%</SelectItem>)}</SelectContent></Select></FormItem>)} />
-                    <div className="col-span-1 pt-2 text-right font-mono text-xs">{formatCurrency(lineTotal)}</div>
-                    <FormField control={form.control} name={`items.${index}.expense_account_id`} render={({ field }) => (<FormItem className="col-span-2"><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Account" /></SelectTrigger></FormControl><SelectContent>{[...(expenseAccounts || []), ...(assetAccounts || [])].map(acc => <SelectItem key={acc.id} value={acc.id}>{acc.name}</SelectItem>)}</SelectContent></Select></FormItem>)} />
-                    <FormField control={form.control} name={`items.${index}.project_id`} render={({ field }) => (<FormItem className="col-span-2"><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="-" /></SelectTrigger></FormControl><SelectContent><SelectItem value="">None</SelectItem>{projects?.map(p => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}</SelectContent></Select></FormItem>)} />
-                    <div className="col-span-12 md:col-span-12 pt-1 flex justify-end"><Button type="button" variant="ghost" size="icon" onClick={() => remove(index)} disabled={fields.length <= 1}><Trash2 className="h-4 w-4" /></Button></div>
+                  <div key={field.id} className="grid grid-cols-12 gap-2 items-start border-b pb-4 md:border-none md:pb-0">
+                    <FormField control={form.control} name={`items.${index}.product_id`} render={({ field }) => (<FormItem className="col-span-12 md:col-span-2"><Select onValueChange={(value) => { field.onChange(value); handleProductSelect(value, index); }} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger></FormControl><SelectContent>{products?.map(p => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}</SelectContent></Select></FormItem>)} />
+                    <FormField control={form.control} name={`items.${index}.description`} render={({ field }) => (<FormItem className="col-span-12 md:col-span-2"><FormControl><Input placeholder="Description" {...field} /></FormControl></FormItem>)} />
+                    <FormField control={form.control} name={`items.${index}.quantity`} render={({ field }) => (<FormItem className="col-span-4 md:col-span-1"><FormControl><Input type="number" step="0.01" {...field} /></FormControl></FormItem>)} />
+                    <FormField control={form.control} name={`items.${index}.unit_cost`} render={({ field }) => (<FormItem className="col-span-4 md:col-span-1"><FormControl><Input type="number" step="0.01" {...field} /></FormControl></FormItem>)} />
+                    <FormField control={form.control} name={`items.${index}.tax_rate_id`} render={({ field }) => (<FormItem className="col-span-4 md:col-span-1"><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="-" /></SelectTrigger></FormControl><SelectContent><SelectItem value="none">None</SelectItem>{taxRates?.map(t => <SelectItem key={t.id} value={t.id}>{t.rate}%</SelectItem>)}</SelectContent></Select></FormItem>)} />
+                    <div className="col-span-6 md:col-span-1 pt-2 text-right font-mono text-xs">{formatCurrency(lineTotal)}</div>
+                    <FormField control={form.control} name={`items.${index}.expense_account_id`} render={({ field }) => (<FormItem className="col-span-5 md:col-span-2"><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Account" /></SelectTrigger></FormControl><SelectContent>{[...(expenseAccounts || []), ...(assetAccounts || [])].map(acc => <SelectItem key={acc.id} value={acc.id}>{acc.name}</SelectItem>)}</SelectContent></Select></FormItem>)} />
+                    <FormField control={form.control} name={`items.${index}.project_id`} render={({ field }) => (<FormItem className="col-span-12 md:col-span-2"><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="-" /></SelectTrigger></FormControl><SelectContent><SelectItem value="">None</SelectItem>{projects?.map(p => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}</SelectContent></Select></FormItem>)} />
+                    <div className="col-span-1 pt-1 flex justify-end"><Button type="button" variant="ghost" size="icon" onClick={() => remove(index)} disabled={fields.length <= 1}><Trash2 className="h-4 w-4" /></Button></div>
                   </div>
                 )
               })}
@@ -436,13 +317,13 @@ const BillForm = ({ isOpen, setIsOpen, billId, duplicateFromId, initialData, onS
             </div>
             
             <div className="flex justify-end pt-2 border-t">
-               <span className="text-lg font-bold">Total: {formatCurrency(totalAmount)}</span>
+               <span className="text-xl font-bold">Total Bill: {formatCurrency(totalAmount)}</span>
             </div>
 
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setIsOpen(false)}>Cancel</Button>
-              <Button type="submit" disabled={mutation.isPending || (isEditing && !isDuplicating)}>
-                {mutation.isPending ? 'Saving...' : isEditing && !isDuplicating ? 'Edit not supported' : 'Record Bill'}
+              <Button type="submit" disabled={mutation.isPending}>
+                {mutation.isPending ? 'Saving...' : 'Record Bill'}
               </Button>
             </DialogFooter>
           </form>
