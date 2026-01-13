@@ -70,21 +70,19 @@ serve(async (req) => {
         // Get users for this company (via company_users)
         ({ data, error } = await supabaseAdmin
            .from('company_users')
-           .select('user_id, role, users:user_id(email, id)') // Use alias if needed or rely on relation detection
+           .select('user_id, role') 
            .eq('company_id', company_id));
-        
-        // Note: 'users' table in auth schema is not directly accessible via standard join in all configurations without setup.
-        // Assuming we have a public view or standard setup. If not, we might need a separate RPC.
-        // For now, let's assume public.users_public or similar, or just get basic info.
-        // Actually, often easiest to use RPC for admin user management.
         break;
         
       case 'GET_AUDIT_LOGS':
         let query = supabaseAdmin
           .from('audit_logs')
-          .select('*, user:user_id(email)') // Assuming we can resolve user email
+          .select(`
+            *,
+            profiles:changed_by ( full_name )
+          `)
           .eq('company_id', company_id)
-          .order('changed_at', { ascending: false })
+          .order('created_at', { ascending: false })
           .limit(100);
         
         if (body.table_name && body.table_name !== 'all') {
@@ -92,12 +90,6 @@ serve(async (req) => {
         }
         
         ({ data, error } = await query);
-        
-        // Attempt to enrich with user emails if join failed (e.g. if user_id links to auth.users which isn't exposed)
-        // In Supabase, auth.users is protected. We can't join directly usually unless we have a wrapper.
-        // We'll return the logs; UI can try to map IDs if needed, or we just show "User ID".
-        // Better approach: We usually have a `profiles` table or similar. 
-        // If not, we'll just return the ID.
         break;
 
       default:

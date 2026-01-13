@@ -40,7 +40,7 @@ const AuditLogViewer = () => {
   };
 
   const tables = [
-    'invoices', 'bills', 'journal_entries', 'products', 'customers', 'vendors', 'expense_claims'
+    'invoices', 'bills', 'journal_entries', 'products', 'customers', 'vendors', 'expense_claims', 'tax_rates', 'chart_of_accounts'
   ];
 
   return (
@@ -81,10 +81,10 @@ const AuditLogViewer = () => {
             ) : logs && logs.length > 0 ? (
               logs.map((log: any) => (
                 <TableRow key={log.id}>
-                  <TableCell className="text-xs">{format(new Date(log.changed_at), 'PP p')}</TableCell>
-                  <TableCell className="text-xs">{log.user?.email || 'System/User'}</TableCell>
+                  <TableCell className="text-xs">{format(new Date(log.created_at), 'PP p')}</TableCell>
+                  <TableCell className="text-xs">{log.profiles?.full_name || 'System/User'}</TableCell>
                   <TableCell className="capitalize">{log.table_name.replace(/_/g, ' ')}</TableCell>
-                  <TableCell>{getActionBadge(log.action)}</TableCell>
+                  <TableCell>{getActionBadge(log.operation)}</TableCell>
                   <TableCell>
                     <Button variant="ghost" size="sm" onClick={() => setSelectedLog(log)}>
                       <Eye className="h-4 w-4 mr-1" /> View Changes
@@ -106,7 +106,7 @@ const AuditLogViewer = () => {
           <DialogHeader>
             <DialogTitle>Change Details</DialogTitle>
             <DialogDescription>
-              {selectedLog && `${selectedLog.action} on ${selectedLog.table_name} at ${format(new Date(selectedLog.changed_at), 'PP p')}`}
+              {selectedLog && `${selectedLog.operation} on ${selectedLog.table_name} at ${format(new Date(selectedLog.created_at), 'PP p')}`}
             </DialogDescription>
           </DialogHeader>
           {selectedLog && (
