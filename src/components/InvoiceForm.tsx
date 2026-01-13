@@ -22,7 +22,7 @@ import { addDays, format, isValid } from 'date-fns';
 import { formatCurrency } from '../lib/utils';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from './ui/sheet';
 import InvoicePreview from './InvoicePreview';
-import { taxRatesQuery, projectsQuery } from '../lib/queries';
+import { taxRatesQuery, projectsQuery, customersQuery } from '../lib/queries';
 import AddUnbilledTimeDialog from './AddUnbilledTimeDialog';
 
 const invoiceItemSchema = z.object({
@@ -79,9 +79,37 @@ const InvoiceForm = ({ isOpen, setIsOpen, invoiceId, duplicateFromId, initialCus
     },
   });
 
-  const { data: customers } = useQuery<Customer[]>({ queryKey: ['customers', activeCompany?.id] });
-  const { data: products } = useQuery<Product[]>({ queryKey: ['products', activeCompany?.id] });
-  const { data: accounts } = useQuery<Account[]>({ queryKey: ['accounts', activeCompany?.id] });
+  const { data: customers } = useQuery<Customer[]>({ 
+    ...customersQuery(activeCompany?.id!),
+    enabled: !!activeCompany 
+  });
+  
+  const { data: products } = useQuery<Product[]>({ 
+    queryKey: ['products', activeCompany?.id],
+    queryFn: async () => {
+        if (!activeCompany) return [];
+        const { data, error } = await supabase.functions.invoke('products', {
+            body: { method: 'GET', company_id: activeCompany.id },
+        });
+        if (error) throw error;
+        return data;
+    },
+    enabled: !!activeCompany 
+  });
+
+  const { data: accounts } = useQuery<Account[]>({ 
+    queryKey: ['accounts', activeCompany?.id],
+    queryFn: async () => {
+        if (!activeCompany) return [];
+        const { data, error } = await supabase.functions.invoke('chart-of-accounts', {
+            body: { method: 'GET', company_id: activeCompany.id },
+        });
+        if (error) throw error;
+        return data;
+    },
+    enabled: !!activeCompany 
+  });
+
   const { data: projects } = useQuery<Project[]>({ ...projectsQuery(activeCompany?.id!), enabled: !!activeCompany });
   const { data: taxRates } = useQuery<TaxRate[]>({ ...taxRatesQuery(activeCompany?.id!), enabled: !!activeCompany });
   
@@ -347,12 +375,14 @@ const InvoiceForm = ({ isOpen, setIsOpen, invoiceId, duplicateFromId, initialCus
       </Dialog>
       
       <Sheet open={isPreviewOpen} onOpenChange={setIsPreviewOpen}>
-        <SheetContent className="sm:max-w-3xl w-full">
+        <SheetContent className="sm:max-w-3xl w-full overflow-y-auto">
             <SheetHeader>
                 <SheetTitle>Invoice Preview</SheetTitle>
                 <SheetDescription>Verify your invoice details before saving.</SheetDescription>
             </SheetHeader>
-            <InvoicePreview formData={watchedValues} customers={customers} company={activeCompany} taxRates={taxRates} />
+            <div className="mt-4">
+                <InvoicePreview formData={watchedValues} customers={customers} company={activeCompany} taxRates={taxRates} />
+            </div>
         </SheetContent>
       </Sheet>
       
