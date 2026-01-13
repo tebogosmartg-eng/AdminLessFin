@@ -12,6 +12,7 @@ import Budgets from "./pages/Budgets";
 import RecurringEntries from "./pages/RecurringEntries";
 import Vendors from "./pages/Vendors";
 import Customers from "./pages/Customers";
+import CustomerDetail from "./pages/CustomerDetail";
 import Bills from "./pages/Bills";
 import PayBills from "./pages/PayBills";
 import ReceivePayments from "./pages/ReceivePayments";
@@ -77,6 +78,7 @@ export const AppRouter = () => {
         <Route path="/settings" element={<Settings />} />
         <Route path="/vendors" element={<Vendors />} />
         <Route path="/customers" element={<Customers />} />
+        <Route path="/customers/:id" element={<CustomerDetail />} />
         <Route path="/products" element={<Products />} />
         <Route path="/import" element={<Import />} />
         <Route path="/employees" element={<Employees />} />

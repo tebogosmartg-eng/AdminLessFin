@@ -23,6 +23,7 @@ import {
 import { useAuth } from '../contexts/AuthContext';
 import { customersQuery } from '../lib/queries';
 import { downloadCSV } from '../lib/utils';
+import { useNavigate } from 'react-router-dom';
 
 export type Customer = {
   id: string;
@@ -38,6 +39,7 @@ const Customers = () => {
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | undefined>(undefined);
   const { activeCompany } = useAuth();
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
 
   const { data: customers, isLoading } = useQuery<Customer[]>({
     ...customersQuery(activeCompany?.id!),
@@ -131,7 +133,7 @@ const Customers = () => {
                 </TableRow>
               ) : customers && customers.length > 0 ? (
                 customers.map((customer) => (
-                  <TableRow key={customer.id}>
+                  <TableRow key={customer.id} className="cursor-pointer" onClick={() => navigate(`/customers/${customer.id}`)}>
                     <TableCell className="font-medium">{customer.name}</TableCell>
                     <TableCell>{customer.contact_name}</TableCell>
                     <TableCell>{customer.email}</TableCell>
@@ -139,14 +141,15 @@ const Customers = () => {
                     <TableCell>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" className="h-8 w-8 p-0">
+                          <Button variant="ghost" className="h-8 w-8 p-0" onClick={(e) => e.stopPropagation()}>
                             <span className="sr-only">Open menu</span>
                             <MoreHorizontal className="h-4 w-4" />
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => handleEdit(customer)}>Edit</DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => handleDelete(customer.id)} className="text-red-600">Delete</DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => navigate(`/customers/${customer.id}`)}>View Details</DropdownMenuItem>
+                          <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleEdit(customer); }}>Edit</DropdownMenuItem>
+                          <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleDelete(customer.id); }} className="text-red-600">Delete</DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </TableCell>
