@@ -5,7 +5,7 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible"
-import { Book, LayoutDashboard, BookText, FileText, Library, Target, Repeat, Building2, Users, TrendingUp, Receipt, Banknote, HandCoins, ChevronRight, Package, Scale, Upload, FileSignature, Briefcase, Landmark, MessageSquare, MessageCircle, Clock, ShoppingBag, Calendar, TicketMinus, PieChart } from 'lucide-react';
+import { Book, LayoutDashboard, BookText, FileText, Library, Target, Repeat, Building2, Users, TrendingUp, Receipt, Banknote, HandCoins, ChevronRight, Package, Scale, Upload, FileSignature, Briefcase, Landmark, MessageSquare, MessageCircle, Clock, ShoppingBag, Calendar, TicketMinus, PieChart, Coins } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { Button } from './ui/button';
 import { useAuth } from '../contexts/AuthContext';
@@ -73,6 +73,7 @@ export const SidebarNav = () => {
 
   const payrollLinks = [
     { to: '/employees', label: 'Employees', icon: Users, prefetch: () => prefetch(queries.employeesQuery) },
+    { to: '/expense-claims', label: 'Expense Claims', icon: Coins, prefetch: () => {} },
     { to: '/payroll-runs', label: 'Payroll Runs', icon: Repeat, prefetch: () => prefetch(queries.payrollRunsQuery) },
   ];
 

@@ -50,6 +50,7 @@ import FinancialCalendar from "./pages/FinancialCalendar";
 import CreditNotes from "./pages/CreditNotes";
 import VendorCredits from "./pages/VendorCredits";
 import ProjectProfitabilityReport from "./pages/ProjectProfitabilityReport";
+import ExpenseClaims from "./pages/ExpenseClaims";
 
 export const AppRouter = () => {
   return (
@@ -90,6 +91,7 @@ export const AppRouter = () => {
         <Route path="/products" element={<Products />} />
         <Route path="/import" element={<Import />} />
         <Route path="/employees" element={<Employees />} />
+        <Route path="/expense-claims" element={<ExpenseClaims />} />
         <Route path="/payroll-runs" element={<PayrollRuns />} />
         <Route path="/payroll-runs/:id" element={<PayrollRunDetail />} />
         <Route path="/payroll-reports" element={<PayrollReports />} />
