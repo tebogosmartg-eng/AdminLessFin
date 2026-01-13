@@ -9,7 +9,13 @@ import { Account } from './ChartOfAccounts';
 import { formatCurrency, downloadCSV } from '../lib/utils';
 import { useAuth } from '../contexts/AuthContext';
 import { Button } from '../components/ui/button';
-import { Download } from 'lucide-react';
+import { Download, Calendar as CalendarIcon } from 'lucide-react';
+import { Popover, PopoverContent, PopoverTrigger } from '../components/ui/popover';
+import { Calendar } from '../components/ui/calendar';
+import { DateRange } from 'react-day-picker';
+import { format, startOfYear, endOfYear } from 'date-fns';
+import { cn } from '../lib/utils';
+import { Input } from '../components/ui/input';
 
 type LedgerEntry = {
   entry_date: string;
@@ -22,6 +28,10 @@ type LedgerEntry = {
 const GeneralLedger = () => {
   const [selectedAccountId, setSelectedAccountId] = useState<string | null>(null);
   const { activeCompany } = useAuth();
+  const [date, setDate] = useState<DateRange | undefined>({
+    from: startOfYear(new Date()),
+    to: endOfYear(new Date()),
+  });
 
   const { data: accounts, isLoading: isLoadingAccounts } = useQuery<Account[]>({
     queryKey: ['accounts', activeCompany?.id],
@@ -40,7 +50,7 @@ const GeneralLedger = () => {
   });
 
   const { data: ledgerEntries, isLoading: isLoadingEntries } = useQuery<LedgerEntry[]>({
-    queryKey: ['ledger', selectedAccountId, activeCompany?.id],
+    queryKey: ['ledger', selectedAccountId, date?.from, date?.to, activeCompany?.id],
     queryFn: async () => {
       if (!selectedAccountId || !activeCompany) return [];
       const { data, error } = await supabase.functions.invoke('accounting', {
@@ -48,6 +58,8 @@ const GeneralLedger = () => {
           method: 'GET_LEDGER_ENTRIES',
           company_id: activeCompany.id,
           account_id: selectedAccountId,
+          start_date: date?.from ? format(date.from, 'yyyy-MM-dd') : undefined,
+          end_date: date?.to ? format(date.to, 'yyyy-MM-dd') : undefined,
         },
       });
 
@@ -102,10 +114,10 @@ const GeneralLedger = () => {
       <h1 className="text-3xl font-bold">General Ledger</h1>
       <Card>
         <CardHeader>
-          <CardTitle>Select an Account</CardTitle>
-          <CardDescription>Choose an account to view its detailed transaction history.</CardDescription>
+          <CardTitle>Filters</CardTitle>
+          <CardDescription>Select an account and date range to view.</CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="flex flex-col md:flex-row gap-4">
           <Select onValueChange={setSelectedAccountId} value={selectedAccountId || ''}>
             <SelectTrigger className="w-full md:w-1/3">
               <SelectValue placeholder="Select an account..." />
@@ -118,6 +130,39 @@ const GeneralLedger = () => {
               )}
             </SelectContent>
           </Select>
+
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button
+                id="date"
+                variant={"outline"}
+                className={cn("w-[300px] justify-start text-left font-normal", !date && "text-muted-foreground")}
+              >
+                <CalendarIcon className="mr-2 h-4 w-4" />
+                {date?.from ? (
+                  date.to ? (
+                    <>
+                      {format(date.from, "LLL dd, y")} - {format(date.to, "LLL dd, y")}
+                    </>
+                  ) : (
+                    format(date.from, "LLL dd, y")
+                  )
+                ) : (
+                  <span>Pick a date range</span>
+                )}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="end">
+              <Calendar
+                initialFocus
+                mode="range"
+                defaultMonth={date?.from}
+                selected={date}
+                onSelect={setDate}
+                numberOfMonths={2}
+              />
+            </PopoverContent>
+          </Popover>
         </CardContent>
       </Card>
 
@@ -126,7 +171,7 @@ const GeneralLedger = () => {
           <CardHeader className="flex flex-row items-center justify-between">
             <div>
               <CardTitle>{selectedAccount?.account_number} - {selectedAccount?.name || 'Ledger'}</CardTitle>
-              <CardDescription>Transaction details and running balance.</CardDescription>
+              <CardDescription>Transaction details from {date?.from ? format(date.from, 'PP') : 'Start'} to {date?.to ? format(date.to, 'PP') : 'End'}</CardDescription>
             </div>
             <Button variant="outline" size="sm" onClick={handleExport} disabled={entriesWithBalance.length === 0}>
               <Download className="mr-2 h-4 w-4" /> Export CSV
@@ -164,7 +209,7 @@ const GeneralLedger = () => {
                   ))
                 ) : (
                   <TableRow>
-                    <TableCell colSpan={6} className="text-center">No transactions found for this account.</TableCell>
+                    <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">No transactions found for this period.</TableCell>
                   </TableRow>
                 )}
               </TableBody>

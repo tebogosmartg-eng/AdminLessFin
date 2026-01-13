@@ -15,6 +15,7 @@ import { formatCurrency } from '../lib/utils';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
 import FinancialRatios from '../components/FinancialRatios';
 import { useAuth } from '../contexts/AuthContext';
+import ReportDrilldownDialog from '../components/ReportDrilldownDialog';
 
 type AccountBalance = {
   id: string;
@@ -40,6 +41,9 @@ type CashFlowItem = {
 const FinancialStatements = () => {
   const { profile, activeCompany } = useAuth();
   const [date, setDate] = useState<DateRange | undefined>();
+  
+  // Drilldown state
+  const [drilldownAccount, setDrilldownAccount] = useState<{ id: string; name: string } | null>(null);
 
   useEffect(() => {
     if (profile?.current_financial_year_start && !date) {
@@ -98,15 +102,12 @@ const FinancialStatements = () => {
   const totalLiabilities = liabilityAccounts.reduce((sum, acc) => sum + acc.balance, 0);
   const totalStoredEquity = equityAccounts.reduce((sum, acc) => sum + acc.balance, 0);
   
-  // IMPORTANT: For the Balance Sheet to balance, we must include the current period's Net Income in Equity
   const totalEquity = totalStoredEquity + netIncome;
   const totalLiabilitiesAndEquity = totalLiabilities + totalEquity;
 
-  // Statement of Changes in Equity Calculations
   const openingRetainedEarnings = openingBalances?.find(acc => acc.name === 'Retained Earnings')?.balance || 0;
   const closingRetainedEarnings = openingRetainedEarnings + netIncome;
 
-  // Trial Balance Calculations
   let totalDebits = 0;
   let totalCredits = 0;
   balancesAsOf?.forEach(acc => {
@@ -117,7 +118,6 @@ const FinancialStatements = () => {
     }
   });
 
-  // Cash Flow Calculations
   const operatingActivities = cashFlowData?.filter(i => i.section === 'Operating') || [];
   const investingActivities = cashFlowData?.filter(i => i.section === 'Investing') || [];
   const financingActivities = cashFlowData?.filter(i => i.section === 'Financing') || [];
@@ -126,7 +126,6 @@ const FinancialStatements = () => {
   const totalFinancing = financingActivities.reduce((sum, i) => sum + i.amount, 0);
   const netCashFlow = totalOperating + totalInvesting + totalFinancing;
 
-  // Ratio Calculations
   const currentAssetKeywords = ['cash', 'bank', 'checking', 'receivable', 'inventory'];
   const currentLiabilityKeywords = ['payable', 'credit card'];
   const currentAssets = assetAccounts.filter(a => currentAssetKeywords.some(k => a.name.toLowerCase().includes(k))).reduce((sum, a) => sum + a.balance, 0);
@@ -225,10 +224,20 @@ const FinancialStatements = () => {
                 <TableHeader><TableRow><TableHead>Account</TableHead><TableHead className="text-right">Amount</TableHead></TableRow></TableHeader>
                 <TableBody>
                   <TableRow className="font-semibold bg-muted/50"><TableCell>Income</TableCell><TableCell></TableCell></TableRow>
-                  {incomeAccounts.map(acc => (<TableRow key={acc.id}><TableCell className="pl-8">{acc.name}</TableCell><TableCell className="text-right">{formatCurrency(acc.activity)}</TableCell></TableRow>))}
+                  {incomeAccounts.map(acc => (
+                    <TableRow key={acc.id} className="cursor-pointer hover:bg-muted/30" onClick={() => setDrilldownAccount({ id: acc.id, name: acc.name })}>
+                        <TableCell className="pl-8">{acc.name}</TableCell>
+                        <TableCell className="text-right">{formatCurrency(acc.activity)}</TableCell>
+                    </TableRow>
+                  ))}
                   <TableRow className="font-semibold"><TableCell>Total Income</TableCell><TableCell className="text-right">{formatCurrency(totalIncome)}</TableCell></TableRow>
                   <TableRow className="font-semibold bg-muted/50"><TableCell>Expenses</TableCell><TableCell></TableCell></TableRow>
-                  {expenseAccounts.map(acc => (<TableRow key={acc.id}><TableCell className="pl-8">{acc.name}</TableCell><TableCell className="text-right">{formatCurrency(acc.activity)}</TableCell></TableRow>))}
+                  {expenseAccounts.map(acc => (
+                    <TableRow key={acc.id} className="cursor-pointer hover:bg-muted/30" onClick={() => setDrilldownAccount({ id: acc.id, name: acc.name })}>
+                        <TableCell className="pl-8">{acc.name}</TableCell>
+                        <TableCell className="text-right">{formatCurrency(acc.activity)}</TableCell>
+                    </TableRow>
+                  ))}
                   <TableRow className="font-semibold"><TableCell>Total Expenses</TableCell><TableCell className="text-right">{formatCurrency(totalExpenses)}</TableCell></TableRow>
                 </TableBody>
                 <TableFooter><TableRow className="text-lg font-bold"><TableCell>Net Income</TableCell><TableCell className="text-right">{formatCurrency(netIncome)}</TableCell></TableRow></TableFooter>
@@ -248,7 +257,12 @@ const FinancialStatements = () => {
                 <div>
                   <Table>
                     <TableHeader><TableRow><TableHead>Assets</TableHead><TableHead className="text-right">Amount</TableHead></TableRow></TableHeader>
-                    <TableBody>{assetAccounts.map(acc => (<TableRow key={acc.id}><TableCell>{acc.name}</TableCell><TableCell className="text-right">{formatCurrency(acc.balance)}</TableCell></TableRow>))}</TableBody>
+                    <TableBody>{assetAccounts.map(acc => (
+                        <TableRow key={acc.id} className="cursor-pointer hover:bg-muted/30" onClick={() => setDrilldownAccount({ id: acc.id, name: acc.name })}>
+                            <TableCell>{acc.name}</TableCell>
+                            <TableCell className="text-right">{formatCurrency(acc.balance)}</TableCell>
+                        </TableRow>
+                    ))}</TableBody>
                     <TableFooter><TableRow className="text-lg font-bold"><TableCell>Total Assets</TableCell><TableCell className="text-right">{formatCurrency(totalAssets)}</TableCell></TableRow></TableFooter>
                   </Table>
                 </div>
@@ -257,10 +271,20 @@ const FinancialStatements = () => {
                     <TableHeader><TableRow><TableHead>Liabilities & Equity</TableHead><TableHead className="text-right">Amount</TableHead></TableRow></TableHeader>
                     <TableBody>
                       <TableRow className="font-semibold bg-muted/50"><TableCell>Liabilities</TableCell><TableCell></TableCell></TableRow>
-                      {liabilityAccounts.map(acc => (<TableRow key={acc.id}><TableCell className="pl-8">{acc.name}</TableCell><TableCell className="text-right">{formatCurrency(acc.balance)}</TableCell></TableRow>))}
+                      {liabilityAccounts.map(acc => (
+                        <TableRow key={acc.id} className="cursor-pointer hover:bg-muted/30" onClick={() => setDrilldownAccount({ id: acc.id, name: acc.name })}>
+                            <TableCell className="pl-8">{acc.name}</TableCell>
+                            <TableCell className="text-right">{formatCurrency(acc.balance)}</TableCell>
+                        </TableRow>
+                      ))}
                       <TableRow className="font-semibold"><TableCell>Total Liabilities</TableCell><TableCell className="text-right">{formatCurrency(totalLiabilities)}</TableCell></TableRow>
                       <TableRow className="font-semibold bg-muted/50"><TableCell>Equity</TableCell><TableCell></TableCell></TableRow>
-                      {equityAccounts.map(acc => (<TableRow key={acc.id}><TableCell className="pl-8">{acc.name}</TableCell><TableCell className="text-right">{formatCurrency(acc.balance)}</TableCell></TableRow>))}
+                      {equityAccounts.map(acc => (
+                        <TableRow key={acc.id} className="cursor-pointer hover:bg-muted/30" onClick={() => setDrilldownAccount({ id: acc.id, name: acc.name })}>
+                            <TableCell className="pl-8">{acc.name}</TableCell>
+                            <TableCell className="text-right">{formatCurrency(acc.balance)}</TableCell>
+                        </TableRow>
+                      ))}
                       <TableRow><TableCell className="pl-8 italic">Current Year Earnings</TableCell><TableCell className="text-right">{formatCurrency(netIncome)}</TableCell></TableRow>
                       <TableRow className="font-semibold"><TableCell>Total Equity</TableCell><TableCell className="text-right">{formatCurrency(totalEquity)}</TableCell></TableRow>
                     </TableBody>
@@ -331,7 +355,7 @@ const FinancialStatements = () => {
                 <TableHeader><TableRow><TableHead>Acc. No.</TableHead><TableHead>Account</TableHead><TableHead className="text-right">Debit</TableHead><TableHead className="text-right">Credit</TableHead></TableRow></TableHeader>
                 <TableBody>
                   {balancesAsOf?.sort((a, b) => a.account_number - b.account_number).map(acc => (
-                    <TableRow key={acc.id}>
+                    <TableRow key={acc.id} className="cursor-pointer hover:bg-muted/30" onClick={() => setDrilldownAccount({ id: acc.id, name: acc.name })}>
                       <TableCell>{acc.account_number}</TableCell>
                       <TableCell>{acc.name}</TableCell>
                       <TableCell className="text-right font-mono">{['Asset', 'Expense'].includes(acc.type) && acc.balance >= 0 ? formatCurrency(acc.balance) : (['Liability', 'Equity', 'Income'].includes(acc.type) && acc.balance < 0 ? formatCurrency(-acc.balance) : '')}</TableCell>
@@ -357,6 +381,15 @@ const FinancialStatements = () => {
           </Card>
         </TabsContent>
       </Tabs>
+
+      <ReportDrilldownDialog
+        isOpen={!!drilldownAccount}
+        setIsOpen={() => setDrilldownAccount(null)}
+        accountId={drilldownAccount?.id || null}
+        accountName={drilldownAccount?.name || ''}
+        dateFrom={fromDate}
+        dateTo={toDate}
+      />
     </div>
   );
 };

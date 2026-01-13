@@ -56,19 +56,28 @@ serve(async (req) => {
 
     switch (method) {
       case 'GET_LEDGER_ENTRIES':
-        ({ data, error } = await supabaseAdmin
+        let query = supabaseAdmin
           .from('journal_entry_items')
           .select(`
             amount,
             type,
-            journal_entries (
+            journal_entries!inner (
               id,
               entry_date,
               description
             )
           `)
           .eq('account_id', body.account_id)
-          .order('entry_date', { foreignTable: 'journal_entries', ascending: true }));
+          .order('entry_date', { foreignTable: 'journal_entries', ascending: true });
+        
+        if (body.start_date) {
+            query = query.gte('journal_entries.entry_date', body.start_date);
+        }
+        if (body.end_date) {
+            query = query.lte('journal_entries.entry_date', body.end_date);
+        }
+
+        ({ data, error } = await query);
         break;
 
       case 'GET_BANK_ACCOUNTS':
