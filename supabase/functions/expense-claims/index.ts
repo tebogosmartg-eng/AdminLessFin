@@ -156,7 +156,7 @@ serve(async (req) => {
           .from('journal_entries')
           .insert({
             company_id: company_id,
-            entry_date: claim.submission_date, // Or approval date? Usually date of expense recognition.
+            entry_date: claim.submission_date,
             description: `Expense Claim ${claim.claim_number} - ${claim.employees.first_name} ${claim.employees.last_name}`,
           })
           .select('id')
@@ -191,6 +191,47 @@ serve(async (req) => {
           .from('expense_claims')
           .update({ status: 'approved', journal_entry_id: entry.id })
           .eq('id', claimId));
+        break;
+
+      case 'REIMBURSE':
+        const { claimId: rClaimId, paymentAccountId, liabilityAccountId: rLiabilityAccountId, paymentDate } = body;
+
+        // 1. Get Claim
+        const { data: rClaim, error: rClaimError } = await supabaseAdmin
+          .from('expense_claims')
+          .select('*, employees(first_name, last_name)')
+          .eq('id', rClaimId)
+          .single();
+        if (rClaimError) throw rClaimError;
+
+        if (rClaim.status !== 'approved') throw new Error("Only approved claims can be reimbursed.");
+
+        // 2. Create Payment Journal Entry
+        const { data: rEntry, error: rEntryError } = await supabaseAdmin
+          .from('journal_entries')
+          .insert({
+            company_id: company_id,
+            entry_date: paymentDate,
+            description: `Reimbursement for Claim ${rClaim.claim_number} - ${rClaim.employees.first_name} ${rClaim.employees.last_name}`,
+          })
+          .select('id')
+          .single();
+        if (rEntryError) throw rEntryError;
+
+        // 3. Create Items (Debit Liability, Credit Cash)
+        const paymentItems = [
+          { journal_entry_id: rEntry.id, account_id: rLiabilityAccountId, type: 'debit', amount: rClaim.total_amount },
+          { journal_entry_id: rEntry.id, account_id: paymentAccountId, type: 'credit', amount: rClaim.total_amount }
+        ];
+
+        const { error: pItemsError } = await supabaseAdmin.from('journal_entry_items').insert(paymentItems);
+        if (pItemsError) throw pItemsError;
+
+        // 4. Update status
+        ({ data, error } = await supabaseAdmin
+          .from('expense_claims')
+          .update({ status: 'paid' })
+          .eq('id', rClaimId));
         break;
 
       default:

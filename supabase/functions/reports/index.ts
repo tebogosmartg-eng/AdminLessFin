@@ -54,6 +54,31 @@ serve(async (req) => {
       }
     );
 
+    if (method === 'GET_INVENTORY_VALUATION') {
+        const { data: products, error } = await supabaseAdmin
+            .from('products')
+            .select('*')
+            .eq('company_id', company_id)
+            .eq('type', 'inventory')
+            .order('name');
+        
+        if (error) throw error;
+
+        // Calculate total value
+        const valuation = products.map((p: any) => ({
+            id: p.id,
+            name: p.name,
+            quantity: p.quantity_on_hand,
+            cost: p.cost,
+            totalValue: p.quantity_on_hand * (p.cost || 0)
+        }));
+
+        return new Response(JSON.stringify(valuation), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 200,
+        });
+    }
+
     if (method === 'GET_PROJECT_PROFITABILITY') {
         const { data: projects, error: projError } = await supabaseAdmin
             .from('projects')
@@ -155,15 +180,13 @@ serve(async (req) => {
                     name, 
                     rate, 
                     netSales: 0, 
-                    taxCollected: 0, // Output Tax (Sales)
+                    taxCollected: 0, 
                     netPurchases: 0,
-                    taxPaid: 0,      // Input Tax (Purchases)
-                    netTax: 0        // Collected - Paid
+                    taxPaid: 0,
+                    netTax: 0
                 };
             }
 
-            // Sales are typically Credit items (Revenue accounts)
-            // Purchases are typically Debit items (Expense/Asset accounts)
             if (itemType === 'credit') {
                 report[name].netSales += netAmount;
                 report[name].taxCollected += taxAmount;

@@ -94,6 +94,7 @@ export const SidebarNav = () => {
   const reportsLinks = [
     { to: '/reports', label: 'Operational Reports', icon: FileText, prefetch: () => {} },
     { to: '/financial-statements', label: 'Financial Statements', icon: FileSignature, prefetch: () => {} },
+    { to: '/inventory-valuation', label: 'Inventory Valuation', icon: Package, prefetch: () => {} },
     { to: '/project-profitability', label: 'Project Profitability', icon: PieChart, prefetch: () => {} },
     { to: '/tax-report', label: 'Sales Tax Report', icon: Scale, prefetch: () => {} },
     { to: '/general-ledger', label: 'General Ledger', icon: Library, prefetch: () => prefetch(queries.accountsQuery) },

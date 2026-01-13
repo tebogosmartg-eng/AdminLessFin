@@ -4,13 +4,14 @@ import { supabase } from '../integrations/supabase/client';
 import { Button } from '../components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/table';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/card';
-import { PlusCircle, MoreHorizontal, CheckCircle } from 'lucide-react';
+import { PlusCircle, MoreHorizontal, CheckCircle, DollarSign } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "../components/ui/dropdown-menu";
 import { Badge } from '../components/ui/badge';
 import { useAuth } from '../contexts/AuthContext';
 import { format } from 'date-fns';
 import { showError, showSuccess } from '../utils/toast';
 import ExpenseClaimForm from '../components/ExpenseClaimForm';
+import ReimburseClaimDialog from '../components/ReimburseClaimDialog';
 import { formatCurrency } from '../lib/utils';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '../components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
@@ -22,6 +23,8 @@ const ExpenseClaims = () => {
   const [selectedClaimId, setSelectedClaimId] = useState<string | undefined>(undefined);
   const [isApproveOpen, setIsApproveOpen] = useState(false);
   const [liabilityAccountId, setLiabilityAccountId] = useState('');
+  const [isReimburseOpen, setIsReimburseOpen] = useState(false);
+  const [claimToReimburse, setClaimToReimburse] = useState<any>(null);
   
   const { activeCompany } = useAuth();
   const queryClient = useQueryClient();
@@ -97,6 +100,11 @@ const ExpenseClaims = () => {
     setIsApproveOpen(true);
   };
 
+  const handleReimburseClick = (claim: any) => {
+    setClaimToReimburse(claim);
+    setIsReimburseOpen(true);
+  };
+
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'approved': return 'default';
@@ -154,6 +162,9 @@ const ExpenseClaims = () => {
                           {claim.status === 'draft' && (
                              <DropdownMenuItem onClick={() => handleApproveClick(claim.id)}><CheckCircle className="mr-2 h-4 w-4 text-green-600" /> Approve</DropdownMenuItem>
                           )}
+                          {claim.status === 'approved' && (
+                             <DropdownMenuItem onClick={() => handleReimburseClick(claim)}><DollarSign className="mr-2 h-4 w-4 text-green-600" /> Reimburse</DropdownMenuItem>
+                          )}
                           <DropdownMenuItem onClick={() => deleteMutation.mutate(claim.id)} className="text-red-600">Delete</DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
@@ -193,6 +204,14 @@ const ExpenseClaims = () => {
             </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {claimToReimburse && (
+        <ReimburseClaimDialog
+          isOpen={isReimburseOpen}
+          setIsOpen={setIsReimburseOpen}
+          claim={claimToReimburse}
+        />
+      )}
     </>
   );
 };
