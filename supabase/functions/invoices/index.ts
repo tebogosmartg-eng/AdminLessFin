@@ -57,6 +57,7 @@ serve(async (req) => {
             invoice_date,
             due_date,
             status,
+            notes,
             customers!inner ( name ),
             journal_entries (
               journal_entry_items (
@@ -100,16 +101,19 @@ serve(async (req) => {
             invoice_date,
             due_date,
             status,
-            customers ( name, address, email ),
+            notes,
+            customers ( id, name, address, email, payment_terms ),
             journal_entries (
+              id,
               journal_entry_items (
                 id,
                 amount,
                 type,
                 project_id,
+                account_id, 
                 chart_of_accounts ( name ),
                 journal_entry_item_tax_rates (
-                  tax_rates ( rate )
+                  tax_rates ( id, rate )
                 )
               )
             )
@@ -121,7 +125,7 @@ serve(async (req) => {
 
       case 'CREATE_WITH_TIMESHEETS':
         const { invoiceData, timesheetIds } = body;
-        const { p_items, ...rpcParams } = invoiceData;
+        const { p_items, notes, ...rpcParams } = invoiceData;
 
         // 1. Create Invoice using RPC
         const { data: newInvoiceId, error: rpcError } = await supabaseAdmin.rpc('create_invoice_with_taxes', {
@@ -134,44 +138,29 @@ serve(async (req) => {
             p_inventory_asset_account_id: rpcParams.inventory_asset_account_id || null,
             p_tax_payable_account_id: rpcParams.tax_payable_account_id || null,
             p_description: rpcParams.description || `Invoice ${rpcParams.invoice_number}`,
-            p_items: p_items, // Note: p_items contains project_id but RPC ignores it currently
+            p_items: p_items,
             p_quote_id: null,
         });
 
         if (rpcError) throw rpcError;
 
-        // 2. Post-process: Update project_id on created items
-        // We need to match items back. This is tricky because the RPC created them.
-        // Strategy: Get the JE ID from the invoice, then fetch items and update them sequentially (imperfect but workable)
-        // OR better: Since we are in an edge function, we can just do the updates.
-        // We need to identify which item corresponds to which input.
-        // Simplified approach: If ALL items are for one project, update all income items.
-        // For line-level, we might need a custom RPC or direct insert instead of `create_invoice_with_taxes`.
-        // Given the constraints, let's assume we fetch the newly created items and update them if `project_id` matches.
-        
-        // Actually, the easiest way to support project_id reliably is to fetch the JE and update items based on order/amount match? No, unsafe.
-        // BETTER: Since we are restricted to `create_invoice_with_taxes` for now, let's try to update the items by matching account_id and amount approximately.
-        
+        // Update notes and post-process projects
         if (newInvoiceId) {
+            await supabaseAdmin.from('invoices').update({ notes: notes }).eq('id', newInvoiceId);
+
             const { data: invoice } = await supabaseAdmin.from('invoices').select('journal_entry_id').eq('id', newInvoiceId).single();
             if (invoice && invoice.journal_entry_id) {
-                // We have the items in p_items. We need to find the created JE items.
                 const { data: createdItems } = await supabaseAdmin
                     .from('journal_entry_items')
                     .select('id, account_id, amount')
                     .eq('journal_entry_id', invoice.journal_entry_id)
-                    .eq('type', 'credit'); // Income items
-                
-                // This matching is fragile if multiple identical lines exist.
-                // However, without rewriting the RPC, this is the best we can do.
-                // For each input item with a project_id, find a matching created item that hasn't been updated yet.
+                    .eq('type', 'credit'); 
                 
                 const updatedItemIds = new Set();
                 
                 for (const inputItem of p_items) {
                     if (inputItem.project_id) {
                         const targetAmount = inputItem.quantity * inputItem.unit_price;
-                        // Find first match
                         const match = createdItems?.find(ci => 
                             ci.account_id === inputItem.income_account_id && 
                             Math.abs(ci.amount - targetAmount) < 0.01 &&
@@ -196,7 +185,7 @@ serve(async (req) => {
 
       case 'PUT':
         if (body.invoiceData.p_items) {
-           const { p_items: updateItems, ...updateParams } = body.invoiceData;
+           const { p_items: updateItems, notes: updateNotes, ...updateParams } = body.invoiceData;
            ({ error } = await supabaseAdmin.rpc('update_invoice_full', {
              p_invoice_id: body.invoiceId,
              p_company_id: company_id,
@@ -210,9 +199,13 @@ serve(async (req) => {
              p_inventory_asset_account_id: updateParams.inventory_asset_account_id || null,
              p_tax_payable_account_id: updateParams.tax_payable_account_id || null
            }));
+
+           if (!error && updateNotes !== undefined) {
+               await supabaseAdmin.from('invoices').update({ notes: updateNotes }).eq('id', body.invoiceId);
+           }
            
            if (!error) {
-               // Similar post-process update for projects
+               // Post-process projects similar to CREATE
                 const { data: invoice } = await supabaseAdmin.from('invoices').select('journal_entry_id').eq('id', body.invoiceId).single();
                 if (invoice && invoice.journal_entry_id) {
                     const { data: createdItems } = await supabaseAdmin
@@ -279,7 +272,6 @@ serve(async (req) => {
           unit_price: item.unit_price * (percentage / 100.0),
           income_account_id: item.income_account_id,
           tax_rate_id: item.tax_rate_id || null,
-          // Note: Quotes don't usually have project_id on items in standard schema, but if they did we'd pass it.
         }));
 
         ({ error } = await supabaseAdmin.rpc('create_invoice_with_taxes', {
@@ -295,6 +287,27 @@ serve(async (req) => {
           p_items: quote_p_items,
           p_quote_id: quoteId,
         }));
+        
+        // Update notes if provided (e.g. from default)
+        if (quoteInvoiceData.notes) {
+            // Need the ID of the invoice just created... RPC returns it!
+            // WAIT: The RPC 'create_invoice_with_taxes' returns VOID in the earlier definition I pasted in 'App Preview'.
+            // BUT in the 'Schema' section of context, there are TWO definitions. One returns uuid, one returns void.
+            // Postgres function overloading. The one used depends on signature.
+            // I should check which one I'm calling.
+            // To be safe, I'll fetch the invoice by number to update notes.
+            const { data: createdInv } = await supabaseAdmin
+                .from('invoices')
+                .select('id')
+                .eq('invoice_number', quoteInvoiceData.invoice_number)
+                .eq('company_id', company_id)
+                .single();
+            
+            if (createdInv) {
+                await supabaseAdmin.from('invoices').update({ notes: quoteInvoiceData.notes }).eq('id', createdInv.id);
+            }
+        }
+
         data = { message: 'Invoice created from quote successfully.' };
         break;
 

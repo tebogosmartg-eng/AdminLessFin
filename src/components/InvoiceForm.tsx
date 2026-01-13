@@ -19,7 +19,7 @@ import { Product } from '../pages/Products';
 import { TaxRate } from '../pages/TaxRates';
 import { Project } from '../pages/Projects';
 import { Trash2, Clock } from 'lucide-react';
-import { addDays, format } from 'date-fns';
+import { addDays, format, isValid } from 'date-fns';
 import { formatCurrency } from '../lib/utils';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from './ui/sheet';
 import InvoicePreview from './InvoicePreview';
@@ -46,6 +46,7 @@ const invoiceSchema = z.object({
   inventory_asset_account_id: z.string().optional(),
   tax_payable_account_id: z.string().optional(),
   description: z.string().optional(),
+  notes: z.string().optional(),
   items: z.array(invoiceItemSchema).min(1, "At least one line item is required."),
 });
 
@@ -74,21 +75,54 @@ const InvoiceForm = ({ isOpen, setIsOpen, invoiceId, duplicateFromId, initialCus
       invoice_date: format(new Date(), 'yyyy-MM-dd'),
       due_date: format(addDays(new Date(), 30), 'yyyy-MM-dd'),
       customer_id: '',
+      notes: activeCompany?.default_invoice_notes || '',
       items: [{ product_id: '', description: '', quantity: 1, unit_price: 0, income_account_id: '', tax_rate_id: '', project_id: '' }],
     },
   });
 
+  const { data: customers } = useQuery<Customer[]>({ queryKey: ['customers', activeCompany?.id] });
+  const { data: products } = useQuery<Product[]>({ queryKey: ['products', activeCompany?.id] });
+  const { data: accounts } = useQuery<Account[]>({ queryKey: ['accounts', activeCompany?.id] });
+  const { data: projects } = useQuery<Project[]>({ ...projectsQuery(activeCompany?.id!), enabled: !!activeCompany });
+  const { data: taxRates } = useQuery<TaxRate[]>({ ...taxRatesQuery(activeCompany?.id!), enabled: !!activeCompany });
+  
+  const incomeAccounts = accounts?.filter(a => a.type === 'Income');
+  const assetAccounts = accounts?.filter(a => a.type === 'Asset');
+  const liabilityAccounts = accounts?.filter(a => a.type === 'Liability');
+
   const watchedValues = form.watch();
   const customerId = form.watch('customer_id');
+  const invoiceDate = form.watch('invoice_date');
 
-  // Set initial customer if provided and new invoice
+  // Auto-calculate Due Date based on Customer Terms
   useEffect(() => {
-    if (isOpen && !isEditing && !isDuplicating && initialCustomerId) {
-      form.setValue('customer_id', initialCustomerId);
-      // Automatically open the unbilled time dialog if coming from project detail
-      setIsUnbilledTimeOpen(true);
+    if (customerId && invoiceDate && !isEditing && customers) {
+      const customer = customers.find(c => c.id === customerId);
+      if (customer) {
+        const terms = customer.payment_terms || 30; // Default to 30 if null
+        const baseDate = new Date(invoiceDate);
+        if (isValid(baseDate)) {
+          const newDueDate = addDays(baseDate, terms);
+          form.setValue('due_date', format(newDueDate, 'yyyy-MM-dd'));
+        }
+      }
     }
-  }, [isOpen, isEditing, isDuplicating, initialCustomerId, form]);
+  }, [customerId, invoiceDate, customers, isEditing, form]);
+
+  // Set initial customer and notes
+  useEffect(() => {
+    if (isOpen && !isEditing && !isDuplicating) {
+      if (initialCustomerId) {
+        form.setValue('customer_id', initialCustomerId);
+        setIsUnbilledTimeOpen(true);
+      }
+      // Reset notes to default if empty
+      const currentNotes = form.getValues('notes');
+      if (!currentNotes && activeCompany?.default_invoice_notes) {
+        form.setValue('notes', activeCompany.default_invoice_notes);
+      }
+    }
+  }, [isOpen, isEditing, isDuplicating, initialCustomerId, activeCompany, form]);
 
   // Fetch data if editing OR duplicating
   const sourceId = invoiceId || duplicateFromId;
@@ -113,11 +147,7 @@ const InvoiceForm = ({ isOpen, setIsOpen, invoiceId, duplicateFromId, initialCus
           description: item.chart_of_accounts?.name || 'Item', 
           quantity: 1, 
           unit_price: item.amount,
-          income_account_id: '', // Ideally we'd get this from backend, but GET_ONE doesn't return account_id on items directly in this shape easily without lookup. For editing, we might lose the selected account ID visual if not returned. 
-          // FIX: In `GET_ONE` invoice function, I updated it to return `account_id`? No, I returned chart_of_accounts(name). 
-          // I should really fetch account_id. But for now, user has to re-select account if it's missing, which is annoying.
-          // However, we can infer it if we had it. 
-          // Let's assume for now user re-confirms or we default to Sales.
+          income_account_id: '', 
           tax_rate_id: item.journal_entry_item_tax_rates?.[0]?.tax_rates?.id || '',
           project_id: item.project_id || '',
         }));
@@ -128,11 +158,12 @@ const InvoiceForm = ({ isOpen, setIsOpen, invoiceId, duplicateFromId, initialCus
         due_date: isDuplicating ? format(addDays(new Date(), 30), 'yyyy-MM-dd') : sourceInvoice.due_date,
         customer_id: sourceInvoice.customers?.id || '',
         description: sourceInvoice.description || '',
+        notes: sourceInvoice.notes || activeCompany?.default_invoice_notes || '',
         accounts_receivable_id: '', 
         items: items || [{ product_id: '', description: '', quantity: 1, unit_price: 0, income_account_id: '', tax_rate_id: '', project_id: '' }],
       });
     }
-  }, [sourceInvoice, isEditing, isDuplicating, isOpen, form]);
+  }, [sourceInvoice, isEditing, isDuplicating, isOpen, activeCompany, form]);
 
   const { data: nextInvoiceNumber } = useQuery({
     queryKey: ['next_invoice_number', activeCompany?.id],
@@ -154,16 +185,6 @@ const InvoiceForm = ({ isOpen, setIsOpen, invoiceId, duplicateFromId, initialCus
 
   const { fields, append, remove, replace } = useFieldArray({ control: form.control, name: "items" });
 
-  const { data: customers } = useQuery<Customer[]>({ queryKey: ['customers', activeCompany?.id] });
-  const { data: products } = useQuery<Product[]>({ queryKey: ['products', activeCompany?.id] });
-  const { data: accounts } = useQuery<Account[]>({ queryKey: ['accounts', activeCompany?.id] });
-  const { data: projects } = useQuery<Project[]>({ ...projectsQuery(activeCompany?.id!), enabled: !!activeCompany });
-  const { data: taxRates } = useQuery<TaxRate[]>({ ...taxRatesQuery(activeCompany?.id!), enabled: !!activeCompany });
-  
-  const incomeAccounts = accounts?.filter(a => a.type === 'Income');
-  const assetAccounts = accounts?.filter(a => a.type === 'Asset');
-  const liabilityAccounts = accounts?.filter(a => a.type === 'Liability');
-
   const handleProductSelect = (productId: string, index: number) => {
     const product = products?.find(p => p.id === productId);
     if (product) {
@@ -183,7 +204,7 @@ const InvoiceForm = ({ isOpen, setIsOpen, invoiceId, duplicateFromId, initialCus
       unit_price: entry.projects.billable_rate || 0,
       income_account_id: '', 
       tax_rate_id: '',
-      project_id: entry.project_id, // Auto-link project!
+      project_id: entry.project_id,
       timesheet_ids: [entry.id],
     }));
 
@@ -207,7 +228,7 @@ const InvoiceForm = ({ isOpen, setIsOpen, invoiceId, duplicateFromId, initialCus
         unit_price: item.unit_price,
         income_account_id: item.income_account_id,
         tax_rate_id: (item.tax_rate_id === 'none' || !item.tax_rate_id) ? null : item.tax_rate_id,
-        project_id: item.project_id || null, // Pass project_id
+        project_id: item.project_id || null,
       }));
 
       const payload: any = {
@@ -313,6 +334,7 @@ const InvoiceForm = ({ isOpen, setIsOpen, invoiceId, duplicateFromId, initialCus
                 })}
                 <Button type="button" variant="outline" size="sm" onClick={() => append({ product_id: '', description: '', quantity: 1, unit_price: 0, income_account_id: '', tax_rate_id: '', project_id: '' })}>Add Line</Button>
               </div>
+              <FormField control={form.control} name="notes" render={({ field }) => (<FormItem><FormLabel>Invoice Notes / Terms</FormLabel><FormControl><Textarea placeholder="Payment terms, bank details, etc." {...field} rows={3} /></FormControl><FormMessage /></FormItem>)} />
               <DialogFooter className="pt-4">
                 <Button type="button" variant="outline" onClick={() => setIsPreviewOpen(true)}>Preview</Button>
                 <div className="flex-grow" />

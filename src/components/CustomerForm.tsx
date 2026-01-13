@@ -24,6 +24,7 @@ import {
 } from './ui/form';
 import { Input } from './ui/input';
 import { Textarea } from './ui/textarea';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { showError, showSuccess } from '../utils/toast';
 import { Customer } from '../pages/Customers';
 
@@ -34,6 +35,7 @@ const customerSchema = z.object({
   phone: z.string().optional(),
   address: z.string().optional(),
   tax_id: z.string().optional(),
+  payment_terms: z.coerce.number().min(0, 'Terms cannot be negative.').optional(),
 });
 
 type CustomerFormValues = z.infer<typeof customerSchema>;
@@ -56,6 +58,7 @@ const CustomerForm = ({ isOpen, setIsOpen, customer }: CustomerFormProps) => {
       phone: '',
       address: '',
       tax_id: '',
+      payment_terms: 30,
     },
   });
 
@@ -68,6 +71,7 @@ const CustomerForm = ({ isOpen, setIsOpen, customer }: CustomerFormProps) => {
         phone: customer.phone || '',
         address: customer.address || '',
         tax_id: customer.tax_id || '',
+        payment_terms: customer.payment_terms || 30,
       });
     } else {
       form.reset({
@@ -77,6 +81,7 @@ const CustomerForm = ({ isOpen, setIsOpen, customer }: CustomerFormProps) => {
         phone: '',
         address: '',
         tax_id: '',
+        payment_terms: 30,
       });
     }
   }, [customer, form, isOpen]);
@@ -149,17 +154,27 @@ const CustomerForm = ({ isOpen, setIsOpen, customer }: CustomerFormProps) => {
                 />
                 <FormField
                 control={form.control}
-                name="tax_id"
+                name="payment_terms"
                 render={({ field }) => (
-                    <FormItem>
-                    <FormLabel>Tax ID / VAT No.</FormLabel>
-                    <FormControl>
-                        <Input placeholder="Optional" {...field} />
-                    </FormControl>
+                  <FormItem>
+                    <FormLabel>Payment Terms (Days)</FormLabel>
+                    <Select onValueChange={(val) => field.onChange(Number(val))} value={String(field.value)}>
+                      <FormControl>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="0">Due on Receipt</SelectItem>
+                        <SelectItem value="7">Net 7</SelectItem>
+                        <SelectItem value="15">Net 15</SelectItem>
+                        <SelectItem value="30">Net 30</SelectItem>
+                        <SelectItem value="60">Net 60</SelectItem>
+                        <SelectItem value="90">Net 90</SelectItem>
+                      </SelectContent>
+                    </Select>
                     <FormMessage />
-                    </FormItem>
+                  </FormItem>
                 )}
-                />
+              />
             </div>
             <div className="grid grid-cols-2 gap-4">
               <FormField
@@ -189,6 +204,19 @@ const CustomerForm = ({ isOpen, setIsOpen, customer }: CustomerFormProps) => {
                 )}
               />
             </div>
+            <FormField
+              control={form.control}
+              name="tax_id"
+              render={({ field }) => (
+                  <FormItem>
+                  <FormLabel>Tax ID / VAT No.</FormLabel>
+                  <FormControl>
+                      <Input placeholder="Optional" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                  </FormItem>
+              )}
+            />
             <FormField
               control={form.control}
               name="address"

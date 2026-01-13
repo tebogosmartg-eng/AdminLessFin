@@ -18,6 +18,7 @@ const companySchema = z.object({
   name: z.string().min(1, 'Company name is required.'),
   address: z.string().optional(),
   tax_id: z.string().optional(),
+  default_invoice_notes: z.string().optional(),
 });
 type CompanyFormValues = z.infer<typeof companySchema>;
 
@@ -28,7 +29,7 @@ const CompanySettings = () => {
 
   const form = useForm<CompanyFormValues>({
     resolver: zodResolver(companySchema),
-    defaultValues: { name: '', address: '', tax_id: '' },
+    defaultValues: { name: '', address: '', tax_id: '', default_invoice_notes: '' },
   });
 
   useEffect(() => {
@@ -37,6 +38,7 @@ const CompanySettings = () => {
         name: activeCompany.name || '',
         address: activeCompany.address || '',
         tax_id: activeCompany.tax_id || '',
+        default_invoice_notes: activeCompany.default_invoice_notes || '',
       });
       setPreviewUrl(activeCompany.logo_url || null);
     }
@@ -79,6 +81,7 @@ const CompanySettings = () => {
             name: values.name, 
             address: values.address || null,
             tax_id: values.tax_id || null,
+            default_invoice_notes: values.default_invoice_notes || null,
             logo_url: logoUrl 
           },
         },
@@ -195,6 +198,19 @@ const CompanySettings = () => {
                     <FormLabel>Tax ID / VAT Number</FormLabel>
                     <FormControl>
                       <Input placeholder="e.g., VAT123456789" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="default_invoice_notes"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Default Invoice Notes / Terms</FormLabel>
+                    <FormControl>
+                      <Textarea placeholder="e.g. Bank Account: 123456. Payment due within 30 days." {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>

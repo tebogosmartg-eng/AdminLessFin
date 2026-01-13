@@ -19,7 +19,7 @@ import { TaxRate } from '../pages/TaxRates';
 import { Account } from '../pages/ChartOfAccounts';
 import { Trash2 } from 'lucide-react';
 import { Alert, AlertDescription } from './ui/alert';
-import { addDays, format } from 'date-fns';
+import { addDays, format, isValid } from 'date-fns';
 import { formatCurrency } from '../lib/utils';
 import { projectsQuery, taxRatesQuery } from '../lib/queries';
 
@@ -74,6 +74,37 @@ const BillForm = ({ isOpen, setIsOpen, billId, duplicateFromId, initialData, onS
       items: [{ product_id: '', description: '', quantity: 1, unit_cost: 0, expense_account_id: '', project_id: '', tax_rate_id: '' }],
     },
   });
+
+  const vendorId = form.watch('vendor_id');
+  const billDate = form.watch('bill_date');
+
+  const { data: vendors } = useQuery<Vendor[]>({
+    queryKey: ['vendors', activeCompany?.id],
+    queryFn: async () => {
+      if (!activeCompany) return [];
+      const { data, error } = await supabase.functions.invoke('vendors', {
+        body: { method: 'GET', company_id: activeCompany.id },
+      });
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!activeCompany
+  });
+
+  // Auto-calculate Due Date based on Vendor Terms
+  useEffect(() => {
+    if (vendorId && billDate && !isEditing && vendors) {
+      const vendor = vendors.find(v => v.id === vendorId);
+      if (vendor) {
+        const terms = vendor.payment_terms || 30; // Default to 30 if null
+        const baseDate = new Date(billDate);
+        if (isValid(baseDate)) {
+          const newDueDate = addDays(baseDate, terms);
+          form.setValue('due_date', format(newDueDate, 'yyyy-MM-dd'));
+        }
+      }
+    }
+  }, [vendorId, billDate, vendors, isEditing, form]);
 
   const sourceId = billId || duplicateFromId;
   const { data: sourceBill } = useQuery({
@@ -165,19 +196,6 @@ const BillForm = ({ isOpen, setIsOpen, billId, duplicateFromId, initialData, onS
   }, [sourceBill, isEditing, isDuplicating, isOpen, form]);
 
   const { fields, append, remove } = useFieldArray({ control: form.control, name: "items" });
-
-  const { data: vendors } = useQuery<Vendor[]>({
-    queryKey: ['vendors', activeCompany?.id],
-    queryFn: async () => {
-      if (!activeCompany) return [];
-      const { data, error } = await supabase.functions.invoke('vendors', {
-        body: { method: 'GET', company_id: activeCompany.id },
-      });
-      if (error) throw error;
-      return data;
-    },
-    enabled: !!activeCompany
-  });
   const { data: products } = useQuery<Product[]>({
     queryKey: ['products', activeCompany?.id],
     queryFn: async () => {

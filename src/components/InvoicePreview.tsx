@@ -87,6 +87,13 @@ const InvoicePreview = ({ formData, customers, company, taxRates }) => {
               </TableRow>
             </TableFooter>
           </Table>
+
+          {formData.notes && (
+            <div className="mt-8 pt-4 border-t">
+                <h4 className="font-semibold text-sm mb-1">Terms & Notes</h4>
+                <p className="text-sm text-muted-foreground whitespace-pre-wrap">{formData.notes}</p>
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>

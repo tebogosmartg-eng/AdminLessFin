@@ -19,6 +19,7 @@ type Company = {
   address: string | null;
   logo_url: string | null;
   tax_id: string | null;
+  default_invoice_notes: string | null;
 };
 
 type AuthContextType = {

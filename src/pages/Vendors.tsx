@@ -33,6 +33,7 @@ export type Vendor = {
   phone: string | null;
   address: string | null;
   tax_id?: string | null;
+  payment_terms?: number | null;
 };
 
 const Vendors = () => {
@@ -93,6 +94,7 @@ const Vendors = () => {
       Phone: v.phone,
       Address: v.address,
       'Tax ID': v.tax_id || '',
+      'Payment Terms': v.payment_terms || '',
     }));
     downloadCSV(data, 'vendors.csv');
   };
