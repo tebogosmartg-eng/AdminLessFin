@@ -6,19 +6,21 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../co
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from '../components/ui/table';
 import { Skeleton } from '../components/ui/skeleton';
 import { Button } from '../components/ui/button';
-import { Printer, FileCheck } from 'lucide-react';
+import { Printer, FileCheck, Send } from 'lucide-react';
 import { Badge } from '../components/ui/badge';
 import { showError, showSuccess } from '../utils/toast';
 import { useAuth } from '../contexts/AuthContext';
 import { formatCurrency } from '../lib/utils';
 import { format } from 'date-fns';
 import BillForm from '../components/BillForm';
+import SendPODialog from '../components/SendPODialog';
 
 const PurchaseOrderDetail = () => {
   const { id } = useParams();
   const { activeCompany } = useAuth();
   const queryClient = useQueryClient();
   const [isBillFormOpen, setIsBillFormOpen] = useState(false);
+  const [isSendDialogOpen, setIsSendDialogOpen] = useState(false);
 
   const { data: po, isLoading } = useQuery({
     queryKey: ['po_detail', id],
@@ -67,13 +69,15 @@ const PurchaseOrderDetail = () => {
             <Badge className="mt-2 capitalize">{po.status}</Badge>
           </div>
           <div className="flex gap-2">
+            {(po.status === 'draft' || po.status === 'sent') && (
+              <Button onClick={() => setIsSendDialogOpen(true)}>
+                <Send className="mr-2 h-4 w-4" /> Email PO
+              </Button>
+            )}
             {po.status !== 'billed' && po.status !== 'closed' && (
               <Button onClick={() => setIsBillFormOpen(true)}>
                 <FileCheck className="mr-2 h-4 w-4" /> Convert to Bill
               </Button>
-            )}
-            {po.status === 'draft' && (
-              <Button variant="outline" onClick={() => updateStatusMutation.mutate('sent')}>Mark Sent</Button>
             )}
             <Button onClick={() => window.print()} variant="outline"><Printer className="mr-2 h-4 w-4" /> Print</Button>
           </div>
@@ -118,6 +122,7 @@ const PurchaseOrderDetail = () => {
                   <TableHead className="text-center">Qty</TableHead>
                   <TableHead className="text-right">Unit Cost</TableHead>
                   <TableHead className="text-right">Total</TableHead>
+                  <TableHead>Project</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -127,6 +132,7 @@ const PurchaseOrderDetail = () => {
                     <TableCell className="text-center">{item.quantity}</TableCell>
                     <TableCell className="text-right font-mono">{formatCurrency(item.unit_cost)}</TableCell>
                     <TableCell className="text-right font-mono">{formatCurrency(item.quantity * item.unit_cost)}</TableCell>
+                    <TableCell className="text-sm text-muted-foreground">{item.projects?.name || '-'}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -134,6 +140,7 @@ const PurchaseOrderDetail = () => {
                 <TableRow className="text-lg font-bold bg-muted/50">
                   <TableCell colSpan={3} className="text-right">Total</TableCell>
                   <TableCell className="text-right font-mono">{formatCurrency(totalAmount)}</TableCell>
+                  <TableCell></TableCell>
                 </TableRow>
               </TableFooter>
             </Table>
@@ -141,11 +148,6 @@ const PurchaseOrderDetail = () => {
         </Card>
       </div>
 
-      {/* 
-        We use the existing BillForm. 
-        Currently BillForm doesn't accept initial data props. 
-        I need to update BillForm to accept `initialData` to pre-populate from PO.
-      */}
       <BillForm
         isOpen={isBillFormOpen}
         setIsOpen={setIsBillFormOpen}
@@ -157,11 +159,22 @@ const PurchaseOrderDetail = () => {
             description: i.description,
             quantity: i.quantity,
             unit_cost: i.unit_cost,
-            expense_account_id: '' // User must select or we could guess based on product
+            expense_account_id: '', // User must select appropriate expense/asset account
+            project_id: i.project_id || '' // Pass Project ID
           }))
         }}
         onSuccess={() => {
            updateStatusMutation.mutate('billed');
+        }}
+      />
+      
+      <SendPODialog 
+        isOpen={isSendDialogOpen} 
+        setIsOpen={setIsSendDialogOpen} 
+        po={{
+          id: po.id,
+          po_number: po.po_number,
+          vendor_email: po.vendors?.email || null
         }}
       />
     </>

@@ -59,7 +59,7 @@ serve(async (req) => {
       case 'GET_ONE':
         ({ data, error } = await supabaseAdmin
           .from('purchase_orders')
-          .select('*, vendors(name, email, address), purchase_order_items(*)')
+          .select('*, vendors(name, email, address), purchase_order_items(*, projects(name))')
           .eq('id', body.poId)
           .eq('company_id', company_id)
           .single());
@@ -91,7 +91,11 @@ serve(async (req) => {
           .single();
         if (postError) throw postError;
         
-        const itemsToInsert = postItems.map(item => ({ ...item, purchase_order_id: newPO.id }));
+        const itemsToInsert = postItems.map(item => ({ 
+          ...item, 
+          purchase_order_id: newPO.id,
+          project_id: item.project_id || null // Ensure project_id is handled
+        }));
         const { error: postItemsError } = await supabaseAdmin.from('purchase_order_items').insert(itemsToInsert);
         if (postItemsError) throw postItemsError;
         data = newPO;
@@ -107,7 +111,11 @@ serve(async (req) => {
         if (putError) throw putError;
 
         await supabaseAdmin.from('purchase_order_items').delete().eq('purchase_order_id', body.poId);
-        const putItemsToInsert = putItems.map(item => ({ ...item, purchase_order_id: body.poId }));
+        const putItemsToInsert = putItems.map(item => ({ 
+          ...item, 
+          purchase_order_id: body.poId,
+          project_id: item.project_id || null
+        }));
         const { error: putItemsError } = await supabaseAdmin.from('purchase_order_items').insert(putItemsToInsert);
         if (putItemsError) throw putItemsError;
         data = { id: body.poId };

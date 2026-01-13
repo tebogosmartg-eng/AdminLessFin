@@ -14,15 +14,18 @@ import { Textarea } from './ui/textarea';
 import { showError, showSuccess } from '../utils/toast';
 import { Vendor } from '../pages/Vendors';
 import { Product } from '../pages/Products';
+import { Project } from '../pages/Projects';
 import { Trash2 } from 'lucide-react';
 import { addDays, format } from 'date-fns';
 import { formatCurrency } from '../lib/utils';
+import { projectsQuery } from '../lib/queries';
 
 const poItemSchema = z.object({
   product_id: z.string().optional(),
   description: z.string().min(1, "Description is required."),
   quantity: z.coerce.number().min(1, "Qty must be at least 1."),
   unit_cost: z.coerce.number().min(0, "Cost must be non-negative."),
+  project_id: z.string().optional(),
 });
 
 const poSchema = z.object({
@@ -55,7 +58,7 @@ const PurchaseOrderForm = ({ isOpen, setIsOpen, poId }: Props) => {
       delivery_date: format(addDays(new Date(), 14), 'yyyy-MM-dd'),
       vendor_id: '',
       notes: '',
-      items: [{ description: '', quantity: 1, unit_cost: 0 }],
+      items: [{ description: '', quantity: 1, unit_cost: 0, project_id: '' }],
     },
   });
 
@@ -102,6 +105,7 @@ const PurchaseOrderForm = ({ isOpen, setIsOpen, poId }: Props) => {
           description: i.description,
           quantity: i.quantity,
           unit_cost: i.unit_cost,
+          project_id: i.project_id || '',
         })),
       });
     } else if (!isEditing) {
@@ -111,7 +115,7 @@ const PurchaseOrderForm = ({ isOpen, setIsOpen, poId }: Props) => {
         delivery_date: format(addDays(new Date(), 14), 'yyyy-MM-dd'),
         vendor_id: '',
         notes: '',
-        items: [{ description: '', quantity: 1, unit_cost: 0 }],
+        items: [{ description: '', quantity: 1, unit_cost: 0, project_id: '' }],
       });
     }
   }, [existingPO, isEditing, isOpen, form]);
@@ -120,6 +124,7 @@ const PurchaseOrderForm = ({ isOpen, setIsOpen, poId }: Props) => {
 
   const { data: vendors } = useQuery<Vendor[]>({ queryKey: ['vendors', activeCompany?.id] });
   const { data: products } = useQuery<Product[]>({ queryKey: ['products', activeCompany?.id] });
+  const { data: projects } = useQuery<Project[]>({ ...projectsQuery(activeCompany?.id!), enabled: !!activeCompany });
 
   const handleProductSelect = (productId: string, index: number) => {
     const product = products?.find(p => p.id === productId);
@@ -133,11 +138,17 @@ const PurchaseOrderForm = ({ isOpen, setIsOpen, poId }: Props) => {
     mutationFn: async (values: POFormValues) => {
       if (!activeCompany) throw new Error('No active company');
       const method = isEditing ? 'PUT' : 'POST';
+      
+      const items = values.items.map(item => ({
+        ...item,
+        project_id: item.project_id || null, // Handle optional field properly
+      }));
+
       const body = {
         method,
         company_id: activeCompany.id,
         poId,
-        poData: values,
+        poData: { ...values, items },
       };
       const { error } = await supabase.functions.invoke('purchase-orders', { body });
       if (error) throw error;
@@ -155,7 +166,7 @@ const PurchaseOrderForm = ({ isOpen, setIsOpen, poId }: Props) => {
 
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
-      <DialogContent className="sm:max-w-4xl">
+      <DialogContent className="sm:max-w-6xl">
         <DialogHeader>
           <DialogTitle>{isEditing ? 'Edit Purchase Order' : 'New Purchase Order'}</DialogTitle>
           <DialogDescription>Create an official order for a vendor.</DialogDescription>
@@ -171,23 +182,32 @@ const PurchaseOrderForm = ({ isOpen, setIsOpen, poId }: Props) => {
             <FormField control={form.control} name="notes" render={({ field }) => (<FormItem><FormLabel>Notes (Optional)</FormLabel><FormControl><Textarea placeholder="Delivery instructions, terms, etc." {...field} /></FormControl><FormMessage /></FormItem>)} />
             
             <div className="space-y-2 pt-4">
-              <FormLabel>Items</FormLabel>
+              <div className="grid grid-cols-12 gap-2 px-2 text-xs font-medium text-muted-foreground">
+                <div className="col-span-2">Item</div>
+                <div className="col-span-3">Description</div>
+                <div className="col-span-1">Qty</div>
+                <div className="col-span-1">Cost</div>
+                <div className="col-span-1 text-right">Total</div>
+                <div className="col-span-2">Project</div>
+                <div className="col-span-2"></div>
+              </div>
               {fields.map((field, index) => {
                 const quantity = form.watch(`items.${index}.quantity`);
                 const unitCost = form.watch(`items.${index}.unit_cost`);
                 const lineTotal = quantity * unitCost;
                 return (
                   <div key={field.id} className="grid grid-cols-12 gap-2 items-start">
-                    <FormField control={form.control} name={`items.${index}.product_id`} render={({ field }) => (<FormItem className="col-span-3"><Select onValueChange={(v) => { field.onChange(v); handleProductSelect(v, index); }} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Item" /></SelectTrigger></FormControl><SelectContent>{products?.map(p => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}</SelectContent></Select></FormItem>)} />
-                    <FormField control={form.control} name={`items.${index}.description`} render={({ field }) => (<FormItem className="col-span-4"><FormControl><Input placeholder="Desc" {...field} /></FormControl></FormItem>)} />
+                    <FormField control={form.control} name={`items.${index}.product_id`} render={({ field }) => (<FormItem className="col-span-2"><Select onValueChange={(v) => { field.onChange(v); handleProductSelect(v, index); }} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Item" /></SelectTrigger></FormControl><SelectContent>{products?.map(p => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}</SelectContent></Select></FormItem>)} />
+                    <FormField control={form.control} name={`items.${index}.description`} render={({ field }) => (<FormItem className="col-span-3"><FormControl><Input placeholder="Desc" {...field} /></FormControl></FormItem>)} />
                     <FormField control={form.control} name={`items.${index}.quantity`} render={({ field }) => (<FormItem className="col-span-1"><FormControl><Input type="number" placeholder="Qty" {...field} /></FormControl></FormItem>)} />
-                    <FormField control={form.control} name={`items.${index}.unit_cost`} render={({ field }) => (<FormItem className="col-span-2"><FormControl><Input type="number" step="0.01" placeholder="Cost" {...field} /></FormControl></FormItem>)} />
+                    <FormField control={form.control} name={`items.${index}.unit_cost`} render={({ field }) => (<FormItem className="col-span-1"><FormControl><Input type="number" step="0.01" placeholder="Cost" {...field} /></FormControl></FormItem>)} />
                     <div className="col-span-1 pt-2 text-right font-mono text-sm">{formatCurrency(lineTotal)}</div>
-                    <div className="col-span-1 pt-1"><Button type="button" variant="ghost" size="icon" onClick={() => remove(index)} disabled={fields.length <= 1}><Trash2 className="h-4 w-4" /></Button></div>
+                    <FormField control={form.control} name={`items.${index}.project_id`} render={({ field }) => (<FormItem className="col-span-2"><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="-" /></SelectTrigger></FormControl><SelectContent><SelectItem value="">None</SelectItem>{projects?.map(p => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}</SelectContent></Select></FormItem>)} />
+                    <div className="col-span-2 pt-1"><Button type="button" variant="ghost" size="icon" onClick={() => remove(index)} disabled={fields.length <= 1}><Trash2 className="h-4 w-4" /></Button></div>
                   </div>
                 )
               })}
-              <Button type="button" variant="outline" size="sm" onClick={() => append({ description: '', quantity: 1, unit_cost: 0 })}>Add Line</Button>
+              <Button type="button" variant="outline" size="sm" onClick={() => append({ description: '', quantity: 1, unit_cost: 0, project_id: '' })}>Add Line</Button>
             </div>
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setIsOpen(false)}>Cancel</Button>
