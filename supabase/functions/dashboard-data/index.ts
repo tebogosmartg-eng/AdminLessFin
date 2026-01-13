@@ -1,7 +1,7 @@
 // @ts-nocheck
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0'
-import { format, subMonths } from "https://esm.sh/date-fns@3.6.0";
+import { format, addDays, isSameDay, parseISO } from "https://esm.sh/date-fns@3.6.0";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -28,15 +28,13 @@ serve(async (req) => {
       throw new Error("Company ID is required.");
     }
 
-    // Default to current month if not provided
+    // Dates
     const endDate = date_to ? new Date(date_to) : new Date();
     const startDate = date_from ? new Date(date_from) : new Date(new Date().getFullYear(), new Date().getMonth(), 1);
-    
-    // For balances, we generally look "as of" the end date
     const asOfDateStr = format(endDate, 'yyyy-MM-dd');
     const startDateStr = format(startDate, 'yyyy-MM-dd');
 
-    // Security Check: Verify user membership
+    // Security Check
     const { data: companyMember, error: memberError } = await supabase
       .from('company_users')
       .select('user_id')
@@ -52,19 +50,54 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
       {
-        auth: {
-          autoRefreshToken: false,
-          persistSession: false,
-        },
-        global: {
-          headers: {
-            Authorization: req.headers.get('Authorization')!,
-          },
-        },
+        auth: { autoRefreshToken: false, persistSession: false },
+        global: { headers: { Authorization: req.headers.get('Authorization')! } },
       }
     );
 
-    // Fetch all data in parallel
+    const supabaseAdmin = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+    );
+
+    // --- Parallel Data Fetching ---
+    const promises = [
+      userSupabase.rpc('get_balances_as_of_date', { p_end_date: asOfDateStr }),
+      userSupabase.rpc('get_monthly_summary', { p_months: 6 }),
+      userSupabase.rpc('get_customer_ar_balances'),
+      userSupabase.rpc('get_vendor_ap_balances'),
+      userSupabase.rpc('get_overdue_invoices'),
+      userSupabase.rpc('get_top_expenses', { p_start_date: startDateStr, p_end_date: asOfDateStr }),
+      
+      // Future Invoices (Inflows)
+      supabaseAdmin
+        .from('invoices')
+        .select('due_date, journal_entries(journal_entry_items(amount, type))')
+        .eq('company_id', company_id)
+        .neq('status', 'paid')
+        .neq('status', 'void')
+        .gte('due_date', new Date().toISOString().split('T')[0])
+        .order('due_date', { ascending: true }),
+
+      // Future Bills (Outflows)
+      supabaseAdmin
+        .from('bills')
+        .select('due_date, journal_entries(journal_entry_items(amount, type))')
+        .eq('company_id', company_id)
+        .neq('status', 'paid')
+        .gte('due_date', new Date().toISOString().split('T')[0])
+        .order('due_date', { ascending: true }),
+
+      // Top Customers (Revenue)
+      supabaseAdmin
+        .from('journal_entries')
+        .select('customer_id, customers(name), journal_entry_items(amount, type, account_id)')
+        .eq('company_id', company_id)
+        .gte('entry_date', startDateStr)
+        .lte('entry_date', asOfDateStr)
+        .not('customer_id', 'is', null)
+    ];
+
     const [
       accountsRes,
       monthlySummaryRes,
@@ -72,28 +105,97 @@ serve(async (req) => {
       apBalancesRes,
       overdueInvoicesRes,
       topExpensesRes,
-    ] = await Promise.all([
-      userSupabase.rpc('get_balances_as_of_date', { p_end_date: asOfDateStr }),
-      // Monthly summary is usually a trend, so we might want to keep showing the last 6 months 
-      // relative to the selected end date, or strictly the range. 
-      // Let's stick to last 6 months ending at endDate for context.
-      userSupabase.rpc('get_monthly_summary', { p_months: 6 }), 
-      userSupabase.rpc('get_customer_ar_balances'),
-      userSupabase.rpc('get_vendor_ap_balances'),
-      userSupabase.rpc('get_overdue_invoices'),
-      // Top expenses should strictly respect the selected range
-      userSupabase.rpc('get_top_expenses', {
-        p_start_date: startDateStr,
-        p_end_date: asOfDateStr,
-      }),
-    ]);
+      futureInvoicesRes,
+      futureBillsRes,
+      revenueRes
+    ] = await Promise.all(promises);
 
+    // Error Handling
     if (accountsRes.error) throw accountsRes.error;
     if (monthlySummaryRes.error) throw monthlySummaryRes.error;
     if (arBalancesRes.error) throw arBalancesRes.error;
     if (apBalancesRes.error) throw apBalancesRes.error;
     if (overdueInvoicesRes.error) throw overdueInvoicesRes.error;
     if (topExpensesRes.error) throw topExpensesRes.error;
+    if (futureInvoicesRes.error) throw futureInvoicesRes.error;
+    if (futureBillsRes.error) throw futureBillsRes.error;
+    if (revenueRes.error) throw revenueRes.error;
+
+    // --- 1. Top Customers Calculation ---
+    // Filter journal items to only include Income accounts (credit)
+    // Note: We need to know which accounts are Income. 
+    // We can infer from accountsRes which contains account types.
+    const incomeAccountIds = new Set(
+      accountsRes.data.filter((a: any) => a.type === 'Income').map((a: any) => a.id)
+    );
+
+    const customerRevenue: Record<string, { name: string, amount: number }> = {};
+    
+    revenueRes.data.forEach((entry: any) => {
+      const customerName = entry.customers?.name || 'Unknown';
+      entry.journal_entry_items.forEach((item: any) => {
+        if (item.type === 'credit' && incomeAccountIds.has(item.account_id)) {
+          if (!customerRevenue[customerName]) {
+            customerRevenue[customerName] = { name: customerName, amount: 0 };
+          }
+          customerRevenue[customerName].amount += item.amount;
+        }
+      });
+    });
+
+    const topCustomers = Object.values(customerRevenue)
+      .sort((a, b) => b.amount - a.amount)
+      .slice(0, 5);
+
+
+    // --- 2. Cash Flow Forecast Calculation ---
+    // Calculate current cash position
+    const bankKeywords = ['cash', 'bank', 'checking', 'savings'];
+    let currentCash = accountsRes.data
+      .filter((a: any) => a.type === 'Asset' && bankKeywords.some(k => a.name.toLowerCase().includes(k)))
+      .reduce((sum: number, a: any) => sum + a.balance, 0);
+
+    const forecast = [];
+    const today = new Date();
+    let runningBalance = currentCash;
+    
+    // Create a 30-day forecast map
+    const changesByDate: Record<string, number> = {};
+    
+    // Add today's starting point
+    forecast.push({ date: format(today, 'yyyy-MM-dd'), balance: runningBalance, type: 'actual' });
+
+    // Process Inflows (Invoices)
+    futureInvoicesRes.data.forEach((inv: any) => {
+      const amount = inv.journal_entries?.journal_entry_items
+        .filter((i: any) => i.type === 'debit') // A/R Debit amount represents invoice total
+        .reduce((sum: number, i: any) => sum + i.amount, 0) || 0;
+      
+      const dateKey = inv.due_date;
+      changesByDate[dateKey] = (changesByDate[dateKey] || 0) + amount;
+    });
+
+    // Process Outflows (Bills)
+    futureBillsRes.data.forEach((bill: any) => {
+      const amount = bill.journal_entries?.journal_entry_items
+        .filter((i: any) => i.type === 'credit') // A/P Credit amount represents bill total
+        .reduce((sum: number, i: any) => sum + i.amount, 0) || 0;
+        
+      const dateKey = bill.due_date;
+      changesByDate[dateKey] = (changesByDate[dateKey] || 0) - amount;
+    });
+
+    // Generate daily points for the next 30 days
+    for (let i = 1; i <= 30; i++) {
+      const d = addDays(today, i);
+      const dateStr = format(d, 'yyyy-MM-dd');
+      const dailyChange = changesByDate[dateStr] || 0;
+      runningBalance += dailyChange;
+      
+      // Only push if there's a change or it's a significant interval (e.g., every 5 days) to keep chart clean
+      // Or push every day for a smooth line
+      forecast.push({ date: dateStr, balance: runningBalance, type: 'projected' });
+    }
 
     const responseData = {
       accounts: accountsRes.data,
@@ -102,6 +204,8 @@ serve(async (req) => {
       apBalances: apBalancesRes.data,
       overdueInvoices: overdueInvoicesRes.data,
       topExpenses: topExpensesRes.data,
+      topCustomers: topCustomers,
+      cashFlowForecast: forecast,
     };
 
     return new Response(JSON.stringify(responseData), {

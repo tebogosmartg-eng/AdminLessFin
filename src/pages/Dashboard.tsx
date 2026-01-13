@@ -14,6 +14,8 @@ import { formatDistanceToNow, startOfMonth, endOfMonth, format } from 'date-fns'
 import { formatCurrency, cn } from '../lib/utils';
 import BudgetStatus from '../components/BudgetStatus';
 import TopExpensesChart from '../components/TopExpensesChart';
+import TopCustomersChart from '../components/TopCustomersChart';
+import CashFlowForecastChart from '../components/CashFlowForecastChart';
 import BankAccountsSummary from '../components/BankAccountsSummary';
 import { Popover, PopoverContent, PopoverTrigger } from '../components/ui/popover';
 import { Calendar } from '../components/ui/calendar';
@@ -61,6 +63,8 @@ const Dashboard = () => {
     apBalances,
     overdueInvoices,
     topExpenses,
+    topCustomers,
+    cashFlowForecast,
   } = dashboardData || {};
 
   const calculateTotals = (accounts: Account[] | undefined) => {
@@ -159,6 +163,28 @@ const Dashboard = () => {
           ))}
         </div>
 
+        {/* Charts Row */}
+        <div className="grid gap-4 md:grid-cols-2">
+          <Card>
+            <CardHeader>
+              <CardTitle>Cash Flow Forecast (30 Days)</CardTitle>
+              <CardDescription>Projected balance based on due invoices and bills.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {isLoading ? <Skeleton className="h-[300px] w-full" /> : <CashFlowForecastChart data={cashFlowForecast} />}
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader>
+              <CardTitle>Income vs Expenses Trend</CardTitle>
+              <CardDescription>6-month trend analysis.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {isLoading ? <Skeleton className="h-[300px] w-full" /> : monthlySummary && monthlySummary.length > 0 ? <IncomeExpenseChart data={monthlySummary} /> : <p className="text-md text-gray-600 dark:text-gray-400">Not enough data to display a chart.</p>}
+            </CardContent>
+          </Card>
+        </div>
+
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           <Card>
             <CardHeader>
@@ -205,7 +231,7 @@ const Dashboard = () => {
             </CardContent>
           </Card>
           <BankAccountsSummary accounts={accounts} isLoading={isLoading} />
-          <BudgetStatus />
+          
           <Card>
             <CardHeader>
               <CardTitle>Overdue Invoices</CardTitle>
@@ -249,17 +275,19 @@ const Dashboard = () => {
               {isLoading ? <Skeleton className="h-[300px] w-full" /> : <TopExpensesChart data={topExpenses} />}
             </CardContent>
           </Card>
+          <Card className="lg:col-span-1">
+            <CardHeader>
+              <CardTitle>Top Customers</CardTitle>
+              <CardDescription>
+                Highest revenue by customer.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {isLoading ? <Skeleton className="h-[300px] w-full" /> : <TopCustomersChart data={topCustomers} />}
+            </CardContent>
+          </Card>
         </div>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Income vs Expenses Trend</CardTitle>
-            <CardDescription>6-month trend analysis.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {isLoading ? <Skeleton className="h-[300px] w-full" /> : monthlySummary && monthlySummary.length > 0 ? <IncomeExpenseChart data={monthlySummary} /> : <p className="text-md text-gray-600 dark:text-gray-400">Not enough data to display a chart.</p>}
-          </CardContent>
-        </Card>
+        <BudgetStatus />
       </main>
     </div>
   );
