@@ -40,8 +40,10 @@ const AuditLogViewer = () => {
   };
 
   const tables = [
-    'invoices', 'bills', 'journal_entries', 'products', 'customers', 'vendors', 'expense_claims', 'tax_rates', 'chart_of_accounts'
-  ];
+    'invoices', 'bills', 'quotes', 'purchase_orders', 'credit_notes', 'vendor_credits',
+    'journal_entries', 'products', 'customers', 'vendors', 'employees',
+    'fixed_assets', 'loans', 'expense_claims', 'tax_rates', 'chart_of_accounts', 'projects'
+  ].sort();
 
   return (
     <Card>
@@ -58,7 +60,7 @@ const AuditLogViewer = () => {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Tables</SelectItem>
-                {tables.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+                {tables.map(t => <SelectItem key={t} value={t}>{t.replace(/_/g, ' ')}</SelectItem>)}
               </SelectContent>
             </Select>
           </div>
@@ -113,13 +115,13 @@ const AuditLogViewer = () => {
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <h4 className="font-semibold mb-2">Old Data</h4>
-                <pre className="bg-muted p-2 rounded text-xs overflow-auto max-h-[400px]">
+                <pre className="bg-muted p-2 rounded text-xs overflow-auto max-h-[400px] whitespace-pre-wrap">
                   {selectedLog.old_data ? JSON.stringify(selectedLog.old_data, null, 2) : 'None'}
                 </pre>
               </div>
               <div>
                 <h4 className="font-semibold mb-2">New Data</h4>
-                <pre className="bg-muted p-2 rounded text-xs overflow-auto max-h-[400px]">
+                <pre className="bg-muted p-2 rounded text-xs overflow-auto max-h-[400px] whitespace-pre-wrap">
                   {selectedLog.new_data ? JSON.stringify(selectedLog.new_data, null, 2) : 'None'}
                 </pre>
               </div>
