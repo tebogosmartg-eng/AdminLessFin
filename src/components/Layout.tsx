@@ -9,6 +9,7 @@ import { SidebarNav } from './SidebarNav';
 import { ThemeToggle } from './ThemeToggle';
 import CompanySwitcher from './CompanySwitcher';
 import NotificationBell from './NotificationBell';
+import { CommandMenu } from './CommandMenu';
 
 const Layout = () => {
   const { signOut, profile } = useAuth();
@@ -44,7 +45,10 @@ const Layout = () => {
       </aside>
       <div className="flex-1 flex flex-col">
         <header className="flex h-16 items-center justify-between gap-4 border-b bg-white dark:bg-gray-800 px-6 print:hidden">
-          <CompanySwitcher />
+          <div className="flex items-center gap-4 flex-1">
+            <CompanySwitcher />
+            <CommandMenu />
+          </div>
           <div className="flex items-center gap-4">
             <ThemeToggle />
             <NotificationBell />
