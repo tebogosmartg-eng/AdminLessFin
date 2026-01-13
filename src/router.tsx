@@ -44,6 +44,7 @@ import TaxReport from "./pages/TaxReport";
 import RecurringBills from "./pages/RecurringBills";
 import PurchaseOrders from "./pages/PurchaseOrders";
 import PurchaseOrderDetail from "./pages/PurchaseOrderDetail";
+import FinancialCalendar from "./pages/FinancialCalendar";
 
 export const AppRouter = () => {
   return (
@@ -52,6 +53,7 @@ export const AppRouter = () => {
       <Route element={<ProtectedRoute />}>
         <Route path="/" element={<Dashboard />} />
         <Route path="/create-company" element={<CreateCompany />} />
+        <Route path="/calendar" element={<FinancialCalendar />} />
         <Route path="/quotes" element={<Quotes />} />
         <Route path="/quotes/:id" element={<QuoteDetail />} />
         <Route path="/invoices" element={<Invoices />} />

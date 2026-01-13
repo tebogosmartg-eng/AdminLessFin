@@ -53,7 +53,9 @@ serve(async (req) => {
       bills,
       accounts,
       projects,
-      products
+      products,
+      purchaseOrders,
+      recurringBills
     ] = await Promise.all([
       supabaseAdmin.from('customers').select('id, name, email').eq('company_id', company_id).ilike('name', searchTerm).limit(3),
       supabaseAdmin.from('vendors').select('id, name, email').eq('company_id', company_id).ilike('name', searchTerm).limit(3),
@@ -62,6 +64,8 @@ serve(async (req) => {
       supabaseAdmin.from('chart_of_accounts').select('id, name, account_number').eq('company_id', company_id).ilike('name', searchTerm).limit(3),
       supabaseAdmin.from('projects').select('id, name').eq('company_id', company_id).ilike('name', searchTerm).limit(3),
       supabaseAdmin.from('products').select('id, name').eq('company_id', company_id).ilike('name', searchTerm).limit(3),
+      supabaseAdmin.from('purchase_orders').select('id, po_number, vendors(name)').eq('company_id', company_id).ilike('po_number', searchTerm).limit(3),
+      supabaseAdmin.from('recurring_bills').select('id, profile_name, vendors(name)').eq('company_id', company_id).ilike('profile_name', searchTerm).limit(3),
     ]);
 
     const results = [
@@ -72,6 +76,8 @@ serve(async (req) => {
       ...(accounts.data || []).map(i => ({ type: 'Account', id: i.id, title: `${i.account_number} - ${i.name}`, subtitle: 'Chart of Accounts', url: '/chart-of-accounts' })),
       ...(projects.data || []).map(i => ({ type: 'Project', id: i.id, title: i.name, subtitle: 'Project', url: `/projects/${i.id}` })),
       ...(products.data || []).map(i => ({ type: 'Product', id: i.id, title: i.name, subtitle: 'Product/Service', url: '/products' })),
+      ...(purchaseOrders.data || []).map(i => ({ type: 'Purchase Order', id: i.id, title: i.po_number, subtitle: i.vendors?.name, url: `/purchase-orders/${i.id}` })),
+      ...(recurringBills.data || []).map(i => ({ type: 'Recurring Bill', id: i.id, title: i.profile_name, subtitle: i.vendors?.name, url: '/recurring-bills' })),
     ];
 
     return new Response(JSON.stringify(results), {

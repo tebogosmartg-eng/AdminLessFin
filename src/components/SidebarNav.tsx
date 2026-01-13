@@ -5,7 +5,7 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible"
-import { Book, LayoutDashboard, BookText, FileText, Library, Target, Repeat, Building2, Users, TrendingUp, Receipt, Banknote, HandCoins, ChevronRight, Package, Scale, Upload, FileSignature, Briefcase, Landmark, MessageSquare, MessageCircle, Clock, ShoppingBag } from 'lucide-react';
+import { Book, LayoutDashboard, BookText, FileText, Library, Target, Repeat, Building2, Users, TrendingUp, Receipt, Banknote, HandCoins, ChevronRight, Package, Scale, Upload, FileSignature, Briefcase, Landmark, MessageSquare, MessageCircle, Clock, ShoppingBag, Calendar } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { Button } from './ui/button';
 import { useAuth } from '../contexts/AuthContext';
@@ -109,6 +109,11 @@ export const SidebarNav = () => {
         Dashboard
       </NavLink>
       
+      <NavLink to="/calendar" className={navLinkClasses}>
+        <Calendar className="mr-3 h-5 w-5" />
+        Calendar
+      </NavLink>
+
       <NavLink to="/chat" className={navLinkClasses}>
         <MessageSquare className="mr-3 h-5 w-5" />
         Chat
