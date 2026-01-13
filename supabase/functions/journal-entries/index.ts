@@ -7,8 +7,6 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-// ARCHITECTURE NOTE:
-// This function acts as a secure API gateway for all journal entry operations.
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders })
@@ -119,17 +117,18 @@ serve(async (req) => {
 
       case 'PUT':
         const { items: putItems, ...putEntryData } = body.entryData;
-        const { error: putError } = await supabaseAdmin
-          .from('journal_entries')
-          .update(putEntryData)
-          .eq('id', body.entryId)
-          .eq('company_id', company_id);
-        if (putError) throw putError;
-
-        await supabaseAdmin.from('journal_entry_items').delete().eq('journal_entry_id', body.entryId);
-        const putItemsToInsert = putItems.map(item => ({ ...item, journal_entry_id: body.entryId }));
-        const { error: putItemsError } = await supabaseAdmin.from('journal_entry_items').insert(putItemsToInsert);
-        if (putItemsError) throw putItemsError;
+        // Use RPC for atomic update
+        ({ error } = await supabaseAdmin.rpc('update_journal_entry_full', {
+          p_entry_id: body.entryId,
+          p_company_id: company_id,
+          p_date: putEntryData.entry_date,
+          p_description: putEntryData.description || null,
+          p_vendor_id: putEntryData.vendor_id || null,
+          p_customer_id: putEntryData.customer_id || null,
+          p_attachment_url: putEntryData.attachment_url || null,
+          p_items: putItems
+        }));
+        
         data = { id: body.entryId };
         break;
 

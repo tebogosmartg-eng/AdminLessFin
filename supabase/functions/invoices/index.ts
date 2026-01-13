@@ -7,8 +7,6 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-// ARCHITECTURE NOTE:
-// This function acts as a secure API gateway for all invoice-related database operations.
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders })
@@ -48,7 +46,6 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
     
-    // User-impersonated client for RPC calls
     const userSupabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
@@ -141,13 +138,34 @@ serve(async (req) => {
         break;
 
       case 'PUT':
-        ({ data, error } = await supabaseAdmin
-          .from('invoices')
-          .update(body.invoiceData)
-          .eq('id', body.invoiceId)
-          .eq('company_id', company_id)
-          .select()
-          .single());
+        // If invoiceData contains items (which it does from InvoiceForm), use full update
+        // Otherwise (status updates from list view), use partial update
+        if (body.invoiceData.p_items) {
+           const { p_items: updateItems, ...updateParams } = body.invoiceData;
+           ({ error } = await supabaseAdmin.rpc('update_invoice_full', {
+             p_invoice_id: body.invoiceId,
+             p_company_id: company_id,
+             p_invoice_number: updateParams.invoice_number,
+             p_invoice_date: updateParams.invoice_date,
+             p_due_date: updateParams.due_date,
+             p_customer_id: updateParams.customer_id,
+             p_description: updateParams.description || null,
+             p_items: updateItems,
+             p_ar_account_id: updateParams.accounts_receivable_id,
+             p_inventory_asset_account_id: updateParams.inventory_asset_account_id || null,
+             p_tax_payable_account_id: updateParams.tax_payable_account_id || null
+           }));
+           data = { id: body.invoiceId };
+        } else {
+           // Standard partial update (e.g. status)
+           ({ data, error } = await supabaseAdmin
+            .from('invoices')
+            .update(body.invoiceData)
+            .eq('id', body.invoiceId)
+            .eq('company_id', company_id)
+            .select()
+            .single());
+        }
         break;
 
       case 'VOID':

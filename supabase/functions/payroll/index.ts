@@ -77,30 +77,11 @@ serve(async (req) => {
         break;
 
       case 'GENERATE_PAYSLIPS':
-        const { data: employees, error: empError } = await supabaseAdmin.from('employees').select('*').eq('company_id', company_id).not('salary_amount', 'is', null);
-        if (empError) throw empError;
-
-        const newPayslips = employees.map((emp) => ({
-          payroll_run_id: body.runId,
-          employee_id: emp.id,
-          company_id: company_id,
-          basic_salary: emp.salary_amount,
-          total_earnings: emp.salary_amount,
-          total_deductions: 0,
-          net_pay: emp.salary_amount,
+        // Updated to use atomic RPC
+        ({ data, error } = await supabaseAdmin.rpc('generate_payslips_for_run', {
+          p_run_id: body.runId,
+          p_company_id: company_id
         }));
-
-        const { data: insertedPayslips, error: payslipError } = await supabaseAdmin.from('payslips').insert(newPayslips).select();
-        if (payslipError) throw payslipError;
-
-        const payslipItems = insertedPayslips.map(p => ({
-          payslip_id: p.id,
-          description: 'Basic Salary',
-          type: 'earning',
-          amount: p.basic_salary,
-        }));
-        
-        ({ data, error } = await supabaseAdmin.from('payslip_items').insert(payslipItems));
         break;
 
       case 'GET_PAYSLIP_DETAIL':
@@ -117,6 +98,7 @@ serve(async (req) => {
         const deductions = items.filter(i => i.type === 'deduction').reduce((sum, i) => sum + i.amount, 0);
         const netPay = earnings - deductions;
 
+        // Perform updates (could be optimized further with RPC, but less critical than bulk generation)
         await supabaseAdmin.from('payslip_items').delete().eq('payslip_id', payslipId);
         const itemsToInsert = items.map(item => ({ ...item, payslip_id: payslipId }));
         await supabaseAdmin.from('payslip_items').insert(itemsToInsert);
