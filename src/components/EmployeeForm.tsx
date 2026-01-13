@@ -142,14 +142,14 @@ const EmployeeForm = ({ isOpen, setIsOpen, employee }: EmployeeFormProps) => {
 
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
-      <DialogContent className="sm:max-w-2xl">
+      <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
         <DialogHeader>
           <DialogTitle>{employee ? 'Edit Employee' : 'Add New Employee'}</DialogTitle>
           <DialogDescription>Enter the employee's details below.</DialogDescription>
         </DialogHeader>
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-            <fieldset className="grid grid-cols-2 gap-4 border p-4 rounded-md">
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 overflow-y-auto pr-6 flex-1">
+            <fieldset className="grid grid-cols-1 md:grid-cols-2 gap-4 border p-4 rounded-md">
               <legend className="text-sm font-medium px-1">Personal Information</legend>
               <FormField control={form.control} name="first_name" render={({ field }) => (
                 <FormItem><FormLabel>First Name</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
@@ -171,7 +171,7 @@ const EmployeeForm = ({ isOpen, setIsOpen, employee }: EmployeeFormProps) => {
               )} />
             </fieldset>
 
-            <fieldset className="grid grid-cols-2 gap-4 border p-4 rounded-md">
+            <fieldset className="grid grid-cols-1 md:grid-cols-2 gap-4 border p-4 rounded-md">
               <legend className="text-sm font-medium px-1">Employment Details</legend>
               <FormField control={form.control} name="employment_type" render={({ field }) => (
                 <FormItem><FormLabel>Employment Type</FormLabel>
@@ -201,7 +201,7 @@ const EmployeeForm = ({ isOpen, setIsOpen, employee }: EmployeeFormProps) => {
               )} />
             </fieldset>
 
-            <fieldset className="grid grid-cols-2 gap-4 border p-4 rounded-md">
+            <fieldset className="grid grid-cols-1 md:grid-cols-2 gap-4 border p-4 rounded-md">
               <legend className="text-sm font-medium px-1">Salary Information</legend>
               <FormField control={form.control} name="salary_amount" render={({ field }) => (
                   <FormItem><FormLabel>Salary Amount</FormLabel><FormControl><Input type="number" step="0.01" placeholder="e.g., 50000" {...field} /></FormControl><FormMessage /></FormItem>
@@ -220,7 +220,7 @@ const EmployeeForm = ({ isOpen, setIsOpen, employee }: EmployeeFormProps) => {
               )} />
             </fieldset>
 
-            <fieldset className="grid grid-cols-2 gap-4 border p-4 rounded-md">
+            <fieldset className="grid grid-cols-1 md:grid-cols-2 gap-4 border p-4 rounded-md">
               <legend className="text-sm font-medium px-1">Bank Details</legend>
               <FormField control={form.control} name="bank_name" render={({ field }) => (
                 <FormItem><FormLabel>Bank Name</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
@@ -229,15 +229,14 @@ const EmployeeForm = ({ isOpen, setIsOpen, employee }: EmployeeFormProps) => {
                 <FormItem><FormLabel>Account Number</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
               )} />
             </fieldset>
-
-            <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setIsOpen(false)}>Cancel</Button>
-              <Button type="submit" disabled={mutation.isPending}>
-                {mutation.isPending ? 'Saving...' : 'Save Employee'}
-              </Button>
-            </DialogFooter>
           </form>
         </Form>
+        <DialogFooter className="pt-4 border-t">
+          <Button type="button" variant="outline" onClick={() => setIsOpen(false)}>Cancel</Button>
+          <Button type="submit" onClick={form.handleSubmit(onSubmit)} disabled={mutation.isPending}>
+            {mutation.isPending ? 'Saving...' : 'Save Employee'}
+          </Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );
