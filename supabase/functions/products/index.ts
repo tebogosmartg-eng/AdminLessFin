@@ -29,7 +29,6 @@ serve(async (req) => {
       throw new Error("Company ID is required.");
     }
 
-    // Security Check: Verify user membership
     const { data: companyMember, error: memberError } = await supabase
       .from('company_users')
       .select('user_id')
@@ -61,6 +60,16 @@ serve(async (req) => {
           .order('name', { ascending: true }));
         break;
       
+      case 'GET_HISTORY':
+        ({ data, error } = await supabaseAdmin
+          .from('inventory_transactions')
+          .select('*')
+          .eq('company_id', company_id)
+          .eq('product_id', body.productId)
+          .order('transaction_date', { ascending: false })
+          .order('created_at', { ascending: false }));
+        break;
+      
       case 'POST':
         ({ data, error } = await supabaseAdmin
           .from('products')
@@ -90,7 +99,6 @@ serve(async (req) => {
       case 'ADJUST_QUANTITY':
         const { productId, newQuantity, inventoryAccountId, adjustmentAccountId, reason, date } = body;
         
-        // 1. Get current product state
         const { data: product, error: fetchError } = await supabaseAdmin
           .from('products')
           .select('*')
@@ -112,7 +120,7 @@ serve(async (req) => {
         const cost = product.cost || 0;
         const totalValue = Math.abs(diff * cost);
 
-        // 2. Create Journal Entry
+        // 1. Create Journal Entry
         const { data: je, error: jeError } = await supabaseAdmin
           .from('journal_entries')
           .insert({
@@ -125,16 +133,14 @@ serve(async (req) => {
         
         if (jeError) throw jeError;
 
-        // 3. Create Journal Items
+        // 2. Create Journal Items
         let items = [];
         if (diff > 0) {
-          // Gained Inventory: Debit Asset, Credit Adjustment (Income/Expense reduction)
           items = [
             { journal_entry_id: je.id, account_id: inventoryAccountId, type: 'debit', amount: totalValue },
             { journal_entry_id: je.id, account_id: adjustmentAccountId, type: 'credit', amount: totalValue }
           ];
         } else {
-          // Lost Inventory: Debit Adjustment (Expense), Credit Asset
           items = [
             { journal_entry_id: je.id, account_id: adjustmentAccountId, type: 'debit', amount: totalValue },
             { journal_entry_id: je.id, account_id: inventoryAccountId, type: 'credit', amount: totalValue }
@@ -144,11 +150,24 @@ serve(async (req) => {
         const { error: itemsError } = await supabaseAdmin.from('journal_entry_items').insert(items);
         if (itemsError) throw itemsError;
 
-        // 4. Update Product Quantity
+        // 3. Update Product Quantity
         ({ data, error } = await supabaseAdmin
           .from('products')
           .update({ quantity_on_hand: newQuantity })
           .eq('id', productId));
+
+        if (error) throw error;
+
+        // 4. Log Transaction
+        await supabaseAdmin.from('inventory_transactions').insert({
+          company_id,
+          product_id: productId,
+          transaction_date: date,
+          quantity_change: diff,
+          transaction_type: 'adjustment',
+          reference_id: je.id,
+          description: reason
+        });
         break;
 
       default:

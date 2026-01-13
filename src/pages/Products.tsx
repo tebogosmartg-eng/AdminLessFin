@@ -11,7 +11,7 @@ import {
   TableRow,
 } from '../components/ui/table';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/card';
-import { PlusCircle, MoreHorizontal, Download, PackageOpen } from 'lucide-react';
+import { PlusCircle, MoreHorizontal, Download, PackageOpen, History } from 'lucide-react';
 import { showError, showSuccess } from '../utils/toast';
 import ProductForm from '../components/ProductForm';
 import InventoryAdjustmentDialog from '../components/InventoryAdjustmentDialog';
@@ -25,6 +25,8 @@ import { formatCurrency } from '../lib/utils';
 import { useAuth } from '../contexts/AuthContext';
 import { productsQuery } from '../lib/queries';
 import { downloadCSV } from '../lib/utils';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '../components/ui/dialog';
+import ProductHistory from '../components/ProductHistory';
 
 export type Product = {
   id: string;
@@ -43,6 +45,7 @@ export type Product = {
 const Products = () => {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [isAdjustmentOpen, setIsAdjustmentOpen] = useState(false);
+  const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<Product | undefined>(undefined);
   const { activeCompany } = useAuth();
   const queryClient = useQueryClient();
@@ -81,6 +84,11 @@ const Products = () => {
   const handleAdjust = (product: Product) => {
     setSelectedProduct(product);
     setIsAdjustmentOpen(true);
+  };
+  
+  const handleHistory = (product: Product) => {
+    setSelectedProduct(product);
+    setIsHistoryOpen(true);
   };
 
   const handleAddNew = () => {
@@ -162,9 +170,14 @@ const Products = () => {
                         <DropdownMenuContent align="end">
                           <DropdownMenuItem onClick={() => handleEdit(product)}>Edit</DropdownMenuItem>
                           {product.type === 'inventory' && (
-                            <DropdownMenuItem onClick={() => handleAdjust(product)}>
-                              <PackageOpen className="mr-2 h-4 w-4" /> Adjust Stock
-                            </DropdownMenuItem>
+                            <>
+                                <DropdownMenuItem onClick={() => handleAdjust(product)}>
+                                    <PackageOpen className="mr-2 h-4 w-4" /> Adjust Stock
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => handleHistory(product)}>
+                                    <History className="mr-2 h-4 w-4" /> View History
+                                </DropdownMenuItem>
+                            </>
                           )}
                           <DropdownMenuItem onClick={() => handleDelete(product.id)} className="text-red-600">Delete</DropdownMenuItem>
                         </DropdownMenuContent>
@@ -190,6 +203,19 @@ const Products = () => {
           setIsOpen={setIsAdjustmentOpen}
           product={selectedProduct}
         />
+      )}
+      {selectedProduct && (
+        <Dialog open={isHistoryOpen} onOpenChange={setIsHistoryOpen}>
+            <DialogContent className="sm:max-w-2xl">
+                <DialogHeader>
+                    <DialogTitle>Stock History: {selectedProduct.name}</DialogTitle>
+                    <DialogDescription>
+                        Tracking movement for {selectedProduct.name} (Current Qty: {selectedProduct.quantity_on_hand})
+                    </DialogDescription>
+                </DialogHeader>
+                <ProductHistory productId={selectedProduct.id} />
+            </DialogContent>
+        </Dialog>
       )}
     </>
   );
