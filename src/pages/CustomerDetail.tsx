@@ -7,11 +7,12 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../co
 import { Button } from '../components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/table';
 import { Skeleton } from '../components/ui/skeleton';
-import { Download, Printer, ArrowLeft, Mail, Phone, MapPin } from 'lucide-react';
+import { Download, Printer, ArrowLeft, Mail, Phone, MapPin, Send } from 'lucide-react';
 import { formatCurrency, downloadCSV } from '../lib/utils';
 import { format, startOfYear, endOfYear } from 'date-fns';
 import { Input } from '../components/ui/input';
 import { Badge } from '../components/ui/badge';
+import SendStatementDialog from '../components/SendStatementDialog';
 
 type Transaction = {
   id: string;
@@ -27,6 +28,7 @@ const CustomerDetail = () => {
   const { activeCompany } = useAuth();
   const [dateFrom, setDateFrom] = useState(format(startOfYear(new Date()), 'yyyy-MM-dd'));
   const [dateTo, setDateTo] = useState(format(endOfYear(new Date()), 'yyyy-MM-dd'));
+  const [isEmailOpen, setIsEmailOpen] = useState(false);
 
   const { data, isLoading } = useQuery({
     queryKey: ['customer_detail', id, activeCompany?.id, dateFrom, dateTo],
@@ -49,10 +51,11 @@ const CustomerDetail = () => {
 
   const customer = data?.customer;
   const rawStatement = data?.statement || [];
+  const openingBalance = data?.opening_balance || 0;
 
-  // Calculate running balance
+  // Calculate running balance starting from opening balance
   const statement = useMemo(() => {
-    let balance = 0;
+    let balance = openingBalance;
     return rawStatement.map((t: Transaction) => {
       if (t.type === 'invoice') {
         balance += t.amount;
@@ -61,21 +64,26 @@ const CustomerDetail = () => {
       }
       return { ...t, balance };
     });
-  }, [rawStatement]);
+  }, [rawStatement, openingBalance]);
 
-  const currentBalance = statement.length > 0 ? statement[statement.length - 1].balance : 0;
+  const currentBalance = statement.length > 0 ? statement[statement.length - 1].balance : openingBalance;
+  
+  // Totals for this period
   const totalInvoiced = statement.filter(t => t.type === 'invoice').reduce((sum, t) => sum + t.amount, 0);
   const totalPaid = statement.filter(t => t.type === 'payment').reduce((sum, t) => sum + t.amount, 0);
 
   const handleDownloadCSV = () => {
-    const csvData = statement.map(t => ({
-      Date: new Date(t.date).toLocaleDateString(),
-      Description: t.description,
-      Reference: t.invoice_number || '-',
-      Type: t.type === 'invoice' ? 'Invoice' : 'Payment',
-      Amount: t.amount.toFixed(2),
-      Balance: t.balance.toFixed(2),
-    }));
+    const csvData = [
+      { Date: dateFrom, Description: 'Opening Balance', Reference: '', Type: '', Amount: '', Balance: openingBalance.toFixed(2) },
+      ...statement.map(t => ({
+        Date: new Date(t.date).toLocaleDateString(),
+        Description: t.description,
+        Reference: t.invoice_number || '-',
+        Type: t.type === 'invoice' ? 'Invoice' : 'Payment',
+        Amount: (t.type === 'payment' ? -t.amount : t.amount).toFixed(2),
+        Balance: t.balance.toFixed(2),
+      }))
+    ];
     downloadCSV(csvData, `Statement_${customer?.name}_${dateFrom}_${dateTo}.csv`);
   };
 
@@ -121,15 +129,19 @@ const CustomerDetail = () => {
 
         <Card className="print:hidden">
           <CardHeader>
-            <CardTitle>Overview</CardTitle>
+            <CardTitle>Period Overview</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="flex justify-between items-center">
-              <span className="text-sm text-muted-foreground">Total Invoiced</span>
+              <span className="text-sm text-muted-foreground">Opening Balance</span>
+              <span className="font-semibold">{formatCurrency(openingBalance)}</span>
+            </div>
+            <div className="flex justify-between items-center">
+              <span className="text-sm text-muted-foreground">Invoiced</span>
               <span className="font-semibold">{formatCurrency(totalInvoiced)}</span>
             </div>
             <div className="flex justify-between items-center">
-              <span className="text-sm text-muted-foreground">Total Paid</span>
+              <span className="text-sm text-muted-foreground">Paid</span>
               <span className="font-semibold text-green-600">{formatCurrency(totalPaid)}</span>
             </div>
             <div className="pt-4 border-t flex justify-center">
@@ -153,6 +165,9 @@ const CustomerDetail = () => {
               <Input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} className="w-40" />
               <span>to</span>
               <Input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} className="w-40" />
+              <Button variant="outline" onClick={() => setIsEmailOpen(true)} title="Email Statement">
+                <Send className="mr-2 h-4 w-4" /> Email
+              </Button>
               <Button variant="outline" size="icon" onClick={handleDownloadCSV} title="Download CSV">
                 <Download className="h-4 w-4" />
               </Button>
@@ -174,6 +189,10 @@ const CustomerDetail = () => {
               </TableRow>
             </TableHeader>
             <TableBody>
+              <TableRow className="bg-muted/30">
+                <TableCell colSpan={4} className="font-medium italic">Opening Balance</TableCell>
+                <TableCell className="text-right font-mono font-medium">{formatCurrency(openingBalance)}</TableCell>
+              </TableRow>
               {statement.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
@@ -203,10 +222,25 @@ const CustomerDetail = () => {
                   </TableRow>
                 ))
               )}
+              <TableRow className="font-bold bg-muted/50">
+                <TableCell colSpan={4} className="text-right">Closing Balance</TableCell>
+                <TableCell className="text-right font-mono">{formatCurrency(currentBalance)}</TableCell>
+              </TableRow>
             </TableBody>
           </Table>
         </CardContent>
       </Card>
+      
+      {customer && (
+        <SendStatementDialog
+          isOpen={isEmailOpen}
+          setIsOpen={setIsEmailOpen}
+          entity={{ id: customer.id, name: customer.name, email: customer.email }}
+          type="customer"
+          dateFrom={dateFrom}
+          dateTo={dateTo}
+        />
+      )}
     </div>
   );
 };

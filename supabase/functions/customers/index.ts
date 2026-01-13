@@ -68,8 +68,44 @@ serve(async (req) => {
           .single();
         if (custError) throw custError;
 
-        // 2. Fetch Transactions (Journal Entries linked to this customer)
-        // We use this to build the running balance and statement.
+        // 2. Identify AR Accounts
+        const { data: arAccounts } = await supabaseAdmin
+          .from('chart_of_accounts')
+          .select('id')
+          .eq('company_id', company_id)
+          .eq('type', 'Asset')
+          .ilike('name', '%receivable%');
+        const arAccountIds = new Set(arAccounts?.map((a: any) => a.id) || []);
+
+        // 3. Calculate Opening Balance (Sum of AR moves before date_from)
+        let opening_balance = 0;
+        if (date_from) {
+            const { data: openingMoves, error: openingError } = await supabaseAdmin
+                .from('journal_entry_items')
+                .select('amount, type, account_id')
+                .eq('journal_entries.company_id', company_id)
+                .eq('journal_entries.customer_id', customerId)
+                .lt('journal_entries.entry_date', date_from)
+                .select(`
+                    amount, type, account_id,
+                    journal_entries!inner (company_id, customer_id, entry_date)
+                `);
+            
+            if (openingError) throw openingError;
+
+            openingMoves.forEach((item: any) => {
+                // If it hits AR account: Debit = +Balance, Credit = -Balance
+                if (arAccountIds.has(item.account_id)) {
+                    opening_balance += item.type === 'debit' ? item.amount : -item.amount;
+                } else {
+                    // Fallback: assume mostly Debit normal if not specific (Sales often Credit, but we track Customer balance here)
+                    // Simplified: Debits increase owing, Credits decrease owing
+                    opening_balance += item.type === 'debit' ? item.amount : -item.amount;
+                }
+            });
+        }
+
+        // 4. Fetch Transactions in range
         let query = supabaseAdmin
           .from('journal_entries')
           .select(`
@@ -86,7 +122,7 @@ serve(async (req) => {
           `)
           .eq('company_id', company_id)
           .eq('customer_id', customerId)
-          .order('entry_date', { ascending: true }); // Order by date for running balance
+          .order('entry_date', { ascending: true });
 
         if (date_from) query = query.gte('entry_date', date_from);
         if (date_to) query = query.lte('entry_date', date_to);
@@ -94,23 +130,11 @@ serve(async (req) => {
         const { data: transactions, error: transError } = await query;
         if (transError) throw transError;
 
-        // 3. Get AR Account ID to filter for relevant movements (Invoice vs Payment)
-        const { data: arAccounts } = await supabaseAdmin
-          .from('chart_of_accounts')
-          .select('id')
-          .eq('company_id', company_id)
-          .eq('type', 'Asset')
-          .ilike('name', '%receivable%');
-        
-        const arAccountIds = new Set(arAccounts?.map((a: any) => a.id) || []);
-
-        // Process transactions into a statement format
         const statement = transactions.map((t: any) => {
-          // Calculate the net impact on AR for this transaction
           let amount = 0;
-          let type = 'other'; // 'invoice', 'payment'
+          let type = 'other';
 
-          // Check if this JE touches AR
+          // AR specific calculation
           const arItems = t.journal_entry_items.filter((item: any) => arAccountIds.has(item.account_id));
           
           if (arItems.length > 0) {
@@ -119,16 +143,22 @@ serve(async (req) => {
             
             if (debits > 0) {
               amount = debits;
-              type = 'invoice'; // Increases AR
+              type = 'invoice';
             } else {
               amount = credits;
-              type = 'payment'; // Decreases AR
+              type = 'payment';
             }
           } else {
-             // Fallback for logic where maybe it wasn't posted to AR directly but is linked to customer
-             // e.g. Cash Sale.
-             // For simplicity, we just sum up items.
-             amount = t.journal_entry_items.reduce((sum: number, i: any) => sum + i.amount, 0) / 2; // Rough estimate if balanced
+             // Fallback
+             const debits = t.journal_entry_items.filter((i: any) => i.type === 'debit').reduce((sum: number, i: any) => sum + i.amount, 0);
+             const credits = t.journal_entry_items.filter((i: any) => i.type === 'credit').reduce((sum: number, i: any) => sum + i.amount, 0);
+             if (debits > credits) {
+                 amount = debits;
+                 type = 'invoice';
+             } else {
+                 amount = credits;
+                 type = 'payment';
+             }
           }
 
           return {
@@ -141,7 +171,7 @@ serve(async (req) => {
           };
         });
 
-        data = { customer, statement };
+        data = { customer, statement, opening_balance };
         break;
 
       case 'POST':

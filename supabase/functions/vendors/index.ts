@@ -68,7 +68,42 @@ serve(async (req) => {
           .single();
         if (venError) throw venError;
 
-        // 2. Get Transactions
+        // 2. Identify AP Accounts
+        const { data: apAccounts } = await supabaseAdmin
+          .from('chart_of_accounts')
+          .select('id')
+          .eq('company_id', company_id)
+          .eq('type', 'Liability')
+          .ilike('name', '%payable%');
+        const apAccountIds = new Set(apAccounts?.map((a: any) => a.id) || []);
+
+        // 3. Calculate Opening Balance
+        let opening_balance = 0;
+        if (date_from) {
+            const { data: openingMoves, error: openingError } = await supabaseAdmin
+                .from('journal_entry_items')
+                .select('amount, type, account_id')
+                .eq('journal_entries.company_id', company_id)
+                .eq('journal_entries.vendor_id', vendorId)
+                .lt('journal_entries.entry_date', date_from)
+                .select(`
+                    amount, type, account_id,
+                    journal_entries!inner (company_id, vendor_id, entry_date)
+                `);
+            
+            if (openingError) throw openingError;
+
+            openingMoves.forEach((item: any) => {
+                // In AP (Liability): Credit = +Balance (Owe more), Debit = -Balance (Owe less)
+                if (apAccountIds.has(item.account_id)) {
+                    opening_balance += item.type === 'credit' ? item.amount : -item.amount;
+                } else {
+                    opening_balance += item.type === 'credit' ? item.amount : -item.amount;
+                }
+            });
+        }
+
+        // 4. Get Transactions
         let query = supabaseAdmin
           .from('journal_entries')
           .select(`
@@ -92,42 +127,34 @@ serve(async (req) => {
         const { data: transactions, error: transError } = await query;
         if (transError) throw transError;
 
-        // 3. Identify AP Accounts
-        const { data: apAccounts } = await supabaseAdmin
-          .from('chart_of_accounts')
-          .select('id')
-          .eq('company_id', company_id)
-          .eq('type', 'Liability')
-          .ilike('name', '%payable%');
-        
-        const apAccountIds = new Set(apAccounts?.map((a: any) => a.id) || []);
-
         const statement = transactions.map((t: any) => {
           let amount = 0;
           let type = 'other';
 
-          // Filter items that touch AP
           const apItems = t.journal_entry_items.filter((item: any) => apAccountIds.has(item.account_id));
 
           if (apItems.length > 0) {
             const debits = apItems.filter((i: any) => i.type === 'debit').reduce((sum: number, i: any) => sum + i.amount, 0);
             const credits = apItems.filter((i: any) => i.type === 'credit').reduce((sum: number, i: any) => sum + i.amount, 0);
-
-            // In AP (Liability):
-            // Credit increases liability (Bill)
-            // Debit decreases liability (Payment)
             
             if (credits > 0) {
               amount = credits;
-              type = 'bill';
+              type = 'bill'; // Increases AP
             } else {
               amount = debits;
-              type = 'payment';
+              type = 'payment'; // Decreases AP
             }
           } else {
-             // Fallback for direct expenses (Cash Bill)
-             amount = t.journal_entry_items.filter((i:any) => i.type === 'debit').reduce((sum:number, i:any) => sum + i.amount, 0);
-             type = 'bill';
+             // Fallback
+             const debits = t.journal_entry_items.filter((i: any) => i.type === 'debit').reduce((sum: number, i: any) => sum + i.amount, 0);
+             const credits = t.journal_entry_items.filter((i: any) => i.type === 'credit').reduce((sum: number, i: any) => sum + i.amount, 0);
+             if (credits > debits) {
+                 amount = credits;
+                 type = 'bill';
+             } else {
+                 amount = debits;
+                 type = 'payment';
+             }
           }
 
           return {
@@ -140,7 +167,7 @@ serve(async (req) => {
           };
         });
 
-        data = { vendor, statement };
+        data = { vendor, statement, opening_balance };
         break;
 
       case 'POST':
@@ -156,7 +183,7 @@ serve(async (req) => {
           .from('vendors')
           .update(body.vendorData)
           .eq('id', body.vendorId)
-          .eq('company_id', company_id) // Extra check for safety
+          .eq('company_id', company_id)
           .select()
           .single());
         break;
@@ -166,7 +193,7 @@ serve(async (req) => {
           .from('vendors')
           .delete()
           .eq('id', body.vendorId)
-          .eq('company_id', company_id)); // Extra check for safety
+          .eq('company_id', company_id));
         break;
 
       default:
