@@ -13,8 +13,6 @@ import {
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/card';
 import { PlusCircle, MoreHorizontal, Search, X } from 'lucide-react';
 import BillForm from '../components/BillForm';
-import JournalEntryDetail from '../components/JournalEntryDetail';
-import JournalEntryForm from '../components/JournalEntryForm';
 import BillPaymentForm from '../components/BillPaymentForm';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '../components/ui/dropdown-menu';
 import { showError, showSuccess } from '../utils/toast';
@@ -25,6 +23,7 @@ import { Badge } from '../components/ui/badge';
 import { Input } from '../components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { Vendor } from './Vendors';
+import { useNavigate } from 'react-router-dom';
 
 type BillEntry = {
   id: string;
@@ -39,11 +38,6 @@ type BillEntry = {
 
 const Bills = () => {
   const [isBillFormOpen, setIsBillFormOpen] = useState(false);
-  const [isEditFormOpen, setIsEditFormOpen] = useState(false);
-  const [selectedEntryIdForDetail, setSelectedEntryIdForDetail] = useState<string | null>(null);
-  const [selectedEntryIdForEdit, setSelectedEntryIdForEdit] = useState<string | undefined>(undefined);
-  
-  // Payment State
   const [isPaymentFormOpen, setIsPaymentFormOpen] = useState(false);
   const [selectedBillForPayment, setSelectedBillForPayment] = useState<BillEntry | null>(null);
 
@@ -56,6 +50,7 @@ const Bills = () => {
 
   const { activeCompany } = useAuth();
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
 
   const { data: bills, isLoading } = useQuery<BillEntry[]>({
     ...billsQuery(activeCompany?.id!, {
@@ -93,11 +88,6 @@ const Bills = () => {
       showError(`Error deleting bill: ${error.message}`);
     },
   });
-
-  const handleEdit = (id: string) => {
-    setSelectedEntryIdForEdit(id);
-    setIsEditFormOpen(true);
-  };
 
   const handleDelete = (id: string) => {
     if (window.confirm('Are you sure you want to delete this bill? This action cannot be undone.')) {
@@ -205,7 +195,7 @@ const Bills = () => {
                 </TableRow>
               ) : bills && bills.length > 0 ? (
                 bills.map((bill) => (
-                  <TableRow key={bill.id}>
+                  <TableRow key={bill.id} className="cursor-pointer" onClick={() => navigate(`/bills/${bill.id}`)}>
                     <TableCell>{new Date(bill.entry_date).toLocaleDateString()}</TableCell>
                     <TableCell>{bill.vendors?.[0]?.name || 'N/A'}</TableCell>
                     <TableCell>{bill.description}</TableCell>
@@ -222,12 +212,11 @@ const Bills = () => {
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => setSelectedEntryIdForDetail(bill.id)}>View Details</DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => handleEdit(bill.id)} disabled={bill.status === 'paid'}>Edit</DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => navigate(`/bills/${bill.id}`)}>View Details</DropdownMenuItem>
                           {bill.status !== 'paid' && (
-                            <DropdownMenuItem onClick={() => handlePay(bill)}>Record Payment</DropdownMenuItem>
+                            <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handlePay(bill); }}>Record Payment</DropdownMenuItem>
                           )}
-                          <DropdownMenuItem onClick={() => handleDelete(bill.id)} className="text-red-600">Delete</DropdownMenuItem>
+                          <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleDelete(bill.id); }} className="text-red-600">Delete</DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </TableCell>
@@ -245,16 +234,6 @@ const Bills = () => {
       <BillForm
         isOpen={isBillFormOpen}
         setIsOpen={setIsBillFormOpen}
-      />
-      <JournalEntryForm
-        isOpen={isEditFormOpen}
-        setIsOpen={setIsEditFormOpen}
-        entryId={selectedEntryIdForEdit}
-      />
-      <JournalEntryDetail 
-        entryId={selectedEntryIdForDetail} 
-        isOpen={!!selectedEntryIdForDetail} 
-        setIsOpen={() => setSelectedEntryIdForDetail(null)} 
       />
       {selectedBillForPayment && (
         <BillPaymentForm

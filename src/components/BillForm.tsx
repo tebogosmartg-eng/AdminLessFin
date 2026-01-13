@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -17,7 +17,7 @@ import { Vendor } from '../pages/Vendors';
 import { Product } from '../pages/Products';
 import { Project } from '../pages/Projects';
 import { TaxRate } from '../pages/TaxRates';
-import { Trash2 } from 'lucide-react';
+import { Trash2, X, Paperclip } from 'lucide-react';
 import { Alert, AlertDescription } from './ui/alert';
 import { addDays, format } from 'date-fns';
 import { formatCurrency } from '../lib/utils';
@@ -56,6 +56,8 @@ interface BillFormProps {
 const BillForm = ({ isOpen, setIsOpen, initialData, onSuccess }: BillFormProps) => {
   const { user, activeCompany } = useAuth();
   const queryClient = useQueryClient();
+  const [attachmentFile, setAttachmentFile] = useState<File | null>(null);
+
   const form = useForm<BillFormValues>({
     resolver: zodResolver(billSchema),
     defaultValues: {
@@ -72,6 +74,7 @@ const BillForm = ({ isOpen, setIsOpen, initialData, onSuccess }: BillFormProps) 
 
   useEffect(() => {
     if (isOpen) {
+      setAttachmentFile(null);
       if (initialData) {
         form.reset({
           bill_number: initialData.bill_number || '',
@@ -163,6 +166,19 @@ const BillForm = ({ isOpen, setIsOpen, initialData, onSuccess }: BillFormProps) 
     mutationFn: async (values: BillFormValues) => {
       if (!user || !activeCompany) throw new Error('User not authenticated or no active company');
 
+      let attachmentUrl = null;
+      if (attachmentFile) {
+        const fileExt = attachmentFile.name.split('.').pop();
+        const fileName = `${Date.now()}-bill.${fileExt}`;
+        const filePath = `${activeCompany.id}/bills/${fileName}`;
+        
+        const { error: uploadError } = await supabase.storage.from('attachments').upload(filePath, attachmentFile);
+        if (uploadError) throw new Error(`Storage Error: ${uploadError.message}`);
+        
+        const { data: urlData } = supabase.storage.from('attachments').getPublicUrl(filePath);
+        attachmentUrl = urlData.publicUrl;
+      }
+
       const p_items = values.items.map(item => ({
         product_id: item.product_id || null,
         quantity: item.quantity,
@@ -181,6 +197,7 @@ const BillForm = ({ isOpen, setIsOpen, initialData, onSuccess }: BillFormProps) 
         tax_receivable_account_id: values.tax_receivable_account_id || null,
         description: values.description || `Bill from ${vendors?.find(v => v.id === values.vendor_id)?.name}`,
         p_items: p_items,
+        attachment_url: attachmentUrl
       };
 
       const { error } = await supabase.functions.invoke('bills', {
@@ -197,7 +214,7 @@ const BillForm = ({ isOpen, setIsOpen, initialData, onSuccess }: BillFormProps) 
       queryClient.invalidateQueries({ queryKey: ['bills', activeCompany?.id] });
       queryClient.invalidateQueries({ queryKey: ['journal_entries', activeCompany?.id] });
       queryClient.invalidateQueries({ queryKey: ['products', activeCompany?.id] });
-      showSuccess('Bill recorded and inventory updated.');
+      showSuccess('Bill recorded successfully.');
       if (onSuccess) onSuccess();
       setIsOpen(false);
     },
@@ -218,7 +235,7 @@ const BillForm = ({ isOpen, setIsOpen, initialData, onSuccess }: BillFormProps) 
 
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
-      <DialogContent className="sm:max-w-6xl">
+      <DialogContent className="sm:max-w-6xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Record New Bill</DialogTitle>
           <DialogDescription>Create a new bill record.</DialogDescription>
@@ -234,13 +251,24 @@ const BillForm = ({ isOpen, setIsOpen, initialData, onSuccess }: BillFormProps) 
               <FormField control={form.control} name="bill_date" render={({ field }) => (<FormItem><FormLabel>Bill Date</FormLabel><FormControl><Input type="date" {...field} /></FormControl><FormMessage /></FormItem>)} />
               <FormField control={form.control} name="due_date" render={({ field }) => (<FormItem><FormLabel>Due Date</FormLabel><FormControl><Input type="date" {...field} /></FormControl><FormMessage /></FormItem>)} />
             </div>
+            
             <div className="grid grid-cols-2 gap-4">
                 <FormField control={form.control} name="accounts_payable_id" render={({ field }) => (<FormItem><FormLabel>Credit A/P</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select A/P Account" /></SelectTrigger></FormControl><SelectContent>{apAccounts?.map(acc => <SelectItem key={acc.id} value={acc.id}>{acc.name}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem>)} />
                 {hasTax && (
                     <FormField control={form.control} name="tax_receivable_account_id" render={({ field }) => (<FormItem><FormLabel>Tax Receivable Account</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select Asset Account" /></SelectTrigger></FormControl><SelectContent>{assetAccounts?.map(acc => <SelectItem key={acc.id} value={acc.id}>{acc.name}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem>)} />
                 )}
             </div>
+
             <FormField control={form.control} name="description" render={({ field }) => (<FormItem><FormLabel>Memo (Optional)</FormLabel><FormControl><Textarea placeholder="A brief description of the bill" {...field} /></FormControl><FormMessage /></FormItem>)} />
+            
+            <FormItem>
+              <FormLabel>Attachment (Optional)</FormLabel>
+              <div className="flex items-center gap-2">
+                <Input type="file" onChange={(e) => setAttachmentFile(e.target.files?.[0] || null)} className="w-full" />
+                {attachmentFile && <Button type="button" variant="ghost" size="icon" onClick={() => setAttachmentFile(null)}><X className="h-4 w-4" /></Button>}
+              </div>
+            </FormItem>
+
             <div className="space-y-2">
               <div className="grid grid-cols-12 gap-2 px-2 text-xs font-medium text-muted-foreground">
                 <div className="col-span-2">Item</div>
@@ -261,7 +289,7 @@ const BillForm = ({ isOpen, setIsOpen, initialData, onSuccess }: BillFormProps) 
                 
                 return (
                   <div key={field.id} className="grid grid-cols-12 gap-2 items-start">
-                    <FormField control={form.control} name={`items.${index}.product_id`} render={({ field }) => (<FormItem className="col-span-2"><Select onValueChange={(value) => { field.onChange(value); handleProductSelect(value, index); }} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger></FormControl><SelectContent>{products?.map(p => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}</SelectContent></Select></FormItem>)} />
+                    <FormField control={form.control} name={`items.${index}.product_id`} render={({ field }) => (<FormItem className="col-span-2"><Select onValueChange={(v) => { field.onChange(v); handleProductSelect(v, index); }} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger></FormControl><SelectContent>{products?.map(p => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}</SelectContent></Select></FormItem>)} />
                     <FormField control={form.control} name={`items.${index}.description`} render={({ field }) => (<FormItem className="col-span-2"><FormControl><Input placeholder="Desc" {...field} /></FormControl></FormItem>)} />
                     <FormField control={form.control} name={`items.${index}.quantity`} render={({ field }) => (<FormItem className="col-span-1"><FormControl><Input type="number" placeholder="Qty" {...field} /></FormControl></FormItem>)} />
                     <FormField control={form.control} name={`items.${index}.unit_cost`} render={({ field }) => (<FormItem className="col-span-1"><FormControl><Input type="number" step="0.01" placeholder="Cost" {...field} /></FormControl></FormItem>)} />
