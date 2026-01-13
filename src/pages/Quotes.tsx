@@ -37,6 +37,7 @@ export type Quote = {
 const Quotes = () => {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [selectedQuoteId, setSelectedQuoteId] = useState<string | undefined>(undefined);
+  const [duplicateFromId, setDuplicateFromId] = useState<string | undefined>(undefined);
   const { activeCompany } = useAuth();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
@@ -63,11 +64,19 @@ const Quotes = () => {
 
   const handleEdit = (id: string) => {
     setSelectedQuoteId(id);
+    setDuplicateFromId(undefined);
     setIsFormOpen(true);
   };
 
   const handleAddNew = () => {
     setSelectedQuoteId(undefined);
+    setDuplicateFromId(undefined);
+    setIsFormOpen(true);
+  };
+
+  const handleDuplicate = (id: string) => {
+    setSelectedQuoteId(undefined);
+    setDuplicateFromId(id);
     setIsFormOpen(true);
   };
 
@@ -133,6 +142,7 @@ const Quotes = () => {
                         <DropdownMenuContent align="end">
                           <DropdownMenuItem onClick={() => navigate(`/quotes/${quote.id}`)}>View</DropdownMenuItem>
                           <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleEdit(quote.id); }}>Edit</DropdownMenuItem>
+                          <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleDuplicate(quote.id); }}>Duplicate</DropdownMenuItem>
                           <DropdownMenuItem onClick={(e) => { e.stopPropagation(); deleteMutation.mutate(quote.id); }} className="text-red-600">Delete</DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
@@ -150,6 +160,7 @@ const Quotes = () => {
         isOpen={isFormOpen}
         setIsOpen={setIsFormOpen}
         quoteId={selectedQuoteId}
+        duplicateFromId={duplicateFromId}
       />
     </>
   );

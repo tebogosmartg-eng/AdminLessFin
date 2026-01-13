@@ -89,6 +89,7 @@ export const SidebarNav = () => {
   const reportsLinks = [
     { to: '/reports', label: 'Operational Reports', icon: FileText, prefetch: () => {} }, // Complex filters, skip prefetch
     { to: '/financial-statements', label: 'Financial Statements', icon: FileSignature, prefetch: () => {} }, // Complex filters, skip prefetch
+    { to: '/tax-report', label: 'Sales Tax Report', icon: Scale, prefetch: () => {} },
     { to: '/general-ledger', label: 'General Ledger', icon: Library, prefetch: () => prefetch(queries.accountsQuery) },
     { to: '/payroll-reports', label: 'Payroll Reports', icon: FileText, prefetch: () => {} }, // Complex filters, skip prefetch
     { to: '/budgets', label: 'Budgets', icon: Target, prefetch: () => prefetch(queries.budgetsQuery) },

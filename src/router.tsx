@@ -39,6 +39,7 @@ import TaxRates from "./pages/TaxRates";
 import Projects from "./pages/Projects";
 import TimeTracking from "./pages/TimeTracking";
 import RecurringInvoices from "./pages/RecurringInvoices";
+import TaxReport from "./pages/TaxReport";
 
 export const AppRouter = () => {
   return (
@@ -63,6 +64,7 @@ export const AppRouter = () => {
         <Route path="/budgets" element={<Budgets />} />
         <Route path="/reports" element={<Reports />} />
         <Route path="/financial-statements" element={<FinancialStatements />} />
+        <Route path="/tax-report" element={<TaxReport />} />
         <Route path="/settings" element={<Settings />} />
         <Route path="/vendors" element={<Vendors />} />
         <Route path="/customers" element={<Customers />} />

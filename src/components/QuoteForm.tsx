@@ -47,12 +47,14 @@ interface QuoteFormProps {
   isOpen: boolean;
   setIsOpen: (isOpen: boolean) => void;
   quoteId?: string;
+  duplicateFromId?: string;
 }
 
-const QuoteForm = ({ isOpen, setIsOpen, quoteId }: QuoteFormProps) => {
+const QuoteForm = ({ isOpen, setIsOpen, quoteId, duplicateFromId }: QuoteFormProps) => {
   const { activeCompany } = useAuth();
   const queryClient = useQueryClient();
   const isEditing = !!quoteId;
+  const isDuplicating = !!duplicateFromId;
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
 
   const form = useForm<QuoteFormValues>({
@@ -69,33 +71,36 @@ const QuoteForm = ({ isOpen, setIsOpen, quoteId }: QuoteFormProps) => {
 
   const watchedValues = form.watch();
 
-  const { data: quoteToEdit } = useQuery({
-    queryKey: ['quote_edit', quoteId],
+  // Fetch data if editing OR duplicating
+  const sourceId = quoteId || duplicateFromId;
+  const { data: sourceQuote } = useQuery({
+    queryKey: ['quote_source', sourceId],
     queryFn: async () => {
       const { data, error } = await supabase.functions.invoke('quotes', {
-        body: { method: 'GET_ONE', company_id: activeCompany!.id, quoteId },
+        body: { method: 'GET_ONE', company_id: activeCompany!.id, quoteId: sourceId },
       });
       if (error) throw error;
       return data;
     },
-    enabled: isEditing && isOpen && !!activeCompany,
+    enabled: !!sourceId && isOpen && !!activeCompany,
   });
 
   useEffect(() => {
-    if (isEditing && quoteToEdit) {
+    if (sourceQuote && isOpen) {
       form.reset({
-        quote_number: quoteToEdit.quote_number,
-        quote_date: quoteToEdit.quote_date,
-        expiry_date: quoteToEdit.expiry_date || '',
-        customer_id: quoteToEdit.customer_id,
-        description: quoteToEdit.description || '',
-        items: quoteToEdit.quote_items.map((item: any) => ({
+        // If duplicating, we reset number and dates
+        quote_number: isDuplicating ? '' : sourceQuote.quote_number,
+        quote_date: isDuplicating ? format(new Date(), 'yyyy-MM-dd') : sourceQuote.quote_date,
+        expiry_date: isDuplicating ? format(addDays(new Date(), 30), 'yyyy-MM-dd') : (sourceQuote.expiry_date || ''),
+        customer_id: sourceQuote.customer_id,
+        description: sourceQuote.description || '',
+        items: sourceQuote.quote_items.map((item: any) => ({
           ...item,
           tax_rate_id: item.tax_rate_id || '',
         })),
       });
     }
-  }, [quoteToEdit, isEditing, form]);
+  }, [sourceQuote, isEditing, isDuplicating, isOpen, form]);
 
   const { data: nextQuoteNumber } = useQuery({
     queryKey: ['next_quote_number', activeCompany?.id],
@@ -106,7 +111,7 @@ const QuoteForm = ({ isOpen, setIsOpen, quoteId }: QuoteFormProps) => {
       if (error) throw error;
       return data;
     },
-    enabled: isOpen && !isEditing && !!activeCompany,
+    enabled: isOpen && !isEditing && !!activeCompany, // Fetch for new or duplicate
   });
 
   useEffect(() => {
@@ -172,7 +177,7 @@ const QuoteForm = ({ isOpen, setIsOpen, quoteId }: QuoteFormProps) => {
       <Dialog open={isOpen} onOpenChange={setIsOpen}>
         <DialogContent className="sm:max-w-5xl">
           <DialogHeader>
-            <DialogTitle>{isEditing ? 'Edit Quote' : 'New Quote'}</DialogTitle>
+            <DialogTitle>{isEditing ? 'Edit Quote' : isDuplicating ? 'Duplicate Quote' : 'New Quote'}</DialogTitle>
             <DialogDescription>Fill out the details below to create a new quote.</DialogDescription>
           </DialogHeader>
           <Form {...form}>
