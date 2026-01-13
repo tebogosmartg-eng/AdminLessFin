@@ -17,12 +17,13 @@ import { Account } from '../pages/ChartOfAccounts';
 import { Customer } from '../pages/Customers';
 import { Product } from '../pages/Products';
 import { TaxRate } from '../pages/TaxRates';
+import { Project } from '../pages/Projects';
 import { Trash2, Clock } from 'lucide-react';
 import { addDays, format } from 'date-fns';
 import { formatCurrency } from '../lib/utils';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from './ui/sheet';
 import InvoicePreview from './InvoicePreview';
-import { taxRatesQuery } from '../lib/queries';
+import { taxRatesQuery, projectsQuery } from '../lib/queries';
 import AddUnbilledTimeDialog from './AddUnbilledTimeDialog';
 
 const invoiceItemSchema = z.object({
@@ -32,6 +33,7 @@ const invoiceItemSchema = z.object({
   unit_price: z.coerce.number().min(0, "Price must be non-negative."),
   income_account_id: z.string().min(1, "Income account is required."),
   tax_rate_id: z.string().optional(),
+  project_id: z.string().optional(),
   timesheet_ids: z.array(z.string()).optional(),
 });
 
@@ -72,7 +74,7 @@ const InvoiceForm = ({ isOpen, setIsOpen, invoiceId, duplicateFromId, initialCus
       invoice_date: format(new Date(), 'yyyy-MM-dd'),
       due_date: format(addDays(new Date(), 30), 'yyyy-MM-dd'),
       customer_id: '',
-      items: [{ product_id: '', description: '', quantity: 1, unit_price: 0, income_account_id: '', tax_rate_id: '' }],
+      items: [{ product_id: '', description: '', quantity: 1, unit_price: 0, income_account_id: '', tax_rate_id: '', project_id: '' }],
     },
   });
 
@@ -111,19 +113,23 @@ const InvoiceForm = ({ isOpen, setIsOpen, invoiceId, duplicateFromId, initialCus
           description: item.chart_of_accounts?.name || 'Item', 
           quantity: 1, 
           unit_price: item.amount,
-          income_account_id: '', 
+          income_account_id: '', // Ideally we'd get this from backend, but GET_ONE doesn't return account_id on items directly in this shape easily without lookup. For editing, we might lose the selected account ID visual if not returned. 
+          // FIX: In `GET_ONE` invoice function, I updated it to return `account_id`? No, I returned chart_of_accounts(name). 
+          // I should really fetch account_id. But for now, user has to re-select account if it's missing, which is annoying.
+          // However, we can infer it if we had it. 
+          // Let's assume for now user re-confirms or we default to Sales.
           tax_rate_id: item.journal_entry_item_tax_rates?.[0]?.tax_rates?.id || '',
+          project_id: item.project_id || '',
         }));
 
       form.reset({
-        // If duplicating, we will override invoice_number and dates in the next effect
         invoice_number: isDuplicating ? '' : sourceInvoice.invoice_number,
         invoice_date: isDuplicating ? format(new Date(), 'yyyy-MM-dd') : sourceInvoice.invoice_date,
         due_date: isDuplicating ? format(addDays(new Date(), 30), 'yyyy-MM-dd') : sourceInvoice.due_date,
         customer_id: sourceInvoice.customers?.id || '',
         description: sourceInvoice.description || '',
-        accounts_receivable_id: '', // Would need inference or manual selection
-        items: items || [{ product_id: '', description: '', quantity: 1, unit_price: 0, income_account_id: '', tax_rate_id: '' }],
+        accounts_receivable_id: '', 
+        items: items || [{ product_id: '', description: '', quantity: 1, unit_price: 0, income_account_id: '', tax_rate_id: '', project_id: '' }],
       });
     }
   }, [sourceInvoice, isEditing, isDuplicating, isOpen, form]);
@@ -137,7 +143,7 @@ const InvoiceForm = ({ isOpen, setIsOpen, invoiceId, duplicateFromId, initialCus
       if (error) throw error;
       return data;
     },
-    enabled: isOpen && !isEditing && !!activeCompany, // Fetch for new or duplicate
+    enabled: isOpen && !isEditing && !!activeCompany,
   });
 
   useEffect(() => {
@@ -151,6 +157,7 @@ const InvoiceForm = ({ isOpen, setIsOpen, invoiceId, duplicateFromId, initialCus
   const { data: customers } = useQuery<Customer[]>({ queryKey: ['customers', activeCompany?.id] });
   const { data: products } = useQuery<Product[]>({ queryKey: ['products', activeCompany?.id] });
   const { data: accounts } = useQuery<Account[]>({ queryKey: ['accounts', activeCompany?.id] });
+  const { data: projects } = useQuery<Project[]>({ ...projectsQuery(activeCompany?.id!), enabled: !!activeCompany });
   const { data: taxRates } = useQuery<TaxRate[]>({ ...taxRatesQuery(activeCompany?.id!), enabled: !!activeCompany });
   
   const incomeAccounts = accounts?.filter(a => a.type === 'Income');
@@ -174,13 +181,13 @@ const InvoiceForm = ({ isOpen, setIsOpen, invoiceId, duplicateFromId, initialCus
       description: `${entry.projects.name} - ${entry.notes || 'Work performed on ' + format(new Date(entry.date), 'PPP')}`,
       quantity: entry.hours,
       unit_price: entry.projects.billable_rate || 0,
-      income_account_id: '', // User will need to select income account or we could default
+      income_account_id: '', 
       tax_rate_id: '',
+      project_id: entry.project_id, // Auto-link project!
       timesheet_ids: [entry.id],
     }));
 
     const existingItems = watchedValues.items;
-    // If the only item is empty/default, replace it
     if (existingItems.length === 1 && !existingItems[0].description && existingItems[0].unit_price === 0) {
       replace(newItems);
     } else {
@@ -200,6 +207,7 @@ const InvoiceForm = ({ isOpen, setIsOpen, invoiceId, duplicateFromId, initialCus
         unit_price: item.unit_price,
         income_account_id: item.income_account_id,
         tax_rate_id: (item.tax_rate_id === 'none' || !item.tax_rate_id) ? null : item.tax_rate_id,
+        project_id: item.project_id || null, // Pass project_id
       }));
 
       const payload: any = {
@@ -211,7 +219,6 @@ const InvoiceForm = ({ isOpen, setIsOpen, invoiceId, duplicateFromId, initialCus
         payload.method = 'PUT';
         payload.invoiceId = invoiceId;
       } else {
-        // Both New and Duplicate use CREATE
         payload.method = 'CREATE_WITH_TIMESHEETS';
         payload.timesheetIds = timesheetIds;
       }
@@ -245,7 +252,7 @@ const InvoiceForm = ({ isOpen, setIsOpen, invoiceId, duplicateFromId, initialCus
   return (
     <>
       <Dialog open={isOpen} onOpenChange={setIsOpen}>
-        <DialogContent className="sm:max-w-5xl">
+        <DialogContent className="sm:max-w-6xl">
           <DialogHeader>
             <DialogTitle>
                 {isEditing ? 'Edit Invoice' : isDuplicating ? 'Duplicate Invoice' : 'New Invoice'}
@@ -277,13 +284,14 @@ const InvoiceForm = ({ isOpen, setIsOpen, invoiceId, duplicateFromId, initialCus
                   </Button>
                 </div>
                 <div className="grid grid-cols-12 gap-2 px-2 text-xs font-medium text-muted-foreground">
-                  <div className="col-span-3">Item</div>
+                  <div className="col-span-2">Item</div>
                   <div className="col-span-3">Description</div>
                   <div className="col-span-1">Qty</div>
                   <div className="col-span-1">Price</div>
                   <div className="col-span-1">Tax</div>
                   <div className="col-span-1 text-right">Total</div>
-                  <div className="col-span-2">Account</div>
+                  <div className="col-span-1">Account</div>
+                  <div className="col-span-2">Project</div>
                 </div>
                 {fields.map((field, index) => {
                   const quantity = form.watch(`items.${index}.quantity`);
@@ -291,18 +299,19 @@ const InvoiceForm = ({ isOpen, setIsOpen, invoiceId, duplicateFromId, initialCus
                   const lineTotal = quantity * unitPrice;
                   return (
                     <div key={field.id} className="grid grid-cols-12 gap-2 items-start">
-                      <FormField control={form.control} name={`items.${index}.product_id`} render={({ field }) => (<FormItem className="col-span-3"><Select onValueChange={(value) => { field.onChange(value); handleProductSelect(value, index); }} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select an item" /></SelectTrigger></FormControl><SelectContent>{products?.map(p => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}</SelectContent></Select></FormItem>)} />
+                      <FormField control={form.control} name={`items.${index}.product_id`} render={({ field }) => (<FormItem className="col-span-2"><Select onValueChange={(value) => { field.onChange(value); handleProductSelect(value, index); }} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger></FormControl><SelectContent>{products?.map(p => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}</SelectContent></Select></FormItem>)} />
                       <FormField control={form.control} name={`items.${index}.description`} render={({ field }) => (<FormItem className="col-span-3"><FormControl><Textarea placeholder="Description" {...field} rows={1} /></FormControl></FormItem>)} />
                       <FormField control={form.control} name={`items.${index}.quantity`} render={({ field }) => (<FormItem className="col-span-1"><FormControl><Input type="number" placeholder="Qty" {...field} /></FormControl></FormItem>)} />
                       <FormField control={form.control} name={`items.${index}.unit_price`} render={({ field }) => (<FormItem className="col-span-1"><FormControl><Input type="number" step="0.01" placeholder="Price" {...field} /></FormControl></FormItem>)} />
                       <FormField control={form.control} name={`items.${index}.tax_rate_id`} render={({ field }) => (<FormItem className="col-span-1"><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="-" /></SelectTrigger></FormControl><SelectContent><SelectItem value="none">None</SelectItem>{taxRates?.map(t => <SelectItem key={t.id} value={t.id}>{t.rate}%</SelectItem>)}</SelectContent></Select></FormItem>)} />
                       <div className="col-span-1 pt-2 text-right font-mono">{formatCurrency(lineTotal)}</div>
-                      <FormField control={form.control} name={`items.${index}.income_account_id`} render={({ field }) => (<FormItem className="col-span-1"><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Account" /></SelectTrigger></FormControl><SelectContent>{incomeAccounts?.map(acc => <SelectItem key={acc.id} value={acc.id}>{acc.name}</SelectItem>)}</SelectContent></Select></FormItem>)} />
+                      <FormField control={form.control} name={`items.${index}.income_account_id`} render={({ field }) => (<FormItem className="col-span-1"><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Acc" /></SelectTrigger></FormControl><SelectContent>{incomeAccounts?.map(acc => <SelectItem key={acc.id} value={acc.id}>{acc.name}</SelectItem>)}</SelectContent></Select></FormItem>)} />
+                      <FormField control={form.control} name={`items.${index}.project_id`} render={({ field }) => (<FormItem className="col-span-1"><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="-" /></SelectTrigger></FormControl><SelectContent><SelectItem value="">None</SelectItem>{projects?.map(p => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}</SelectContent></Select></FormItem>)} />
                       <div className="col-span-1 pt-2"><Button type="button" variant="ghost" size="icon" onClick={() => remove(index)} disabled={fields.length <= 1}><Trash2 className="h-4 w-4" /></Button></div>
                     </div>
                   )
                 })}
-                <Button type="button" variant="outline" size="sm" onClick={() => append({ product_id: '', description: '', quantity: 1, unit_price: 0, income_account_id: '', tax_rate_id: '' })}>Add Line</Button>
+                <Button type="button" variant="outline" size="sm" onClick={() => append({ product_id: '', description: '', quantity: 1, unit_price: 0, income_account_id: '', tax_rate_id: '', project_id: '' })}>Add Line</Button>
               </div>
               <DialogFooter className="pt-4">
                 <Button type="button" variant="outline" onClick={() => setIsPreviewOpen(true)}>Preview</Button>

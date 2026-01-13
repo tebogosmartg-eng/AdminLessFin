@@ -109,7 +109,13 @@ serve(async (req) => {
           .single();
         if (postError) throw postError;
         
-        const itemsToInsert = postItems.map(item => ({ ...item, journal_entry_id: newEntry.id }));
+        // Add project_id to the items being inserted
+        const itemsToInsert = postItems.map(item => ({ 
+          ...item, 
+          journal_entry_id: newEntry.id,
+          project_id: item.project_id || null // Ensure project_id is handled
+        }));
+        
         const { error: postItemsError } = await supabaseAdmin.from('journal_entry_items').insert(itemsToInsert);
         if (postItemsError) throw postItemsError;
         data = newEntry;
@@ -117,17 +123,33 @@ serve(async (req) => {
 
       case 'PUT':
         const { items: putItems, ...putEntryData } = body.entryData;
-        // Use RPC for atomic update
-        ({ error } = await supabaseAdmin.rpc('update_journal_entry_full', {
-          p_entry_id: body.entryId,
-          p_company_id: company_id,
-          p_date: putEntryData.entry_date,
-          p_description: putEntryData.description || null,
-          p_vendor_id: putEntryData.vendor_id || null,
-          p_customer_id: putEntryData.customer_id || null,
-          p_attachment_url: putEntryData.attachment_url || null,
-          p_items: putItems
+        
+        // Update Header
+        const { error: headerError } = await supabaseAdmin
+          .from('journal_entries')
+          .update({
+            entry_date: putEntryData.entry_date,
+            description: putEntryData.description || null,
+            vendor_id: putEntryData.vendor_id || null,
+            customer_id: putEntryData.customer_id || null,
+            attachment_url: putEntryData.attachment_url || null,
+          })
+          .eq('id', body.entryId)
+          .eq('company_id', company_id);
+        
+        if (headerError) throw headerError;
+
+        // Replace Items (Delete & Insert)
+        await supabaseAdmin.from('journal_entry_items').delete().eq('journal_entry_id', body.entryId);
+        
+        const putItemsToInsert = putItems.map(item => ({ 
+          ...item, 
+          journal_entry_id: body.entryId,
+          project_id: item.project_id || null
         }));
+        
+        const { error: putItemsError } = await supabaseAdmin.from('journal_entry_items').insert(putItemsToInsert);
+        if (putItemsError) throw putItemsError;
         
         data = { id: body.entryId };
         break;
