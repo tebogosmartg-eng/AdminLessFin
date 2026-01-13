@@ -5,7 +5,7 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible"
-import { Book, LayoutDashboard, BookText, FileText, Library, Target, Repeat, Building2, Users, TrendingUp, Receipt, Banknote, HandCoins, ChevronRight, Package, Scale, Upload, FileSignature, Briefcase, Landmark, MessageSquare, MessageCircle, Clock, ShoppingBag, Calendar, TicketMinus, PieChart, Coins } from 'lucide-react';
+import { Book, LayoutDashboard, BookText, Library, Target, Repeat, Building2, Users, TrendingUp, Receipt, Banknote, HandCoins, ChevronRight, Package, Scale, Upload, FileSignature, Briefcase, Landmark, MessageSquare, MessageCircle, Clock, ShoppingBag, Calendar, TicketMinus, PieChart, Coins, FileText } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { Button } from './ui/button';
 import { useAuth } from '../contexts/AuthContext';
@@ -79,7 +79,7 @@ export const SidebarNav = () => {
 
   const accountingLinks = [
     { to: '/chart-of-accounts', label: 'Chart of Accounts', icon: Book, prefetch: () => prefetch(queries.accountsQuery) },
-    { to: '/journal-entries', label: 'Journal Entries', icon: BookText, prefetch: () => {} }, // Complex filters, skip prefetch
+    { to: '/journal-entries', label: 'Journal Entries', icon: BookText, prefetch: () => {} },
     { to: '/recurring-entries', label: 'Recurring Entries', icon: Repeat, prefetch: () => prefetch(queries.recurringEntriesQuery) },
     { to: '/reconciliation', label: 'Reconcile', icon: Scale, prefetch: () => prefetch(queries.accountsQuery) },
     { to: '/tax-rates', label: 'Tax Rates', icon: Scale, prefetch: () => prefetch(queries.taxRatesQuery) },

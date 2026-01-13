@@ -7,7 +7,17 @@ import { AuthProvider } from "./contexts/AuthContext";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { AppRouter } from "./router";
 
-const queryClient = new QueryClient();
+// Configure global caching to prevent redundant loading states
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 1000 * 60 * 5, // Data stays "fresh" for 5 minutes
+      gcTime: 1000 * 60 * 30,    // Keep data in cache for 30 minutes
+      retry: 1,
+      refetchOnWindowFocus: false, // Prevent unnecessary refetches when switching tabs
+    },
+  },
+});
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
