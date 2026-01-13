@@ -42,6 +42,8 @@ import TimeTracking from "./pages/TimeTracking";
 import RecurringInvoices from "./pages/RecurringInvoices";
 import TaxReport from "./pages/TaxReport";
 import RecurringBills from "./pages/RecurringBills";
+import PurchaseOrders from "./pages/PurchaseOrders";
+import PurchaseOrderDetail from "./pages/PurchaseOrderDetail";
 
 export const AppRouter = () => {
   return (
@@ -58,6 +60,8 @@ export const AppRouter = () => {
         <Route path="/bills" element={<Bills />} />
         <Route path="/pay-bills" element={<PayBills />} />
         <Route path="/recurring-bills" element={<RecurringBills />} />
+        <Route path="/purchase-orders" element={<PurchaseOrders />} />
+        <Route path="/purchase-orders/:id" element={<PurchaseOrderDetail />} />
         <Route path="/receive-payments" element={<ReceivePayments />} />
         <Route path="/chart-of-accounts" element={<ChartOfAccounts />} />
         <Route path="/journal-entries" element={<JournalEntries />} />

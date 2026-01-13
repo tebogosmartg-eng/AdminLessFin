@@ -232,3 +232,14 @@ export const timesheetsQuery = (companyId: string) => ({
     return data;
   },
 });
+
+export const purchaseOrdersQuery = (companyId: string) => ({
+  queryKey: ['purchase_orders', companyId],
+  queryFn: async () => {
+    const { data, error } = await supabase.functions.invoke('purchase-orders', {
+      body: { method: 'GET_ALL', company_id: companyId },
+    });
+    if (error) throw new Error(error.message);
+    return data;
+  },
+});

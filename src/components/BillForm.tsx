@@ -42,9 +42,11 @@ type BillFormValues = z.infer<typeof billSchema>;
 interface BillFormProps {
   isOpen: boolean;
   setIsOpen: (isOpen: boolean) => void;
+  initialData?: Partial<BillFormValues>;
+  onSuccess?: () => void;
 }
 
-const BillForm = ({ isOpen, setIsOpen }: BillFormProps) => {
+const BillForm = ({ isOpen, setIsOpen, initialData, onSuccess }: BillFormProps) => {
   const { user, activeCompany } = useAuth();
   const queryClient = useQueryClient();
   const form = useForm<BillFormValues>({
@@ -60,17 +62,28 @@ const BillForm = ({ isOpen, setIsOpen }: BillFormProps) => {
   });
 
   useEffect(() => {
-    if (!isOpen) {
-      form.reset({
-        bill_date: format(new Date(), 'yyyy-MM-dd'),
-        due_date: format(addDays(new Date(), 30), 'yyyy-MM-dd'),
-        vendor_id: '',
-        accounts_payable_id: '',
-        description: '',
-        items: [{ product_id: '', description: '', quantity: 1, unit_cost: 0, expense_account_id: '' }],
-      });
+    if (isOpen) {
+      if (initialData) {
+        form.reset({
+          bill_date: initialData.bill_date || format(new Date(), 'yyyy-MM-dd'),
+          due_date: initialData.due_date || format(addDays(new Date(), 30), 'yyyy-MM-dd'),
+          vendor_id: initialData.vendor_id || '',
+          accounts_payable_id: initialData.accounts_payable_id || '',
+          description: initialData.description || '',
+          items: initialData.items || [{ product_id: '', description: '', quantity: 1, unit_cost: 0, expense_account_id: '' }],
+        });
+      } else {
+        form.reset({
+          bill_date: format(new Date(), 'yyyy-MM-dd'),
+          due_date: format(addDays(new Date(), 30), 'yyyy-MM-dd'),
+          vendor_id: '',
+          accounts_payable_id: '',
+          description: '',
+          items: [{ product_id: '', description: '', quantity: 1, unit_cost: 0, expense_account_id: '' }],
+        });
+      }
     }
-  }, [isOpen, form]);
+  }, [isOpen, initialData, form]);
 
   const { fields, append, remove } = useFieldArray({ control: form.control, name: "items" });
 
@@ -165,6 +178,7 @@ const BillForm = ({ isOpen, setIsOpen }: BillFormProps) => {
       queryClient.invalidateQueries({ queryKey: ['journal_entries', activeCompany?.id] });
       queryClient.invalidateQueries({ queryKey: ['products', activeCompany?.id] });
       showSuccess('Bill recorded and inventory updated.');
+      if (onSuccess) onSuccess();
       setIsOpen(false);
     },
     onError: (error) => {
