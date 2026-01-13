@@ -22,6 +22,7 @@ import { Calendar } from '../components/ui/calendar';
 import { DateRange } from 'react-day-picker';
 import { Alert, AlertTitle, AlertDescription } from '../components/ui/alert';
 import { Badge } from '../components/ui/badge';
+import SetupChecklist from '../components/SetupChecklist';
 
 type OverdueInvoice = {
   id: string;
@@ -71,31 +72,22 @@ const Dashboard = () => {
     cashFlowForecast = [],
     lowStockItems = [],
     actions = { pendingClaims: 0, draftInvoices: 0, openBills: 0, expiringQuotes: 0 },
-    recentActivity = []
+    recentActivity = [],
+    setupStatus = { isComplete: true }
   } = dashboardData || {};
 
   const calculateTotals = (accList: Account[]) => {
     if (!accList || accList.length === 0) return { assets: 0, liabilities: 0, netIncome: 0, cash: 0 };
-    
     const bankAccountKeywords = ['cash', 'bank', 'checking', 'savings'];
-
     const totals = accList.reduce((acc, account) => {
       const type = account.type.toLowerCase() as keyof typeof acc;
       acc[type] = (acc[type] || 0) + (account.balance || 0);
-
       if (account.type === 'Asset' && bankAccountKeywords.some(keyword => account.name?.toLowerCase().includes(keyword))) {
           acc.cash = (acc.cash || 0) + (account.balance || 0);
       }
-
       return acc;
     }, { asset: 0, liability: 0, equity: 0, income: 0, expense: 0, cash: 0 });
-
-    return { 
-        assets: totals.asset, 
-        liabilities: totals.liability, 
-        netIncome: totals.income - totals.expense,
-        cash: totals.cash
-    };
+    return { assets: totals.asset, liabilities: totals.liability, netIncome: totals.income - totals.expense, cash: totals.cash };
   };
 
   const totals = calculateTotals(accounts);
@@ -134,10 +126,7 @@ const Dashboard = () => {
             <Button
               id="date"
               variant={"outline"}
-              className={cn(
-                "w-[260px] justify-start text-left font-normal",
-                !date && "text-muted-foreground"
-              )}
+              className={cn("w-[260px] justify-start text-left font-normal", !date && "text-muted-foreground")}
             >
               <CalendarIcon className="mr-2 h-4 w-4" />
               {date?.from ? (
@@ -151,6 +140,8 @@ const Dashboard = () => {
         </Popover>
       </header>
       
+      {!isLoading && !setupStatus.isComplete && <SetupChecklist status={setupStatus} />}
+
       {lowStockItems && lowStockItems.length > 0 && (
         <Alert variant="destructive">
           <AlertTriangle className="h-4 w-4" />
