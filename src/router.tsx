@@ -37,6 +37,7 @@ import Quotes from "./pages/Quotes";
 import QuoteDetail from "./pages/QuoteDetail";
 import TaxRates from "./pages/TaxRates";
 import Projects from "./pages/Projects";
+import ProjectDetail from "./pages/ProjectDetail";
 import TimeTracking from "./pages/TimeTracking";
 import RecurringInvoices from "./pages/RecurringInvoices";
 import TaxReport from "./pages/TaxReport";
@@ -82,6 +83,7 @@ export const AppRouter = () => {
         <Route path="/chat" element={<Chat />} />
         <Route path="/tax-rates" element={<TaxRates />} />
         <Route path="/projects" element={<Projects />} />
+        <Route path="/projects/:id" element={<ProjectDetail />} />
         <Route path="/time-tracking" element={<TimeTracking />} />
       </Route>
       {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}

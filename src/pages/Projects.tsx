@@ -22,6 +22,7 @@ import {
 } from "../components/ui/dropdown-menu";
 import { Badge } from '../components/ui/badge';
 import { useAuth } from '../contexts/AuthContext';
+import { useNavigate } from 'react-router-dom';
 
 export type Project = {
   id: string;
@@ -38,6 +39,7 @@ const Projects = () => {
   const [selectedProject, setSelectedProject] = useState<Project | undefined>(undefined);
   const { activeCompany } = useAuth();
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
 
   const { data: projects, isLoading } = useQuery<Project[]>({
     queryKey: ['projects', activeCompany?.id],
@@ -121,21 +123,22 @@ const Projects = () => {
                 </TableRow>
               ) : projects && projects.length > 0 ? (
                 projects.map((project) => (
-                  <TableRow key={project.id}>
+                  <TableRow key={project.id} className="cursor-pointer" onClick={() => navigate(`/projects/${project.id}`)}>
                     <TableCell className="font-medium">{project.name}</TableCell>
                     <TableCell>{project.customers?.name || 'N/A'}</TableCell>
                     <TableCell><Badge variant="outline" className="capitalize">{project.status}</Badge></TableCell>
                     <TableCell>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" className="h-8 w-8 p-0">
+                          <Button variant="ghost" className="h-8 w-8 p-0" onClick={(e) => e.stopPropagation()}>
                             <span className="sr-only">Open menu</span>
                             <MoreHorizontal className="h-4 w-4" />
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => handleEdit(project)}>Edit</DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => handleDelete(project.id)} className="text-red-600">Delete</DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => navigate(`/projects/${project.id}`)}>View Details</DropdownMenuItem>
+                          <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleEdit(project); }}>Edit</DropdownMenuItem>
+                          <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleDelete(project.id); }} className="text-red-600">Delete</DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </TableCell>

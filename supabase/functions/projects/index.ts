@@ -57,6 +57,42 @@ serve(async (req) => {
           .order('created_at', { ascending: false }));
         break;
       
+      case 'GET_DETAILS':
+        // Fetch project info
+        const { data: project, error: projError } = await supabaseAdmin
+          .from('projects')
+          .select('*, customers(id, name, email)')
+          .eq('id', body.projectId)
+          .eq('company_id', company_id)
+          .single();
+        if (projError) throw projError;
+
+        // Fetch timesheets statistics
+        const { data: timesheets, error: timeError } = await supabaseAdmin
+          .from('timesheets')
+          .select('*')
+          .eq('project_id', body.projectId)
+          .order('date', { ascending: false });
+        if (timeError) throw timeError;
+
+        const totalHours = timesheets.reduce((sum, t) => sum + Number(t.hours), 0);
+        const unbilledHours = timesheets.filter(t => !t.is_billed).reduce((sum, t) => sum + Number(t.hours), 0);
+        const billableAmount = totalHours * (project.billable_rate || 0);
+        const unbilledAmount = unbilledHours * (project.billable_rate || 0);
+
+        data = {
+          project,
+          stats: {
+            totalHours,
+            unbilledHours,
+            billableAmount,
+            unbilledAmount,
+            timesheetCount: timesheets.length
+          },
+          timesheets
+        };
+        break;
+
       case 'POST':
         ({ data, error } = await supabaseAdmin
           .from('projects')

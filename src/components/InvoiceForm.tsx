@@ -54,9 +54,10 @@ interface InvoiceFormProps {
   setIsOpen: (isOpen: boolean) => void;
   invoiceId?: string;
   duplicateFromId?: string;
+  initialCustomerId?: string;
 }
 
-const InvoiceForm = ({ isOpen, setIsOpen, invoiceId, duplicateFromId }: InvoiceFormProps) => {
+const InvoiceForm = ({ isOpen, setIsOpen, invoiceId, duplicateFromId, initialCustomerId }: InvoiceFormProps) => {
   const { user, activeCompany } = useAuth();
   const queryClient = useQueryClient();
   const isEditing = !!invoiceId;
@@ -70,12 +71,22 @@ const InvoiceForm = ({ isOpen, setIsOpen, invoiceId, duplicateFromId }: InvoiceF
       invoice_number: '',
       invoice_date: format(new Date(), 'yyyy-MM-dd'),
       due_date: format(addDays(new Date(), 30), 'yyyy-MM-dd'),
+      customer_id: '',
       items: [{ product_id: '', description: '', quantity: 1, unit_price: 0, income_account_id: '', tax_rate_id: '' }],
     },
   });
 
   const watchedValues = form.watch();
   const customerId = form.watch('customer_id');
+
+  // Set initial customer if provided and new invoice
+  useEffect(() => {
+    if (isOpen && !isEditing && !isDuplicating && initialCustomerId) {
+      form.setValue('customer_id', initialCustomerId);
+      // Automatically open the unbilled time dialog if coming from project detail
+      setIsUnbilledTimeOpen(true);
+    }
+  }, [isOpen, isEditing, isDuplicating, initialCustomerId, form]);
 
   // Fetch data if editing OR duplicating
   const sourceId = invoiceId || duplicateFromId;
@@ -163,12 +174,13 @@ const InvoiceForm = ({ isOpen, setIsOpen, invoiceId, duplicateFromId }: InvoiceF
       description: `${entry.projects.name} - ${entry.notes || 'Work performed on ' + format(new Date(entry.date), 'PPP')}`,
       quantity: entry.hours,
       unit_price: entry.projects.billable_rate || 0,
-      income_account_id: '',
+      income_account_id: '', // User will need to select income account or we could default
       tax_rate_id: '',
       timesheet_ids: [entry.id],
     }));
 
     const existingItems = watchedValues.items;
+    // If the only item is empty/default, replace it
     if (existingItems.length === 1 && !existingItems[0].description && existingItems[0].unit_price === 0) {
       replace(newItems);
     } else {
