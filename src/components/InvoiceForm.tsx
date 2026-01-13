@@ -52,12 +52,14 @@ interface InvoiceFormProps {
   isOpen: boolean;
   setIsOpen: (isOpen: boolean) => void;
   invoiceId?: string;
+  duplicateFromId?: string;
 }
 
-const InvoiceForm = ({ isOpen, setIsOpen, invoiceId }: InvoiceFormProps) => {
+const InvoiceForm = ({ isOpen, setIsOpen, invoiceId, duplicateFromId }: InvoiceFormProps) => {
   const { user, activeCompany } = useAuth();
   const queryClient = useQueryClient();
   const isEditing = !!invoiceId;
+  const isDuplicating = !!duplicateFromId;
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const [isUnbilledTimeOpen, setIsUnbilledTimeOpen] = useState(false);
 
@@ -74,50 +76,45 @@ const InvoiceForm = ({ isOpen, setIsOpen, invoiceId }: InvoiceFormProps) => {
   const watchedValues = form.watch();
   const customerId = form.watch('customer_id');
 
-  const { data: invoiceToEdit } = useQuery({
-    queryKey: ['invoice_edit', invoiceId],
+  // Fetch data if editing OR duplicating
+  const sourceId = invoiceId || duplicateFromId;
+  const { data: sourceInvoice } = useQuery({
+    queryKey: ['invoice_source', sourceId],
     queryFn: async () => {
       const { data, error } = await supabase.functions.invoke('invoices', {
-        body: { method: 'GET_ONE', company_id: activeCompany!.id, invoiceId },
+        body: { method: 'GET_ONE', company_id: activeCompany!.id, invoiceId: sourceId },
       });
       if (error) throw error;
       return data;
     },
-    enabled: isEditing && isOpen && !!activeCompany,
+    enabled: !!sourceId && isOpen && !!activeCompany,
   });
 
   useEffect(() => {
-    if (isEditing && invoiceToEdit) {
-      // Map the invoice items from the journal entry format
-      const items = invoiceToEdit.journal_entries?.[0]?.journal_entry_items
+    if (sourceInvoice && isOpen) {
+      const items = sourceInvoice.journal_entries?.[0]?.journal_entry_items
         .filter((item: any) => item.type === 'credit' && !item.chart_of_accounts?.name.toLowerCase().includes('tax'))
         .map((item: any) => ({
-          product_id: '', // We don't track product ID in journal items explicitly in GET_ONE, but in future optimization we could
-          description: item.chart_of_accounts?.name || 'Item', // This is a fallback if description isn't stored per line item in basic journal structure
-          quantity: 1, // Basic journal doesn't store qty/price separately usually, simplifying here or we need enhanced schema
+          product_id: '', 
+          description: item.chart_of_accounts?.name || 'Item', 
+          quantity: 1, 
           unit_price: item.amount,
-          income_account_id: '', // Would need to reverse lookup or store this
+          income_account_id: '', 
           tax_rate_id: item.journal_entry_item_tax_rates?.[0]?.tax_rates?.id || '',
         }));
 
       form.reset({
-        invoice_number: invoiceToEdit.invoice_number,
-        invoice_date: invoiceToEdit.invoice_date,
-        due_date: invoiceToEdit.due_date,
-        customer_id: invoiceToEdit.customers?.id || '', // Need ID, GET_ONE currently returns object. We might need to adjust GET_ONE or use the ID from the parent object if available. 
-        // Note: GET_ONE select includes customers(name, address, email). We need customer_id directly from invoices table.
-        // Adjusting GET_ONE is out of scope for this file, assuming we can get it or user re-selects.
-        // Actually, let's fix the logic below slightly to be robust.
-        accounts_receivable_id: '', // Needs to be inferred from the Debit line of the JE
+        // If duplicating, we will override invoice_number and dates in the next effect
+        invoice_number: isDuplicating ? '' : sourceInvoice.invoice_number,
+        invoice_date: isDuplicating ? format(new Date(), 'yyyy-MM-dd') : sourceInvoice.invoice_date,
+        due_date: isDuplicating ? format(addDays(new Date(), 30), 'yyyy-MM-dd') : sourceInvoice.due_date,
+        customer_id: sourceInvoice.customers?.id || '',
+        description: sourceInvoice.description || '',
+        accounts_receivable_id: '', // Would need inference or manual selection
         items: items || [{ product_id: '', description: '', quantity: 1, unit_price: 0, income_account_id: '', tax_rate_id: '' }],
       });
-      // NOTE: Full edit reconstruction from Journal Entry is complex because JE loses some context (like Qty). 
-      // For now, simple editing of header fields or creating new is safer. 
-      // Real "Edit Invoice" usually requires a dedicated invoice_items table which we are simulating via JSONB -> JE.
-      // Given the schema limitations, editing an existing invoice fully might reset items if not careful.
-      // We will allow editing but user might need to re-enter items if we can't perfectly reconstruct them.
-    } 
-  }, [invoiceToEdit, isEditing, form]);
+    }
+  }, [sourceInvoice, isEditing, isDuplicating, isOpen, form]);
 
   const { data: nextInvoiceNumber } = useQuery({
     queryKey: ['next_invoice_number', activeCompany?.id],
@@ -128,7 +125,7 @@ const InvoiceForm = ({ isOpen, setIsOpen, invoiceId }: InvoiceFormProps) => {
       if (error) throw error;
       return data;
     },
-    enabled: isOpen && !isEditing && !!activeCompany,
+    enabled: isOpen && !isEditing && !!activeCompany, // Fetch for new or duplicate
   });
 
   useEffect(() => {
@@ -194,13 +191,14 @@ const InvoiceForm = ({ isOpen, setIsOpen, invoiceId }: InvoiceFormProps) => {
 
       const payload: any = {
         company_id: activeCompany.id,
-        invoiceData: { ...values, p_items }, // p_items is key for the PUT logic we added
+        invoiceData: { ...values, p_items },
       };
 
       if (isEditing) {
         payload.method = 'PUT';
         payload.invoiceId = invoiceId;
       } else {
+        // Both New and Duplicate use CREATE
         payload.method = 'CREATE_WITH_TIMESHEETS';
         payload.timesheetIds = timesheetIds;
       }
@@ -215,8 +213,6 @@ const InvoiceForm = ({ isOpen, setIsOpen, invoiceId }: InvoiceFormProps) => {
       queryClient.invalidateQueries({ queryKey: ['invoices', activeCompany?.id] });
       queryClient.invalidateQueries({ queryKey: ['journal_entries', activeCompany?.id] });
       queryClient.invalidateQueries({ queryKey: ['products', activeCompany?.id] });
-      queryClient.invalidateQueries({ queryKey: ['unbilled_time', customerId, activeCompany?.id] });
-      // Invalidate specific invoice detail if editing
       if (invoiceId) {
           queryClient.invalidateQueries({ queryKey: ['invoice_detail', invoiceId] });
       }
@@ -238,7 +234,9 @@ const InvoiceForm = ({ isOpen, setIsOpen, invoiceId }: InvoiceFormProps) => {
       <Dialog open={isOpen} onOpenChange={setIsOpen}>
         <DialogContent className="sm:max-w-5xl">
           <DialogHeader>
-            <DialogTitle>{isEditing ? 'Edit Invoice' : 'New Invoice'}</DialogTitle>
+            <DialogTitle>
+                {isEditing ? 'Edit Invoice' : isDuplicating ? 'Duplicate Invoice' : 'New Invoice'}
+            </DialogTitle>
             <DialogDescription>
                 {isEditing 
                     ? "Updating this invoice will regenerate the underlying accounting entries." 
@@ -302,7 +300,7 @@ const InvoiceForm = ({ isOpen, setIsOpen, invoiceId }: InvoiceFormProps) => {
             </form>
           </Form>
         </DialogContent>
-      </Dialog>
+      </Sheet>
       <Sheet open={isPreviewOpen} onOpenChange={setIsPreviewOpen}>
         <SheetContent className="sm:max-w-3xl w-full">
             <SheetHeader>

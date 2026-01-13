@@ -11,7 +11,7 @@ import {
   TableRow,
 } from '../components/ui/table';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/card';
-import { PlusCircle, MoreHorizontal, Search, X } from 'lucide-react';
+import { PlusCircle, MoreHorizontal, Search, X, Copy } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "../components/ui/dropdown-menu";
 import { showError, showSuccess } from '../utils/toast';
 import { Badge } from '../components/ui/badge';
@@ -42,6 +42,7 @@ export type Invoice = {
 const Invoices = () => {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [selectedInvoiceId, setSelectedInvoiceId] = useState<string | undefined>(undefined);
+  const [duplicateFromId, setDuplicateFromId] = useState<string | undefined>(undefined);
   
   // Filter State
   const [searchTerm, setSearchTerm] = useState('');
@@ -92,11 +93,19 @@ const Invoices = () => {
 
   const handleEdit = (id: string) => {
     setSelectedInvoiceId(id);
+    setDuplicateFromId(undefined);
     setIsFormOpen(true);
   };
 
   const handleAddNew = () => {
     setSelectedInvoiceId(undefined);
+    setDuplicateFromId(undefined);
+    setIsFormOpen(true);
+  };
+
+  const handleDuplicate = (id: string) => {
+    setSelectedInvoiceId(undefined);
+    setDuplicateFromId(id);
     setIsFormOpen(true);
   };
 
@@ -228,6 +237,7 @@ const Invoices = () => {
                         <DropdownMenuContent align="end">
                           <DropdownMenuItem onClick={() => navigate(`/invoices/${invoice.id}`)}>View</DropdownMenuItem>
                           <DropdownMenuItem onClick={() => handleEdit(invoice.id)}>Edit</DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleDuplicate(invoice.id)}>Duplicate</DropdownMenuItem>
                           <DropdownMenuItem onClick={() => updateStatusMutation.mutate({ id: invoice.id, status: 'sent' })}>Mark as Sent</DropdownMenuItem>
                           <DropdownMenuItem onClick={() => updateStatusMutation.mutate({ id: invoice.id, status: 'paid' })}>Mark as Paid</DropdownMenuItem>
                           <DropdownMenuItem onClick={() => updateStatusMutation.mutate({ id: invoice.id, status: 'void' })} className="text-red-600">Void</DropdownMenuItem>
@@ -247,6 +257,7 @@ const Invoices = () => {
         isOpen={isFormOpen}
         setIsOpen={setIsFormOpen}
         invoiceId={selectedInvoiceId}
+        duplicateFromId={duplicateFromId}
       />
     </>
   );

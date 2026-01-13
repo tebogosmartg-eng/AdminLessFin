@@ -1,19 +1,23 @@
+import { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/card';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../integrations/supabase/client';
 import { Account } from './ChartOfAccounts';
-import { Landmark, TrendingUp, TrendingDown, Wallet, DollarSign } from 'lucide-react';
+import { Landmark, TrendingUp, TrendingDown, Wallet, DollarSign, Calendar as CalendarIcon } from 'lucide-react';
 import { Skeleton } from '../components/ui/skeleton';
 import IncomeExpenseChart from '../components/IncomeExpenseChart';
 import { Link } from 'react-router-dom';
 import { Button } from '../components/ui/button';
 import QuickActions from '../components/QuickActions';
-import { formatDistanceToNow } from 'date-fns';
-import { formatCurrency } from '../lib/utils';
+import { formatDistanceToNow, startOfMonth, endOfMonth, format } from 'date-fns';
+import { formatCurrency, cn } from '../lib/utils';
 import BudgetStatus from '../components/BudgetStatus';
 import TopExpensesChart from '../components/TopExpensesChart';
 import BankAccountsSummary from '../components/BankAccountsSummary';
+import { Popover, PopoverContent, PopoverTrigger } from '../components/ui/popover';
+import { Calendar } from '../components/ui/calendar';
+import { DateRange } from 'react-day-picker';
 
 type OverdueInvoice = {
   id: string;
@@ -25,13 +29,24 @@ type OverdueInvoice = {
 
 const Dashboard = () => {
   const { user, profile, activeCompany } = useAuth();
+  const [date, setDate] = useState<DateRange | undefined>({
+    from: startOfMonth(new Date()),
+    to: endOfMonth(new Date()),
+  });
+
+  const fromDate = date?.from;
+  const toDate = date?.to;
 
   const { data: dashboardData, isLoading } = useQuery({
-    queryKey: ['dashboardData', activeCompany?.id],
+    queryKey: ['dashboardData', activeCompany?.id, fromDate, toDate],
     queryFn: async () => {
       if (!activeCompany) return null;
       const { data, error } = await supabase.functions.invoke('dashboard-data', {
-        body: { company_id: activeCompany.id },
+        body: { 
+          company_id: activeCompany.id,
+          date_from: fromDate ? format(fromDate, 'yyyy-MM-dd') : undefined,
+          date_to: toDate ? format(toDate, 'yyyy-MM-dd') : undefined,
+        },
       });
       if (error) throw new Error(error.message);
       return data;
@@ -80,15 +95,53 @@ const Dashboard = () => {
     { title: 'Cash Balance', value: totals.cash, icon: DollarSign },
     { title: 'Total Assets', value: totals.assets, icon: Wallet },
     { title: 'Total Liabilities', value: totals.liabilities, icon: Landmark },
-    { title: 'Net Income', value: totals.netIncome, icon: totals.netIncome >= 0 ? TrendingUp : TrendingDown, color: totals.netIncome >= 0 ? 'text-green-600' : 'text-red-600' },
+    { title: 'Net Income (YTD)', value: totals.netIncome, icon: totals.netIncome >= 0 ? TrendingUp : TrendingDown, color: totals.netIncome >= 0 ? 'text-green-600' : 'text-red-600' },
   ];
 
   return (
     <div>
-      <header className="mb-6">
-        <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Dashboard</h1>
-        <p className="text-gray-600 dark:text-gray-400">Welcome back, {profile?.full_name || user?.email}!</p>
+      <header className="mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Dashboard</h1>
+          <p className="text-gray-600 dark:text-gray-400">Welcome back, {profile?.full_name || user?.email}!</p>
+        </div>
+        <Popover>
+          <PopoverTrigger asChild>
+            <Button
+              id="date"
+              variant={"outline"}
+              className={cn(
+                "w-[260px] justify-start text-left font-normal",
+                !date && "text-muted-foreground"
+              )}
+            >
+              <CalendarIcon className="mr-2 h-4 w-4" />
+              {date?.from ? (
+                date.to ? (
+                  <>
+                    {format(date.from, "LLL dd, y")} - {format(date.to, "LLL dd, y")}
+                  </>
+                ) : (
+                  format(date.from, "LLL dd, y")
+                )
+              ) : (
+                <span>Pick a date range</span>
+              )}
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-auto p-0" align="end">
+            <Calendar
+              initialFocus
+              mode="range"
+              defaultMonth={date?.from}
+              selected={date}
+              onSelect={setDate}
+              numberOfMonths={2}
+            />
+          </PopoverContent>
+        </Popover>
       </header>
+      
       <main className="space-y-6">
         <QuickActions />
         
@@ -185,8 +238,12 @@ const Dashboard = () => {
           </Card>
           <Card className="lg:col-span-1">
             <CardHeader>
-              <CardTitle>Top Expenses This Month</CardTitle>
-              <CardDescription>Your biggest spending categories for the current month.</CardDescription>
+              <CardTitle>Top Expenses</CardTitle>
+              <CardDescription>
+                {fromDate && toDate ? (
+                  <>Spending from {format(fromDate, 'MMM d')} to {format(toDate, 'MMM d')}</>
+                ) : 'Top spending categories'}
+              </CardDescription>
             </CardHeader>
             <CardContent>
               {isLoading ? <Skeleton className="h-[300px] w-full" /> : <TopExpensesChart data={topExpenses} />}
@@ -196,8 +253,8 @@ const Dashboard = () => {
 
         <Card>
           <CardHeader>
-            <CardTitle>Financial Overview</CardTitle>
-            <CardDescription>Income vs. Expenses for the last 6 months.</CardDescription>
+            <CardTitle>Income vs Expenses Trend</CardTitle>
+            <CardDescription>6-month trend analysis.</CardDescription>
           </CardHeader>
           <CardContent>
             {isLoading ? <Skeleton className="h-[300px] w-full" /> : monthlySummary && monthlySummary.length > 0 ? <IncomeExpenseChart data={monthlySummary} /> : <p className="text-md text-gray-600 dark:text-gray-400">Not enough data to display a chart.</p>}
