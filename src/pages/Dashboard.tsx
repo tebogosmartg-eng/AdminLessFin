@@ -47,7 +47,7 @@ const Dashboard = () => {
   const fromDate = date?.from;
   const toDate = date?.to;
 
-  const { data: dashboardData, isLoading } = useQuery({
+  const { data: dashboardData, isLoading, error: queryError } = useQuery({
     queryKey: ['dashboardData', activeCompany?.id, fromDate, toDate],
     queryFn: async () => {
       if (!activeCompany) return null;
@@ -62,31 +62,32 @@ const Dashboard = () => {
       return data;
     },
     enabled: !!activeCompany,
+    retry: 1,
   });
 
   const {
-    accounts,
-    monthlySummary,
-    arBalances,
-    apBalances,
-    overdueInvoices,
-    topExpenses,
-    topCustomers,
-    cashFlowForecast,
-    lowStockItems,
+    accounts = [],
+    monthlySummary = [],
+    arBalances = [],
+    apBalances = [],
+    overdueInvoices = [],
+    topExpenses = [],
+    topCustomers = [],
+    cashFlowForecast = [],
+    lowStockItems = [],
   } = dashboardData || {};
 
-  const calculateTotals = (accounts: Account[] | undefined) => {
-    if (!accounts) return { assets: 0, liabilities: 0, netIncome: 0, cash: 0 };
+  const calculateTotals = (accList: Account[]) => {
+    if (!accList || accList.length === 0) return { assets: 0, liabilities: 0, netIncome: 0, cash: 0 };
     
     const bankAccountKeywords = ['cash', 'bank', 'checking', 'savings'];
 
-    const totals = accounts.reduce((acc, account) => {
+    const totals = accList.reduce((acc, account) => {
       const type = account.type.toLowerCase() as keyof typeof acc;
-      acc[type] = (acc[type] || 0) + account.balance;
+      acc[type] = (acc[type] || 0) + (account.balance || 0);
 
-      if (account.type === 'Asset' && bankAccountKeywords.some(keyword => account.name.toLowerCase().includes(keyword))) {
-          acc.cash = (acc.cash || 0) + account.balance;
+      if (account.type === 'Asset' && bankAccountKeywords.some(keyword => account.name?.toLowerCase().includes(keyword))) {
+          acc.cash = (acc.cash || 0) + (account.balance || 0);
       }
 
       return acc;
@@ -110,6 +111,19 @@ const Dashboard = () => {
     { title: 'Total Liabilities', value: totals.liabilities, icon: Landmark, link: '/financial-statements' },
     { title: 'Net Income (YTD)', value: totals.netIncome, icon: totals.netIncome >= 0 ? TrendingUp : TrendingDown, color: totals.netIncome >= 0 ? 'text-green-600' : 'text-red-600', link: '/reports' },
   ];
+
+  if (queryError) {
+    return (
+        <div className="p-6">
+            <Alert variant="destructive">
+                <AlertTriangle className="h-4 w-4" />
+                <AlertTitle>Error loading dashboard</AlertTitle>
+                <AlertDescription>We couldn't load your financial summary. This often happens if your Chart of Accounts hasn't been initialized yet. {queryError.message}</AlertDescription>
+            </Alert>
+            <Button className="mt-4" onClick={() => window.location.reload()}>Try Again</Button>
+        </div>
+    );
+  }
 
   return (
     <div>
