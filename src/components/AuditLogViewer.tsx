@@ -43,7 +43,8 @@ const AuditLogViewer = () => {
     'invoices', 'bills', 'quotes', 'purchase_orders', 'credit_notes', 'vendor_credits',
     'journal_entries', 'products', 'customers', 'vendors', 'employees',
     'fixed_assets', 'loans', 'expense_claims', 'tax_rates', 'chart_of_accounts', 'projects',
-    'companies', 'company_users', 'recurring_invoices', 'recurring_bills'
+    'companies', 'company_users', 'recurring_invoices', 'recurring_bills',
+    'inventory_transactions', 'payroll_runs', 'payslips'
   ].sort();
 
   return (
