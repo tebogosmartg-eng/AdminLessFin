@@ -7,8 +7,6 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-// ARCHITECTURE NOTE:
-// This function acts as a secure API gateway for bill-related journal entries.
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders })
@@ -52,18 +50,60 @@ serve(async (req) => {
 
     switch (method) {
       case 'GET':
-        ({ data, error } = await supabaseAdmin
-          .from('journal_entries')
+        let query = supabaseAdmin
+          .from('bills')
           .select(`
             id,
-            entry_date,
-            description,
-            vendors ( name ),
-            journal_entry_items ( type, amount )
+            bill_date,
+            due_date,
+            status,
+            description:journal_entries(description),
+            bill_number,
+            vendors!inner ( name ),
+            journal_entries (
+              id,
+              entry_date,
+              journal_entry_items ( type, amount )
+            )
           `)
           .eq('company_id', company_id)
-          .not('vendor_id', 'is', null)
-          .order('entry_date', { ascending: false }));
+          .order('bill_date', { ascending: false });
+
+        if (body.filters) {
+          const { status, date_from, date_to, search, vendor_id } = body.filters;
+          
+          if (status && status !== 'all') {
+            query = query.eq('status', status);
+          }
+          if (date_from) {
+            query = query.gte('bill_date', date_from);
+          }
+          if (date_to) {
+            query = query.lte('bill_date', date_to);
+          }
+          if (vendor_id && vendor_id !== 'all') {
+            query = query.eq('vendor_id', vendor_id);
+          }
+          if (search) {
+            query = query.ilike('bill_number', `%${search}%`);
+          }
+        }
+
+        ({ data, error } = await query);
+        
+        // Data transformation for frontend consistency
+        if (data) {
+          data = data.map(bill => ({
+            id: bill.id,
+            entry_date: bill.bill_date,
+            description: bill.description?.description || `Bill from ${bill.vendors?.name}`,
+            status: bill.status,
+            vendor_id: bill.vendor_id,
+            vendors: [bill.vendors], // Wrap in array to match previous structure expected by frontend
+            bill_number: bill.bill_number,
+            journal_entry_items: bill.journal_entries?.journal_entry_items
+          }));
+        }
         break;
       
       case 'POST':
@@ -81,7 +121,7 @@ serve(async (req) => {
 
       case 'DELETE':
         ({ data, error } = await supabaseAdmin
-          .from('journal_entries')
+          .from('bills')
           .delete()
           .eq('id', body.billId)
           .eq('company_id', company_id));

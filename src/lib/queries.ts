@@ -37,11 +37,11 @@ export const accountsQuery = (companyId: string) => ({
   },
 });
 
-export const invoicesQuery = (companyId: string) => ({
-  queryKey: ['invoices', companyId],
+export const invoicesQuery = (companyId: string, filters?: any) => ({
+  queryKey: ['invoices', companyId, filters],
   queryFn: async () => {
     const { data, error } = await supabase.functions.invoke('invoices', {
-      body: { method: 'GET_ALL', company_id: companyId },
+      body: { method: 'GET_ALL', company_id: companyId, filters },
     });
     if (error) throw new Error(error.message);
     return data;
@@ -70,19 +70,19 @@ export const quotesQuery = (companyId: string) => ({
   },
 });
 
-export const billsQuery = (companyId: string) => ({
-  queryKey: ['bills', companyId],
+export const billsQuery = (companyId: string, filters?: any) => ({
+  queryKey: ['bills', companyId, filters],
   queryFn: async () => {
     const { data, error } = await supabase.functions.invoke('bills', {
-      body: { method: 'GET', company_id: companyId },
+      body: { method: 'GET', company_id: companyId, filters },
     });
     if (error) throw new Error(error.message);
     if (!data) return [];
     return data.map((entry: any) => ({
       ...entry,
       total: entry.journal_entry_items
-        .filter((item: any) => item.type === 'credit')
-        .reduce((sum: number, item: any) => sum + item.amount, 0),
+        ?.filter((item: any) => item.type === 'credit')
+        .reduce((sum: number, item: any) => sum + item.amount, 0) || 0,
     }));
   },
 });

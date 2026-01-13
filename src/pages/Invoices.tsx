@@ -11,7 +11,7 @@ import {
   TableRow,
 } from '../components/ui/table';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/card';
-import { PlusCircle, MoreHorizontal } from 'lucide-react';
+import { PlusCircle, MoreHorizontal, Search, X } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "../components/ui/dropdown-menu";
 import { showError, showSuccess } from '../utils/toast';
 import { Badge } from '../components/ui/badge';
@@ -19,7 +19,10 @@ import { useNavigate } from 'react-router-dom';
 import InvoiceForm from '../components/InvoiceForm';
 import { formatCurrency } from '../lib/utils';
 import { useAuth } from '../contexts/AuthContext';
-import { invoicesQuery } from '../lib/queries';
+import { invoicesQuery, customersQuery } from '../lib/queries';
+import { Input } from '../components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
+import { Customer } from './Customers';
 
 export type Invoice = {
   id: string;
@@ -39,12 +42,31 @@ export type Invoice = {
 const Invoices = () => {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [selectedInvoiceId, setSelectedInvoiceId] = useState<string | undefined>(undefined);
+  
+  // Filter State
+  const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [customerFilter, setCustomerFilter] = useState('all');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
+
   const { activeCompany } = useAuth();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
 
   const { data: invoices, isLoading } = useQuery<Invoice[]>({
-    ...invoicesQuery(activeCompany?.id!),
+    ...invoicesQuery(activeCompany?.id!, {
+      search: searchTerm,
+      status: statusFilter,
+      customer_id: customerFilter,
+      date_from: dateFrom || null,
+      date_to: dateTo || null,
+    }),
+    enabled: !!activeCompany,
+  });
+
+  const { data: customers } = useQuery<Customer[]>({
+    ...customersQuery(activeCompany?.id!),
     enabled: !!activeCompany,
   });
 
@@ -94,6 +116,14 @@ const Invoices = () => {
     }
   };
 
+  const clearFilters = () => {
+    setSearchTerm('');
+    setStatusFilter('all');
+    setCustomerFilter('all');
+    setDateFrom('');
+    setDateTo('');
+  };
+
   return (
     <>
       <Card>
@@ -107,6 +137,62 @@ const Invoices = () => {
               <PlusCircle className="mr-2 h-4 w-4" />
               New Invoice
             </Button>
+          </div>
+          
+          <div className="flex flex-wrap gap-4 pt-4">
+            <div className="relative w-full md:w-64">
+              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Input
+                type="search"
+                placeholder="Search Invoice #"
+                className="pl-8"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+            </div>
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger className="w-[150px]">
+                <SelectValue placeholder="Status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Statuses</SelectItem>
+                <SelectItem value="draft">Draft</SelectItem>
+                <SelectItem value="sent">Sent</SelectItem>
+                <SelectItem value="partial">Partial</SelectItem>
+                <SelectItem value="paid">Paid</SelectItem>
+                <SelectItem value="void">Void</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={customerFilter} onValueChange={setCustomerFilter}>
+              <SelectTrigger className="w-[180px]">
+                <SelectValue placeholder="Customer" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Customers</SelectItem>
+                {customers?.map(c => (
+                  <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Input 
+              type="date" 
+              className="w-[150px]" 
+              value={dateFrom} 
+              onChange={(e) => setDateFrom(e.target.value)} 
+              placeholder="From Date"
+            />
+            <Input 
+              type="date" 
+              className="w-[150px]" 
+              value={dateTo} 
+              onChange={(e) => setDateTo(e.target.value)} 
+              placeholder="To Date"
+            />
+            {(searchTerm || statusFilter !== 'all' || customerFilter !== 'all' || dateFrom || dateTo) && (
+              <Button variant="ghost" onClick={clearFilters} className="px-2">
+                <X className="h-4 w-4 mr-1" /> Clear
+              </Button>
+            )}
           </div>
         </CardHeader>
         <CardContent>
@@ -151,7 +237,7 @@ const Invoices = () => {
                   </TableRow>
                 ))
               ) : (
-                <TableRow><TableCell colSpan={7} className="text-center">No invoices found. Create one to get started.</TableCell></TableRow>
+                <TableRow><TableCell colSpan={7} className="text-center">No invoices found matching your filters.</TableCell></TableRow>
               )}
             </TableBody>
           </Table>

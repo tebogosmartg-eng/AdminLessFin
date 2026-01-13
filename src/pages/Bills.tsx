@@ -11,7 +11,7 @@ import {
   TableRow,
 } from '../components/ui/table';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/card';
-import { PlusCircle, MoreHorizontal } from 'lucide-react';
+import { PlusCircle, MoreHorizontal, Search, X } from 'lucide-react';
 import BillForm from '../components/BillForm';
 import JournalEntryDetail from '../components/JournalEntryDetail';
 import JournalEntryForm from '../components/JournalEntryForm';
@@ -20,8 +20,11 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { showError, showSuccess } from '../utils/toast';
 import { useAuth } from '../contexts/AuthContext';
 import { formatCurrency } from '../lib/utils';
-import { billsQuery } from '../lib/queries';
+import { billsQuery, vendorsQuery } from '../lib/queries';
 import { Badge } from '../components/ui/badge';
+import { Input } from '../components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
+import { Vendor } from './Vendors';
 
 type BillEntry = {
   id: string;
@@ -31,6 +34,7 @@ type BillEntry = {
   vendor_id: string;
   vendors: { name: string }[] | null;
   total: number;
+  bill_number: string | null;
 };
 
 const Bills = () => {
@@ -43,11 +47,29 @@ const Bills = () => {
   const [isPaymentFormOpen, setIsPaymentFormOpen] = useState(false);
   const [selectedBillForPayment, setSelectedBillForPayment] = useState<BillEntry | null>(null);
 
+  // Filter State
+  const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [vendorFilter, setVendorFilter] = useState('all');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
+
   const { activeCompany } = useAuth();
   const queryClient = useQueryClient();
 
   const { data: bills, isLoading } = useQuery<BillEntry[]>({
-    ...billsQuery(activeCompany?.id!),
+    ...billsQuery(activeCompany?.id!, {
+      search: searchTerm,
+      status: statusFilter,
+      vendor_id: vendorFilter,
+      date_from: dateFrom || null,
+      date_to: dateTo || null,
+    }),
+    enabled: !!activeCompany,
+  });
+
+  const { data: vendors } = useQuery<Vendor[]>({
+    ...vendorsQuery(activeCompany?.id!),
     enabled: !!activeCompany,
   });
 
@@ -88,6 +110,14 @@ const Bills = () => {
     setIsPaymentFormOpen(true);
   };
 
+  const clearFilters = () => {
+    setSearchTerm('');
+    setStatusFilter('all');
+    setVendorFilter('all');
+    setDateFrom('');
+    setDateTo('');
+  };
+
   return (
     <>
       <Card>
@@ -101,6 +131,59 @@ const Bills = () => {
               <PlusCircle className="mr-2 h-4 w-4" />
               Record New Bill
             </Button>
+          </div>
+
+          <div className="flex flex-wrap gap-4 pt-4">
+            <div className="relative w-full md:w-64">
+              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Input
+                type="search"
+                placeholder="Search Bill #"
+                className="pl-8"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+            </div>
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger className="w-[150px]">
+                <SelectValue placeholder="Status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Statuses</SelectItem>
+                <SelectItem value="open">Open</SelectItem>
+                <SelectItem value="paid">Paid</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={vendorFilter} onValueChange={setVendorFilter}>
+              <SelectTrigger className="w-[180px]">
+                <SelectValue placeholder="Vendor" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Vendors</SelectItem>
+                {vendors?.map(v => (
+                  <SelectItem key={v.id} value={v.id}>{v.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Input 
+              type="date" 
+              className="w-[150px]" 
+              value={dateFrom} 
+              onChange={(e) => setDateFrom(e.target.value)} 
+              placeholder="From Date"
+            />
+            <Input 
+              type="date" 
+              className="w-[150px]" 
+              value={dateTo} 
+              onChange={(e) => setDateTo(e.target.value)} 
+              placeholder="To Date"
+            />
+            {(searchTerm || statusFilter !== 'all' || vendorFilter !== 'all' || dateFrom || dateTo) && (
+              <Button variant="ghost" onClick={clearFilters} className="px-2">
+                <X className="h-4 w-4 mr-1" /> Clear
+              </Button>
+            )}
           </div>
         </CardHeader>
         <CardContent>
@@ -152,7 +235,7 @@ const Bills = () => {
                 ))
               ) : (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center">No bills recorded yet. Add one to get started.</TableCell>
+                  <TableCell colSpan={6} className="text-center">No bills found matching your filters.</TableCell>
                 </TableRow>
               )}
             </TableBody>

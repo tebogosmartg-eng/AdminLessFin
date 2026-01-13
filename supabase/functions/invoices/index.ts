@@ -56,7 +56,7 @@ serve(async (req) => {
 
     switch (method) {
       case 'GET_ALL':
-        ({ data, error } = await supabaseAdmin
+        let query = supabaseAdmin
           .from('invoices')
           .select(`
             id,
@@ -64,7 +64,7 @@ serve(async (req) => {
             invoice_date,
             due_date,
             status,
-            customers ( name ),
+            customers!inner ( name ),
             journal_entries (
               journal_entry_items (
                 type,
@@ -73,7 +73,34 @@ serve(async (req) => {
             )
           `)
           .eq('company_id', company_id)
-          .order('invoice_date', { ascending: false }));
+          .order('invoice_date', { ascending: false });
+
+        if (body.filters) {
+          const { status, date_from, date_to, search, customer_id } = body.filters;
+          
+          if (status && status !== 'all') {
+            query = query.eq('status', status);
+          }
+          if (date_from) {
+            query = query.gte('invoice_date', date_from);
+          }
+          if (date_to) {
+            query = query.lte('invoice_date', date_to);
+          }
+          if (customer_id && customer_id !== 'all') {
+            query = query.eq('customer_id', customer_id);
+          }
+          if (search) {
+            // Search by invoice number OR customer name (via joined table filter)
+            // Supabase postgrest filter for OR across tables is tricky. 
+            // Simplified: Search invoice_number OR filter by customer name if possible.
+            // For now, sticking to invoice_number or exact customer match logic.
+            // Let's assume search is mainly for invoice number for simplicity in this standard query structure.
+            query = query.ilike('invoice_number', `%${search}%`);
+          }
+        }
+
+        ({ data, error } = await query);
         break;
       
       case 'GET_ONE':
