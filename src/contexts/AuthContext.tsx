@@ -17,6 +17,7 @@ type Company = {
   name: string;
   owner_id: string;
   address: string | null;
+  logo_url: string | null;
 };
 
 type AuthContextType = {

@@ -27,9 +27,9 @@ const InvoicePreview = ({ formData, customers, company, taxRates }) => {
       <Card className="shadow-none border-none">
         <CardHeader className="grid grid-cols-2 gap-4">
           <div>
-            <img src="/logo.png" alt="SmaAcc Logo" className="h-12 w-auto mb-2" />
+            <img src={company?.logo_url || "/logo.png"} alt="Company Logo" className="h-12 w-auto mb-2 object-contain" />
             <CardTitle className="text-base">{company?.name || 'Your Company'}</CardTitle>
-            <p className="text-sm text-muted-foreground">{company?.address || 'Your Company Address'}</p>
+            <p className="text-sm text-muted-foreground whitespace-pre-wrap">{company?.address || 'Your Company Address'}</p>
           </div>
           <div className="text-right">
             <p className="text-3xl font-bold tracking-tight">INVOICE</p>
@@ -41,7 +41,7 @@ const InvoicePreview = ({ formData, customers, company, taxRates }) => {
             <div>
               <h3 className="font-semibold mb-1">Bill To:</h3>
               <p>{customer?.name || 'Select a customer'}</p>
-              <p>{customer?.address}</p>
+              <p className="whitespace-pre-wrap">{customer?.address}</p>
               <p>{customer?.email}</p>
             </div>
             <div className="text-right">

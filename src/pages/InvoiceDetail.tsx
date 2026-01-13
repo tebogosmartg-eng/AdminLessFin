@@ -161,9 +161,9 @@ const InvoiceDetail = () => {
         <Card className={`print:shadow-none print:border-none ${invoice.status === 'void' ? 'opacity-50' : ''}`}>
           <CardHeader className="grid grid-cols-2 gap-4">
             <div>
-              <img src="/logo.png" alt="SmaAcc Logo" className="h-12 w-auto mb-2" />
+              <img src={activeCompany?.logo_url || "/logo.png"} alt="Company Logo" className="h-12 w-auto mb-2 object-contain" />
               <CardTitle className="text-base">{activeCompany?.name || 'Your Company'}</CardTitle>
-              <p className="text-sm text-muted-foreground">{activeCompany?.address || 'Your Company Address'}</p>
+              <p className="text-sm text-muted-foreground whitespace-pre-wrap">{activeCompany?.address || 'Your Company Address'}</p>
             </div>
             <div className="text-right">
               <p className="text-3xl font-bold tracking-tight">INVOICE</p>
@@ -175,7 +175,7 @@ const InvoiceDetail = () => {
               <div>
                 <h3 className="font-semibold mb-1">Bill To:</h3>
                 <p>{invoice.customers?.name}</p>
-                <p>{invoice.customers?.address}</p>
+                <p className="whitespace-pre-wrap">{invoice.customers?.address}</p>
                 <p>{invoice.customers?.email}</p>
               </div>
               <div className="text-right">

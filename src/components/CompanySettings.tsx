@@ -10,9 +10,9 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { Input } from './ui/input';
 import { Textarea } from './ui/textarea';
 import { showError, showSuccess } from '../utils/toast';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from './ui/alert-dialog';
-import { AlertCircle } from 'lucide-react';
+import { AlertCircle, Upload, X } from 'lucide-react';
 
 const companySchema = z.object({
   name: z.string().min(1, 'Company name is required.'),
@@ -22,6 +22,8 @@ type CompanyFormValues = z.infer<typeof companySchema>;
 
 const CompanySettings = () => {
   const { user, activeCompany, refreshProfile } = useAuth();
+  const [logoFile, setLogoFile] = useState<File | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
 
   const form = useForm<CompanyFormValues>({
     resolver: zodResolver(companySchema),
@@ -34,17 +36,50 @@ const CompanySettings = () => {
         name: activeCompany.name || '',
         address: activeCompany.address || '',
       });
+      setPreviewUrl(activeCompany.logo_url || null);
     }
   }, [activeCompany, form]);
+
+  const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setLogoFile(file);
+      setPreviewUrl(URL.createObjectURL(file));
+    }
+  };
 
   const updateMutation = useMutation({
     mutationFn: async (values: CompanyFormValues) => {
       if (!user || !activeCompany) throw new Error('User not authenticated or no active company');
+      
+      let logoUrl = activeCompany.logo_url;
+
+      if (logoFile) {
+        const fileExt = logoFile.name.split('.').pop();
+        const fileName = `logo-${Date.now()}.${fileExt}`;
+        const filePath = `${activeCompany.id}/${fileName}`;
+        
+        // Remove old logo if exists (optional cleanup)
+        
+        const { error: uploadError } = await supabase.storage
+          .from('attachments') // Re-using attachments bucket for simplicity
+          .upload(filePath, logoFile, { upsert: true });
+          
+        if (uploadError) throw new Error(`Logo Upload Error: ${uploadError.message}`);
+        
+        const { data: urlData } = supabase.storage.from('attachments').getPublicUrl(filePath);
+        logoUrl = urlData.publicUrl;
+      }
+
       const { error } = await supabase.functions.invoke('settings', {
         body: {
           method: 'UPDATE_COMPANY',
           company_id: activeCompany.id,
-          companyData: { name: values.name, address: values.address || null },
+          companyData: { 
+            name: values.name, 
+            address: values.address || null,
+            logo_url: logoUrl 
+          },
         },
       });
       if (error) throw error;
@@ -52,6 +87,7 @@ const CompanySettings = () => {
     onSuccess: async () => {
       await refreshProfile();
       showSuccess('Company information updated successfully.');
+      setLogoFile(null);
     },
     onError: (error: any) => {
       showError(`Error updating company information: ${error.message}`);
@@ -86,11 +122,44 @@ const CompanySettings = () => {
       <Card>
         <CardHeader>
           <CardTitle>Company Information</CardTitle>
-          <CardDescription>This will appear on your invoices.</CardDescription>
+          <CardDescription>This information and logo will appear on your invoices.</CardDescription>
         </CardHeader>
         <CardContent>
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 max-w-md">
+              <div className="space-y-2">
+                <FormLabel>Company Logo</FormLabel>
+                <div className="flex items-center gap-4">
+                  {previewUrl ? (
+                    <div className="relative border rounded-md p-1 h-20 w-20 flex items-center justify-center bg-gray-50">
+                      <img src={previewUrl} alt="Logo Preview" className="max-h-full max-w-full object-contain" />
+                      <Button 
+                        type="button" 
+                        variant="destructive" 
+                        size="icon" 
+                        className="absolute -top-2 -right-2 h-6 w-6 rounded-full"
+                        onClick={() => { setLogoFile(null); setPreviewUrl(null); }}
+                      >
+                        <X className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="h-20 w-20 border-2 border-dashed rounded-md flex items-center justify-center text-muted-foreground bg-gray-50">
+                      <Upload className="h-6 w-6" />
+                    </div>
+                  )}
+                  <div className="flex-1">
+                    <Input 
+                      type="file" 
+                      accept="image/*" 
+                      onChange={handleLogoChange}
+                      className="cursor-pointer"
+                    />
+                    <p className="text-xs text-muted-foreground mt-1">Recommended size: 200x200px (PNG or JPG)</p>
+                  </div>
+                </div>
+              </div>
+
               <FormField
                 control={form.control}
                 name="name"
