@@ -118,6 +118,17 @@ serve(async (req) => {
           .eq('id', body.id)
           .eq('company_id', company_id));
         break;
+        
+      case 'ALLOCATE':
+        const { creditNoteId, invoiceId, amount, arAccountId } = body;
+        ({ data, error } = await supabaseAdmin.rpc('allocate_credit_note', {
+            p_company_id: company_id,
+            p_credit_note_id: creditNoteId,
+            p_invoice_id: invoiceId,
+            p_amount: amount,
+            p_ar_account_id: arAccountId
+        }));
+        break;
 
       default:
         throw new Error(`Unsupported method: ${method}`);
