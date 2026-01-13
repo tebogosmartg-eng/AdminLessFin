@@ -106,40 +106,8 @@ serve(async (req) => {
         }
         break;
       
-      case 'GET_ONE':
-        ({ data, error } = await supabaseAdmin
-          .from('bills')
-          .select(`
-            id,
-            bill_number,
-            bill_date,
-            due_date,
-            status,
-            vendor_id,
-            vendors ( name, email, address, phone ),
-            journal_entries (
-              id,
-              description,
-              attachment_url,
-              journal_entry_items (
-                id,
-                amount,
-                type,
-                project_id,
-                chart_of_accounts ( name ),
-                journal_entry_item_tax_rates (
-                  tax_rates ( rate )
-                )
-              )
-            )
-          `)
-          .eq('id', body.billId)
-          .eq('company_id', company_id)
-          .single());
-        break;
-
       case 'POST':
-        const { p_items, attachment_url, ...billData } = body.billData;
+        const { p_items, ...billData } = body.billData;
         
         const itemsWithProjectAndTax = p_items.map(item => ({
             product_id: item.product_id,
@@ -150,7 +118,7 @@ serve(async (req) => {
             project_id: item.project_id || null
         }));
 
-        const { data: newBillId, error: rpcError } = await supabaseAdmin.rpc('record_bill_with_taxes', {
+        ({ data, error } = await supabaseAdmin.rpc('record_bill_with_taxes', {
           p_company_id: company_id,
           p_vendor_id: billData.vendor_id,
           p_bill_date: billData.bill_date,
@@ -160,19 +128,7 @@ serve(async (req) => {
           p_tax_receivable_account_id: billData.tax_receivable_account_id || null,
           p_description: billData.description,
           p_items: itemsWithProjectAndTax,
-        });
-
-        if (rpcError) throw rpcError;
-
-        // If attachment URL provided, update the journal entry
-        if (attachment_url && newBillId) {
-            const { data: bill } = await supabaseAdmin.from('bills').select('journal_entry_id').eq('id', newBillId).single();
-            if (bill && bill.journal_entry_id) {
-                await supabaseAdmin.from('journal_entries').update({ attachment_url }).eq('id', bill.journal_entry_id);
-            }
-        }
-
-        data = { id: newBillId };
+        }));
         break;
 
       case 'DELETE':

@@ -52,7 +52,6 @@ import VendorCredits from "./pages/VendorCredits";
 import ProjectProfitabilityReport from "./pages/ProjectProfitabilityReport";
 import ExpenseClaims from "./pages/ExpenseClaims";
 import InventoryValuation from "./pages/InventoryValuation";
-import BillDetail from "./pages/BillDetail";
 
 export const AppRouter = () => {
   return (
@@ -69,7 +68,6 @@ export const AppRouter = () => {
         <Route path="/credit-notes" element={<CreditNotes />} />
         <Route path="/recurring-invoices" element={<RecurringInvoices />} />
         <Route path="/bills" element={<Bills />} />
-        <Route path="/bills/:id" element={<BillDetail />} />
         <Route path="/pay-bills" element={<PayBills />} />
         <Route path="/recurring-bills" element={<RecurringBills />} />
         <Route path="/purchase-orders" element={<PurchaseOrders />} />
