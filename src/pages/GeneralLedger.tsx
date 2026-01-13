@@ -6,8 +6,10 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '.
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { Skeleton } from '../components/ui/skeleton';
 import { Account } from './ChartOfAccounts';
-import { formatCurrency } from '../lib/utils';
+import { formatCurrency, downloadCSV } from '../lib/utils';
 import { useAuth } from '../contexts/AuthContext';
+import { Button } from '../components/ui/button';
+import { Download } from 'lucide-react';
 
 type LedgerEntry = {
   entry_date: string;
@@ -82,6 +84,19 @@ const GeneralLedger = () => {
 
   const entriesWithBalance = calculateRunningBalance();
 
+  const handleExport = () => {
+    if (!entriesWithBalance || !selectedAccount) return;
+    const data = entriesWithBalance.map(e => ({
+      Date: new Date(e.entry_date).toLocaleDateString(),
+      Description: e.description,
+      Ref: e.journal_entry_id.substring(0, 8),
+      Debit: e.type === 'debit' ? e.amount.toFixed(2) : '',
+      Credit: e.type === 'credit' ? e.amount.toFixed(2) : '',
+      Balance: e.runningBalance.toFixed(2),
+    }));
+    downloadCSV(data, `${selectedAccount.name.replace(/\s+/g, '_')}_ledger.csv`);
+  };
+
   return (
     <div className="space-y-6">
       <h1 className="text-3xl font-bold">General Ledger</h1>
@@ -108,9 +123,14 @@ const GeneralLedger = () => {
 
       {selectedAccountId && (
         <Card>
-          <CardHeader>
-            <CardTitle>{selectedAccount?.account_number} - {selectedAccount?.name || 'Ledger'}</CardTitle>
-            <CardDescription>Transaction details and running balance.</CardDescription>
+          <CardHeader className="flex flex-row items-center justify-between">
+            <div>
+              <CardTitle>{selectedAccount?.account_number} - {selectedAccount?.name || 'Ledger'}</CardTitle>
+              <CardDescription>Transaction details and running balance.</CardDescription>
+            </div>
+            <Button variant="outline" size="sm" onClick={handleExport} disabled={entriesWithBalance.length === 0}>
+              <Download className="mr-2 h-4 w-4" /> Export CSV
+            </Button>
           </CardHeader>
           <CardContent>
             <Table>

@@ -1,7 +1,7 @@
 // @ts-nocheck
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0'
-import { format, addDays, isSameDay, parseISO } from "https://esm.sh/date-fns@3.6.0";
+import { format, addDays } from "https://esm.sh/date-fns@3.6.0";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -95,7 +95,17 @@ serve(async (req) => {
         .eq('company_id', company_id)
         .gte('entry_date', startDateStr)
         .lte('entry_date', asOfDateStr)
-        .not('customer_id', 'is', null)
+        .not('customer_id', 'is', null),
+
+      // Low Stock Items
+      supabaseAdmin
+        .from('products')
+        .select('id, name, quantity_on_hand')
+        .eq('company_id', company_id)
+        .eq('type', 'inventory')
+        .lte('quantity_on_hand', 5)
+        .order('quantity_on_hand', { ascending: true })
+        .limit(5)
     ];
 
     const [
@@ -107,7 +117,8 @@ serve(async (req) => {
       topExpensesRes,
       futureInvoicesRes,
       futureBillsRes,
-      revenueRes
+      revenueRes,
+      lowStockRes
     ] = await Promise.all(promises);
 
     // Error Handling
@@ -120,11 +131,9 @@ serve(async (req) => {
     if (futureInvoicesRes.error) throw futureInvoicesRes.error;
     if (futureBillsRes.error) throw futureBillsRes.error;
     if (revenueRes.error) throw revenueRes.error;
+    if (lowStockRes.error) throw lowStockRes.error;
 
     // --- 1. Top Customers Calculation ---
-    // Filter journal items to only include Income accounts (credit)
-    // Note: We need to know which accounts are Income. 
-    // We can infer from accountsRes which contains account types.
     const incomeAccountIds = new Set(
       accountsRes.data.filter((a: any) => a.type === 'Income').map((a: any) => a.id)
     );
@@ -149,7 +158,6 @@ serve(async (req) => {
 
 
     // --- 2. Cash Flow Forecast Calculation ---
-    // Calculate current cash position
     const bankKeywords = ['cash', 'bank', 'checking', 'savings'];
     let currentCash = accountsRes.data
       .filter((a: any) => a.type === 'Asset' && bankKeywords.some(k => a.name.toLowerCase().includes(k)))
@@ -158,42 +166,29 @@ serve(async (req) => {
     const forecast = [];
     const today = new Date();
     let runningBalance = currentCash;
-    
-    // Create a 30-day forecast map
     const changesByDate: Record<string, number> = {};
     
-    // Add today's starting point
     forecast.push({ date: format(today, 'yyyy-MM-dd'), balance: runningBalance, type: 'actual' });
 
-    // Process Inflows (Invoices)
     futureInvoicesRes.data.forEach((inv: any) => {
       const amount = inv.journal_entries?.journal_entry_items
-        .filter((i: any) => i.type === 'debit') // A/R Debit amount represents invoice total
+        .filter((i: any) => i.type === 'debit') 
         .reduce((sum: number, i: any) => sum + i.amount, 0) || 0;
-      
-      const dateKey = inv.due_date;
-      changesByDate[dateKey] = (changesByDate[dateKey] || 0) + amount;
+      changesByDate[inv.due_date] = (changesByDate[inv.due_date] || 0) + amount;
     });
 
-    // Process Outflows (Bills)
     futureBillsRes.data.forEach((bill: any) => {
       const amount = bill.journal_entries?.journal_entry_items
-        .filter((i: any) => i.type === 'credit') // A/P Credit amount represents bill total
+        .filter((i: any) => i.type === 'credit')
         .reduce((sum: number, i: any) => sum + i.amount, 0) || 0;
-        
-      const dateKey = bill.due_date;
-      changesByDate[dateKey] = (changesByDate[dateKey] || 0) - amount;
+      changesByDate[bill.due_date] = (changesByDate[bill.due_date] || 0) - amount;
     });
 
-    // Generate daily points for the next 30 days
     for (let i = 1; i <= 30; i++) {
       const d = addDays(today, i);
       const dateStr = format(d, 'yyyy-MM-dd');
       const dailyChange = changesByDate[dateStr] || 0;
       runningBalance += dailyChange;
-      
-      // Only push if there's a change or it's a significant interval (e.g., every 5 days) to keep chart clean
-      // Or push every day for a smooth line
       forecast.push({ date: dateStr, balance: runningBalance, type: 'projected' });
     }
 
@@ -206,6 +201,7 @@ serve(async (req) => {
       topExpenses: topExpensesRes.data,
       topCustomers: topCustomers,
       cashFlowForecast: forecast,
+      lowStockItems: lowStockRes.data,
     };
 
     return new Response(JSON.stringify(responseData), {

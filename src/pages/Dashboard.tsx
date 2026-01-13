@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../co
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../integrations/supabase/client';
 import { Account } from './ChartOfAccounts';
-import { Landmark, TrendingUp, TrendingDown, Wallet, DollarSign, Calendar as CalendarIcon } from 'lucide-react';
+import { Landmark, TrendingUp, TrendingDown, Wallet, DollarSign, Calendar as CalendarIcon, AlertTriangle } from 'lucide-react';
 import { Skeleton } from '../components/ui/skeleton';
 import IncomeExpenseChart from '../components/IncomeExpenseChart';
 import { Link } from 'react-router-dom';
@@ -20,6 +20,7 @@ import BankAccountsSummary from '../components/BankAccountsSummary';
 import { Popover, PopoverContent, PopoverTrigger } from '../components/ui/popover';
 import { Calendar } from '../components/ui/calendar';
 import { DateRange } from 'react-day-picker';
+import { Alert, AlertTitle, AlertDescription } from '../components/ui/alert';
 
 type OverdueInvoice = {
   id: string;
@@ -27,6 +28,12 @@ type OverdueInvoice = {
   due_date: string;
   customer_name: string;
   total: number;
+};
+
+type LowStockItem = {
+  id: string;
+  name: string;
+  quantity_on_hand: number;
 };
 
 const Dashboard = () => {
@@ -65,6 +72,7 @@ const Dashboard = () => {
     topExpenses,
     topCustomers,
     cashFlowForecast,
+    lowStockItems,
   } = dashboardData || {};
 
   const calculateTotals = (accounts: Account[] | undefined) => {
@@ -147,6 +155,26 @@ const Dashboard = () => {
       </header>
       
       <main className="space-y-6">
+        {lowStockItems && lowStockItems.length > 0 && (
+          <Alert variant="destructive">
+            <AlertTriangle className="h-4 w-4" />
+            <AlertTitle>Low Stock Alert</AlertTitle>
+            <AlertDescription className="mt-2">
+              The following items are running low on stock:
+              <ul className="list-disc pl-5 mt-1 space-y-1">
+                {lowStockItems.map((item: LowStockItem) => (
+                  <li key={item.id}>
+                    <span className="font-medium">{item.name}</span>: {item.quantity_on_hand} remaining
+                  </li>
+                ))}
+              </ul>
+              <Button asChild variant="link" className="px-0 h-auto mt-2 text-destructive">
+                <Link to="/products">Manage Inventory &rarr;</Link>
+              </Button>
+            </AlertDescription>
+          </Alert>
+        )}
+
         <QuickActions />
         
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
