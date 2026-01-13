@@ -65,6 +65,7 @@ serve(async (req) => {
         break;
 
       case 'RECORD_CUSTOMER_PAYMENT':
+        // General Payment on Account (not linked to specific invoice)
         const { customerId, paymentData } = body;
         const { data: entry, error: entryError } = await supabaseAdmin
           .from('journal_entries')
@@ -86,24 +87,38 @@ serve(async (req) => {
         break;
 
       case 'RECORD_VENDOR_PAYMENT':
-        const { vendorId, paymentData: vendorPaymentData } = body;
-        const { data: vendorEntry, error: vendorEntryError } = await supabaseAdmin
-          .from('journal_entries')
-          .insert({
-            company_id: company_id,
-            entry_date: vendorPaymentData.payment_date,
-            description: vendorPaymentData.description,
-            vendor_id: vendorId,
-          })
-          .select('id')
-          .single();
-        if (vendorEntryError) throw vendorEntryError;
+        // General Payment on Account or Specific Bill
+        const { vendorId, billId, paymentData: vendorPaymentData } = body;
+        
+        if (billId) {
+          // Paying a specific bill
+          ({ data, error } = await supabaseAdmin.rpc('pay_specific_bill', {
+            p_bill_id: billId,
+            p_payment_date: vendorPaymentData.payment_date,
+            p_payment_account_id: vendorPaymentData.payment_account_id,
+            p_ap_account_id: vendorPaymentData.accounts_payable_id,
+            p_amount: vendorPaymentData.amount,
+          }));
+        } else {
+          // General payment to vendor (Balance Forward)
+          const { data: vendorEntry, error: vendorEntryError } = await supabaseAdmin
+            .from('journal_entries')
+            .insert({
+              company_id: company_id,
+              entry_date: vendorPaymentData.payment_date,
+              description: vendorPaymentData.description,
+              vendor_id: vendorId,
+            })
+            .select('id')
+            .single();
+          if (vendorEntryError) throw vendorEntryError;
 
-        const vendorJournalItems = [
-          { journal_entry_id: vendorEntry.id, account_id: vendorPaymentData.accounts_payable_id, type: 'debit', amount: vendorPaymentData.amount },
-          { journal_entry_id: vendorEntry.id, account_id: vendorPaymentData.payment_account_id, type: 'credit', amount: vendorPaymentData.amount },
-        ];
-        ({ data, error } = await supabaseAdmin.from('journal_entry_items').insert(vendorJournalItems));
+          const vendorJournalItems = [
+            { journal_entry_id: vendorEntry.id, account_id: vendorPaymentData.accounts_payable_id, type: 'debit', amount: vendorPaymentData.amount },
+            { journal_entry_id: vendorEntry.id, account_id: vendorPaymentData.payment_account_id, type: 'credit', amount: vendorPaymentData.amount },
+          ];
+          ({ data, error } = await supabaseAdmin.from('journal_entry_items').insert(vendorJournalItems));
+        }
         break;
 
       case 'RECORD_INVOICE_PAYMENT':
@@ -112,6 +127,7 @@ serve(async (req) => {
           p_payment_date: body.payment_date,
           p_asset_account_id: body.asset_account_id,
           p_ar_account_id: body.ar_account_id,
+          p_amount: body.amount,
         }));
         break;
 

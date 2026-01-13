@@ -32,9 +32,10 @@ interface BillPaymentFormProps {
   vendorId: string;
   vendorName: string;
   amountDue: number;
+  billId?: string; // Optional: if present, marks specific bill as paid
 }
 
-const BillPaymentForm = ({ isOpen, setIsOpen, vendorId, vendorName, amountDue }: BillPaymentFormProps) => {
+const BillPaymentForm = ({ isOpen, setIsOpen, vendorId, vendorName, amountDue, billId }: BillPaymentFormProps) => {
   const { activeCompany } = useAuth();
   const queryClient = useQueryClient();
   const form = useForm<PaymentFormValues>({
@@ -87,6 +88,7 @@ const BillPaymentForm = ({ isOpen, setIsOpen, vendorId, vendorName, amountDue }:
           method: 'RECORD_VENDOR_PAYMENT',
           company_id: activeCompany.id,
           vendorId: vendorId,
+          billId: billId, // Pass this to the edge function
           paymentData: values,
         },
       });
@@ -95,6 +97,7 @@ const BillPaymentForm = ({ isOpen, setIsOpen, vendorId, vendorName, amountDue }:
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['vendor_ap_balances'] });
       queryClient.invalidateQueries({ queryKey: ['journal_entries', activeCompany?.id] });
+      queryClient.invalidateQueries({ queryKey: ['bills', activeCompany?.id] });
       showSuccess('Payment recorded successfully.');
       setIsOpen(false);
     },

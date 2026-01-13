@@ -15,16 +15,20 @@ import { PlusCircle, MoreHorizontal } from 'lucide-react';
 import BillForm from '../components/BillForm';
 import JournalEntryDetail from '../components/JournalEntryDetail';
 import JournalEntryForm from '../components/JournalEntryForm';
+import BillPaymentForm from '../components/BillPaymentForm';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '../components/ui/dropdown-menu';
 import { showError, showSuccess } from '../utils/toast';
 import { useAuth } from '../contexts/AuthContext';
 import { formatCurrency } from '../lib/utils';
 import { billsQuery } from '../lib/queries';
+import { Badge } from '../components/ui/badge';
 
 type BillEntry = {
   id: string;
   entry_date: string;
   description: string | null;
+  status: string;
+  vendor_id: string;
   vendors: { name: string }[] | null;
   total: number;
 };
@@ -34,6 +38,11 @@ const Bills = () => {
   const [isEditFormOpen, setIsEditFormOpen] = useState(false);
   const [selectedEntryIdForDetail, setSelectedEntryIdForDetail] = useState<string | null>(null);
   const [selectedEntryIdForEdit, setSelectedEntryIdForEdit] = useState<string | undefined>(undefined);
+  
+  // Payment State
+  const [isPaymentFormOpen, setIsPaymentFormOpen] = useState(false);
+  const [selectedBillForPayment, setSelectedBillForPayment] = useState<BillEntry | null>(null);
+
   const { activeCompany } = useAuth();
   const queryClient = useQueryClient();
 
@@ -74,6 +83,11 @@ const Bills = () => {
     }
   };
 
+  const handlePay = (bill: BillEntry) => {
+    setSelectedBillForPayment(bill);
+    setIsPaymentFormOpen(true);
+  };
+
   return (
     <>
       <Card>
@@ -97,13 +111,14 @@ const Bills = () => {
                 <TableHead>Vendor</TableHead>
                 <TableHead>Description</TableHead>
                 <TableHead className="text-right">Amount</TableHead>
+                <TableHead>Status</TableHead>
                 <TableHead className="w-[50px]"></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {isLoading ? (
                 <TableRow>
-                  <TableCell colSpan={5} className="text-center">Loading bills...</TableCell>
+                  <TableCell colSpan={6} className="text-center">Loading bills...</TableCell>
                 </TableRow>
               ) : bills && bills.length > 0 ? (
                 bills.map((bill) => (
@@ -112,6 +127,9 @@ const Bills = () => {
                     <TableCell>{bill.vendors?.[0]?.name || 'N/A'}</TableCell>
                     <TableCell>{bill.description}</TableCell>
                     <TableCell className="text-right font-mono">{formatCurrency(bill.total)}</TableCell>
+                    <TableCell>
+                      <Badge variant={bill.status === 'paid' ? 'default' : 'outline'}>{bill.status}</Badge>
+                    </TableCell>
                     <TableCell>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
@@ -122,7 +140,10 @@ const Bills = () => {
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
                           <DropdownMenuItem onClick={() => setSelectedEntryIdForDetail(bill.id)}>View Details</DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => handleEdit(bill.id)}>Edit</DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleEdit(bill.id)} disabled={bill.status === 'paid'}>Edit</DropdownMenuItem>
+                          {bill.status !== 'paid' && (
+                            <DropdownMenuItem onClick={() => handlePay(bill)}>Record Payment</DropdownMenuItem>
+                          )}
                           <DropdownMenuItem onClick={() => handleDelete(bill.id)} className="text-red-600">Delete</DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
@@ -131,7 +152,7 @@ const Bills = () => {
                 ))
               ) : (
                 <TableRow>
-                  <TableCell colSpan={5} className="text-center">No bills recorded yet. Add one to get started.</TableCell>
+                  <TableCell colSpan={6} className="text-center">No bills recorded yet. Add one to get started.</TableCell>
                 </TableRow>
               )}
             </TableBody>
@@ -152,6 +173,16 @@ const Bills = () => {
         isOpen={!!selectedEntryIdForDetail} 
         setIsOpen={() => setSelectedEntryIdForDetail(null)} 
       />
+      {selectedBillForPayment && (
+        <BillPaymentForm
+          isOpen={isPaymentFormOpen}
+          setIsOpen={setIsPaymentFormOpen}
+          vendorId={selectedBillForPayment.vendor_id}
+          vendorName={selectedBillForPayment.vendors?.[0]?.name || 'Vendor'}
+          amountDue={selectedBillForPayment.total}
+          billId={selectedBillForPayment.id}
+        />
+      )}
     </>
   );
 };

@@ -19,6 +19,7 @@ const paymentSchema = z.object({
   payment_date: z.string().min(1, "Date is required."),
   deposit_account_id: z.string().min(1, "Deposit account is required."),
   ar_account_id: z.string().min(1, "Accounts Receivable account is required."),
+  amount: z.coerce.number().min(0.01, "Amount must be positive."),
 });
 
 type PaymentFormValues = z.infer<typeof paymentSchema>;
@@ -38,6 +39,7 @@ const InvoicePaymentForm = ({ isOpen, setIsOpen, invoice }: InvoicePaymentFormPr
       payment_date: format(new Date(), 'yyyy-MM-dd'),
       deposit_account_id: '',
       ar_account_id: '',
+      amount: invoice.totalAmount,
     },
   });
 
@@ -47,10 +49,13 @@ const InvoicePaymentForm = ({ isOpen, setIsOpen, invoice }: InvoicePaymentFormPr
   const cashAccounts = assetAccounts?.filter(a => !a.name.toLowerCase().includes('receivable'));
 
   useEffect(() => {
-    if (isOpen && arAccounts && arAccounts.length > 0) {
-      form.setValue('ar_account_id', arAccounts[0].id);
+    if (isOpen) {
+      form.setValue('amount', invoice.totalAmount);
+      if (arAccounts && arAccounts.length > 0) {
+        form.setValue('ar_account_id', arAccounts[0].id);
+      }
     }
-  }, [isOpen, arAccounts, form]);
+  }, [isOpen, invoice, arAccounts, form]);
 
   const mutation = useMutation({
     mutationFn: async (values: PaymentFormValues) => {
@@ -63,6 +68,7 @@ const InvoicePaymentForm = ({ isOpen, setIsOpen, invoice }: InvoicePaymentFormPr
           payment_date: values.payment_date,
           asset_account_id: values.deposit_account_id,
           ar_account_id: values.ar_account_id,
+          amount: values.amount,
         },
       });
       if (error) throw error;
@@ -85,16 +91,21 @@ const InvoicePaymentForm = ({ isOpen, setIsOpen, invoice }: InvoicePaymentFormPr
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Receive Payment for Invoice</DialogTitle>
+          <DialogTitle>Receive Payment</DialogTitle>
           <DialogDescription>
-            Recording payment of {formatCurrency(invoice.totalAmount)} from {invoice.customerName}.
+            Invoice Total: {formatCurrency(invoice.totalAmount)}
           </DialogDescription>
         </DialogHeader>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-            <FormField control={form.control} name="payment_date" render={({ field }) => (
-              <FormItem><FormLabel>Payment Date</FormLabel><FormControl><Input type="date" {...field} /></FormControl><FormMessage /></FormItem>
-            )} />
+            <div className="grid grid-cols-2 gap-4">
+              <FormField control={form.control} name="payment_date" render={({ field }) => (
+                <FormItem><FormLabel>Payment Date</FormLabel><FormControl><Input type="date" {...field} /></FormControl><FormMessage /></FormItem>
+              )} />
+              <FormField control={form.control} name="amount" render={({ field }) => (
+                <FormItem><FormLabel>Amount Received</FormLabel><FormControl><Input type="number" step="0.01" {...field} /></FormControl><FormMessage /></FormItem>
+              )} />
+            </div>
             <FormField control={form.control} name="deposit_account_id" render={({ field }) => (
               <FormItem><FormLabel>Deposit To</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select a cash/bank account" /></SelectTrigger></FormControl><SelectContent>{cashAccounts?.map(acc => <SelectItem key={acc.id} value={acc.id}>{acc.name}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem>
             )} />
