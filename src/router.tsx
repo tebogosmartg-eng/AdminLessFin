@@ -41,6 +41,7 @@ import ProjectDetail from "./pages/ProjectDetail";
 import TimeTracking from "./pages/TimeTracking";
 import RecurringInvoices from "./pages/RecurringInvoices";
 import TaxReport from "./pages/TaxReport";
+import RecurringBills from "./pages/RecurringBills";
 
 export const AppRouter = () => {
   return (
@@ -56,6 +57,7 @@ export const AppRouter = () => {
         <Route path="/recurring-invoices" element={<RecurringInvoices />} />
         <Route path="/bills" element={<Bills />} />
         <Route path="/pay-bills" element={<PayBills />} />
+        <Route path="/recurring-bills" element={<RecurringBills />} />
         <Route path="/receive-payments" element={<ReceivePayments />} />
         <Route path="/chart-of-accounts" element={<ChartOfAccounts />} />
         <Route path="/journal-entries" element={<JournalEntries />} />
