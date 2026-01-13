@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState } from 'react';
+import { createContext, useContext, useEffect, useState, useRef } from 'react';
 import { supabase } from '../integrations/supabase/client';
 import { Session, User } from '@supabase/supabase-js';
 
@@ -43,13 +43,20 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [companies, setCompanies] = useState<Company[] | null>(null);
   const [activeCompany, setActiveCompany] = useState<Company | null>(null);
   const [loading, setLoading] = useState(true);
+  const lastFetchUserId = useRef<string | null>(null);
 
-  const fetchUserAndCompanyData = async (user: User | null) => {
+  const fetchUserAndCompanyData = async (currentUser: User | null, force = false) => {
     try {
-      if (!user) {
+      if (!currentUser) {
         setProfile(null);
         setCompanies(null);
         setActiveCompany(null);
+        lastFetchUserId.current = null;
+        return;
+      }
+
+      // Avoid redundant fetches for the same user unless forced
+      if (!force && lastFetchUserId.current === currentUser.id) {
         return;
       }
 
@@ -57,17 +64,15 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         body: { method: 'GET' },
       });
 
-      if (error) {
-        throw new Error(`Failed to fetch user session: ${error.message}`);
-      }
+      if (error) throw error;
 
       setProfile(data.profile);
       setCompanies(data.companies);
       setActiveCompany(data.activeCompany);
+      lastFetchUserId.current = currentUser.id;
 
     } catch (error) {
       console.error('[AuthContext] Error fetching user data:', error);
-      // Reset to a safe state on error
       setProfile(null);
       setCompanies(null);
       setActiveCompany(null);
@@ -75,13 +80,30 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   useEffect(() => {
-    setLoading(true);
+    const initSession = async () => {
+      const { data: { session: initialSession } } = await supabase.auth.getSession();
+      setSession(initialSession);
+      setUser(initialSession?.user ?? null);
+      if (initialSession?.user) {
+        await fetchUserAndCompanyData(initialSession.user);
+      }
+      setLoading(false);
+    };
+
+    initSession();
+
     const { data: authListener } = supabase.auth.onAuthStateChange(
-      async (_event, session) => {
-        setSession(session);
-        setUser(session?.user ?? null);
-        await fetchUserAndCompanyData(session?.user ?? null);
-        setLoading(false); // Set loading to false after every auth state change and data fetch attempt
+      async (event, currentSession) => {
+        setSession(currentSession);
+        setUser(currentSession?.user ?? null);
+        
+        if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+          await fetchUserAndCompanyData(currentSession?.user ?? null);
+        } else if (event === 'SIGNED_OUT') {
+          fetchUserAndCompanyData(null);
+        }
+        
+        setLoading(false);
       }
     );
 
@@ -95,7 +117,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   const refreshProfile = async () => {
-    await fetchUserAndCompanyData(user);
+    await fetchUserAndCompanyData(user, true);
   };
 
   const switchCompany = async (companyId: string) => {
@@ -103,10 +125,11 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       const { error } = await supabase.functions.invoke('settings', {
         body: {
           method: 'SWITCH_COMPANY',
+          company_id: companyId, // Fixed key name mismatch in settings function call
           target_company_id: companyId,
         },
       });
-      if (error) throw new Error(`Failed to switch company: ${error.message}`);
+      if (error) throw error;
       await refreshProfile();
     }
   };
