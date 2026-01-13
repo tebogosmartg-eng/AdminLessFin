@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation } from '@tanstack/react-query';
 import { supabase } from '../integrations/supabase/client';
 import { Button } from './ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from './ui/dialog';
@@ -7,7 +7,8 @@ import { formatCurrency } from '../lib/utils';
 import { useAuth } from '../contexts/AuthContext';
 import { format } from 'date-fns';
 import { Separator } from './ui/separator';
-import { Printer } from 'lucide-react';
+import { Printer, Mail } from 'lucide-react';
+import { showSuccess, showError } from '../utils/toast';
 
 interface PayslipDetailDialogProps {
   isOpen: boolean;
@@ -35,8 +36,21 @@ const PayslipDetailDialog = ({ isOpen, setIsOpen, payslipId }: PayslipDetailDial
     enabled: isOpen && !!activeCompany,
   });
 
-  const earnings = payslipData?.payslip_items.filter(i => i.type === 'earning') || [];
-  const deductions = payslipData?.payslip_items.filter(i => i.type === 'deduction') || [];
+  const sendEmailMutation = useMutation({
+    mutationFn: async () => {
+      const { error } = await supabase.functions.invoke('send-payslip-email', {
+        body: { payslipId },
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      showSuccess('Payslip emailed to employee.');
+    },
+    onError: (error: any) => showError(error.message),
+  });
+
+  const earnings = payslipData?.payslip_items.filter((i: any) => i.type === 'earning') || [];
+  const deductions = payslipData?.payslip_items.filter((i: any) => i.type === 'deduction') || [];
 
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
@@ -55,7 +69,7 @@ const PayslipDetailDialog = ({ isOpen, setIsOpen, payslipId }: PayslipDetailDial
           <div className="text-sm">
             <div className="grid grid-cols-2 gap-4 mb-4">
               <div>
-                <img src="/logo.png" alt="SmaAcc Logo" className="h-12 w-auto mb-2" />
+                <img src={activeCompany?.logo_url || "/logo.png"} alt="Company Logo" className="h-12 w-auto mb-2 object-contain" />
                 <h3 className="font-bold text-base">{activeCompany?.name || 'Your Company'}</h3>
                 <p className="text-muted-foreground">{activeCompany?.address}</p>
               </div>
@@ -71,6 +85,7 @@ const PayslipDetailDialog = ({ isOpen, setIsOpen, payslipId }: PayslipDetailDial
               <h4 className="font-semibold mb-1">Employee Details</h4>
               <p>{payslipData.employees.first_name} {payslipData.employees.last_name}</p>
               <p>{payslipData.employees.position}</p>
+              <p className="text-muted-foreground">{payslipData.employees.email}</p>
             </div>
 
             <Separator className="my-4" />
@@ -78,7 +93,7 @@ const PayslipDetailDialog = ({ isOpen, setIsOpen, payslipId }: PayslipDetailDial
             <div className="grid grid-cols-2 gap-8">
               <div>
                 <h4 className="font-semibold mb-2">Earnings</h4>
-                {earnings.map(item => (
+                {earnings.map((item: any) => (
                   <div key={item.id} className="flex justify-between">
                     <span>{item.description}</span>
                     <span className="font-mono">{formatCurrency(item.amount)}</span>
@@ -87,7 +102,7 @@ const PayslipDetailDialog = ({ isOpen, setIsOpen, payslipId }: PayslipDetailDial
               </div>
               <div>
                 <h4 className="font-semibold mb-2">Deductions</h4>
-                {deductions.map(item => (
+                {deductions.map((item: any) => (
                   <div key={item.id} className="flex justify-between">
                     <span>{item.description}</span>
                     <span className="font-mono">{formatCurrency(item.amount)}</span>
@@ -117,10 +132,16 @@ const PayslipDetailDialog = ({ isOpen, setIsOpen, payslipId }: PayslipDetailDial
               </div>
             </div>
             
-            <div className="mt-6 flex justify-end">
+            <div className="mt-6 flex justify-end gap-2">
                 <Button variant="outline" onClick={() => window.print()}>
                     <Printer className="mr-2 h-4 w-4" /> Print
                 </Button>
+                {payslipData.employees.email && (
+                  <Button onClick={() => sendEmailMutation.mutate()} disabled={sendEmailMutation.isPending}>
+                    <Mail className="mr-2 h-4 w-4" /> 
+                    {sendEmailMutation.isPending ? 'Sending...' : 'Email'}
+                  </Button>
+                )}
             </div>
           </div>
         )}

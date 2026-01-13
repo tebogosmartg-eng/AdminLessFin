@@ -11,9 +11,10 @@ import {
   TableRow,
 } from '../components/ui/table';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/card';
-import { PlusCircle, MoreHorizontal, Download } from 'lucide-react';
+import { PlusCircle, MoreHorizontal, Download, PackageOpen } from 'lucide-react';
 import { showError, showSuccess } from '../utils/toast';
 import ProductForm from '../components/ProductForm';
+import InventoryAdjustmentDialog from '../components/InventoryAdjustmentDialog';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -41,6 +42,7 @@ export type Product = {
 
 const Products = () => {
   const [isFormOpen, setIsFormOpen] = useState(false);
+  const [isAdjustmentOpen, setIsAdjustmentOpen] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<Product | undefined>(undefined);
   const { activeCompany } = useAuth();
   const queryClient = useQueryClient();
@@ -74,6 +76,11 @@ const Products = () => {
   const handleEdit = (product: Product) => {
     setSelectedProduct(product);
     setIsFormOpen(true);
+  };
+
+  const handleAdjust = (product: Product) => {
+    setSelectedProduct(product);
+    setIsAdjustmentOpen(true);
   };
 
   const handleAddNew = () => {
@@ -154,6 +161,11 @@ const Products = () => {
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
                           <DropdownMenuItem onClick={() => handleEdit(product)}>Edit</DropdownMenuItem>
+                          {product.type === 'inventory' && (
+                            <DropdownMenuItem onClick={() => handleAdjust(product)}>
+                              <PackageOpen className="mr-2 h-4 w-4" /> Adjust Stock
+                            </DropdownMenuItem>
+                          )}
                           <DropdownMenuItem onClick={() => handleDelete(product.id)} className="text-red-600">Delete</DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
@@ -172,6 +184,13 @@ const Products = () => {
         setIsOpen={setIsFormOpen}
         product={selectedProduct}
       />
+      {selectedProduct && (
+        <InventoryAdjustmentDialog
+          isOpen={isAdjustmentOpen}
+          setIsOpen={setIsAdjustmentOpen}
+          product={selectedProduct}
+        />
+      )}
     </>
   );
 };

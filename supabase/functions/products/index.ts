@@ -7,8 +7,6 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-// ARCHITECTURE NOTE:
-// This function acts as a secure API gateway for all product-related database operations.
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders })
@@ -87,6 +85,70 @@ serve(async (req) => {
           .delete()
           .eq('id', body.productId)
           .eq('company_id', company_id));
+        break;
+
+      case 'ADJUST_QUANTITY':
+        const { productId, newQuantity, inventoryAccountId, adjustmentAccountId, reason, date } = body;
+        
+        // 1. Get current product state
+        const { data: product, error: fetchError } = await supabaseAdmin
+          .from('products')
+          .select('*')
+          .eq('id', productId)
+          .eq('company_id', company_id)
+          .single();
+        
+        if (fetchError) throw fetchError;
+        if (!product) throw new Error("Product not found");
+
+        const oldQuantity = product.quantity_on_hand;
+        const diff = newQuantity - oldQuantity;
+        
+        if (diff === 0) {
+          data = { message: "No change in quantity." };
+          break;
+        }
+
+        const cost = product.cost || 0;
+        const totalValue = Math.abs(diff * cost);
+
+        // 2. Create Journal Entry
+        const { data: je, error: jeError } = await supabaseAdmin
+          .from('journal_entries')
+          .insert({
+            company_id,
+            entry_date: date,
+            description: `Inventory Adjustment: ${product.name} (${diff > 0 ? '+' : ''}${diff}) - ${reason}`,
+          })
+          .select('id')
+          .single();
+        
+        if (jeError) throw jeError;
+
+        // 3. Create Journal Items
+        let items = [];
+        if (diff > 0) {
+          // Gained Inventory: Debit Asset, Credit Adjustment (Income/Expense reduction)
+          items = [
+            { journal_entry_id: je.id, account_id: inventoryAccountId, type: 'debit', amount: totalValue },
+            { journal_entry_id: je.id, account_id: adjustmentAccountId, type: 'credit', amount: totalValue }
+          ];
+        } else {
+          // Lost Inventory: Debit Adjustment (Expense), Credit Asset
+          items = [
+            { journal_entry_id: je.id, account_id: adjustmentAccountId, type: 'debit', amount: totalValue },
+            { journal_entry_id: je.id, account_id: inventoryAccountId, type: 'credit', amount: totalValue }
+          ];
+        }
+
+        const { error: itemsError } = await supabaseAdmin.from('journal_entry_items').insert(items);
+        if (itemsError) throw itemsError;
+
+        // 4. Update Product Quantity
+        ({ data, error } = await supabaseAdmin
+          .from('products')
+          .update({ quantity_on_hand: newQuantity })
+          .eq('id', productId));
         break;
 
       default:
