@@ -52,6 +52,7 @@ import VendorCredits from "./pages/VendorCredits";
 import ProjectProfitabilityReport from "./pages/ProjectProfitabilityReport";
 import ExpenseClaims from "./pages/ExpenseClaims";
 import InventoryValuation from "./pages/InventoryValuation";
+import ComparativePL from "./pages/ComparativePL";
 
 export const AppRouter = () => {
   return (
@@ -85,6 +86,7 @@ export const AppRouter = () => {
         <Route path="/project-profitability" element={<ProjectProfitabilityReport />} />
         <Route path="/inventory-valuation" element={<InventoryValuation />} />
         <Route path="/tax-report" element={<TaxReport />} />
+        <Route path="/comparative-pl" element={<ComparativePL />} />
         <Route path="/settings" element={<Settings />} />
         <Route path="/vendors" element={<Vendors />} />
         <Route path="/vendors/:id" element={<VendorDetail />} />
@@ -108,7 +110,6 @@ export const AppRouter = () => {
         <Route path="/projects/:id" element={<ProjectDetail />} />
         <Route path="/time-tracking" element={<TimeTracking />} />
       </Route>
-      {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
       <Route path="*" element={<NotFound />} />
     </Routes>
   );

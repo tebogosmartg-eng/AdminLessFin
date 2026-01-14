@@ -45,13 +45,15 @@ export const SidebarNav = () => {
   const location = useLocation();
   const pathname = location.pathname;
   const queryClient = useQueryClient();
-  const { activeCompany } = useAuth();
+  const { activeCompany, role } = useAuth();
 
   const prefetch = (query: (companyId: string) => any) => {
     if (activeCompany) {
       queryClient.prefetchQuery(query(activeCompany.id));
     }
   };
+
+  const isAdmin = role === 'owner' || role === 'admin';
 
   const salesLinks = [
     { to: '/quotes', label: 'Quotes', icon: MessageCircle, prefetch: () => prefetch(queries.quotesQuery) },
@@ -136,30 +138,39 @@ export const SidebarNav = () => {
         links={purchasesLinks} 
         defaultOpen={purchasesLinks.some(l => pathname.startsWith(l.to))}
       />
-      <NavGroup 
-        title="Payroll" 
-        icon={Briefcase} 
-        links={payrollLinks} 
-        defaultOpen={payrollLinks.some(l => pathname.startsWith(l.to))}
-      />
+      
+      {isAdmin && (
+        <NavGroup 
+            title="Payroll" 
+            icon={Briefcase} 
+            links={payrollLinks} 
+            defaultOpen={payrollLinks.some(l => pathname.startsWith(l.to))}
+        />
+      )}
+
       <NavGroup 
         title="Time Tracking" 
         icon={Clock} 
         links={timeTrackingLinks} 
         defaultOpen={timeTrackingLinks.some(l => pathname.startsWith(l.to))}
       />
+
       <NavGroup 
         title="Accounting" 
         icon={Book} 
         links={accountingLinks} 
         defaultOpen={accountingLinks.some(l => pathname.startsWith(l.to))}
       />
-      <NavGroup 
-        title="Assets & Loans" 
-        icon={Landmark} 
-        links={assetsAndLoansLinks} 
-        defaultOpen={assetsAndLoansLinks.some(l => pathname.startsWith(l.to))}
-      />
+
+      {isAdmin && (
+        <NavGroup 
+            title="Assets & Loans" 
+            icon={Landmark} 
+            links={assetsAndLoansLinks} 
+            defaultOpen={assetsAndLoansLinks.some(l => pathname.startsWith(l.to))}
+        />
+      )}
+
       <NavGroup 
         title="Reports" 
         icon={FileText} 
@@ -171,6 +182,7 @@ export const SidebarNav = () => {
         <Package className="mr-3 h-5 w-5" />
         Products & Services
       </NavLink>
+
       <NavLink to="/import" className={navLinkClasses}>
         <Upload className="mr-3 h-5 w-5" />
         Import Data

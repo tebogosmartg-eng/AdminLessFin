@@ -34,36 +34,34 @@ serve(async (req) => {
       .eq('id', user.id)
       .single();
     
-    // 2. Fetch all companies the user is a member of
+    // 2. Fetch all companies and user roles
     const { data: companyUsers, error: companyUsersError } = await supabaseAdmin
       .from('company_users')
-      .select('companies(*)')
+      .select('role, companies(*)')
       .eq('user_id', user.id);
     
     if (companyUsersError) throw companyUsersError;
 
-    const userCompanies = companyUsers?.map(cu => cu.companies).flat().filter(Boolean) || [];
+    const userCompanies = companyUsers?.map(cu => ({
+        ...cu.companies,
+        user_role: cu.role
+    })).filter(Boolean) || [];
 
     // 3. Robust Active Company Selection & Auto-Repair
     let activeCompany = null;
     let finalProfile = userProfile;
 
     if (userCompanies.length > 0) {
-      // Try to find the company specified in profile
       activeCompany = userCompanies.find(c => c.id === userProfile?.active_company_id) || null;
       
-      // AUTO-REPAIR: If no active company or it's invalid, pick the first one
       if (!activeCompany) {
         activeCompany = userCompanies[0];
-        
-        // Update the profile in the database so RPCs work correctly
         const { data: updatedProfile } = await supabaseAdmin
             .from('profiles')
             .update({ active_company_id: activeCompany.id })
             .eq('id', user.id)
             .select()
             .single();
-        
         if (updatedProfile) finalProfile = updatedProfile;
       }
     }
@@ -72,6 +70,7 @@ serve(async (req) => {
       profile: finalProfile || null,
       companies: userCompanies,
       activeCompany: activeCompany,
+      role: activeCompany?.user_role || 'member', // Return specific role
     };
 
     return new Response(JSON.stringify(responseData), {
