@@ -32,7 +32,6 @@ const FinancialCalendar = () => {
       const start = startOfMonth(currentMonth);
       const end = endOfMonth(currentMonth);
       
-      // Fetch a bit wider range to cover the visual calendar grid (weeks)
       const visualStart = startOfWeek(start);
       const visualEnd = endOfWeek(end);
 
@@ -72,7 +71,7 @@ const FinancialCalendar = () => {
   const handleEventClick = (event: CalendarEvent) => {
     switch (event.type) {
       case 'invoice': navigate(`/invoices/${event.id}`); break;
-      case 'bill': navigate(`/bills`); break; // Bills don't have a detail page yet, just list
+      case 'bill': navigate(`/bills`); break;
       case 'payroll': navigate(`/payroll-runs/${event.id}`); break;
       case 'recurring_invoice': navigate(`/recurring-invoices`); break;
       case 'recurring_bill': navigate(`/recurring-bills`); break;
@@ -112,7 +111,7 @@ const FinancialCalendar = () => {
                   className={cn(
                     "border-b border-r p-2 transition-colors hover:bg-muted/30 min-h-[120px] flex flex-col gap-1",
                     !isSameMonth(day, currentMonth) && "bg-muted/10 text-muted-foreground",
-                    dayIdx % 7 === 0 && "border-l", // Add left border for first col
+                    dayIdx % 7 === 0 && "border-l",
                     isSameDay(day, new Date()) && "bg-blue-50/50 dark:bg-blue-900/10"
                   )}
                 >
