@@ -54,6 +54,7 @@ serve(async (req) => {
       }
     );
 
+    // --- Inventory Valuation ---
     if (method === 'GET_INVENTORY_VALUATION') {
         const { data: products, error } = await supabaseAdmin
             .from('products')
@@ -79,6 +80,7 @@ serve(async (req) => {
         });
     }
 
+    // --- Project Profitability ---
     if (method === 'GET_PROJECT_PROFITABILITY') {
         const { data: projects, error: projError } = await supabaseAdmin
             .from('projects')
@@ -126,8 +128,10 @@ serve(async (req) => {
             
             if (projectStats[pid]) {
                 if (accType === 'Income') {
+                    // Income is Credit normal. Credit = Revenue, Debit = Reversal/Return
                     projectStats[pid].revenue += item.type === 'credit' ? item.amount : -item.amount;
                 } else if (accType === 'Expense' || accType === 'Cost of Goods Sold') {
+                    // Expense is Debit normal. Debit = Cost, Credit = Reversal/Refund
                     projectStats[pid].expenses += item.type === 'debit' ? item.amount : -item.amount;
                 }
             }
@@ -139,6 +143,7 @@ serve(async (req) => {
             return p;
         });
 
+        // Sort by profit descending
         result.sort((a, b) => b.profit - a.profit);
 
         return new Response(JSON.stringify(result), {
@@ -204,7 +209,7 @@ serve(async (req) => {
         });
     }
 
-    // Default Reports Logic
+    // --- Standard Reports Logic ---
     const promises = [];
 
     if (end_date) {
