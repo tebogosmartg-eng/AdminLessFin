@@ -1,3 +1,5 @@
+"use client";
+
 import { useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -113,10 +115,22 @@ const InventoryAdjustmentDialog = ({ isOpen, setIsOpen, product }: InventoryAdju
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
               <FormField control={form.control} name="date" render={({ field }) => (
-                <FormItem><FormLabel>Date</FormLabel><FormControl><Input type="date" {...field} /></FormControl><FormMessage /></FormItem>
+                <FormItem>
+                  <FormLabel>Date</FormLabel>
+                  <FormControl>
+                    <Input type="date" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
               )} />
               <FormField control={form.control} name="new_quantity" render={({ field }) => (
-                <FormItem><FormLabel>New Quantity</FormLabel><FormControl><Input type="number" {...field} /></FormControl><FormMessage /></FormItem>
+                <FormItem>
+                  <FormLabel>New Quantity</FormLabel>
+                  <FormControl>
+                    <Input type="number" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
               )} />
             </div>
             
@@ -128,15 +142,47 @@ const InventoryAdjustmentDialog = ({ isOpen, setIsOpen, product }: InventoryAdju
             )}
 
             <FormField control={form.control} name="inventory_account_id" render={({ field }) => (
-              <FormItem><FormLabel>Inventory Asset Account</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select asset account" /></SelectTrigger></FormControl><SelectContent>{assetAccounts?.map(a => <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem>
+              <FormItem>
+                <FormLabel>Inventory Asset Account</FormLabel>
+                <Select onValueChange={field.onChange} value={field.value}>
+                  <FormControl>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select asset account" />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    {assetAccounts?.map(a => <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+                <FormMessage />
+              </FormItem>
             )} />
             
             <FormField control={form.control} name="adjustment_account_id" render={({ field }) => (
-              <FormItem><FormLabel>Adjustment Account (Expense/COGS)</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select expense account" /></SelectTrigger></FormControl><SelectContent>{expenseAccounts?.map(a => <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem>
+              <FormItem>
+                <FormLabel>Adjustment Account (Expense/COGS)</FormLabel>
+                <Select onValueChange={field.onChange} value={field.value}>
+                  <FormControl>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select expense account" />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    {expenseAccounts?.map(a => <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+                <FormMessage />
+              </FormItem>
             )} />
 
             <FormField control={form.control} name="reason" render={({ field }) => (
-              <FormItem><FormLabel>Reason</FormLabel><FormControl><Input placeholder="e.g. Shrinkage, Broken Stock, Found Item" {...field} /></FormControl><FormMessage /></FormItem>
+              <FormItem>
+                <FormLabel>Reason</FormLabel>
+                <FormControl>
+                  <Input placeholder="e.g. Shrinkage, Broken Stock, Found Item" {...field} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
             )} />
 
             <DialogFooter>
