@@ -33,31 +33,43 @@ serve(async (req) => {
       .select('*')
       .eq('id', user.id)
       .single();
-    if (profileError && profileError.code !== 'PGRST116') throw profileError;
-
+    
     // 2. Fetch all companies the user is a member of
     const { data: companyUsers, error: companyUsersError } = await supabaseAdmin
       .from('company_users')
       .select('companies(*)')
       .eq('user_id', user.id);
+    
     if (companyUsersError) throw companyUsersError;
 
     const userCompanies = companyUsers?.map(cu => cu.companies).flat().filter(Boolean) || [];
 
-    // 3. Determine the active company
+    // 3. Robust Active Company Selection & Auto-Repair
     let activeCompany = null;
+    let finalProfile = userProfile;
+
     if (userCompanies.length > 0) {
+      // Try to find the company specified in profile
       activeCompany = userCompanies.find(c => c.id === userProfile?.active_company_id) || null;
+      
+      // AUTO-REPAIR: If no active company or it's invalid, pick the first one
       if (!activeCompany) {
         activeCompany = userCompanies[0];
-        if (userProfile) {
-          await supabaseAdmin.from('profiles').update({ active_company_id: activeCompany.id }).eq('id', user.id);
-        }
+        
+        // Update the profile in the database so RPCs work correctly
+        const { data: updatedProfile } = await supabaseAdmin
+            .from('profiles')
+            .update({ active_company_id: activeCompany.id })
+            .eq('id', user.id)
+            .select()
+            .single();
+        
+        if (updatedProfile) finalProfile = updatedProfile;
       }
     }
 
     const responseData = {
-      profile: userProfile || null,
+      profile: finalProfile || null,
       companies: userCompanies,
       activeCompany: activeCompany,
     };

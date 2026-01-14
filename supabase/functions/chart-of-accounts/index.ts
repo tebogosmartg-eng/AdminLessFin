@@ -7,9 +7,6 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-// ARCHITECTURE NOTE:
-// This function acts as a secure API gateway for all chart of accounts operations.
-// The frontend should never query the 'chart_of_accounts' table directly.
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders })
@@ -32,7 +29,7 @@ serve(async (req) => {
       throw new Error("Company ID is required.");
     }
 
-    // Security Check: Verify user membership
+    // Security Check
     const { data: companyMember, error: memberError } = await supabase
       .from('company_users')
       .select('user_id')
@@ -41,7 +38,7 @@ serve(async (req) => {
       .single();
 
     if (memberError || !companyMember) {
-      throw new Error("Permission denied: User is not a member of this company.");
+      throw new Error("Permission denied.");
     }
 
     const supabaseAdmin = createClient(
@@ -49,20 +46,16 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
     
-    const userSupabase = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
-      { auth: { autoRefreshToken: false, persistSession: false }, global: { headers: { Authorization: req.headers.get('Authorization')! } } }
-    );
-
     let data, error;
 
     switch (method) {
       case 'GET':
-        ({ data, error } = await userSupabase.rpc('get_balances_as_of_date', {
+        // Use RPC with explicit company_id to avoid profile sync issues
+        ({ data, error } = await supabaseAdmin.rpc('get_balances_as_of_date', {
           p_end_date: new Date().toISOString().split('T')[0],
+          p_company_id: company_id
         }));
-        if (!error) {
+        if (!error && data) {
           data.sort((a, b) => a.account_number - b.account_number);
         }
         break;
