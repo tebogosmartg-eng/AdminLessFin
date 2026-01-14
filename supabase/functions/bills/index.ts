@@ -60,7 +60,7 @@ serve(async (req) => {
             description:journal_entries(description),
             bill_number,
             attachment_url,
-            vendors!inner ( name ),
+            vendors ( name ),
             journal_entries (
               id,
               entry_date,
@@ -97,19 +97,18 @@ serve(async (req) => {
           data = data.map(bill => ({
             id: bill.id,
             entry_date: bill.bill_date,
-            description: bill.description?.description || `Bill from ${bill.vendors?.name}`,
+            description: bill.description?.description || `Bill from ${bill.vendors?.name || 'Unknown Vendor'}`,
             status: bill.status,
             vendor_id: bill.vendor_id,
-            vendors: [bill.vendors], 
+            vendors: bill.vendors ? [bill.vendors] : [], 
             bill_number: bill.bill_number,
             attachment_url: bill.attachment_url,
-            journal_entry_items: bill.journal_entries?.journal_entry_items
+            journal_entry_items: bill.journal_entries?.journal_entry_items || []
           }));
         }
         break;
       
       case 'GET_ONE':
-        // Retrieve single bill details including Journal Entry items
         ({ data, error } = await supabaseAdmin
           .from('bills')
           .select(`
@@ -130,7 +129,6 @@ serve(async (req) => {
                 type,
                 account_id,
                 project_id,
-                product_id:product_id, 
                 chart_of_accounts ( name ),
                 journal_entry_item_tax_rates (
                   tax_rates ( id, rate )
@@ -167,13 +165,6 @@ serve(async (req) => {
           p_items: itemsWithProjectAndTax,
         }));
         
-        // If there's an attachment, we need to update the newly created bill with the URL
-        // The RPC doesn't accept attachment_url directly to the bills table insertion currently,
-        // and modifying the huge RPC is risky. Safer to update after creation.
-        // We need the Bill ID. The RPC returns VOID. 
-        // We can fetch the latest bill for this vendor/number to update it.
-        // Or better, update RPC to return UUID.
-        // For now, let's look up the bill we just created.
         if (!error && billData.attachment_url) {
              const { data: newBill } = await supabaseAdmin
                 .from('bills')
@@ -200,29 +191,16 @@ serve(async (req) => {
         break;
 
       case 'VOID':
-        // 1. Get Bill and JE
-        const { data: bill } = await supabaseAdmin
-          .from('bills')
-          .select('journal_entry_id, bill_number')
-          .eq('id', body.billId)
-          .single();
-        
-        if (!bill) throw new Error("Bill not found");
-        if (!bill.journal_entry_id) throw new Error("Journal Entry not found for bill");
-
-        // 2. Create Reversal JE
-        const { data: jeData } = await supabaseAdmin.from('journal_entries').select('*').eq('id', bill.journal_entry_id).single();
-        
+        const { data: billToVoid } = await supabaseAdmin.from('bills').select('journal_entry_id, bill_number').eq('id', body.billId).single();
+        if (!billToVoid) throw new Error("Bill not found");
+        const { data: jeData } = await supabaseAdmin.from('journal_entries').select('*').eq('id', billToVoid.journal_entry_id).single();
         const { data: reversalJe } = await supabaseAdmin.from('journal_entries').insert({
           company_id,
           entry_date: new Date().toISOString().split('T')[0],
-          description: `Void Reversal for Bill ${bill.bill_number}`,
+          description: `Void Reversal for Bill ${billToVoid.bill_number}`,
           vendor_id: jeData.vendor_id
         }).select('id').single();
-
-        // 3. Create Reversed Items
-        const { data: originalItems } = await supabaseAdmin.from('journal_entry_items').select('*').eq('journal_entry_id', bill.journal_entry_id);
-        
+        const { data: originalItems } = await supabaseAdmin.from('journal_entry_items').select('*').eq('journal_entry_id', billToVoid.journal_entry_id);
         const reversalItems = originalItems.map(item => ({
           journal_entry_id: reversalJe.id,
           account_id: item.account_id,
@@ -230,10 +208,7 @@ serve(async (req) => {
           amount: item.amount,
           project_id: item.project_id
         }));
-
         await supabaseAdmin.from('journal_entry_items').insert(reversalItems);
-
-        // 4. Update Bill Status
         ({ data, error } = await supabaseAdmin.from('bills').update({ status: 'void' }).eq('id', body.billId));
         break;
 
