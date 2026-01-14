@@ -1,19 +1,20 @@
-# Tech Stack
+# Tech Stack & Architectural Safety Rules
 
-- You are building a React application.
-- Use TypeScript.
-- Use React Router. KEEP the routes in src/App.tsx
-- Always put source code in the src folder.
-- Put pages into src/pages/
-- Put components into src/components/
-- The main page (default page) is src/pages/Index.tsx
-- UPDATE the main page to include the new components. OTHERWISE, the user can NOT see any components!
-- ALWAYS try to use the shadcn/ui library.
-- Tailwind CSS: always use Tailwind CSS for styling components. Utilize Tailwind classes extensively for layout, spacing, colors, and other design aspects.
+- You are building a React application using TypeScript and Tailwind CSS.
+- **NEVER** use code blocks (```). Use <dyad-write> tags for **ALL** code output.
 
-Available packages and libraries:
+## Safety & Stability Rules (LOCKED)
 
-- The lucide-react package is installed for icons.
-- You ALREADY have ALL the shadcn/ui components and their dependencies installed. So you don't need to install them again.
-- You have ALL the necessary Radix UI components installed.
-- Use prebuilt components from the shadcn/ui library after importing them. Note that these files shouldn't be edited, so make new components if you need to change them.
+### 1. Dropdown Components (Select)
+- **NEVER** use an empty string `""` as a value for a `<SelectItem />`. This causes a critical crash in Radix UI.
+- Always use the constant `EMPTY_SELECT_VALUE` (defined as `"none"`) for optional fields (e.g., Projects, Tax Rates).
+- Handle the conversion from `"none"` to `null` in the server function, not the UI state.
+
+### 2. Multi-Tenant Data Fetching
+- **EXPLICIT CONTEXT**: Every server function (Edge Function) **MUST** receive `company_id` as an explicit parameter in the request body.
+- **NO PROFILE GUESSING**: Do not rely on `profiles.active_company_id` inside RPCs or Edge Functions for primary data filtering; always use the ID passed from the frontend `useAuth()` hook.
+- **RESILIENT LISTS**: Use `LEFT JOIN` (represented as `select('*, table(...)')`) instead of `INNER JOIN` (represented as `select('*, table!inner(...)')`) in list views. This ensures parent records aren't hidden if a related detail is missing.
+
+### 3. Database Integrity
+- All primary entity tables (Invoices, Bills, etc.) **MUST** have a `NOT NULL` constraint on `company_id`.
+- Use the `user-session` function to auto-repair user profiles if they lose their `active_company_id` reference.
