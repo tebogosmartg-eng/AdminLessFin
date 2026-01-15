@@ -7,8 +7,6 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-// ARCHITECTURE NOTE:
-// This function acts as a secure API gateway for all employee-related database operations.
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders })
@@ -27,21 +25,19 @@ serve(async (req) => {
     const body = await req.json();
     const { method, company_id } = body;
 
-    if (!company_id) {
-      throw new Error("Company ID is required.");
-    }
+    if (!company_id) throw new Error("Company ID is required.");
 
-    // Security Check: Verify user membership
-    const { data: companyMember, error: memberError } = await supabase
+    // SECURITY: Fetch user Role
+    const { data: member, error: memberError } = await supabase
       .from('company_users')
-      .select('user_id')
+      .select('role')
       .eq('user_id', user.id)
       .eq('company_id', company_id)
       .single();
 
-    if (memberError || !companyMember) {
-      throw new Error("Permission denied: User is not a member of this company.");
-    }
+    if (memberError || !member) throw new Error("Permission denied.");
+
+    const isAdmin = ['owner', 'admin'].includes(member.role);
 
     const supabaseAdmin = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
@@ -52,14 +48,20 @@ serve(async (req) => {
 
     switch (method) {
       case 'GET':
+        // DATA MASKING: If not admin, only return public fields for dropdowns
+        const selectQuery = isAdmin 
+            ? '*' 
+            : 'id, first_name, last_name, department, position'; // Sensitive fields excluded
+
         ({ data, error } = await supabaseAdmin
           .from('employees')
-          .select('*')
+          .select(selectQuery)
           .eq('company_id', company_id)
           .order('last_name', { ascending: true }));
         break;
       
       case 'POST':
+        if (!isAdmin) throw new Error("Access Denied: Only Admins can create employees.");
         ({ data, error } = await supabaseAdmin
           .from('employees')
           .insert({ ...body.employeeData, company_id })
@@ -68,6 +70,7 @@ serve(async (req) => {
         break;
 
       case 'PUT':
+        if (!isAdmin) throw new Error("Access Denied: Only Admins can update employees.");
         ({ data, error } = await supabaseAdmin
           .from('employees')
           .update(body.employeeData)
@@ -78,6 +81,7 @@ serve(async (req) => {
         break;
 
       case 'DELETE':
+        if (!isAdmin) throw new Error("Access Denied: Only Admins can delete employees.");
         ({ data, error } = await supabaseAdmin
           .from('employees')
           .delete()

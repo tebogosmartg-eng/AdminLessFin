@@ -25,20 +25,21 @@ serve(async (req) => {
     const body = await req.json();
     const { method, company_id } = body;
 
-    if (!company_id) {
-      throw new Error("Company ID is required.");
-    }
+    if (!company_id) throw new Error("Company ID is required.");
 
-    // Security Check
-    const { data: companyMember, error: memberError } = await supabase
+    // SECURITY LOCK: Strict RBAC Check
+    // Only Owners and Admins can touch Payroll
+    const { data: member, error: memberError } = await supabase
       .from('company_users')
-      .select('user_id')
+      .select('role')
       .eq('user_id', user.id)
       .eq('company_id', company_id)
       .single();
 
-    if (memberError || !companyMember) {
-      throw new Error("Permission denied.");
+    if (memberError || !member) throw new Error("Permission denied.");
+    
+    if (!['owner', 'admin'].includes(member.role)) {
+        throw new Error("Access Denied: Payroll requires Admin privileges.");
     }
 
     const supabaseAdmin = createClient(
@@ -46,7 +47,6 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
     
-    // User-impersonated client for RPC calls
     const userSupabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
@@ -77,7 +77,6 @@ serve(async (req) => {
         break;
 
       case 'GENERATE_PAYSLIPS':
-        // Updated to use atomic RPC
         ({ data, error } = await supabaseAdmin.rpc('generate_payslips_for_run', {
           p_run_id: body.runId,
           p_company_id: company_id
@@ -87,7 +86,7 @@ serve(async (req) => {
       case 'GET_PAYSLIP_DETAIL':
         ({ data, error } = await supabaseAdmin
           .from('payslips')
-          .select('*, employees(first_name, last_name), payroll_runs(*), payslip_items(*)')
+          .select('*, employees(first_name, last_name, email), payroll_runs(*), payslip_items(*)')
           .eq('id', body.payslipId)
           .single());
         break;
@@ -98,7 +97,6 @@ serve(async (req) => {
         const deductions = items.filter(i => i.type === 'deduction').reduce((sum, i) => sum + i.amount, 0);
         const netPay = earnings - deductions;
 
-        // Perform updates (could be optimized further with RPC, but less critical than bulk generation)
         await supabaseAdmin.from('payslip_items').delete().eq('payslip_id', payslipId);
         const itemsToInsert = items.map(item => ({ ...item, payslip_id: payslipId }));
         await supabaseAdmin.from('payslip_items').insert(itemsToInsert);
