@@ -1,7 +1,7 @@
 // @ts-nocheck
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0'
-import { format, subMonths, startOfMonth, endOfMonth } from "https://esm.sh/date-fns@3.6.0";
+import { format, subMonths, subYears, startOfMonth, endOfMonth } from "https://esm.sh/date-fns@3.6.0";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -47,6 +47,49 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
       { auth: { autoRefreshToken: false, persistSession: false }, global: { headers: { Authorization: req.headers.get('Authorization')! } } }
     );
+
+    // --- Comparative Balance Sheet ---
+    if (method === 'GET_COMPARATIVE_BS') {
+        const currentDate = end_date;
+        const priorDate = format(subYears(new Date(currentDate), 1), 'yyyy-MM-dd');
+
+        const { data: currentBalances, error: currError } = await userSupabase.rpc('get_balances_as_of_date', {
+            p_end_date: currentDate,
+            p_company_id: company_id
+        });
+        if (currError) throw currError;
+
+        const { data: priorBalances, error: priorError } = await userSupabase.rpc('get_balances_as_of_date', {
+            p_end_date: priorDate,
+            p_company_id: company_id
+        });
+        if (priorError) throw priorError;
+
+        // Merge logic
+        const reportData = {};
+        
+        [...(currentBalances || []), ...(priorBalances || [])].forEach(acc => {
+            if (!reportData[acc.id]) {
+                reportData[acc.id] = { 
+                    name: acc.name, 
+                    type: acc.type, 
+                    current: 0, 
+                    prior: 0 
+                };
+            }
+        });
+
+        currentBalances?.forEach(acc => { reportData[acc.id].current = acc.balance; });
+        priorBalances?.forEach(acc => { reportData[acc.id].prior = acc.balance; });
+
+        return new Response(JSON.stringify({ 
+            accounts: Object.values(reportData),
+            dates: { current: currentDate, prior: priorDate }
+        }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 200,
+        });
+    }
 
     // --- Comparative P&L ---
     if (method === 'GET_COMPARATIVE_PL') {
