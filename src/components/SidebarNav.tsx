@@ -96,8 +96,6 @@ export const SidebarNav = () => {
   const reportsLinks = [
     { to: '/reports', label: 'Operational Reports', icon: FileText, prefetch: () => {} },
     { to: '/financial-statements', label: 'Financial Statements', icon: FileSignature, prefetch: () => {} },
-    { to: '/comparative-pl', label: 'Comparative P&L', icon: TrendingUp, prefetch: () => {} },
-    { to: '/comparative-bs', label: 'Comparative B/S', icon: Scale, prefetch: () => {} },
     { to: '/inventory-valuation', label: 'Inventory Valuation', icon: Package, prefetch: () => {} },
     { to: '/project-profitability', label: 'Project Profitability', icon: PieChart, prefetch: () => {} },
     { to: '/tax-report', label: 'Sales Tax Report', icon: Scale, prefetch: () => {} },
@@ -142,12 +140,28 @@ export const SidebarNav = () => {
       />
       
       {isAdmin && (
-        <NavGroup 
-            title="Payroll" 
-            icon={Briefcase} 
-            links={payrollLinks} 
-            defaultOpen={payrollLinks.some(l => pathname.startsWith(l.to))}
-        />
+        <>
+            <NavGroup 
+                title="Payroll" 
+                icon={Briefcase} 
+                links={payrollLinks} 
+                defaultOpen={payrollLinks.some(l => pathname.startsWith(l.to))}
+            />
+            
+            <NavGroup 
+                title="Accounting" 
+                icon={Book} 
+                links={accountingLinks} 
+                defaultOpen={accountingLinks.some(l => pathname.startsWith(l.to))}
+            />
+
+            <NavGroup 
+                title="Assets & Loans" 
+                icon={Landmark} 
+                links={assetsAndLoansLinks} 
+                defaultOpen={assetsAndLoansLinks.some(l => pathname.startsWith(l.to))}
+            />
+        </>
       )}
 
       <NavGroup 
@@ -156,22 +170,6 @@ export const SidebarNav = () => {
         links={timeTrackingLinks} 
         defaultOpen={timeTrackingLinks.some(l => pathname.startsWith(l.to))}
       />
-
-      <NavGroup 
-        title="Accounting" 
-        icon={Book} 
-        links={accountingLinks} 
-        defaultOpen={accountingLinks.some(l => pathname.startsWith(l.to))}
-      />
-
-      {isAdmin && (
-        <NavGroup 
-            title="Assets & Loans" 
-            icon={Landmark} 
-            links={assetsAndLoansLinks} 
-            defaultOpen={assetsAndLoansLinks.some(l => pathname.startsWith(l.to))}
-        />
-      )}
 
       <NavGroup 
         title="Reports" 

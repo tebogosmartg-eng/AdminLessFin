@@ -30,16 +30,16 @@ serve(async (req) => {
     }
 
     // Security Check
-    const { data: companyMember, error: memberError } = await supabase
+    const { data: member, error: memberError } = await supabase
       .from('company_users')
-      .select('user_id')
+      .select('role')
       .eq('user_id', user.id)
       .eq('company_id', company_id)
       .single();
 
-    if (memberError || !companyMember) {
-      throw new Error("Permission denied.");
-    }
+    if (memberError || !member) throw new Error("Permission denied.");
+
+    const isAdmin = ['owner', 'admin'].includes(member.role);
 
     const supabaseAdmin = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
@@ -61,6 +61,7 @@ serve(async (req) => {
         break;
       
       case 'POST':
+        if (!isAdmin) throw new Error("Access Denied: Only Admins can create accounts.");
         ({ data, error } = await supabaseAdmin
           .from('chart_of_accounts')
           .insert({ ...body.accountData, company_id })
@@ -69,6 +70,7 @@ serve(async (req) => {
         break;
 
       case 'PUT':
+        if (!isAdmin) throw new Error("Access Denied: Only Admins can update accounts.");
         ({ data, error } = await supabaseAdmin
           .from('chart_of_accounts')
           .update(body.accountData)
@@ -79,6 +81,7 @@ serve(async (req) => {
         break;
 
       case 'DELETE':
+        if (!isAdmin) throw new Error("Access Denied: Only Admins can delete accounts.");
         ({ data, error } = await supabaseAdmin
           .from('chart_of_accounts')
           .delete()

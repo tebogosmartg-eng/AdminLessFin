@@ -62,6 +62,7 @@ const Dashboard = () => {
   });
 
   const {
+    role = 'member',
     accounts = [],
     monthlySummary = [],
     arBalances = [],
@@ -75,6 +76,8 @@ const Dashboard = () => {
     recentActivity = [],
     setupStatus = { isComplete: true }
   } = dashboardData || {};
+
+  const isAdmin = role === 'owner' || role === 'admin';
 
   const calculateTotals = (accList: Account[]) => {
     if (!accList || accList.length === 0) return { assets: 0, liabilities: 0, netIncome: 0, cash: 0 };
@@ -95,10 +98,10 @@ const Dashboard = () => {
   const totalAp = apBalances?.reduce((sum: number, item: { balance: number }) => sum + item.balance, 0) || 0;
 
   const summaryCards = [
-    { title: 'Cash Balance', value: totals.cash, icon: DollarSign, link: '/chart-of-accounts' },
-    { title: 'Total Assets', value: totals.assets, icon: Wallet, link: '/financial-statements' },
-    { title: 'Total Liabilities', value: totals.liabilities, icon: Landmark, link: '/financial-statements' },
-    { title: 'Net Income (YTD)', value: totals.netIncome, icon: totals.netIncome >= 0 ? TrendingUp : TrendingDown, color: totals.netIncome >= 0 ? 'text-green-600' : 'text-red-600', link: '/reports' },
+    { title: 'Cash Balance', value: totals.cash, icon: DollarSign, link: '/chart-of-accounts', hidden: !isAdmin },
+    { title: 'Total Assets', value: totals.assets, icon: Wallet, link: '/financial-statements', hidden: !isAdmin },
+    { title: 'Total Liabilities', value: totals.liabilities, icon: Landmark, link: '/financial-statements', hidden: !isAdmin },
+    { title: 'Net Income (YTD)', value: totals.netIncome, icon: totals.netIncome >= 0 ? TrendingUp : TrendingDown, color: totals.netIncome >= 0 ? 'text-green-600' : 'text-red-600', link: '/reports', hidden: !isAdmin },
   ];
 
   if (queryError) {
@@ -162,19 +165,21 @@ const Dashboard = () => {
 
       <QuickActions />
       
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        {summaryCards.map((card, index) => (
-          <Card key={index} className="cursor-pointer transition-colors hover:bg-muted/50" onClick={() => navigate(card.link)}>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">{card.title}</CardTitle>
-              <card.icon className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              {isLoading ? <Skeleton className="h-8 w-3/4" /> : <div className={`text-2xl font-bold ${card.color || ''}`}>{formatCurrency(card.value)}</div>}
-            </CardContent>
-          </Card>
-        ))}
-      </div>
+      {isAdmin && (
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+            {summaryCards.filter(c => !c.hidden).map((card, index) => (
+            <Card key={index} className="cursor-pointer transition-colors hover:bg-muted/50" onClick={() => navigate(card.link)}>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">{card.title}</CardTitle>
+                <card.icon className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                {isLoading ? <Skeleton className="h-8 w-3/4" /> : <div className={`text-2xl font-bold ${card.color || ''}`}>{formatCurrency(card.value)}</div>}
+                </CardContent>
+            </Card>
+            ))}
+        </div>
+      )}
 
       <div className="grid gap-6 md:grid-cols-3">
         <Card className="md:col-span-1">
@@ -232,23 +237,25 @@ const Dashboard = () => {
                     <p className="text-xs text-muted-foreground">recorded {formatDistanceToNow(new Date(activity.created_at), { addSuffix: true })}</p>
                   </div>
                 )) : <p className="text-sm text-muted-foreground text-center py-4">No recent activity recorded.</p>}
-                <Button asChild variant="ghost" className="w-full text-xs h-8"><Link to="/journal-entries">View All Transactions</Link></Button>
+                {isAdmin && <Button asChild variant="ghost" className="w-full text-xs h-8"><Link to="/journal-entries">View All Transactions</Link></Button>}
               </div>
             )}
           </CardContent>
         </Card>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2">
-        <Card>
-          <CardHeader><CardTitle>Cash Flow Forecast (30 Days)</CardTitle><CardDescription>Projected balance based on due invoices and bills.</CardDescription></CardHeader>
-          <CardContent>{isLoading ? <Skeleton className="h-[300px] w-full" /> : <CashFlowForecastChart data={cashFlowForecast} />}</CardContent>
-        </Card>
-        <Card>
-          <CardHeader><CardTitle>Income vs Expenses Trend</CardTitle><CardDescription>6-month trend analysis.</CardDescription></CardHeader>
-          <CardContent>{isLoading ? <Skeleton className="h-[300px] w-full" /> : monthlySummary && monthlySummary.length > 0 ? <IncomeExpenseChart data={monthlySummary} /> : <p className="text-md text-muted-foreground text-center py-8">Not enough data to display a chart.</p>}</CardContent>
-        </Card>
-      </div>
+      {isAdmin && (
+        <div className="grid gap-4 md:grid-cols-2">
+            <Card>
+            <CardHeader><CardTitle>Cash Flow Forecast (30 Days)</CardTitle><CardDescription>Projected balance based on due invoices and bills.</CardDescription></CardHeader>
+            <CardContent>{isLoading ? <Skeleton className="h-[300px] w-full" /> : <CashFlowForecastChart data={cashFlowForecast} />}</CardContent>
+            </Card>
+            <Card>
+            <CardHeader><CardTitle>Income vs Expenses Trend</CardTitle><CardDescription>6-month trend analysis.</CardDescription></CardHeader>
+            <CardContent>{isLoading ? <Skeleton className="h-[300px] w-full" /> : monthlySummary && monthlySummary.length > 0 ? <IncomeExpenseChart data={monthlySummary} /> : <p className="text-md text-muted-foreground text-center py-8">Not enough data to display a chart.</p>}</CardContent>
+            </Card>
+        </div>
+      )}
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         <Card className="cursor-pointer hover:bg-muted/50 transition-colors" onClick={() => navigate('/receive-payments')}>
@@ -279,7 +286,7 @@ const Dashboard = () => {
             )}
           </CardContent>
         </Card>
-        <BankAccountsSummary accounts={accounts} isLoading={isLoading} />
+        {isAdmin && <BankAccountsSummary accounts={accounts} isLoading={isLoading} />}
       </div>
       
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
@@ -302,10 +309,10 @@ const Dashboard = () => {
             )}
           </CardContent>
         </Card>
-        <Card><CardHeader><CardTitle>Top Expenses</CardTitle><CardDescription>Spending for the current period.</CardDescription></CardHeader><CardContent>{isLoading ? <Skeleton className="h-[300px] w-full" /> : <TopExpensesChart data={topExpenses} />}</CardContent></Card>
-        <Card><CardHeader><CardTitle>Top Customers</CardTitle><CardDescription>Highest revenue by customer.</CardDescription></CardHeader><CardContent>{isLoading ? <Skeleton className="h-[300px] w-full" /> : <TopCustomersChart data={topCustomers} />}</CardContent></Card>
+        {isAdmin && <Card><CardHeader><CardTitle>Top Expenses</CardTitle><CardDescription>Spending for the current period.</CardDescription></CardHeader><CardContent>{isLoading ? <Skeleton className="h-[300px] w-full" /> : <TopExpensesChart data={topExpenses} />}</CardContent></Card>}
+        {isAdmin && <Card><CardHeader><CardTitle>Top Customers</CardTitle><CardDescription>Highest revenue by customer.</CardDescription></CardHeader><CardContent>{isLoading ? <Skeleton className="h-[300px] w-full" /> : <TopCustomersChart data={topCustomers} />}</CardContent></Card>}
       </div>
-      <BudgetStatus />
+      {isAdmin && <BudgetStatus />}
     </div>
   );
 };
