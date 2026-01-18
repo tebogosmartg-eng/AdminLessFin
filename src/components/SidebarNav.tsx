@@ -5,7 +5,7 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible"
-import { Book, LayoutDashboard, BookText, Library, Target, Repeat, Building2, Users, TrendingUp, Receipt, Banknote, HandCoins, ChevronRight, Package, Scale, Upload, FileSignature, Briefcase, Landmark, MessageSquare, MessageCircle, Clock, ShoppingBag, Calendar, TicketMinus, PieChart, Coins, FileText } from 'lucide-react';
+import { Book, LayoutDashboard, BookText, Library, Target, Repeat, Building2, Users, TrendingUp, Receipt, Banknote, HandCoins, ChevronRight, Package, Scale, Upload, FileSignature, Briefcase, Landmark, MessageSquare, MessageCircle, Clock, ShoppingBag, Calendar, TicketMinus, PieChart, Coins, FileText, HelpCircle } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { Button } from './ui/button';
 import { useAuth } from '../contexts/AuthContext';
@@ -96,6 +96,8 @@ export const SidebarNav = () => {
   const reportsLinks = [
     { to: '/reports', label: 'Operational Reports', icon: FileText, prefetch: () => {} },
     { to: '/financial-statements', label: 'Financial Statements', icon: FileSignature, prefetch: () => {} },
+    { to: '/comparative-pl', label: 'Comparative P&L', icon: TrendingUp, prefetch: () => {} },
+    { to: '/comparative-bs', label: 'Comparative B/S', icon: Scale, prefetch: () => {} },
     { to: '/inventory-valuation', label: 'Inventory Valuation', icon: Package, prefetch: () => {} },
     { to: '/project-profitability', label: 'Project Profitability', icon: PieChart, prefetch: () => {} },
     { to: '/tax-report', label: 'Sales Tax Report', icon: Scale, prefetch: () => {} },
@@ -140,28 +142,12 @@ export const SidebarNav = () => {
       />
       
       {isAdmin && (
-        <>
-            <NavGroup 
-                title="Payroll" 
-                icon={Briefcase} 
-                links={payrollLinks} 
-                defaultOpen={payrollLinks.some(l => pathname.startsWith(l.to))}
-            />
-            
-            <NavGroup 
-                title="Accounting" 
-                icon={Book} 
-                links={accountingLinks} 
-                defaultOpen={accountingLinks.some(l => pathname.startsWith(l.to))}
-            />
-
-            <NavGroup 
-                title="Assets & Loans" 
-                icon={Landmark} 
-                links={assetsAndLoansLinks} 
-                defaultOpen={assetsAndLoansLinks.some(l => pathname.startsWith(l.to))}
-            />
-        </>
+        <NavGroup 
+            title="Payroll" 
+            icon={Briefcase} 
+            links={payrollLinks} 
+            defaultOpen={payrollLinks.some(l => pathname.startsWith(l.to))}
+        />
       )}
 
       <NavGroup 
@@ -170,6 +156,22 @@ export const SidebarNav = () => {
         links={timeTrackingLinks} 
         defaultOpen={timeTrackingLinks.some(l => pathname.startsWith(l.to))}
       />
+
+      <NavGroup 
+        title="Accounting" 
+        icon={Book} 
+        links={accountingLinks} 
+        defaultOpen={accountingLinks.some(l => pathname.startsWith(l.to))}
+      />
+
+      {isAdmin && (
+        <NavGroup 
+            title="Assets & Loans" 
+            icon={Landmark} 
+            links={assetsAndLoansLinks} 
+            defaultOpen={assetsAndLoansLinks.some(l => pathname.startsWith(l.to))}
+        />
+      )}
 
       <NavGroup 
         title="Reports" 
@@ -187,6 +189,13 @@ export const SidebarNav = () => {
         <Upload className="mr-3 h-5 w-5" />
         Import Data
       </NavLink>
+      
+      <div className="pt-4 mt-auto">
+        <NavLink to="/manual" className={navLinkClasses}>
+          <HelpCircle className="mr-3 h-5 w-5" />
+          User Guide
+        </NavLink>
+      </div>
     </nav>
   );
 };

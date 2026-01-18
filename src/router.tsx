@@ -55,6 +55,7 @@ import ExpenseClaims from "./pages/ExpenseClaims";
 import InventoryValuation from "./pages/InventoryValuation";
 import ComparativePL from "./pages/ComparativePL";
 import ComparativeBalanceSheet from "./pages/ComparativeBalanceSheet";
+import UserManual from "./pages/UserManual";
 
 export const AppRouter = () => {
   return (
@@ -66,6 +67,7 @@ export const AppRouter = () => {
         <Route path="/create-company" element={<CreateCompany />} />
         <Route path="/calendar" element={<FinancialCalendar />} />
         <Route path="/chat" element={<Chat />} />
+        <Route path="/manual" element={<UserManual />} />
         
         <Route path="/quotes" element={<Quotes />} />
         <Route path="/quotes/:id" element={<QuoteDetail />} />
