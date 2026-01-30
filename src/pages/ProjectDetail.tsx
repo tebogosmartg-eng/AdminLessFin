@@ -1,25 +1,36 @@
 import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Badge } from '../components/ui/badge';
 import { Skeleton } from '../components/ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/table';
-import { Clock, DollarSign, FileSignature, CheckCircle, CircleDashed, Target } from 'lucide-react';
+import { Clock, DollarSign, FileSignature, CheckCircle, CircleDashed, Target, PlusCircle, MoreHorizontal, Calendar } from 'lucide-react';
 import { formatCurrency, cn } from '../lib/utils';
 import { useAuth } from '../contexts/AuthContext';
 import { format } from 'date-fns';
 import InvoiceForm from '../components/InvoiceForm';
+import MilestoneForm from '../components/MilestoneForm';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
 import { Progress } from '../components/ui/progress';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "../components/ui/dropdown-menu";
+import { showError, showSuccess } from '../utils/toast';
 
 const ProjectDetail = () => {
   const { id } = useParams();
   const { activeCompany } = useAuth();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [isInvoiceFormOpen, setIsInvoiceFormOpen] = useState(false);
+  const [isMilestoneFormOpen, setIsMilestoneFormOpen] = useState(false);
+  const [selectedMilestone, setSelectedMilestone] = useState<any>(null);
 
   const { data, isLoading } = useQuery({
     queryKey: ['project_detail', id, activeCompany?.id],
@@ -38,7 +49,26 @@ const ProjectDetail = () => {
     enabled: !!id && !!activeCompany,
   });
 
+  const deleteMilestoneMutation = useMutation({
+    mutationFn: async (milestoneId: string) => {
+      const { error } = await supabase.functions.invoke('projects', {
+        body: {
+          method: 'DELETE_MILESTONE',
+          company_id: activeCompany!.id,
+          milestoneId,
+        },
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['project_detail', id] });
+      showSuccess('Milestone deleted.');
+    },
+    onError: (e: any) => showError(e.message),
+  });
+
   const project = data?.project;
+  const milestones = data?.milestones || [];
   const stats = data?.stats;
   const timesheets = data?.timesheets;
   const financials = data?.financials;
@@ -51,8 +81,14 @@ const ProjectDetail = () => {
     return <div>Project not found.</div>;
   }
 
-  const handleCreateInvoice = () => {
-    setIsInvoiceFormOpen(true);
+  const handleEditMilestone = (m: any) => {
+    setSelectedMilestone(m);
+    setIsMilestoneFormOpen(true);
+  };
+
+  const handleAddMilestone = () => {
+    setSelectedMilestone(null);
+    setIsMilestoneFormOpen(true);
   };
 
   const profitMargin = financials?.totalRevenue > 0 
@@ -62,6 +98,9 @@ const ProjectDetail = () => {
   const budgetProgress = project.budget_amount > 0 
     ? ((financials?.totalRevenue || 0) / project.budget_amount) * 100 
     : 0;
+
+  const completedMilestones = milestones.filter((m: any) => m.status === 'completed').length;
+  const milestoneProgress = milestones.length > 0 ? (completedMilestones / milestones.length) * 100 : 0;
 
   return (
     <div className="space-y-6">
@@ -81,42 +120,63 @@ const ProjectDetail = () => {
             <Clock className="mr-2 h-4 w-4" /> Log Time
           </Button>
           {stats?.unbilledAmount > 0 && (
-            <Button onClick={handleCreateInvoice}>
+            <Button onClick={() => setIsInvoiceFormOpen(true)}>
               <FileSignature className="mr-2 h-4 w-4" /> Invoice Unbilled ({formatCurrency(stats.unbilledAmount)})
             </Button>
           )}
         </div>
       </div>
 
+      <div className="grid gap-6 md:grid-cols-2">
+        {project.budget_amount > 0 && (
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium flex justify-between">
+                    Revenue vs Budget Goal
+                    <Target className="h-4 w-4 text-muted-foreground" />
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="flex justify-between items-end mb-2">
+                  <div className="text-2xl font-bold">{formatCurrency(financials?.totalRevenue || 0)}</div>
+                  <div className="text-sm text-muted-foreground">Budget: {formatCurrency(project.budget_amount)}</div>
+                </div>
+                <Progress value={budgetProgress} className={cn(budgetProgress > 100 ? "bg-green-600" : "")} />
+                <p className="text-xs text-muted-foreground mt-2">
+                  {budgetProgress.toFixed(1)}% of revenue budget achieved.
+                </p>
+              </CardContent>
+            </Card>
+        )}
+        <Card>
+            <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium flex justify-between">
+                    Milestone Completion
+                    <CheckCircle className="h-4 w-4 text-muted-foreground" />
+                </CardTitle>
+            </CardHeader>
+            <CardContent>
+                <div className="flex justify-between items-end mb-2">
+                  <div className="text-2xl font-bold">{completedMilestones} / {milestones.length}</div>
+                  <div className="text-sm text-muted-foreground">Completed</div>
+                </div>
+                <Progress value={milestoneProgress} />
+                <p className="text-xs text-muted-foreground mt-2">
+                  {milestoneProgress.toFixed(1)}% of project phases completed.
+                </p>
+            </CardContent>
+        </Card>
+      </div>
+
       <Tabs defaultValue="overview">
         <TabsList>
           <TabsTrigger value="overview">Overview</TabsTrigger>
+          <TabsTrigger value="milestones">Milestones</TabsTrigger>
           <TabsTrigger value="financials">Profitability</TabsTrigger>
           <TabsTrigger value="timesheets">Timesheets</TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview" className="space-y-4">
-          {project.budget_amount > 0 && (
-            <Card>
-              <CardHeader className="pb-2">
-                <div className="flex justify-between">
-                  <CardTitle className="text-sm font-medium">Revenue Budget Progress</CardTitle>
-                  <Target className="h-4 w-4 text-muted-foreground" />
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="flex justify-between items-end mb-2">
-                  <div className="text-2xl font-bold">{formatCurrency(financials?.totalRevenue || 0)}</div>
-                  <div className="text-sm text-muted-foreground">Goal: {formatCurrency(project.budget_amount)}</div>
-                </div>
-                <Progress value={budgetProgress} className={cn(budgetProgress > 100 ? "bg-green-600" : "")} />
-                <p className="text-xs text-muted-foreground mt-2">
-                  {budgetProgress.toFixed(1)}% of budget achieved via invoices.
-                </p>
-              </CardContent>
-            </Card>
-          )}
-
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -159,6 +219,70 @@ const ProjectDetail = () => {
               </CardContent>
             </Card>
           </div>
+        </TabsContent>
+
+        <TabsContent value="milestones" className="space-y-4">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <div>
+                <CardTitle>Project Milestones</CardTitle>
+                <CardDescription>Track key deliverables and project phases.</CardDescription>
+              </div>
+              <Button onClick={handleAddMilestone} size="sm">
+                <PlusCircle className="mr-2 h-4 w-4" /> Add Milestone
+              </Button>
+            </CardHeader>
+            <CardContent>
+                <Table>
+                    <TableHeader>
+                        <TableRow>
+                            <TableHead>Milestone</TableHead>
+                            <TableHead>Due Date</TableHead>
+                            <TableHead className="text-right">Amount</TableHead>
+                            <TableHead>Status</TableHead>
+                            <TableHead className="w-[50px]"></TableHead>
+                        </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                        {milestones.length > 0 ? milestones.map((m: any) => (
+                            <TableRow key={m.id}>
+                                <TableCell>
+                                    <div className="font-medium">{m.name}</div>
+                                    <div className="text-xs text-muted-foreground line-clamp-1">{m.description}</div>
+                                </TableCell>
+                                <TableCell>
+                                    {m.due_date ? (
+                                        <div className="flex items-center gap-1">
+                                            <Calendar className="h-3 w-3" />
+                                            {format(new Date(m.due_date), 'PP')}
+                                        </div>
+                                    ) : '-'}
+                                </TableCell>
+                                <TableCell className="text-right font-mono">{formatCurrency(m.amount)}</TableCell>
+                                <TableCell>
+                                    <Badge variant={m.status === 'completed' ? 'default' : (m.status === 'in-progress' ? 'secondary' : 'outline')} className="capitalize">
+                                        {m.status.replace('-', ' ')}
+                                    </Badge>
+                                </TableCell>
+                                <TableCell>
+                                    <DropdownMenu>
+                                        <DropdownMenuTrigger asChild>
+                                            <Button variant="ghost" className="h-8 w-8 p-0"><MoreHorizontal className="h-4 w-4" /></Button>
+                                        </DropdownMenuTrigger>
+                                        <DropdownMenuContent align="end">
+                                            <DropdownMenuItem onClick={() => handleEditMilestone(m)}>Edit</DropdownMenuItem>
+                                            <DropdownMenuItem onClick={() => deleteMilestoneMutation.mutate(m.id)} className="text-red-600">Delete</DropdownMenuItem>
+                                        </DropdownMenuContent>
+                                    </DropdownMenu>
+                                </TableCell>
+                            </TableRow>
+                        )) : (
+                            <TableRow><TableCell colSpan={5} className="text-center py-8 text-muted-foreground">No milestones defined for this project.</TableCell></TableRow>
+                        )}
+                    </TableBody>
+                </Table>
+            </CardContent>
+          </Card>
         </TabsContent>
 
         <TabsContent value="financials" className="space-y-4">
@@ -252,6 +376,12 @@ const ProjectDetail = () => {
         isOpen={isInvoiceFormOpen}
         setIsOpen={setIsInvoiceFormOpen}
         initialCustomerId={project.customer_id}
+      />
+      <MilestoneForm
+        isOpen={isMilestoneFormOpen}
+        setIsOpen={setIsMilestoneFormOpen}
+        projectId={project.id}
+        milestone={selectedMilestone}
       />
     </div>
   );

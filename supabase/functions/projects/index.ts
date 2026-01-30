@@ -67,6 +67,14 @@ serve(async (req) => {
           .single();
         if (projError) throw projError;
 
+        // Fetch milestones
+        const { data: milestones, error: mileError } = await supabaseAdmin
+          .from('project_milestones')
+          .select('*')
+          .eq('project_id', body.projectId)
+          .order('due_date', { ascending: true });
+        if (mileError) throw mileError;
+
         // Fetch timesheets statistics
         const { data: timesheets, error: timeError } = await supabaseAdmin
           .from('timesheets')
@@ -98,16 +106,15 @@ serve(async (req) => {
         financialItems.forEach(item => {
           const accountType = item.chart_of_accounts?.type;
           if (accountType === 'Income') {
-            // Income is Credit normal.
             totalRevenue += item.type === 'credit' ? item.amount : -item.amount;
           } else if (accountType === 'Expense' || accountType === 'Cost of Goods Sold') {
-            // Expense is Debit normal.
             totalExpenses += item.type === 'debit' ? item.amount : -item.amount;
           }
         });
 
         data = {
           project,
+          milestones,
           stats: {
             totalHours,
             unbilledHours,
@@ -147,6 +154,32 @@ serve(async (req) => {
           .from('projects')
           .delete()
           .eq('id', body.projectId)
+          .eq('company_id', company_id));
+        break;
+
+      case 'POST_MILESTONE':
+        ({ data, error } = await supabaseAdmin
+          .from('project_milestones')
+          .insert({ ...body.milestoneData, company_id })
+          .select()
+          .single());
+        break;
+
+      case 'PUT_MILESTONE':
+        ({ data, error } = await supabaseAdmin
+          .from('project_milestones')
+          .update(body.milestoneData)
+          .eq('id', body.milestoneId)
+          .eq('company_id', company_id)
+          .select()
+          .single());
+        break;
+
+      case 'DELETE_MILESTONE':
+        ({ data, error } = await supabaseAdmin
+          .from('project_milestones')
+          .delete()
+          .eq('id', body.milestoneId)
           .eq('company_id', company_id));
         break;
 
