@@ -14,7 +14,6 @@ import { cn } from '../lib/utils';
 import { showError, showSuccess } from '../utils/toast';
 import { formatCurrency } from '../lib/utils';
 import { useAuth } from '../contexts/AuthContext';
-import { Sparkles } from 'lucide-react';
 
 type Transaction = {
   id: string;
@@ -130,22 +129,6 @@ const Reconciliation = () => {
     });
   };
 
-  const handleMagicMatch = () => {
-    if (!transactions || !bookBalanceData) return;
-    const allIds = transactions.map(t => t.id);
-    setClearedItemIds(new Set(allIds));
-    
-    const statementBalance = parseFloat(statementEndBalance) || 0;
-    const bookBalance = bookBalanceData.balance;
-    const expectedDiff = statementBalance - bookBalance;
-    
-    if (Math.abs(expectedDiff) < 0.001) {
-      showSuccess("Magic Match successful! The difference is $0.00.");
-    } else {
-      showSuccess(`Selected ${allIds.length} transactions. Verify any remaining discrepancies.`);
-    }
-  };
-
   const { payments, deposits, difference } = useMemo(() => {
     if (!transactions || !bookBalanceData) return { payments: [], deposits: [], difference: null };
 
@@ -209,26 +192,13 @@ const Reconciliation = () => {
           <CardTitle>Setup</CardTitle>
           <CardDescription>Select an account and enter your bank statement details to begin.</CardDescription>
         </CardHeader>
-        <CardContent className="flex flex-col md:flex-row gap-4 items-end">
+        <CardContent className="grid md:grid-cols-3 gap-4 items-end">
           <Select onValueChange={v => { setSelectedAccountId(v); setClearedItemIds(new Set()); }} value={selectedAccountId || ''}>
-            <SelectTrigger className="w-full md:w-1/3">
-                <SelectValue placeholder="Select a bank or cash account..." />
-            </SelectTrigger>
+            <SelectTrigger><SelectValue placeholder="Select a bank or cash account..." /></SelectTrigger>
             <SelectContent>{bankAccounts?.map(acc => <SelectItem key={acc.id} value={acc.id}>{acc.name}</SelectItem>)}</SelectContent>
           </Select>
-          <Input type="date" className="w-full md:w-auto" value={statementEndDate} onChange={e => setStatementEndDate(e.target.value)} />
-          <div className="flex gap-2 w-full md:w-auto">
-            <Input type="number" className="flex-1" placeholder="Statement End Balance" value={statementEndBalance} onChange={e => setStatementEndBalance(e.target.value)} />
-            {isSetupComplete && transactions && transactions.length > 0 && (
-                <Button 
-                    variant="secondary" 
-                    onClick={handleMagicMatch}
-                    className="bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border border-indigo-200 whitespace-nowrap"
-                >
-                    <Sparkles className="mr-2 h-4 w-4" /> Magic Match
-                </Button>
-            )}
-          </div>
+          <Input type="date" value={statementEndDate} onChange={e => setStatementEndDate(e.target.value)} />
+          <Input type="number" placeholder="Statement End Balance" value={statementEndBalance} onChange={e => setStatementEndBalance(e.target.value)} />
         </CardContent>
       </Card>
 
