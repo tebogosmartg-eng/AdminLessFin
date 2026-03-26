@@ -7,11 +7,10 @@ import { Button } from '../components/ui/button';
 import { Badge } from '../components/ui/badge';
 import { Skeleton } from '../components/ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/table';
-import { Clock, DollarSign, FileSignature, CheckCircle, CircleDashed, Target, PlusCircle, MoreHorizontal, Calendar } from 'lucide-react';
+import { Clock, DollarSign, FileSignature, CheckCircle, CircleDashed, Target, PlusCircle, MoreHorizontal, Calendar, Loader2 } from 'lucide-react';
 import { formatCurrency, cn } from '../lib/utils';
 import { useAuth } from '../contexts/AuthContext';
-import { format } from 'date-fns';
-import InvoiceForm from '../components/InvoiceForm';
+import { format, addDays } from 'date-fns';
 import MilestoneForm from '../components/MilestoneForm';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
 import { Progress } from '../components/ui/progress';
@@ -28,7 +27,6 @@ const ProjectDetail = () => {
   const { activeCompany } = useAuth();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const [isInvoiceFormOpen, setIsInvoiceFormOpen] = useState(false);
   const [isMilestoneFormOpen, setIsMilestoneFormOpen] = useState(false);
   const [selectedMilestone, setSelectedMilestone] = useState<any>(null);
 
@@ -65,6 +63,73 @@ const ProjectDetail = () => {
       showSuccess('Milestone deleted.');
     },
     onError: (e: any) => showError(e.message),
+  });
+
+  // ONE-CLICK INVOICE GENERATION
+  const generateInvoiceMutation = useMutation({
+    mutationFn: async () => {
+      if (!activeCompany || !data?.project) throw new Error("Missing company or project data");
+      
+      // 1. Get unbilled timesheets
+      const { data: unbilled, error: unbilledError } = await supabase.functions.invoke('timesheets', {
+        body: { method: 'GET_UNBILLED_TIME', company_id: activeCompany.id, customer_id: data.project.customer_id }
+      });
+      if (unbilledError) throw unbilledError;
+      
+      const projectUnbilled = unbilled.filter((t: any) => t.project_id === id);
+      if (projectUnbilled.length === 0) throw new Error("No unbilled time to invoice.");
+
+      // 2. Get Next Invoice Number
+      const { data: invNum, error: numError } = await supabase.functions.invoke('invoices', {
+        body: { method: 'GET_NEXT_INVOICE_NUMBER', company_id: activeCompany.id }
+      });
+      if (numError) throw numError;
+
+      // 3. Get Default AR & Income Accounts
+      const { data: accounts } = await supabase.functions.invoke('chart-of-accounts', {
+        body: { method: 'GET', company_id: activeCompany.id }
+      });
+      const arAcc = accounts?.find((a: any) => a.name.toLowerCase().includes('receivable'));
+      const incomeAcc = accounts?.find((a: any) => a.type === 'Income');
+      
+      if (!arAcc || !incomeAcc) throw new Error("Missing default A/R or Income account. Please check Chart of Accounts.");
+
+      // 4. Construct Payload
+      const p_items = projectUnbilled.map((t: any) => ({
+        description: `${data.project.name} - ${t.notes || 'Time entry'}`,
+        quantity: t.hours,
+        unit_price: data.project.billable_rate || 0,
+        income_account_id: incomeAcc.id,
+        project_id: id
+      }));
+
+      const payload = {
+        method: 'CREATE_WITH_TIMESHEETS',
+        company_id: activeCompany.id,
+        invoiceData: {
+          invoice_number: invNum,
+          invoice_date: format(new Date(), 'yyyy-MM-dd'),
+          due_date: format(addDays(new Date(), 14), 'yyyy-MM-dd'), // Default Net 14
+          customer_id: data.project.customer_id,
+          accounts_receivable_id: arAcc.id,
+          description: `Billing for project: ${data.project.name}`,
+          p_items
+        },
+        timesheetIds: projectUnbilled.map((t: any) => t.id)
+      };
+
+      const { data: result, error: invError } = await supabase.functions.invoke('invoices', { body: payload });
+      if (invError) throw invError;
+      
+      return result;
+    },
+    onSuccess: (result) => {
+      queryClient.invalidateQueries({ queryKey: ['project_detail', id] });
+      queryClient.invalidateQueries({ queryKey: ['invoices'] });
+      showSuccess("Invoice generated successfully!");
+      if (result?.id) navigate(`/invoices/${result.id}`);
+    },
+    onError: (e: any) => showError(e.message)
   });
 
   const project = data?.project;
@@ -120,8 +185,9 @@ const ProjectDetail = () => {
             <Clock className="mr-2 h-4 w-4" /> Log Time
           </Button>
           {stats?.unbilledAmount > 0 && (
-            <Button onClick={() => setIsInvoiceFormOpen(true)}>
-              <FileSignature className="mr-2 h-4 w-4" /> Invoice Unbilled ({formatCurrency(stats.unbilledAmount)})
+            <Button onClick={() => generateInvoiceMutation.mutate()} disabled={generateInvoiceMutation.isPending}>
+              {generateInvoiceMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileSignature className="mr-2 h-4 w-4" />}
+              {generateInvoiceMutation.isPending ? 'Generating...' : `Auto-Invoice (${formatCurrency(stats.unbilledAmount)})`}
             </Button>
           )}
         </div>
@@ -372,11 +438,6 @@ const ProjectDetail = () => {
         </TabsContent>
       </Tabs>
 
-      <InvoiceForm
-        isOpen={isInvoiceFormOpen}
-        setIsOpen={setIsInvoiceFormOpen}
-        initialCustomerId={project.customer_id}
-      />
       <MilestoneForm
         isOpen={isMilestoneFormOpen}
         setIsOpen={setIsMilestoneFormOpen}

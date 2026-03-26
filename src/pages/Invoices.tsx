@@ -11,7 +11,7 @@ import {
   TableRow,
 } from '../components/ui/table';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/card';
-import { PlusCircle, MoreHorizontal, Search, X, Copy } from 'lucide-react';
+import { PlusCircle, MoreHorizontal, Search, X } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "../components/ui/dropdown-menu";
 import { showError, showSuccess } from '../utils/toast';
 import { Badge } from '../components/ui/badge';
@@ -84,11 +84,31 @@ const Invoices = () => {
       });
       if (error) throw error;
     },
-    onSuccess: () => {
+    // OPTIMISTIC UPDATE
+    onMutate: async ({ id, status }) => {
+      await queryClient.cancelQueries({ queryKey: ['invoices', activeCompany?.id] });
+      const previousInvoices = queryClient.getQueryData<Invoice[]>(['invoices', activeCompany?.id, { search: searchTerm, status: statusFilter, customer_id: customerFilter, date_from: dateFrom || null, date_to: dateTo || null }]);
+
+      if (previousInvoices) {
+        queryClient.setQueryData<Invoice[]>(
+          ['invoices', activeCompany?.id, { search: searchTerm, status: statusFilter, customer_id: customerFilter, date_from: dateFrom || null, date_to: dateTo || null }],
+          previousInvoices.map(inv => inv.id === id ? { ...inv, status: status as Invoice['status'] } : inv)
+        );
+      }
+      return { previousInvoices };
+    },
+    onError: (err, variables, context) => {
+      if (context?.previousInvoices) {
+        queryClient.setQueryData(['invoices', activeCompany?.id, { search: searchTerm, status: statusFilter, customer_id: customerFilter, date_from: dateFrom || null, date_to: dateTo || null }], context.previousInvoices);
+      }
+      showError(err.message);
+    },
+    onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ['invoices', activeCompany?.id] });
+    },
+    onSuccess: () => {
       showSuccess('Invoice status updated.');
     },
-    onError: (error: any) => showError(error.message),
   });
 
   const handleEdit = (id: string) => {
