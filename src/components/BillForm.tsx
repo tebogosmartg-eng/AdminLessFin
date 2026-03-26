@@ -17,7 +17,7 @@ import { Product } from '../pages/Products';
 import { Project } from '../pages/Projects';
 import { TaxRate } from '../pages/TaxRates';
 import { Account } from '../pages/ChartOfAccounts';
-import { Trash2, X } from 'lucide-react';
+import { Trash2, X, ChevronDown, ChevronUp } from 'lucide-react';
 import { Alert, AlertDescription } from './ui/alert';
 import { addDays, format, isValid } from 'date-fns';
 import { formatCurrency } from '../lib/utils';
@@ -63,6 +63,7 @@ const BillForm = ({ isOpen, setIsOpen, billId, duplicateFromId, initialData, onS
   const [attachmentFile, setAttachmentFile] = useState<File | null>(null);
   const [existingAttachmentUrl, setExistingAttachmentUrl] = useState<string | null>(null);
   const [removeAttachment, setRemoveAttachment] = useState(false);
+  const [showAdvanced, setShowAdvanced] = useState(false);
 
   const form = useForm<BillFormValues>({
     resolver: zodResolver(billSchema),
@@ -128,6 +129,14 @@ const BillForm = ({ isOpen, setIsOpen, billId, duplicateFromId, initialData, onS
   const vendorId = form.watch('vendor_id');
   const billDate = form.watch('bill_date');
 
+  // Smart Defaults: Auto-select ledger routing
+  useEffect(() => {
+    if (isOpen && accounts && !isEditing) {
+      const apAcc = accounts.find(a => a.type === 'Liability' && a.name.toLowerCase().includes('payable'));
+      if (apAcc) form.setValue('accounts_payable_id', apAcc.id);
+    }
+  }, [isOpen, accounts, isEditing, form]);
+
   useEffect(() => {
     if (vendorId && billDate && !isEditing && vendors) {
       const vendor = vendors.find(v => v.id === vendorId);
@@ -167,7 +176,7 @@ const BillForm = ({ isOpen, setIsOpen, billId, duplicateFromId, initialData, onS
 
       if (attachmentFile) {
          const fileExt = attachmentFile.name.split('.').pop();
-         const fileName = `logo-${Date.now()}.${fileExt}`;
+         const fileName = `bill-${Date.now()}.${fileExt}`;
          const filePath = `${activeCompany.id}/bills/${fileName}`;
          const { error: uploadError } = await supabase.storage.from('attachments').upload(filePath, attachmentFile);
          if (uploadError) throw new Error(`Upload Error: ${uploadError.message}`);
@@ -245,12 +254,7 @@ const BillForm = ({ isOpen, setIsOpen, billId, duplicateFromId, initialData, onS
               <FormField control={form.control} name="bill_date" render={({ field }) => (<FormItem><FormLabel>Bill Date</FormLabel><FormControl><Input type="date" {...field} /></FormControl><FormMessage /></FormItem>)} />
               <FormField control={form.control} name="due_date" render={({ field }) => (<FormItem><FormLabel>Due Date</FormLabel><FormControl><Input type="date" {...field} /></FormControl><FormMessage /></FormItem>)} />
             </div>
-            <div className="grid grid-cols-2 gap-4">
-                <FormField control={form.control} name="accounts_payable_id" render={({ field }) => (<FormItem><FormLabel>Credit Accounts Payable</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select Account" /></SelectTrigger></FormControl><SelectContent>{apAccounts?.map(acc => <SelectItem key={acc.id} value={acc.id}>{acc.name}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem>)} />
-                {hasTax && (
-                    <FormField control={form.control} name="tax_receivable_account_id" render={({ field }) => (<FormItem><FormLabel>Tax Receivable Account</FormLabel><Select onValueChange={field.onChange} value={field.value || 'none'}><FormControl><SelectTrigger><SelectValue placeholder="Select Asset Account" /></SelectTrigger></FormControl><SelectContent><SelectItem value="none">None</SelectItem>{assetAccounts?.map(acc => <SelectItem key={acc.id} value={acc.id}>{acc.name}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem>)} />
-                )}
-            </div>
+
             <FormField control={form.control} name="description" render={({ field }) => (<FormItem><FormLabel>General Description</FormLabel><FormControl><Textarea placeholder="Brief note about this bill" {...field} /></FormControl><FormMessage /></FormItem>)} />
             
             <FormItem>
@@ -313,9 +317,24 @@ const BillForm = ({ isOpen, setIsOpen, billId, duplicateFromId, initialData, onS
                   </div>
                 )
               })}
-              <Button type="button" variant="outline" size="sm" onClick={() => append({ description: '', quantity: 1, unit_cost: 0, expense_account_id: '', project_id: '', tax_rate_id: '' })}>Add Line</Button>
+              <Button type="button" variant="outline" size="sm" onClick={() => append({ description: '', quantity: 1, unit_cost: 0, expense_account_id: expenseAccounts?.[0]?.id || '', project_id: '', tax_rate_id: '' })}>Add Line</Button>
             </div>
             
+            <div className="pt-4 border-t">
+                <Button type="button" variant="ghost" size="sm" onClick={() => setShowAdvanced(!showAdvanced)} className="text-muted-foreground px-0">
+                  {showAdvanced ? <ChevronUp className="mr-2 h-4 w-4" /> : <ChevronDown className="mr-2 h-4 w-4" />}
+                  {showAdvanced ? 'Hide Advanced Accounting' : 'Show Advanced Accounting'}
+                </Button>
+                {showAdvanced && (
+                  <div className="grid grid-cols-2 gap-4 mt-4 bg-muted/30 p-4 rounded-md">
+                      <FormField control={form.control} name="accounts_payable_id" render={({ field }) => (<FormItem><FormLabel>Credit Accounts Payable</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select Account" /></SelectTrigger></FormControl><SelectContent>{apAccounts?.map(acc => <SelectItem key={acc.id} value={acc.id}>{acc.name}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem>)} />
+                      {hasTax && (
+                          <FormField control={form.control} name="tax_receivable_account_id" render={({ field }) => (<FormItem><FormLabel>Tax Receivable Account</FormLabel><Select onValueChange={field.onChange} value={field.value || 'none'}><FormControl><SelectTrigger><SelectValue placeholder="Select Asset Account" /></SelectTrigger></FormControl><SelectContent><SelectItem value="none">None</SelectItem>{assetAccounts?.map(acc => <SelectItem key={acc.id} value={acc.id}>{acc.name}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem>)} />
+                      )}
+                  </div>
+                )}
+            </div>
+
             <div className="flex justify-end pt-2 border-t">
                <span className="text-xl font-bold">Total Bill: {formatCurrency(totalAmount)}</span>
             </div>

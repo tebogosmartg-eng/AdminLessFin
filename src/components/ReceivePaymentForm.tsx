@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -15,6 +15,7 @@ import { Account } from '../pages/ChartOfAccounts';
 import { Alert, AlertDescription } from './ui/alert';
 import { Textarea } from './ui/textarea';
 import { formatCurrency } from '../lib/utils';
+import { ChevronDown, ChevronUp } from 'lucide-react';
 
 const paymentSchema = z.object({
   payment_date: z.string().min(1, "Date is required."),
@@ -37,6 +38,8 @@ interface ReceivePaymentFormProps {
 const ReceivePaymentForm = ({ isOpen, setIsOpen, customerId, customerName, amountDue }: ReceivePaymentFormProps) => {
   const { activeCompany } = useAuth();
   const queryClient = useQueryClient();
+  const [showAdvanced, setShowAdvanced] = useState(false);
+
   const form = useForm<PaymentFormValues>({
     resolver: zodResolver(paymentSchema),
     defaultValues: {
@@ -48,18 +51,6 @@ const ReceivePaymentForm = ({ isOpen, setIsOpen, customerId, customerName, amoun
     },
   });
 
-  useEffect(() => {
-    if (isOpen) {
-      form.reset({
-        payment_date: new Date().toISOString().split('T')[0],
-        deposit_account_id: '',
-        accounts_receivable_id: '',
-        amount: amountDue,
-        description: `Payment from ${customerName}`,
-      });
-    }
-  }, [isOpen, amountDue, customerName, form]);
-
   const { data: assetAccounts } = useQuery<Account[]>({
     queryKey: ['asset_accounts', activeCompany?.id],
     queryFn: async () => {
@@ -70,6 +61,36 @@ const ReceivePaymentForm = ({ isOpen, setIsOpen, customerId, customerName, amoun
     },
     enabled: !!activeCompany,
   });
+
+  // Reset form when opened with new props
+  useEffect(() => {
+    if (isOpen) {
+      form.reset({
+        payment_date: new Date().toISOString().split('T')[0],
+        deposit_account_id: form.getValues('deposit_account_id'), // Preserve if already set
+        accounts_receivable_id: form.getValues('accounts_receivable_id'), // Preserve if already set
+        amount: amountDue,
+        description: `Payment from ${customerName}`,
+      });
+    }
+  }, [isOpen, amountDue, customerName, form]);
+
+  // Smart Defaults: Auto-select bank and AR accounts
+  useEffect(() => {
+    if (isOpen && assetAccounts) {
+      const arAcc = assetAccounts.find(a => a.name.toLowerCase().includes('receivable'));
+      // Prefer checking/bank account over generic assets
+      const bankAcc = assetAccounts.find(a => a.name.toLowerCase().includes('bank') || a.name.toLowerCase().includes('checking') || a.name.toLowerCase().includes('cash')) 
+        || assetAccounts.find(a => !a.name.toLowerCase().includes('receivable'));
+
+      if (arAcc && !form.getValues('accounts_receivable_id')) {
+          form.setValue('accounts_receivable_id', arAcc.id);
+      }
+      if (bankAcc && !form.getValues('deposit_account_id')) {
+          form.setValue('deposit_account_id', bankAcc.id);
+      }
+    }
+  }, [isOpen, assetAccounts, form]);
 
   const mutation = useMutation({
     mutationFn: async (values: PaymentFormValues) => {
@@ -97,6 +118,9 @@ const ReceivePaymentForm = ({ isOpen, setIsOpen, customerId, customerName, amoun
 
   const onSubmit = (values: PaymentFormValues) => mutation.mutate(values);
 
+  const bankAccountsList = assetAccounts?.filter(a => !a.name.toLowerCase().includes('receivable'));
+  const arAccountsList = assetAccounts?.filter(a => a.name.toLowerCase().includes('receivable'));
+
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogContent className="sm:max-w-lg">
@@ -104,7 +128,7 @@ const ReceivePaymentForm = ({ isOpen, setIsOpen, customerId, customerName, amoun
           <DialogTitle>Receive Payment from {customerName}</DialogTitle>
           <DialogDescription>Amount Due: {formatCurrency(amountDue)}</DialogDescription>
         </DialogHeader>
-        {!assetAccounts?.some(acc => acc.name.toLowerCase().includes('accounts receivable')) && (
+        {!arAccountsList?.length && (
             <Alert variant="destructive">
                 <AlertDescription>
                 Warning: You don't have an "Accounts Receivable" account. Please create one in your Chart of Accounts (Type: Asset).
@@ -121,15 +145,29 @@ const ReceivePaymentForm = ({ isOpen, setIsOpen, customerId, customerName, amoun
                 <FormItem><FormLabel>Amount</FormLabel><FormControl><Input type="number" step="0.01" {...field} /></FormControl><FormMessage /></FormItem>
               )} />
             </div>
+            
             <FormField control={form.control} name="deposit_account_id" render={({ field }) => (
-              <FormItem><FormLabel>Deposit To Account</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select a cash/bank account" /></SelectTrigger></FormControl><SelectContent>{assetAccounts?.filter(a => !a.name.toLowerCase().includes('receivable')).map(acc => <SelectItem key={acc.id} value={acc.id}>{acc.name}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem>
+              <FormItem><FormLabel>Deposit To Bank Account</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select a bank account" /></SelectTrigger></FormControl><SelectContent>{bankAccountsList?.map(acc => <SelectItem key={acc.id} value={acc.id}>{acc.name}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem>
             )} />
-            <FormField control={form.control} name="accounts_receivable_id" render={({ field }) => (
-              <FormItem><FormLabel>Accounts Receivable Account</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select an A/R account" /></SelectTrigger></FormControl><SelectContent>{assetAccounts?.filter(a => a.name.toLowerCase().includes('receivable')).map(acc => <SelectItem key={acc.id} value={acc.id}>{acc.name}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem>
-            )} />
+            
             <FormField control={form.control} name="description" render={({ field }) => (
                 <FormItem><FormLabel>Memo (Optional)</FormLabel><FormControl><Textarea placeholder="e.g., Payment for invoice #123" {...field} /></FormControl><FormMessage /></FormItem>
             )} />
+
+            <div className="pt-2">
+                <Button type="button" variant="ghost" size="sm" onClick={() => setShowAdvanced(!showAdvanced)} className="text-muted-foreground px-0">
+                  {showAdvanced ? <ChevronUp className="mr-2 h-4 w-4" /> : <ChevronDown className="mr-2 h-4 w-4" />}
+                  {showAdvanced ? 'Hide Advanced Accounting' : 'Show Advanced Accounting'}
+                </Button>
+                {showAdvanced && (
+                  <div className="mt-4 bg-muted/30 p-4 rounded-md">
+                     <FormField control={form.control} name="accounts_receivable_id" render={({ field }) => (
+                        <FormItem><FormLabel>Credit Accounts Receivable</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select an A/R account" /></SelectTrigger></FormControl><SelectContent>{arAccountsList?.map(acc => <SelectItem key={acc.id} value={acc.id}>{acc.name}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem>
+                     )} />
+                  </div>
+                )}
+            </div>
+
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setIsOpen(false)}>Cancel</Button>
               <Button type="submit" disabled={mutation.isPending}>{mutation.isPending ? 'Saving...' : 'Receive Payment'}</Button>

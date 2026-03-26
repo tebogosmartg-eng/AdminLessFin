@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -15,6 +15,7 @@ import { Account } from '../pages/ChartOfAccounts';
 import { Alert, AlertDescription } from './ui/alert';
 import { Textarea } from './ui/textarea';
 import { formatCurrency } from '../lib/utils';
+import { ChevronDown, ChevronUp } from 'lucide-react';
 
 const paymentSchema = z.object({
   payment_date: z.string().min(1, "Date is required."),
@@ -38,6 +39,8 @@ interface BillPaymentFormProps {
 const BillPaymentForm = ({ isOpen, setIsOpen, vendorId, vendorName, amountDue, billId }: BillPaymentFormProps) => {
   const { activeCompany } = useAuth();
   const queryClient = useQueryClient();
+  const [showAdvanced, setShowAdvanced] = useState(false);
+
   const form = useForm<PaymentFormValues>({
     resolver: zodResolver(paymentSchema),
     defaultValues: {
@@ -48,18 +51,6 @@ const BillPaymentForm = ({ isOpen, setIsOpen, vendorId, vendorName, amountDue, b
       description: '',
     },
   });
-
-  useEffect(() => {
-    if (isOpen) {
-      form.reset({
-        payment_date: new Date().toISOString().split('T')[0],
-        payment_account_id: '',
-        accounts_payable_id: '',
-        amount: amountDue,
-        description: `Payment to ${vendorName}`,
-      });
-    }
-  }, [isOpen, amountDue, vendorName, form]);
 
   const { data: accounts } = useQuery<Account[]>({
     queryKey: ['accounts', activeCompany?.id],
@@ -79,6 +70,34 @@ const BillPaymentForm = ({ isOpen, setIsOpen, vendorId, vendorName, amountDue, b
 
   const assetAccounts = accounts?.filter(acc => acc.type === 'Asset');
   const apAccounts = accounts?.filter(acc => acc.type === 'Liability');
+
+  useEffect(() => {
+    if (isOpen) {
+      form.reset({
+        payment_date: new Date().toISOString().split('T')[0],
+        payment_account_id: form.getValues('payment_account_id'),
+        accounts_payable_id: form.getValues('accounts_payable_id'),
+        amount: amountDue,
+        description: `Payment to ${vendorName}`,
+      });
+    }
+  }, [isOpen, amountDue, vendorName, form]);
+
+  // Smart Defaults: Auto-select bank and AP accounts
+  useEffect(() => {
+    if (isOpen && accounts) {
+      const bankAcc = assetAccounts?.find(a => a.name.toLowerCase().includes('bank') || a.name.toLowerCase().includes('checking') || a.name.toLowerCase().includes('cash')) 
+        || assetAccounts?.[0];
+      const apAcc = apAccounts?.find(a => a.name.toLowerCase().includes('payable'));
+      
+      if (bankAcc && !form.getValues('payment_account_id')) {
+          form.setValue('payment_account_id', bankAcc.id);
+      }
+      if (apAcc && !form.getValues('accounts_payable_id')) {
+          form.setValue('accounts_payable_id', apAcc.id);
+      }
+    }
+  }, [isOpen, accounts, assetAccounts, apAccounts, form]);
 
   const mutation = useMutation({
     mutationFn: async (values: PaymentFormValues) => {
@@ -108,6 +127,8 @@ const BillPaymentForm = ({ isOpen, setIsOpen, vendorId, vendorName, amountDue, b
 
   const onSubmit = (values: PaymentFormValues) => mutation.mutate(values);
 
+  const apAccountsList = apAccounts?.filter(a => a.name.toLowerCase().includes('payable'));
+
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogContent className="sm:max-w-lg">
@@ -115,7 +136,7 @@ const BillPaymentForm = ({ isOpen, setIsOpen, vendorId, vendorName, amountDue, b
           <DialogTitle>Record Payment to {vendorName}</DialogTitle>
           <DialogDescription>Amount Due: {formatCurrency(amountDue)}</DialogDescription>
         </DialogHeader>
-        {!apAccounts?.some(acc => acc.name.toLowerCase().includes('accounts payable')) && (
+        {!apAccountsList?.length && (
             <Alert variant="destructive">
                 <AlertDescription>
                 Warning: You don't have an "Accounts Payable" account. Please create one in your Chart of Accounts (Type: Liability).
@@ -133,14 +154,27 @@ const BillPaymentForm = ({ isOpen, setIsOpen, vendorId, vendorName, amountDue, b
               )} />
             </div>
             <FormField control={form.control} name="payment_account_id" render={({ field }) => (
-              <FormItem><FormLabel>Pay From Account</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select a cash/bank account" /></SelectTrigger></FormControl><SelectContent>{assetAccounts?.map(acc => <SelectItem key={acc.id} value={acc.id}>{acc.name}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem>
+              <FormItem><FormLabel>Pay From Bank Account</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select a bank account" /></SelectTrigger></FormControl><SelectContent>{assetAccounts?.map(acc => <SelectItem key={acc.id} value={acc.id}>{acc.name}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem>
             )} />
-            <FormField control={form.control} name="accounts_payable_id" render={({ field }) => (
-              <FormItem><FormLabel>Accounts Payable Account</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select an A/P account" /></SelectTrigger></FormControl><SelectContent>{apAccounts?.map(acc => <SelectItem key={acc.id} value={acc.id}>{acc.name}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem>
-            )} />
+            
             <FormField control={form.control} name="description" render={({ field }) => (
                 <FormItem><FormLabel>Memo (Optional)</FormLabel><FormControl><Textarea placeholder="e.g., Payment for invoice #123" {...field} /></FormControl><FormMessage /></FormItem>
             )} />
+
+            <div className="pt-2">
+                <Button type="button" variant="ghost" size="sm" onClick={() => setShowAdvanced(!showAdvanced)} className="text-muted-foreground px-0">
+                  {showAdvanced ? <ChevronUp className="mr-2 h-4 w-4" /> : <ChevronDown className="mr-2 h-4 w-4" />}
+                  {showAdvanced ? 'Hide Advanced Accounting' : 'Show Advanced Accounting'}
+                </Button>
+                {showAdvanced && (
+                  <div className="mt-4 bg-muted/30 p-4 rounded-md">
+                     <FormField control={form.control} name="accounts_payable_id" render={({ field }) => (
+                      <FormItem><FormLabel>Debit Accounts Payable Account</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select an A/P account" /></SelectTrigger></FormControl><SelectContent>{apAccounts?.map(acc => <SelectItem key={acc.id} value={acc.id}>{acc.name}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem>
+                     )} />
+                  </div>
+                )}
+            </div>
+
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setIsOpen(false)}>Cancel</Button>
               <Button type="submit" disabled={mutation.isPending}>{mutation.isPending ? 'Saving...' : 'Record Payment'}</Button>

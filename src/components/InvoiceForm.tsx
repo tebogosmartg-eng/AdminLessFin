@@ -17,7 +17,7 @@ import { Customer } from '../pages/Customers';
 import { Product } from '../pages/Products';
 import { TaxRate } from '../pages/TaxRates';
 import { Project } from '../pages/Projects';
-import { Trash2, Clock } from 'lucide-react';
+import { Trash2, Clock, ChevronDown, ChevronUp } from 'lucide-react';
 import { addDays, format, isValid } from 'date-fns';
 import { formatCurrency } from '../lib/utils';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from './ui/sheet';
@@ -66,6 +66,7 @@ const InvoiceForm = ({ isOpen, setIsOpen, invoiceId, duplicateFromId, initialCus
   const isDuplicating = !!duplicateFromId;
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const [isUnbilledTimeOpen, setIsUnbilledTimeOpen] = useState(false);
+  const [showAdvanced, setShowAdvanced] = useState(false);
 
   const form = useForm<InvoiceFormValues>({
     resolver: zodResolver(invoiceSchema),
@@ -121,6 +122,7 @@ const InvoiceForm = ({ isOpen, setIsOpen, invoiceId, duplicateFromId, initialCus
   const customerId = form.watch('customer_id');
   const invoiceDate = form.watch('invoice_date');
 
+  // Smart Defaults: Auto-select ledger routing so user doesn't have to
   useEffect(() => {
     if (isOpen && accounts && !isEditing) {
       const arAcc = accounts.find(a => a.name.toLowerCase().includes('receivable'));
@@ -320,11 +322,7 @@ const InvoiceForm = ({ isOpen, setIsOpen, invoiceId, duplicateFromId, initialCus
                 <FormField control={form.control} name="invoice_date" render={({ field }) => (<FormItem><FormLabel>Invoice Date</FormLabel><FormControl><Input type="date" {...field} /></FormControl><FormMessage /></FormItem>)} />
                 <FormField control={form.control} name="due_date" render={({ field }) => (<FormItem><FormLabel>Due Date</FormLabel><FormControl><Input type="date" {...field} /></FormControl><FormMessage /></FormItem>)} />
               </div>
-              <div className="grid grid-cols-3 gap-4">
-                <FormField control={form.control} name="accounts_receivable_id" render={({ field }) => (<FormItem><FormLabel>A/R Account</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select Account" /></SelectTrigger></FormControl><SelectContent>{assetAccounts?.map(acc => <SelectItem key={acc.id} value={acc.id}>{acc.name}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem>)} />
-                {hasInventoryItem && (<FormField control={form.control} name="inventory_asset_account_id" render={({ field }) => (<FormItem><FormLabel>Inventory Asset Account</FormLabel><Select onValueChange={field.onChange} value={field.value || 'none'}><FormControl><SelectTrigger><SelectValue placeholder="Select Account" /></SelectTrigger></FormControl><SelectContent><SelectItem value="none">None</SelectItem>{assetAccounts?.map(acc => <SelectItem key={acc.id} value={acc.id}>{acc.name}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem>)} />)}
-                {hasTax && (<FormField control={form.control} name="tax_payable_account_id" render={({ field }) => (<FormItem><FormLabel>Tax Payable Account</FormLabel><Select onValueChange={field.onChange} value={field.value || 'none'}><FormControl><SelectTrigger><SelectValue placeholder="Select Account" /></SelectTrigger></FormControl><SelectContent><SelectItem value="none">None</SelectItem>{liabilityAccounts?.map(acc => <SelectItem key={acc.id} value={acc.id}>{acc.name}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem>)} />)}
-              </div>
+              
               <div className="space-y-2 pt-4">
                 <div className="flex justify-between items-center">
                   <FormLabel>Line Items</FormLabel>
@@ -360,9 +358,24 @@ const InvoiceForm = ({ isOpen, setIsOpen, invoiceId, duplicateFromId, initialCus
                     </div>
                   )
                 })}
-                <Button type="button" variant="outline" size="sm" onClick={() => append({ product_id: '', description: '', quantity: 1, unit_price: 0, income_account_id: '', tax_rate_id: '', project_id: '' })}>Add Line</Button>
+                <Button type="button" variant="outline" size="sm" onClick={() => append({ product_id: '', description: '', quantity: 1, unit_price: 0, income_account_id: incomeAccounts?.[0]?.id || '', tax_rate_id: '', project_id: '' })}>Add Line</Button>
               </div>
               <FormField control={form.control} name="notes" render={({ field }) => (<FormItem><FormLabel>Invoice Notes</FormLabel><FormControl><Textarea placeholder="Terms, bank details..." {...field} rows={3} /></FormControl><FormMessage /></FormItem>)} />
+              
+              <div className="pt-4 border-t">
+                <Button type="button" variant="ghost" size="sm" onClick={() => setShowAdvanced(!showAdvanced)} className="text-muted-foreground px-0">
+                  {showAdvanced ? <ChevronUp className="mr-2 h-4 w-4" /> : <ChevronDown className="mr-2 h-4 w-4" />}
+                  {showAdvanced ? 'Hide Advanced Accounting' : 'Show Advanced Accounting'}
+                </Button>
+                {showAdvanced && (
+                  <div className="grid grid-cols-3 gap-4 mt-4 bg-muted/30 p-4 rounded-md">
+                    <FormField control={form.control} name="accounts_receivable_id" render={({ field }) => (<FormItem><FormLabel>A/R Account</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select Account" /></SelectTrigger></FormControl><SelectContent>{assetAccounts?.map(acc => <SelectItem key={acc.id} value={acc.id}>{acc.name}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem>)} />
+                    {hasInventoryItem && (<FormField control={form.control} name="inventory_asset_account_id" render={({ field }) => (<FormItem><FormLabel>Inventory Asset Account</FormLabel><Select onValueChange={field.onChange} value={field.value || 'none'}><FormControl><SelectTrigger><SelectValue placeholder="Select Account" /></SelectTrigger></FormControl><SelectContent><SelectItem value="none">None</SelectItem>{assetAccounts?.map(acc => <SelectItem key={acc.id} value={acc.id}>{acc.name}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem>)} />)}
+                    {hasTax && (<FormField control={form.control} name="tax_payable_account_id" render={({ field }) => (<FormItem><FormLabel>Tax Payable Account</FormLabel><Select onValueChange={field.onChange} value={field.value || 'none'}><FormControl><SelectTrigger><SelectValue placeholder="Select Account" /></SelectTrigger></FormControl><SelectContent><SelectItem value="none">None</SelectItem>{liabilityAccounts?.map(acc => <SelectItem key={acc.id} value={acc.id}>{acc.name}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem>)} />)}
+                  </div>
+                )}
+              </div>
+
               <DialogFooter className="pt-4 border-t sticky bottom-0 bg-background py-4">
                 <Button type="button" variant="outline" onClick={() => setIsPreviewOpen(true)}>Preview</Button>
                 <div className="flex-grow" />
