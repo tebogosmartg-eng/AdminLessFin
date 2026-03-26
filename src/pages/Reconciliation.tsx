@@ -14,6 +14,7 @@ import { cn } from '../lib/utils';
 import { showError, showSuccess } from '../utils/toast';
 import { formatCurrency } from '../lib/utils';
 import { useAuth } from '../contexts/AuthContext';
+import { Sparkles, Wand2 } from 'lucide-react';
 
 type Transaction = {
   id: string;
@@ -129,6 +130,65 @@ const Reconciliation = () => {
     });
   };
 
+  const handleMagicMatch = () => {
+    if (!transactions || !bookBalanceData) return;
+    
+    const targetBalance = parseFloat(statementEndBalance) || 0;
+    const bookBalance = bookBalanceData.balance;
+    const isDebitNormal = bankAccounts?.find(acc => acc.id === selectedAccountId)?.type === 'Asset';
+    
+    // We want to find the transactions to LEAVE UNCLEARED.
+    // If we clear everything, Reconciled Balance == Book Balance.
+    // Every time we leave a transaction UNCLEARED, the Reconciled Balance shifts.
+    // Reconciled Balance = Book Balance - SUM(Uncleared Deposits) + SUM(Uncleared Payments)
+    // We want: targetBalance = bookBalance - SUM(Uncleared Deposits) + SUM(Uncleared Payments)
+    // Therefore: SUM(Uncleared Deposits) - SUM(Uncleared Payments) = bookBalance - targetBalance
+    
+    const targetLeftOut = bookBalance - targetBalance;
+    
+    const items = transactions.map(t => {
+      const isDeposit = isDebitNormal ? t.type === 'debit' : t.type === 'credit';
+      return {
+        id: t.id,
+        val: isDeposit ? t.amount : -t.amount
+      };
+    });
+
+    // Subset sum to find up to 3 items to leave uncleared
+    const checkSubsets = () => {
+      if (Math.abs(targetLeftOut) < 0.01) return []; // Clear everything
+
+      // Size 1
+      for (let i=0; i<items.length; i++) {
+        if (Math.abs(items[i].val - targetLeftOut) < 0.01) return [items[i].id];
+      }
+      // Size 2
+      for (let i=0; i<items.length; i++) {
+        for (let j=i+1; j<items.length; j++) {
+          if (Math.abs(items[i].val + items[j].val - targetLeftOut) < 0.01) return [items[i].id, items[j].id];
+        }
+      }
+      // Size 3
+      for (let i=0; i<items.length; i++) {
+        for (let j=i+1; j<items.length; j++) {
+          for (let k=j+1; k<items.length; k++) {
+            if (Math.abs(items[i].val + items[j].val + items[k].val - targetLeftOut) < 0.01) return [items[i].id, items[j].id, items[k].id];
+          }
+        }
+      }
+      return null;
+    };
+
+    const leftOutIds = checkSubsets();
+    if (leftOutIds !== null) {
+      const clearedIds = items.filter(item => !leftOutIds.includes(item.id)).map(item => item.id);
+      setClearedItemIds(new Set(clearedIds));
+      showSuccess('✨ Magic Match found the perfect combination!');
+    } else {
+      showError('Could not auto-match. There may be more than 3 uncleared items, or missing data.');
+    }
+  };
+
   const { payments, deposits, difference } = useMemo(() => {
     if (!transactions || !bookBalanceData) return { payments: [], deposits: [], difference: null };
 
@@ -170,7 +230,7 @@ const Reconciliation = () => {
           </TableHeader>
           <TableBody>
             {items.map(item => (
-              <TableRow key={item.id}>
+              <TableRow key={item.id} className={clearedItemIds.has(item.id) ? "opacity-50" : ""}>
                 <TableCell><Checkbox checked={clearedItemIds.has(item.id)} onCheckedChange={(checked) => handleClearItem(item.id, !!checked)} /></TableCell>
                 <TableCell>{format(new Date(item.entry_date), 'PP')}</TableCell>
                 <TableCell>{item.description}</TableCell>
@@ -204,9 +264,15 @@ const Reconciliation = () => {
 
       {isSetupComplete && (
         <>
-          <Card>
-            <CardHeader>
+          <Card className="border-indigo-200 shadow-sm">
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle>Reconciliation Summary</CardTitle>
+              {difference !== null && Math.abs(difference) > 0.001 && transactions && transactions.length > 0 && (
+                <Button onClick={handleMagicMatch} variant="secondary" className="text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border-indigo-200">
+                  <Wand2 className="mr-2 h-4 w-4" />
+                  Auto-Match Transactions
+                </Button>
+              )}
             </CardHeader>
             <CardContent className="grid grid-cols-3 gap-4 text-center">
               <div>
@@ -235,10 +301,11 @@ const Reconciliation = () => {
 
           {difference !== null && Math.abs(difference) < 0.001 && (
             <div className="text-center pt-4">
-              <Button size="lg" onClick={() => finishReconciliationMutation.mutate(Array.from(clearedItemIds))} disabled={finishReconciliationMutation.isPending}>
+              <Button size="lg" onClick={() => finishReconciliationMutation.mutate(Array.from(clearedItemIds))} disabled={finishReconciliationMutation.isPending} className="bg-green-600 hover:bg-green-700 text-white">
+                <Sparkles className="mr-2 h-5 w-5" />
                 {finishReconciliationMutation.isPending ? 'Finishing...' : 'Finish Reconciliation'}
               </Button>
-              <p className="text-sm text-muted-foreground mt-2">Once finished, these transactions will be marked as cleared.</p>
+              <p className="text-sm text-muted-foreground mt-2">Books are perfectly balanced! Once finished, these transactions will be locked.</p>
             </div>
           )}
         </>

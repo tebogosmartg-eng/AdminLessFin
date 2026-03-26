@@ -84,9 +84,12 @@ serve(async (req) => {
         promises.push(userSupabase.rpc('get_monthly_summary', { p_months: 6 }));
         promises.push(userSupabase.rpc('get_vendor_ap_balances'));
         promises.push(userSupabase.rpc('get_top_expenses', { p_start_date: startDateStr, p_end_date: asOfDateStr }));
-        // Forecast Data
+        // Forecast Data: Current Open Payables/Receivables
         promises.push(supabaseAdmin.from('invoices').select('due_date, journal_entries(journal_entry_items(amount, type))').eq('company_id', company_id).neq('status', 'paid').neq('status', 'void').gte('due_date', format(new Date(), 'yyyy-MM-dd')).order('due_date', { ascending: true }));
         promises.push(supabaseAdmin.from('bills').select('due_date, journal_entries(journal_entry_items(amount, type))').eq('company_id', company_id).neq('status', 'paid').neq('status', 'void').gte('due_date', format(new Date(), 'yyyy-MM-dd')).order('due_date', { ascending: true }));
+        // Forecast Data: Future Recurring Payables/Receivables
+        promises.push(supabaseAdmin.from('recurring_invoices').select('next_run_date, recurring_invoice_items(quantity, unit_price)').eq('company_id', company_id).eq('status', 'active').lte('next_run_date', format(addDays(new Date(), 30), 'yyyy-MM-dd')));
+        promises.push(supabaseAdmin.from('recurring_bills').select('next_run_date, recurring_bill_items(quantity, unit_cost)').eq('company_id', company_id).eq('status', 'active').lte('next_run_date', format(addDays(new Date(), 30), 'yyyy-MM-dd')));
         // Revenue Data for Top Customers chart
         promises.push(supabaseAdmin.from('journal_entries').select('customer_id, customers(name), journal_entry_items(amount, type, account_id)').eq('company_id', company_id).gte('entry_date', startDateStr).lte('entry_date', asOfDateStr).not('customer_id', 'is', null));
     }
@@ -107,7 +110,7 @@ serve(async (req) => {
     const vendorsCheck = results[10];
     const entriesCheck = results[11];
 
-    let accountsRes = { data: [] }, monthlySummaryRes = { data: [] }, apBalancesRes = { data: [] }, topExpensesRes = { data: [] }, futureInvoicesRes = { data: [] }, futureBillsRes = { data: [] }, revenueRes = { data: [] };
+    let accountsRes = { data: [] }, monthlySummaryRes = { data: [] }, apBalancesRes = { data: [] }, topExpensesRes = { data: [] }, futureInvoicesRes = { data: [] }, futureBillsRes = { data: [] }, futureRecInvRes = { data: [] }, futureRecBillsRes = { data: [] }, revenueRes = { data: [] };
     let forecast = [], topCustomers = [];
 
     if (isAdmin) {
@@ -117,7 +120,9 @@ serve(async (req) => {
         topExpensesRes = results[15];
         futureInvoicesRes = results[16];
         futureBillsRes = results[17];
-        revenueRes = results[18];
+        futureRecInvRes = results[18];
+        futureRecBillsRes = results[19];
+        revenueRes = results[20];
 
         // --- Top Customers Calculation ---
         const incomeAccountIds = new Set(accountsRes.data?.filter(a => a.type === 'Income').map(a => a.id) || []);
@@ -142,6 +147,7 @@ serve(async (req) => {
         const todayStr = format(new Date(), 'yyyy-MM-dd');
         const changesByDate = {};
 
+        // 1. Current Open Invoices & Bills
         (futureInvoicesRes.data || []).forEach(inv => {
             const amount = inv.journal_entries?.journal_entry_items?.filter(i => i.type === 'debit').reduce((s, i) => s + i.amount, 0) || 0;
             changesByDate[inv.due_date] = (changesByDate[inv.due_date] || 0) + amount;
@@ -149,6 +155,20 @@ serve(async (req) => {
         (futureBillsRes.data || []).forEach(bill => {
             const amount = bill.journal_entries?.journal_entry_items?.filter(i => i.type === 'credit').reduce((s, i) => s + i.amount, 0) || 0;
             changesByDate[bill.due_date] = (changesByDate[bill.due_date] || 0) - amount;
+        });
+
+        // 2. Future Recurring Invoices & Bills (Predictive)
+        (futureRecInvRes.data || []).forEach(inv => {
+            // Estimate total (ignoring tax for simplicity in forecast to keep fast)
+            const amount = inv.recurring_invoice_items?.reduce((s, i) => s + (i.quantity * i.unit_price), 0) || 0;
+            // Assume Net 30 for recurring forecast cash arrival
+            const estimatedDueDate = format(addDays(new Date(inv.next_run_date), 30), 'yyyy-MM-dd');
+            changesByDate[estimatedDueDate] = (changesByDate[estimatedDueDate] || 0) + amount;
+        });
+        (futureRecBillsRes.data || []).forEach(bill => {
+            const amount = bill.recurring_bill_items?.reduce((s, i) => s + (i.quantity * i.unit_cost), 0) || 0;
+            const estimatedDueDate = format(addDays(new Date(bill.next_run_date), 30), 'yyyy-MM-dd');
+            changesByDate[estimatedDueDate] = (changesByDate[estimatedDueDate] || 0) - amount;
         });
 
         forecast.push({ date: todayStr, balance: runningBalance, type: 'actual' });
