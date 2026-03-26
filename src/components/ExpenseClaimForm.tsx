@@ -15,7 +15,7 @@ import { showError, showSuccess } from '../utils/toast';
 import { Employee } from '../pages/Employees';
 import { Account } from '../pages/ChartOfAccounts';
 import { Project } from '../pages/Projects';
-import { Trash2, X } from 'lucide-react';
+import { Trash2, X, Sparkles, Loader2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { formatCurrency } from '../lib/utils';
 import { projectsQuery } from '../lib/queries';
@@ -51,6 +51,7 @@ const ExpenseClaimForm = ({ isOpen, setIsOpen, claimId }: Props) => {
   const [attachmentFile, setAttachmentFile] = useState<File | null>(null);
   const [existingAttachmentUrl, setExistingAttachmentUrl] = useState<string | null>(null);
   const [removeAttachment, setRemoveAttachment] = useState(false);
+  const [isAiLoading, setIsAiLoading] = useState(false);
 
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
@@ -132,6 +133,42 @@ const ExpenseClaimForm = ({ isOpen, setIsOpen, claimId }: Props) => {
   const { data: projects } = useQuery<Project[]>({ ...projectsQuery(activeCompany?.id!), enabled: !!activeCompany });
 
   const expenseAccounts = accounts?.filter(a => a.type === 'Expense');
+
+  const handleAutoCategorize = async () => {
+    const currentItems = form.getValues('items');
+    const itemsToCategorize = currentItems
+      .map((item, index) => ({ index, description: item.description }))
+      .filter(item => item.description.trim() !== '');
+
+    if (itemsToCategorize.length === 0) {
+      showError("Please enter descriptions for your items first.");
+      return;
+    }
+
+    setIsAiLoading(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('ai-copilot', {
+        body: {
+          method: 'CATEGORIZE_EXPENSES',
+          company_id: activeCompany!.id,
+          items: itemsToCategorize,
+        }
+      });
+
+      if (error) throw new Error(error.message);
+
+      if (data && data.mappings) {
+        data.mappings.forEach((mapping: { index: number, account_id: string }) => {
+          form.setValue(`items.${mapping.index}.expense_account_id`, mapping.account_id);
+        });
+        showSuccess("Items categorized successfully!");
+      }
+    } catch (err: any) {
+      showError(err.message.includes('OPENAI') ? 'AI is not configured yet. Set OPENAI_API_KEY.' : err.message);
+    } finally {
+      setIsAiLoading(false);
+    }
+  };
 
   const mutation = useMutation({
     mutationFn: async (values: FormValues) => {
@@ -225,13 +262,18 @@ const ExpenseClaimForm = ({ isOpen, setIsOpen, claimId }: Props) => {
             </FormItem>
 
             <div className="space-y-2 pt-2">
-              <div className="grid grid-cols-12 gap-2 px-2 text-xs font-medium text-muted-foreground">
-                <div className="col-span-2">Date</div>
-                <div className="col-span-3">Description</div>
-                <div className="col-span-2">Account</div>
-                <div className="col-span-2">Project</div>
-                <div className="col-span-2 text-right">Amount</div>
+              <div className="flex justify-between items-end px-2">
+                <div className="grid grid-cols-12 gap-2 text-xs font-medium text-muted-foreground w-full pr-12">
+                  <div className="col-span-2">Date</div>
+                  <div className="col-span-3">Description</div>
+                  <div className="col-span-2 flex items-center gap-2">
+                    Account
+                  </div>
+                  <div className="col-span-2">Project</div>
+                  <div className="col-span-3 text-right">Amount</div>
+                </div>
               </div>
+
               {fields.map((field, index) => (
                 <div key={field.id} className="grid grid-cols-12 gap-2 items-start">
                   <FormField control={form.control} name={`items.${index}.expense_date`} render={({ field }) => (<FormItem className="col-span-2"><FormControl><Input type="date" {...field} /></FormControl></FormItem>)} />
@@ -242,7 +284,13 @@ const ExpenseClaimForm = ({ isOpen, setIsOpen, claimId }: Props) => {
                   <div className="col-span-1 pt-1 flex justify-end"><Button type="button" variant="ghost" size="icon" onClick={() => remove(index)} disabled={fields.length <= 1}><Trash2 className="h-4 w-4" /></Button></div>
                 </div>
               ))}
-              <Button type="button" variant="outline" size="sm" onClick={() => append({ expense_date: format(new Date(), 'yyyy-MM-dd'), description: '', amount: 0, expense_account_id: '', project_id: '' })}>Add Line</Button>
+              <div className="flex gap-2 items-center pt-2">
+                <Button type="button" variant="outline" size="sm" onClick={() => append({ expense_date: format(new Date(), 'yyyy-MM-dd'), description: '', amount: 0, expense_account_id: '', project_id: '' })}>Add Line</Button>
+                <Button type="button" variant="secondary" size="sm" onClick={handleAutoCategorize} disabled={isAiLoading} className="text-indigo-600 bg-indigo-50 hover:bg-indigo-100 border-indigo-200">
+                    {isAiLoading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Sparkles className="h-4 w-4 mr-2" />}
+                    Auto-Categorize
+                </Button>
+              </div>
             </div>
 
             <div className="flex justify-end pt-2 border-t">

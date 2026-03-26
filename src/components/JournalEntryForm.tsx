@@ -35,7 +35,7 @@ import { showError, showSuccess } from '../utils/toast';
 import { Account } from '../pages/ChartOfAccounts';
 import { Vendor } from '../pages/Vendors';
 import { Customer } from '../pages/Customers';
-import { Trash2, X } from 'lucide-react';
+import { Trash2, X, Sparkles, Loader2 } from 'lucide-react';
 import { formatCurrency } from '../lib/utils';
 
 const journalEntryItemSchema = z.object({
@@ -74,6 +74,10 @@ const JournalEntryForm = ({ isOpen, setIsOpen, entryId }: JournalEntryFormProps)
   const [attachmentFile, setAttachmentFile] = useState<File | null>(null);
   const [existingAttachmentUrl, setExistingAttachmentUrl] = useState<string | null>(null);
   const [removeAttachment, setRemoveAttachment] = useState(false);
+  
+  // AI State
+  const [aiPrompt, setAiPrompt] = useState('');
+  const [isMagicLoading, setIsMagicLoading] = useState(false);
 
   const form = useForm<JournalEntryFormValues>({
     resolver: zodResolver(journalEntrySchema),
@@ -131,9 +135,10 @@ const JournalEntryForm = ({ isOpen, setIsOpen, entryId }: JournalEntryFormProps)
     }
     setAttachmentFile(null);
     setRemoveAttachment(false);
+    setAiPrompt('');
   }, [entryToEdit, isEditing, isOpen, form]);
 
-  const { fields, append, remove } = useFieldArray({
+  const { fields, append, remove, replace } = useFieldArray({
     control: form.control,
     name: "items",
   });
@@ -141,6 +146,34 @@ const JournalEntryForm = ({ isOpen, setIsOpen, entryId }: JournalEntryFormProps)
   const { data: accounts } = useQuery<Account[]>({ queryKey: ['accounts', activeCompany?.id], enabled: !!activeCompany });
   const { data: vendors } = useQuery<Vendor[]>({ queryKey: ['vendors', activeCompany?.id], enabled: !!activeCompany });
   const { data: customers } = useQuery<Customer[]>({ queryKey: ['customers', activeCompany?.id], enabled: !!activeCompany });
+
+  const handleMagicFill = async () => {
+    if (!aiPrompt.trim()) return;
+    setIsMagicLoading(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('ai-copilot', {
+        body: {
+          method: 'JOURNAL_ENTRY',
+          company_id: activeCompany!.id,
+          prompt: aiPrompt,
+        }
+      });
+
+      if (error) throw new Error(error.message);
+      
+      if (data && data.items) {
+        replace(data.items);
+        if (data.description) {
+          form.setValue('description', data.description);
+        }
+        showSuccess("Magic Fill applied!");
+      }
+    } catch (err: any) {
+      showError(err.message.includes('OPENAI') ? 'AI is not configured yet. Set OPENAI_API_KEY.' : err.message);
+    } finally {
+      setIsMagicLoading(false);
+    }
+  };
 
   const mutation = useMutation({
     mutationFn: async (values: JournalEntryFormValues) => {
@@ -199,11 +232,33 @@ const JournalEntryForm = ({ isOpen, setIsOpen, entryId }: JournalEntryFormProps)
 
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
-      <DialogContent className="sm:max-w-2xl">
+      <DialogContent className="sm:max-w-3xl">
         <DialogHeader>
           <DialogTitle>{isEditing ? 'Edit Journal Entry' : 'New Journal Entry'}</DialogTitle>
           <DialogDescription>Record a financial transaction. Ensure debits equal credits.</DialogDescription>
         </DialogHeader>
+
+        {!isEditing && (
+          <div className="bg-gradient-to-r from-indigo-50 to-purple-50 dark:from-indigo-950/30 dark:to-purple-950/30 p-4 rounded-lg border border-indigo-100 dark:border-indigo-900 mb-2">
+            <label className="text-indigo-800 dark:text-indigo-300 text-sm font-semibold flex items-center gap-2 mb-2">
+              <Sparkles className="h-4 w-4" /> AI Copilot
+            </label>
+            <div className="flex gap-2">
+              <Input 
+                placeholder="E.g., Bought $1,200 MacBook Pro using Checking account" 
+                value={aiPrompt} 
+                onChange={e => setAiPrompt(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleMagicFill(); } }}
+                className="bg-white/80 dark:bg-black/20 border-indigo-200 dark:border-indigo-800"
+              />
+              <Button onClick={handleMagicFill} disabled={isMagicLoading || !aiPrompt.trim()} className="bg-indigo-600 hover:bg-indigo-700 text-white">
+                 {isMagicLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Magic Fill'}
+              </Button>
+            </div>
+            <p className="text-xs text-indigo-600/70 dark:text-indigo-400/70 mt-2">Just type what happened. The AI will perfectly categorize the debits and credits.</p>
+          </div>
+        )}
+
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
