@@ -1,0 +1,116 @@
+{
+  "section": "PERFORMANCE",
+  "at": "2026-07-29T11:19:59.662Z",
+  "company": "be3855e9-d11c-48a8-8c39-10e12a0ff2df",
+  "measurements": {
+    "dashboardLoad": {
+      "ms_min": 893,
+      "ms_median": 980,
+      "ms_max": 1036,
+      "ok": true,
+      "error": null,
+      "sample": [
+        "role",
+        "accounts",
+        "monthlySummary",
+        "arBalances",
+        "apBalances",
+        "overdueInvoices"
+      ]
+    },
+    "financialStatements": {
+      "ms_min": 561,
+      "ms_median": 592,
+      "ms_max": 661,
+      "ok": true,
+      "error": null,
+      "sample": [
+        "balancesAsOf",
+        "periodActivity",
+        "cashFlowData",
+        "openingBalances",
+        "agedReceivables",
+        "agedPayables"
+      ]
+    },
+    "invoiceList": {
+      "ms_min": 653,
+      "ms_median": 655,
+      "ms_max": 860,
+      "ok": true,
+      "sample": "array[3]"
+    },
+    "journalList": {
+      "ms_min": 501,
+      "ms_median": 737,
+      "ms_max": 784,
+      "ok": true,
+      "error": null,
+      "sample": "array[9]"
+    },
+    "search": {
+      "ms_min": 670,
+      "ms_median": 680,
+      "ms_max": 827,
+      "ok": true,
+      "error": null,
+      "sample": "array[9]"
+    },
+    "taxReport": {
+      "ms_min": 576,
+      "ms_median": 615,
+      "ms_max": 629,
+      "ok": true,
+      "error": null,
+      "sample": "array[1]"
+    }
+  },
+  "notes": {
+    "n1": "dashboard-data and global-search use Promise.all with bounded .limit() — no N+1.",
+    "pagination": "invoices GET and journal-entries GET have no server-side pagination (unbounded per-company lists) — scale risk beyond a few thousand rows.",
+    "postingLatency": "Bill/payment/payroll/banking posts each completed within the lifecycle runs (<2s round-trip incl. verification reads)."
+  },
+  "bundle": {
+    "buildExit": 0,
+    "warning": "chunks >500kB: vendor-pdf, FinancialStatementsWorkspaceDashboard",
+    "largestChunks": [
+      {
+        "name": "vendor-pdf",
+        "kb": 812.94,
+        "gzipKb": 250.11,
+        "lazy": true
+      },
+      {
+        "name": "FinancialStatementsWorkspaceDashboard",
+        "kb": 431.46,
+        "gzipKb": 107.97,
+        "lazy": true
+      },
+      {
+        "name": "vendor-recharts",
+        "kb": 382.51,
+        "gzipKb": 98.21,
+        "lazy": true
+      },
+      {
+        "name": "vendor-supabase",
+        "kb": 256.23,
+        "gzipKb": 68.99
+      },
+      {
+        "name": "index",
+        "kb": 251.87,
+        "gzipKb": 62.02
+      }
+    ],
+    "note": "App is route-code-split into many small chunks; heavy libs isolated to lazy vendor chunks."
+  },
+  "regression": {
+    "tsc": "0 errors",
+    "eslint": "0 errors / 384 warnings",
+    "unit": "511/511",
+    "integration": "3/3",
+    "dom": "4/4",
+    "build": "exit 0"
+  }
+}

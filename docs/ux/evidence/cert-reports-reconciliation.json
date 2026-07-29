@@ -1,0 +1,33 @@
+{
+  "company": "CERT TX 1785230675937",
+  "companyId": "be3855e9-d11c-48a8-8c39-10e12a0ff2df",
+  "scannedAt": "2026-07-29T10:46:34.633Z",
+  "profitAndLoss": {
+    "totalIncome": 21000,
+    "totalExpenses": 0,
+    "netIncome": 21000,
+    "incomeAccounts": 2,
+    "expenseAccounts": 1
+  },
+  "balanceSheet": {
+    "totalAssets": 21750,
+    "totalLiabilities": 750,
+    "totalEquity": 0,
+    "netIncome": 21000
+  },
+  "accountingEquation": {
+    "lhsAssets": 21750,
+    "rhsLiabEquityNI": 21750,
+    "diff": 0,
+    "balances": true
+  },
+  "trialBalance": {
+    "signedNet": 0,
+    "balances": true
+  },
+  "accountsReceivable": {
+    "agedTotal": 0,
+    "customers": 0
+  },
+  "verdict": "FINANCIAL OUTPUTS RECONCILE"
+}

@@ -1,0 +1,534 @@
+{
+  "certification": "ADMINLESS_FIN_FINAL_PRODUCTION",
+  "at": "2026-07-29T12:41:12.826Z",
+  "company": "be3855e9-d11c-48a8-8c39-10e12a0ff2df",
+  "decision": "NO-GO",
+  "score": 85,
+  "matrix": {
+    "pass": 44,
+    "fail": 4,
+    "unknown": 4,
+    "total": 52
+  },
+  "failures": [
+    "PAYROLL: Payroll control account deltas",
+    "CUSTOMER_PAYMENTS: AR reduced by payment",
+    "FINANCIAL_STATEMENTS: Accounting equation (Equation diff 43400)",
+    "SECURITY: RLS tenant scoping (read)"
+  ],
+  "steps": [
+    {
+      "area": "ENV",
+      "step": "Authentication",
+      "status": "PASS",
+      "evidence": {
+        "userId": "908ad90e-ee0e-4957-943d-ed1ec2fb843a"
+      }
+    },
+    {
+      "area": "ENV",
+      "step": "Cert company resolved",
+      "status": "PASS",
+      "evidence": {
+        "companyId": "be3855e9-d11c-48a8-8c39-10e12a0ff2df",
+        "fyStart": "2026-07-01",
+        "fyEnd": "2026-07-29"
+      }
+    },
+    {
+      "area": "PAYROLL",
+      "step": "Resolve GL accounts",
+      "status": "PASS",
+      "evidence": {
+        "wage": "CERT Salaries & Wages",
+        "bank": "CERT Bank Account",
+        "payLiab": "CERT Payroll Liabilities"
+      }
+    },
+    {
+      "area": "PAYROLL",
+      "step": "Trial balance before payroll",
+      "status": "PASS",
+      "evidence": {
+        "net": 0,
+        "totalDr": 0,
+        "totalCr": 0
+      }
+    },
+    {
+      "area": "PAYROLL",
+      "step": "Employee ready",
+      "status": "PASS",
+      "evidence": {
+        "id": "52e4c760-df4f-4def-862a-1722a2de8260",
+        "name": "CERT Employee"
+      }
+    },
+    {
+      "area": "PAYROLL",
+      "step": "Create payroll run",
+      "status": "PASS",
+      "evidence": {
+        "runId": "ad0fa0b7-593f-4709-b5d4-2660387e5380",
+        "period": {
+          "pay_period_start": "2026-09-01",
+          "pay_period_end": "2026-09-30",
+          "pay_date": "2026-09-30",
+          "status": "draft"
+        }
+      }
+    },
+    {
+      "area": "PAYROLL",
+      "step": "Gross pay calculated",
+      "status": "PASS",
+      "evidence": {
+        "grossPay": 20000
+      }
+    },
+    {
+      "area": "PAYROLL",
+      "step": "PAYE deducted",
+      "status": "PASS",
+      "evidence": {
+        "paye": 2115
+      }
+    },
+    {
+      "area": "PAYROLL",
+      "step": "UIF deducted",
+      "status": "PASS",
+      "evidence": {
+        "uif": 177.12
+      }
+    },
+    {
+      "area": "PAYROLL",
+      "step": "SDL employer cost",
+      "status": "PASS",
+      "evidence": {
+        "sdl": 200
+      }
+    },
+    {
+      "area": "PAYROLL",
+      "step": "Net pay calculated",
+      "status": "PASS",
+      "evidence": {
+        "netPay": 17707.88
+      }
+    },
+    {
+      "area": "PAYROLL",
+      "step": "Payslip generated",
+      "status": "PASS",
+      "evidence": {
+        "payslipId": "63e23c19-e89f-4cb1-8743-5968ab1e9a21"
+      }
+    },
+    {
+      "area": "PAYROLL",
+      "step": "Approve payroll run",
+      "status": "PASS"
+    },
+    {
+      "area": "PAYROLL",
+      "step": "Finalize / post payroll journal",
+      "status": "PASS",
+      "evidence": {
+        "journalEntryId": "174a4d43-cf95-408a-8abe-28c3146507dc",
+        "status": "finalized"
+      }
+    },
+    {
+      "area": "PAYROLL",
+      "step": "Payroll journal balanced",
+      "status": "PASS",
+      "evidence": {
+        "lines": [
+          {
+            "acct": "CERT Salaries & Wages",
+            "type": "debit",
+            "amount": 20000
+          },
+          {
+            "acct": "CERT Bank Account",
+            "type": "credit",
+            "amount": 17707.88
+          },
+          {
+            "acct": "CERT Payroll Liabilities",
+            "type": "credit",
+            "amount": 2292.12
+          },
+          {
+            "acct": "CERT Salaries & Wages",
+            "type": "debit",
+            "amount": 377.12
+          },
+          {
+            "acct": "CERT Payroll Liabilities",
+            "type": "credit",
+            "amount": 377.12
+          }
+        ],
+        "dr": 20377.12,
+        "cr": 20377.12
+      }
+    },
+    {
+      "area": "PAYROLL",
+      "step": "Trial balance after payroll",
+      "status": "PASS",
+      "evidence": {
+        "net": 0,
+        "totalDr": 0,
+        "totalCr": 0
+      }
+    },
+    {
+      "area": "PAYROLL",
+      "step": "Payroll control account deltas",
+      "status": "FAIL",
+      "evidence": {
+        "wageDelta": 0,
+        "bankDelta": null,
+        "payLiabDelta": 0
+      }
+    },
+    {
+      "area": "CUSTOMER_PAYMENTS",
+      "step": "Resolve AR/Bank/Income accounts",
+      "status": "PASS",
+      "evidence": {
+        "ar": "Accounts Receivable",
+        "bank": "CERT Bank Account",
+        "income": "Sales Revenue"
+      }
+    },
+    {
+      "area": "CUSTOMER_PAYMENTS",
+      "step": "Customer available",
+      "status": "PASS",
+      "evidence": {
+        "customerId": "467af1d0-e9a6-4377-a46e-c9e6b72775fc"
+      }
+    },
+    {
+      "area": "CUSTOMER_PAYMENTS",
+      "step": "Create invoice",
+      "status": "PASS",
+      "evidence": {
+        "invoiceId": "efee3bb2-4d1f-4d03-8dfc-2976e9de76a7",
+        "amount": 5000
+      }
+    },
+    {
+      "area": "CUSTOMER_PAYMENTS",
+      "step": "Receive payment",
+      "status": "PASS"
+    },
+    {
+      "area": "CUSTOMER_PAYMENTS",
+      "step": "Trial balance balanced after payment",
+      "status": "PASS",
+      "evidence": {
+        "net": 0
+      }
+    },
+    {
+      "area": "CUSTOMER_PAYMENTS",
+      "step": "AR reduced by payment",
+      "status": "FAIL",
+      "evidence": {
+        "arBefore": null,
+        "arAfter": null,
+        "delta": null
+      }
+    },
+    {
+      "area": "CUSTOMER_PAYMENTS",
+      "step": "Bank increased",
+      "status": "UNKNOWN",
+      "evidence": {
+        "bankAfter": null
+      }
+    },
+    {
+      "area": "BANKING",
+      "step": "Bank account",
+      "status": "PASS",
+      "evidence": {
+        "bankAccountId": "6e9bd8c0-dce4-4ad3-aa71-ff9443abca19"
+      }
+    },
+    {
+      "area": "BANKING",
+      "step": "Statement import",
+      "status": "PASS",
+      "evidence": {
+        "import_id": "bdafdf78-0b2e-47a5-951b-e6deb92cd92c",
+        "inserted_count": 1,
+        "duplicate_count": 0
+      }
+    },
+    {
+      "area": "BANKING",
+      "step": "Statement line available",
+      "status": "PASS",
+      "evidence": {
+        "lineId": "503c5870-e086-4347-bdb9-a9a333d11409",
+        "amount": 1500
+      }
+    },
+    {
+      "area": "BANKING",
+      "step": "Match statement to journal",
+      "status": "UNKNOWN",
+      "evidence": {
+        "note": "No bank debit journal leg found for match; import-only verified"
+      }
+    },
+    {
+      "area": "BANKING",
+      "step": "Reconciliation outstanding query",
+      "status": "PASS",
+      "evidence": [
+        {
+          "id": "503c5870-e086-4347-bdb9-a9a333d11409",
+          "company_id": "be3855e9-d11c-48a8-8c39-10e12a0ff2df",
+          "statement_import_id": "bdafdf78-0b2e-47a5-951b-e6deb92cd92c",
+          "bank_account_id": "6e9bd8c0-dce4-4ad3-aa71-ff9443abca19",
+          "line_date": "2026-07-29",
+          "description": "Cert unmatched deposit",
+          "amount": 1500,
+          "external_reference": "CERT-STMT-1785328855835",
+          "match_status": "unmatched",
+          "matched_journal_entry_item_id": null,
+          "matched_bank_transaction_id": null,
+          "created_at": "2026-07-29T12:40:55.228828+00:00"
+        }
+      ]
+    },
+    {
+      "area": "FINANCIAL_STATEMENTS",
+      "step": "Fetch P&L and BS data",
+      "status": "PASS",
+      "evidence": {
+        "balanceCount": 13,
+        "activityCount": 5
+      }
+    },
+    {
+      "area": "FINANCIAL_STATEMENTS",
+      "step": "Statement of Profit or Loss computable",
+      "status": "PASS",
+      "evidence": {
+        "totalIncome": 0,
+        "totalExpenses": 0,
+        "netIncome": 0
+      }
+    },
+    {
+      "area": "FINANCIAL_STATEMENTS",
+      "step": "Statement of Financial Position computable",
+      "status": "PASS",
+      "evidence": {
+        "totalAssets": 45600,
+        "totalLiabilities": 2200,
+        "totalEquity": 0,
+        "netIncome": 0
+      }
+    },
+    {
+      "area": "FINANCIAL_STATEMENTS",
+      "step": "Accounting equation",
+      "status": "FAIL",
+      "evidence": {
+        "assets": 45600,
+        "liabilities": 2200,
+        "equity": 0,
+        "netIncome": 0,
+        "diff": 43400
+      },
+      "error": "Equation diff 43400"
+    },
+    {
+      "area": "FINANCIAL_STATEMENTS",
+      "step": "Payroll liability on balance sheet",
+      "status": "UNKNOWN",
+      "evidence": {
+        "account": "CERT Payroll Liabilities"
+      }
+    },
+    {
+      "area": "SECURITY",
+      "step": "Unauthenticated edge blocked",
+      "status": "PASS",
+      "evidence": {
+        "blocked": true
+      }
+    },
+    {
+      "area": "SECURITY",
+      "step": "RLS tenant scoping (read)",
+      "status": "FAIL",
+      "evidence": {
+        "rowsScanned": 714,
+        "foreignRows": 678
+      }
+    },
+    {
+      "area": "SECURITY",
+      "step": "Anon read blocked: chart_of_accounts",
+      "status": "PASS",
+      "evidence": {
+        "error": "permission denied for table chart_of_accounts"
+      }
+    },
+    {
+      "area": "SECURITY",
+      "step": "Anon read blocked: invoices",
+      "status": "PASS",
+      "evidence": {
+        "error": "permission denied for table invoices"
+      }
+    },
+    {
+      "area": "SECURITY",
+      "step": "Anon read blocked: employees",
+      "status": "PASS",
+      "evidence": {
+        "error": "permission denied for table employees"
+      }
+    },
+    {
+      "area": "SECURITY",
+      "step": "JWT Bearer auth model",
+      "status": "PASS",
+      "evidence": {
+        "mechanism": "Authorization header Bearer JWT"
+      }
+    },
+    {
+      "area": "SECURITY",
+      "step": "RBAC edge gates present",
+      "status": "PASS",
+      "evidence": {
+        "note": "Admin gates verified in chart-of-accounts, payroll, banking, employees edges"
+      }
+    },
+    {
+      "area": "SECURITY",
+      "step": "CSRF mitigation",
+      "status": "PASS",
+      "evidence": {
+        "cookieAuth": false,
+        "bearerJwt": true
+      }
+    },
+    {
+      "area": "SECURITY",
+      "step": "XSS surface",
+      "status": "PASS",
+      "evidence": {
+        "dangerouslySetInnerHTML": "chart.tsx only (dev CSS vars, not user data)"
+      }
+    },
+    {
+      "area": "SECURITY",
+      "step": "SQL injection (PostgREST parameterized)",
+      "status": "PASS",
+      "evidence": {
+        "note": "Malicious filters return 0 rows or WAF block; tables intact"
+      }
+    },
+    {
+      "area": "PERFORMANCE",
+      "step": "Dashboard data (parallel RPCs)",
+      "status": "PASS",
+      "evidence": {
+        "ms_min": 702,
+        "ms_median": 1128,
+        "ms_max": 1314,
+        "thresholdMs": 3000
+      }
+    },
+    {
+      "area": "PERFORMANCE",
+      "step": "Invoice list",
+      "status": "PASS",
+      "evidence": {
+        "ms_min": 480,
+        "ms_median": 508,
+        "ms_max": 521,
+        "thresholdMs": 3000
+      }
+    },
+    {
+      "area": "PERFORMANCE",
+      "step": "Financial statements bundle",
+      "status": "PASS",
+      "evidence": {
+        "ms_min": 577,
+        "ms_median": 579,
+        "ms_max": 589,
+        "thresholdMs": 3000
+      }
+    },
+    {
+      "area": "PERFORMANCE",
+      "step": "Payroll workspace summary",
+      "status": "PASS",
+      "evidence": {
+        "ms_min": 549,
+        "ms_median": 555,
+        "ms_max": 710,
+        "thresholdMs": 3000
+      }
+    },
+    {
+      "area": "PERFORMANCE",
+      "step": "Journal list",
+      "status": "PASS",
+      "evidence": {
+        "ms_min": 456,
+        "ms_median": 469,
+        "ms_max": 471,
+        "thresholdMs": 3000
+      }
+    },
+    {
+      "area": "PERFORMANCE",
+      "step": "Global search",
+      "status": "PASS",
+      "evidence": {
+        "ms_min": 505,
+        "ms_median": 540,
+        "ms_max": 633,
+        "thresholdMs": 3000
+      }
+    },
+    {
+      "area": "PERFORMANCE",
+      "step": "N+1 query pattern (dashboard/search)",
+      "status": "PASS",
+      "evidence": {
+        "note": "Promise.all with bounded limits — no sequential per-row fetches in cert paths"
+      }
+    },
+    {
+      "area": "PERFORMANCE",
+      "step": "Pagination gap (invoice/journal lists)",
+      "status": "UNKNOWN",
+      "evidence": {
+        "note": "Unbounded company-scoped lists — scale risk beyond ~few thousand rows"
+      }
+    }
+  ],
+  "purchasing": {
+    "status": "PASS",
+    "note": "Pre-certified 2026-07-29 — not re-run per instruction",
+    "evidence": "docs/ux/evidence/cert-purchasing.json"
+  }
+}

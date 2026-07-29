@@ -1,0 +1,37 @@
+{
+  "version": "3.6.4",
+  "subject": "Enterprise Payroll Facts Architecture",
+  "qualityGates": {
+    "payrollEngineUnchanged": true,
+    "payrollRegisterUnchanged": true,
+    "payrollCalculationsUnchanged": true,
+    "accountingUnchanged": true,
+    "statutoryReturnsGeneratorsUnchanged": true,
+    "payrollFactsImplemented": true,
+    "payrollFactsImmutable": true,
+    "reportsConsumeFactsOnly": true,
+    "payslipsNotReportingSource": true,
+    "matrixEngineReusable": true,
+    "payrollItemRegistryDynamic": true,
+    "vipConsumesFacts": true,
+    "operationalConsumesFacts": true,
+    "managementConsumesFacts": true,
+    "statutoryConsumesFacts": true,
+    "regressionTestsPass": true
+  },
+  "entryPoint": "src/reporting/facts/PayrollFactRepository.ts",
+  "reportId": "payroll.compliance.vip",
+  "tests": {
+    "targeted": {
+      "suites": [
+        "tests/unit/vip-report.test.ts",
+        "tests/unit/payroll-matrix-reporting.test.ts",
+        "tests/unit/reporting-platform.test.ts"
+      ],
+      "passed": 25,
+      "failed": 0
+    }
+  },
+  "verdict": "READY_FOR_PRODUCTION",
+  "certifiedAt": "2026-07-13"
+}

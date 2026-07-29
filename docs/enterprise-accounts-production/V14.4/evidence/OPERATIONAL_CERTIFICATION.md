@@ -1,0 +1,101 @@
+# V14.4 Operational Certification Evidence
+
+Generated: 2026-07-29T12:40:42.339Z
+Decision: CERTIFIED FOR PRODUCTION
+
+## Scenarios
+- trading: PASS | notes=17 policies=22 pdf=134736B docx=305721B pages=25
+- service: PASS | notes=17 policies=22 pdf=135071B docx=306437B pages=25
+- manufacturing: PASS | notes=17 policies=22 pdf=135025B docx=306464B pages=25
+- holding: PASS | notes=18 policies=22 pdf=137752B docx=307197B pages=26
+- subsidiaries: PASS | notes=18 policies=22 pdf=137883B docx=307208B pages=26
+- associates: PASS | notes=18 policies=22 pdf=139987B docx=317719B pages=26
+- joint_ventures: PASS | notes=18 policies=22 pdf=139848B docx=316268B pages=26
+- government_grants: PASS | notes=18 policies=22 pdf=140215B docx=317980B pages=26
+- leases: PASS | notes=18 policies=22 pdf=140390B docx=321166B pages=26
+- borrowing_costs: PASS | notes=17 policies=22 pdf=135351B docx=307244B pages=25
+- foreign_currency: PASS | notes=18 policies=22 pdf=138834B docx=315179B pages=26
+- impairment: PASS | notes=18 policies=22 pdf=140090B docx=320631B pages=26
+- biological: PASS | notes=18 policies=22 pdf=139987B docx=319301B pages=26
+- discontinued: PASS | notes=18 policies=22 pdf=141936B docx=322353B pages=26
+- first_time_adopter: PASS | notes=18 policies=22 pdf=141923B docx=320607B pages=26
+- loss_making: PASS | notes=18 policies=22 pdf=135570B docx=306440B pages=25
+- growing: PASS | notes=17 policies=22 pdf=134765B docx=305727B pages=25
+- asset_intensive: PASS | notes=18 policies=22 pdf=142319B docx=329372B pages=26
+- cash_intensive: PASS | notes=17 policies=22 pdf=131803B docx=292713B pages=25
+- high_debt: PASS | notes=17 policies=22 pdf=135046B docx=306483B pages=25
+
+## Policies
+- POL.BASIS: CERTIFIED
+- POL.REVENUE: CERTIFIED
+- POL.PPE: CERTIFIED
+- POL.INTANGIBLES: CERTIFIED
+- POL.INVPROP: CERTIFIED
+- POL.LEASES: CERTIFIED
+- POL.FININST: CERTIFIED
+- POL.IMPAIRMENT: CERTIFIED
+- POL.INVENTORY: CERTIFIED
+- POL.PROVISIONS: CERTIFIED
+- POL.EMPLOYEE: CERTIFIED
+- POL.TAX: CERTIFIED
+- POL.FOREX: CERTIFIED
+- POL.BORROWINGCOST: CERTIFIED
+- POL.GRANTS: CERTIFIED
+- POL.ASSOCIATES: CERTIFIED
+- POL.JOINTVENTURES: CERTIFIED
+- POL.BUSCOMB: CERTIFIED
+- POL.SBP: CERTIFIED
+- POL.HYPERINFLATION: CERTIFIED
+- POL.CONSOLIDATION: CERTIFIED
+- POL.EQUITY: CERTIFIED
+
+## Disclosures
+- DISC.GENERAL: CERTIFIED
+- DISC.BASIS: CERTIFIED
+- DISC.POLICIES: CERTIFIED
+- DISC.JUDGEMENTS: CERTIFIED
+- DISC.POLICYCHANGES: NOT_APPLICABLE
+- DISC.REVENUE: CERTIFIED
+- DISC.PPE: CERTIFIED
+- DISC.INTANGIBLES: CERTIFIED
+- DISC.INVPROP: NOT_APPLICABLE
+- DISC.INVENTORIES: CERTIFIED
+- DISC.RECEIVABLES: CERTIFIED
+- DISC.PAYABLES: CERTIFIED
+- DISC.FININST: CERTIFIED
+- DISC.LEASES: CERTIFIED
+- DISC.BORROWINGS: CERTIFIED
+- DISC.PROVISIONS: NOT_APPLICABLE
+- DISC.CONTINGENT: NOT_APPLICABLE
+- DISC.COMMITMENTS: NOT_APPLICABLE
+- DISC.EMPLOYEE: CERTIFIED
+- DISC.TAX: CERTIFIED
+- DISC.SHARECAPITAL: CERTIFIED
+- DISC.CASHFLOW: CERTIFIED
+- DISC.RELATED: CERTIFIED
+- DISC.EVENTS: CERTIFIED
+- DISC.GOINGCONCERN: CERTIFIED
+- DISC.ASSOCIATES: CERTIFIED
+- DISC.JOINTVENTURES: CERTIFIED
+- DISC.BUSCOMB: NOT_APPLICABLE
+- DISC.GRANTS: CERTIFIED
+- DISC.BORROWINGCOST: CERTIFIED
+- DISC.SBP: NOT_APPLICABLE
+- DISC.IMPAIRMENT: CERTIFIED
+- DISC.FOREX: CERTIFIED
+- DISC.HYPERINFLATION: NOT_APPLICABLE
+- DISC.DISCONTINUED: CERTIFIED
+- DISC.CONSOLIDATION: CERTIFIED
+- DISC.CAPITAL: NOT_APPLICABLE
+- DISC.TRANSITION: CERTIFIED
+- DISC.BIOLOGICAL: CERTIFIED
+
+## Decision evidence
+- Scenarios executed: 20
+- Scenarios passed: 20
+- Policies CERTIFIED: 22/22
+- Disclosures CERTIFIED: 30; NOT_APPLICABLE: 9; FAILED: 0
+- All scenarios passed end-to-end without manual document editing
+- All accounting policies CERTIFIED
+- All applicable disclosures CERTIFIED (conditionals N/A where not triggered)
+- PDF and DOCX publication certified across all scenarios

@@ -1,0 +1,64 @@
+{
+  "version": "4.1.5",
+  "board": "Emergency Production Recovery",
+  "project_ref": "zaulhnpohrgqqodvzhxp",
+  "timestamp_utc": "2026-07-13T13:35:00Z",
+  "final_status": "PRODUCTION READY",
+  "root_cause": {
+    "primary": "work edge function not deployed",
+    "symptom": "CORS preflight failure / net::ERR_FAILED",
+    "mechanism": "gateway 404 omit content-type from Access-Control-Allow-Headers",
+    "secondary": "ewm_* schema migration not applied (0 tables)"
+  },
+  "pre_recovery": {
+    "work_deployed": false,
+    "options_work_http": 404,
+    "options_work_body": {"code": "NOT_FOUND", "message": "Requested function was not found"},
+    "ewm_table_count": 0
+  },
+  "post_recovery": {
+    "work_deployed": true,
+    "work_status": "ACTIVE",
+    "work_version": 1,
+    "verify_jwt": false,
+    "options_work_http": 200,
+    "cors": {
+      "Access-Control-Allow-Origin": "*",
+      "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+      "Access-Control-Allow-Methods": "POST, OPTIONS"
+    },
+    "ewm_table_count": 23,
+    "ewm_resource_types_count": 16,
+    "migration_version": "20260713120000"
+  },
+  "live_validation": {
+    "OPTIONS": 200,
+    "POST_unauthenticated": {"http": 400, "error": "User not authenticated."},
+    "POST_invalid_jwt": {"http": 400, "error": "User not authenticated."},
+    "POST_GET_EXECUTIVE_DASHBOARD": {"http": 200},
+    "POST_invalid_company": {"http": 400, "error": "Permission denied."},
+    "POST_unknown_method": {"http": 400, "error": "Unknown method: NOT_A_REAL_METHOD"},
+    "POST_missing_method": {"http": 400, "error": "Method is required."},
+    "LIST_EWM_PROJECTS": 200,
+    "LIST_WORK_RESOURCES": 200,
+    "LIST_TIME_ENTRIES": 200,
+    "LIST_CLOCK_SESSIONS": 200,
+    "LIST_RESOURCE_TYPES": 200
+  },
+  "regression": {
+    "payroll_options": 200,
+    "payroll_version": 24,
+    "accounting_options": 200,
+    "accounting_version": 6,
+    "projects_options": 200,
+    "projects_version": 8
+  },
+  "code_changes": [
+    "supabase/functions/work/index.ts — CORS Allow-Methods, OPTIONS-first, method/JSON guards, safe error messages",
+    "deleted empty duplicate migration 20260713113340_ewm_v41_enterprise_work_management.sql"
+  ],
+  "ops_actions": [
+    "supabase functions deploy work --project-ref zaulhnpohrgqqodvzhxp --no-verify-jwt --use-api",
+    "applied supabase/migrations/20260713120000_ewm_v41_enterprise_work_management.sql via Management API"
+  ]
+}

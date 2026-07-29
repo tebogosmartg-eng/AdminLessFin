@@ -1,0 +1,101 @@
+{
+  "section": "PURCHASING",
+  "at": "2026-07-29T11:09:01.869Z",
+  "company": "be3855e9-d11c-48a8-8c39-10e12a0ff2df",
+  "steps": {
+    "vendorCreate": {
+      "ok": true,
+      "error": null,
+      "id": "9f70e848-10ce-4392-a271-c22553367d66"
+    },
+    "billCreate": {
+      "ok": true,
+      "error": null
+    },
+    "bill": {
+      "id": "0f9ea039-b63c-4815-a016-756b0319d1aa",
+      "bill_number": "CBILL-23341868",
+      "status": "open",
+      "journal_entry_id": "25f58f13-21d1-451b-b287-90382e23fde0",
+      "vendor_id": "9f70e848-10ce-4392-a271-c22553367d66"
+    },
+    "billJournal": {
+      "lines": [
+        {
+          "acct": "6000 CERT Operating Expenses",
+          "type": "debit",
+          "amount": 1000
+        },
+        {
+          "acct": "4001 VAT Control",
+          "type": "debit",
+          "amount": 150
+        },
+        {
+          "acct": "4000 Accounts Payable",
+          "type": "credit",
+          "amount": 1150
+        }
+      ],
+      "dr": 1150,
+      "cr": 1150,
+      "derivedTotal": 1150
+    },
+    "supplierLedger": {
+      "ok": true
+    },
+    "reportsAP": {
+      "id": "9c851628-379f-44e6-9aff-b1128bb211ac",
+      "account_number": 4000,
+      "name": "Accounts Payable",
+      "type": "Liability",
+      "balance": 3050
+    },
+    "taxReport": {
+      "name": "CERT VAT 15%",
+      "rate": 15,
+      "netSales": 150,
+      "taxCollected": 22.5,
+      "netPurchases": 2000,
+      "taxPaid": 300,
+      "netTax": -277.5
+    },
+    "billPayment": {
+      "ok": true,
+      "error": null
+    }
+  },
+  "failures": [],
+  "resolved": {
+    "AP": "4000 Accounts Payable",
+    "VATC": "4001 VAT Control",
+    "EXP": "6000 CERT Operating Expenses",
+    "BANK": "1100 CERT Bank Account",
+    "TAX": "CERT VAT 15% 15%"
+  },
+  "trialBalanceBefore": {
+    "net": 0,
+    "totalDr": 42900,
+    "totalCr": 42900
+  },
+  "trialBalanceAfterBill": {
+    "net": 0,
+    "totalDr": 44050,
+    "totalCr": 44050
+  },
+  "deltasAfterBill": {
+    "AP": -1150,
+    "EXP": 1000,
+    "VAT": 150
+  },
+  "trialBalanceAfterPay": {
+    "net": 0,
+    "totalDr": 45200,
+    "totalCr": 45200
+  },
+  "deltasAfterPay": {
+    "AP": 1150,
+    "BANK": -1150
+  },
+  "verdict": "PASS"
+}

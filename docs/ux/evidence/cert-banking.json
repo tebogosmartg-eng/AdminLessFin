@@ -1,0 +1,69 @@
+{
+  "section": "BANKING",
+  "at": "2026-07-29T11:15:16.236Z",
+  "company": "be3855e9-d11c-48a8-8c39-10e12a0ff2df",
+  "steps": {
+    "bankAccount": {
+      "ok": true,
+      "error": null,
+      "id": "6e9bd8c0-dce4-4ad3-aa71-ff9443abca19"
+    },
+    "receivePayment": {
+      "ok": true,
+      "error": null,
+      "data": null
+    },
+    "paymentJournal": {
+      "id": "4ac51ef7-f4e1-403f-a883-b8a3bc6aa868",
+      "desc": "Payment for Invoice INV-00002",
+      "bankLegItemId": "f9db2849-4e4e-4abd-9f38-bfed85aedc17"
+    },
+    "importStatement": {
+      "ok": true,
+      "error": null,
+      "data": {
+        "import_id": "b0442dbc-c039-45da-a8e5-36f9d6209b24",
+        "inserted_count": 1,
+        "duplicate_count": 0
+      }
+    },
+    "statementLine": {
+      "id": "953f1dac-bcfc-4a9a-927b-9cc409768c90",
+      "amount": 20000,
+      "status": "unmatched"
+    },
+    "match": {
+      "ok": true,
+      "error": null,
+      "data": {
+        "match_status": "matched",
+        "statement_line_id": "953f1dac-bcfc-4a9a-927b-9cc409768c90",
+        "journal_entry_item_id": "f9db2849-4e4e-4abd-9f38-bfed85aedc17"
+      }
+    },
+    "lineAfterMatch": {
+      "match_status": "matched",
+      "matched_journal_entry_item_id": "f9db2849-4e4e-4abd-9f38-bfed85aedc17"
+    },
+    "jeItemReconciled": true,
+    "outstandingAfter": 0
+  },
+  "failures": [],
+  "resolved": {
+    "BANKGL": "1100 CERT Bank Account",
+    "AR": "3010 Accounts Receivable"
+  },
+  "trialBalanceBefore": {
+    "net": 0
+  },
+  "deltas": {
+    "AR": -20000,
+    "BANK": 20000
+  },
+  "trialBalanceFinal": {
+    "net": 0,
+    "totalDr": 85577.12,
+    "totalCr": 85577.12
+  },
+  "verdict": "PASS"
+}

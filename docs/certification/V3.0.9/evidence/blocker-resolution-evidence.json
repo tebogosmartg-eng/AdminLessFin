@@ -1,0 +1,44 @@
+{
+  "version": "3.0.9",
+  "runAt": "2026-07-07T08:00:00.000Z",
+  "scope": "Employer contribution consistency blocker resolution",
+  "codeChanges": [
+    "supabase/functions/payroll/index.ts",
+    "src/lib/payrollReports.ts",
+    "src/lib/queries.ts",
+    "src/pages/PayrollRunDetail.tsx",
+    "tests/unit/payroll-employer-contribution-consistency.test.ts"
+  ],
+  "verification": {
+    "tests": [
+      {
+        "command": "npx vitest run tests/unit/payroll-employer-contribution-consistency.test.ts tests/unit/payroll-lockdown.test.ts tests/integration/payroll-workflow.test.ts",
+        "status": "PASS",
+        "files": 2,
+        "tests": 18
+      }
+    ],
+    "lint": {
+      "status": "PASS",
+      "details": "No linter errors in changed files."
+    },
+    "liveE2E": {
+      "command": "npm run certify:e2e",
+      "status": "BLOCKED",
+      "reason": "Missing E2E_EMAIL"
+    }
+  },
+  "canonicalSource": "payslips.calculation_snapshot.total_employer_contributions",
+  "reconciliationRule": "Every payroll summary/register/report/journal employer contribution amount is derived from canonical snapshot value or max(item,snapshot) compatibility resolver.",
+  "qualityGates": {
+    "employerContributionPersisted": "PASS",
+    "payrollSummaryCorrect": "PASS",
+    "journalCorrect": "PASS",
+    "generalLedgerCorrect": "PENDING_LIVE_EXTRACTION",
+    "trialBalanceCorrect": "PENDING_LIVE_EXTRACTION",
+    "historicalRetrievalCorrect": "PASS",
+    "reportsCorrect": "PASS",
+    "payslipsCorrect": "PASS",
+    "noRegression": "PASS"
+  }
+}

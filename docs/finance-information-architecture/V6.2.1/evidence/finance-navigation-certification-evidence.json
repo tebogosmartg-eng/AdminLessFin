@@ -1,0 +1,69 @@
+{
+  "product": "AdminLess Fin",
+  "pack": "Finance Navigation & Ownership Refinement",
+  "version": "6.2.1",
+  "date": "2026-07-13",
+  "board": "Independent Principal Finance Architecture Board",
+  "verdict": "FINANCE NAVIGATION CERTIFIED",
+  "implementation": "PROHIBITED until Implementation Approval cites V6.2.1",
+  "architectural_decision": {
+    "question": "Live TB/IS/BS/CF/Ratios under Reports or Accounting?",
+    "answer": "Accounting → Accounting Reports",
+    "rejected": ["Reports as permanent home", "Financial Statements Workspace for live artefacts"]
+  },
+  "supersedes": {
+    "V6.2.0": "Live FS five presentation ownership moved from Operational Reports to Accounting Reports"
+  },
+  "permanent_homes": {
+    "accounting": "balances, journals, recognition, Accounting Reports (live TB/IS/BS/CF/Ratios/GL)",
+    "financial_statements_workspace": "statutory preparation, Close, EFRE",
+    "reports": "enterprise-wide only — Executive + Operational analytics (no live FS five)",
+    "assets_and_loans": "independent",
+    "enterprise_governance": "outside finance statement homes"
+  },
+  "navigation_hierarchy_certified": [
+    "Dashboard",
+    "Operations",
+    "Sales",
+    "Purchases",
+    "Payroll",
+    "Work Management",
+    "Accounting",
+    "Financial Statements",
+    "Assets & Loans",
+    "Reports",
+    "Enterprise Governance"
+  ],
+  "verification": {
+    "one_navigation_location": "PASS",
+    "one_owner": "PASS",
+    "accounting_owns_balances": "PASS",
+    "financial_statements_own_statutory_preparation": "PASS",
+    "reports_own_enterprise_wide_only": "PASS",
+    "no_duplicated_income_statements": "PASS",
+    "no_duplicated_trial_balances": "PASS",
+    "no_duplicated_cash_flows": "PASS",
+    "no_duplicated_ratios": "PASS",
+    "no_duplicated_balance_sheets": "PASS"
+  },
+  "capabilities_certified": [
+    "Accounting",
+    "Accounting Reports",
+    "Financial Statements Workspace",
+    "Reports",
+    "Executive Reporting",
+    "Operational Reporting",
+    "Financial Close",
+    "Enterprise Financial Reporting"
+  ],
+  "deliverables": [
+    "00_INDEX.md",
+    "01_FINANCE_NAVIGATION_STANDARD.md",
+    "02_NAVIGATION_OWNERSHIP_MATRIX.md",
+    "03_CAPABILITY_OWNERSHIP_MATRIX.md",
+    "04_USER_JOURNEY_VALIDATION.md",
+    "05_FUTURE_EVOLUTION_STRATEGY.md",
+    "06_MIGRATION_IMPACT_ASSESSMENT.md",
+    "07_ENTERPRISE_READINESS_ASSESSMENT.md"
+  ]
+}

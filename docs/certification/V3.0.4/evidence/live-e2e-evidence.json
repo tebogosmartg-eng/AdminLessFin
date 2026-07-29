@@ -1,0 +1,1263 @@
+{
+  "runAt": "2026-07-28T10:07:08.959Z",
+  "version": "3.5",
+  "decision": "CERTIFIED FOR PRODUCTION",
+  "timings": {
+    "generatePayslipsMs": 896,
+    "approveRunMs": 689,
+    "finalizeRunMs": 778,
+    "generateBankBatchMs": 587,
+    "workspaceSummaryMs": 630
+  },
+  "steps": [
+    {
+      "phase": "1",
+      "step": "VITE_SUPABASE_URL loaded",
+      "status": "PASS",
+      "evidence": {
+        "loaded": true
+      }
+    },
+    {
+      "phase": "1",
+      "step": "VITE_SUPABASE_ANON_KEY loaded",
+      "status": "PASS",
+      "evidence": {
+        "loaded": true
+      }
+    },
+    {
+      "phase": "1",
+      "step": "E2E_EMAIL loaded",
+      "status": "PASS",
+      "evidence": {
+        "loaded": true
+      }
+    },
+    {
+      "phase": "1",
+      "step": "E2E_PASSWORD loaded",
+      "status": "PASS",
+      "evidence": {
+        "loaded": true
+      }
+    },
+    {
+      "phase": "1",
+      "step": "Supabase reachable",
+      "status": "PASS",
+      "evidence": {
+        "reachable": true
+      }
+    },
+    {
+      "phase": "1",
+      "step": "Authentication",
+      "status": "PASS",
+      "request": {
+        "email": "efs.certification.v6102@adminless.local",
+        "provider": "password"
+      },
+      "response": {
+        "userId": "908ad90e-ee0e-4957-943d-ed1ec2fb843a",
+        "email": "efs.certification.v6102@adminless.local",
+        "accessTokenPrefix": "eyJhbGciOiJIUzI1NiIs…",
+        "expiresAt": 1785236814,
+        "expiresIn": 3600
+      },
+      "evidence": {
+        "userId": "908ad90e-ee0e-4957-943d-ed1ec2fb843a",
+        "jwtExpiry": "2026-07-28T11:06:54.000Z"
+      }
+    },
+    {
+      "phase": "1",
+      "step": "Company resolved",
+      "status": "PASS",
+      "evidence": {
+        "companyId": "063d0ae0-394a-4b22-b140-087d5979633b",
+        "role": "owner",
+        "companyName": "CERT TX 1785231635647"
+      }
+    },
+    {
+      "phase": "1",
+      "step": "Admin privileges",
+      "status": "PASS",
+      "evidence": {
+        "role": "owner"
+      }
+    },
+    {
+      "phase": "2",
+      "step": "Employee created",
+      "status": "PASS",
+      "request": {
+        "method": "POST",
+        "company_id": "063d0ae0-394a-4b22-b140-087d5979633b",
+        "command_id": "c9bf97ab-a22a-4f79-8731-1adc40898fbc",
+        "correlation_id": "cba8948f-a3f5-4ad5-863d-82428822c693",
+        "employeeData": {
+          "first_name": "Cert",
+          "last_name": "E2E-20260728-1206",
+          "email": "cert.e2e.1785233214969@adminless-fin.test",
+          "department": "Certification",
+          "position": "Test Employee",
+          "salary_amount": 35000,
+          "salary_period": "monthly",
+          "employment_type": "permanent",
+          "bank_name": "FNB",
+          "bank_account_number": "62000000001",
+          "branch": "250655",
+          "tax_number": "0000000000",
+          "start_date": "2026-07-28"
+        }
+      },
+      "response": {
+        "id": "73d397ce-842c-431b-8732-a3357e74992d",
+        "company_id": "063d0ae0-394a-4b22-b140-087d5979633b",
+        "first_name": "Cert",
+        "last_name": "E2E-20260728-1206",
+        "email": "cert.e2e.1785233214969@adminless-fin.test",
+        "phone": null,
+        "id_number": null,
+        "tax_number": "0000000000",
+        "bank_name": "FNB",
+        "bank_account_number": "62000000001",
+        "employment_type": "permanent",
+        "department": "Certification",
+        "position": "Test Employee",
+        "start_date": "2026-07-28",
+        "end_date": null,
+        "created_at": "2026-07-28T10:06:55.869198+00:00",
+        "salary_amount": 35000,
+        "salary_period": "monthly",
+        "employee_number": "EMP-000004",
+        "branch": "250655",
+        "manager_id": null,
+        "employment_status": "active"
+      },
+      "evidence": {
+        "employeeId": "73d397ce-842c-431b-8732-a3357e74992d",
+        "employeeNumber": "EMP-000004",
+        "commandId": "c9bf97ab-a22a-4f79-8731-1adc40898fbc",
+        "correlationId": "cba8948f-a3f5-4ad5-863d-82428822c693"
+      }
+    },
+    {
+      "phase": "2",
+      "step": "Employee Created Event",
+      "status": "PASS",
+      "evidence": {
+        "timeline": [
+          {
+            "id": "da0695d5-cff2-480f-90dd-44fcbfa97eba",
+            "employee_id": "73d397ce-842c-431b-8732-a3357e74992d",
+            "employee_number": "EMP-000004",
+            "company_id": "063d0ae0-394a-4b22-b140-087d5979633b",
+            "event_type": "EMPLOYEE_NUMBER_ASSIGNED",
+            "event_label": "Employee Number Assigned",
+            "event_data": {
+              "branch": "250655",
+              "detail": "EMP-000004 — Cert E2E-20260728-1206 — Certification — Test Employee",
+              "last_name": "E2E-20260728-1206",
+              "department": "Certification",
+              "first_name": "Cert"
+            },
+            "command_id": "c9bf97ab-a22a-4f79-8731-1adc40898fbc",
+            "correlation_id": "cba8948f-a3f5-4ad5-863d-82428822c693",
+            "changed_by": "908ad90e-ee0e-4957-943d-ed1ec2fb843a",
+            "created_at": "2026-07-28T10:06:56.21604+00:00"
+          },
+          {
+            "id": "a707d44d-2d41-4ca9-bbca-6f2491784678",
+            "employee_id": "73d397ce-842c-431b-8732-a3357e74992d",
+            "employee_number": "EMP-000004",
+            "company_id": "063d0ae0-394a-4b22-b140-087d5979633b",
+            "event_type": "EMPLOYEE_CREATED",
+            "event_label": "Employee Created",
+            "event_data": {
+              "branch": "250655",
+              "detail": "EMP-000004 — Cert E2E-20260728-1206 — Certification — Test Employee",
+              "last_name": "E2E-20260728-1206",
+              "department": "Certification",
+              "first_name": "Cert"
+            },
+            "command_id": "c9bf97ab-a22a-4f79-8731-1adc40898fbc",
+            "correlation_id": "cba8948f-a3f5-4ad5-863d-82428822c693",
+            "changed_by": "908ad90e-ee0e-4957-943d-ed1ec2fb843a",
+            "created_at": "2026-07-28T10:06:56.141068+00:00"
+          }
+        ]
+      }
+    },
+    {
+      "phase": "2",
+      "step": "Employee Number assigned",
+      "status": "PASS",
+      "evidence": {
+        "employeeNumber": "EMP-000004",
+        "timeline": [
+          {
+            "id": "da0695d5-cff2-480f-90dd-44fcbfa97eba",
+            "employee_id": "73d397ce-842c-431b-8732-a3357e74992d",
+            "employee_number": "EMP-000004",
+            "company_id": "063d0ae0-394a-4b22-b140-087d5979633b",
+            "event_type": "EMPLOYEE_NUMBER_ASSIGNED",
+            "event_label": "Employee Number Assigned",
+            "event_data": {
+              "branch": "250655",
+              "detail": "EMP-000004 — Cert E2E-20260728-1206 — Certification — Test Employee",
+              "last_name": "E2E-20260728-1206",
+              "department": "Certification",
+              "first_name": "Cert"
+            },
+            "command_id": "c9bf97ab-a22a-4f79-8731-1adc40898fbc",
+            "correlation_id": "cba8948f-a3f5-4ad5-863d-82428822c693",
+            "changed_by": "908ad90e-ee0e-4957-943d-ed1ec2fb843a",
+            "created_at": "2026-07-28T10:06:56.21604+00:00"
+          },
+          {
+            "id": "a707d44d-2d41-4ca9-bbca-6f2491784678",
+            "employee_id": "73d397ce-842c-431b-8732-a3357e74992d",
+            "employee_number": "EMP-000004",
+            "company_id": "063d0ae0-394a-4b22-b140-087d5979633b",
+            "event_type": "EMPLOYEE_CREATED",
+            "event_label": "Employee Created",
+            "event_data": {
+              "branch": "250655",
+              "detail": "EMP-000004 — Cert E2E-20260728-1206 — Certification — Test Employee",
+              "last_name": "E2E-20260728-1206",
+              "department": "Certification",
+              "first_name": "Cert"
+            },
+            "command_id": "c9bf97ab-a22a-4f79-8731-1adc40898fbc",
+            "correlation_id": "cba8948f-a3f5-4ad5-863d-82428822c693",
+            "changed_by": "908ad90e-ee0e-4957-943d-ed1ec2fb843a",
+            "created_at": "2026-07-28T10:06:56.141068+00:00"
+          }
+        ]
+      }
+    },
+    {
+      "phase": "3",
+      "step": "Payroll Run created",
+      "status": "PASS",
+      "request": {
+        "method": "CREATE_RUN",
+        "company_id": "063d0ae0-394a-4b22-b140-087d5979633b",
+        "runData": {
+          "pay_period_start": "2026-08-01",
+          "pay_period_end": "2026-08-31",
+          "pay_date": "2026-08-31",
+          "status": "draft"
+        }
+      },
+      "response": {
+        "id": "4c5917d7-10a2-40b4-9457-0f4fd7eac4ac",
+        "company_id": "063d0ae0-394a-4b22-b140-087d5979633b",
+        "pay_period_start": "2026-08-01",
+        "pay_period_end": "2026-08-31",
+        "pay_date": "2026-08-31",
+        "status": "draft",
+        "created_at": "2026-07-28T10:06:57.205048+00:00",
+        "journal_entry_id": null,
+        "approved_by": null,
+        "approved_at": null,
+        "processed_by": null,
+        "processed_at": null,
+        "output_metadata": {},
+        "rule_config": {},
+        "posting_request_id": null
+      },
+      "evidence": {
+        "runId": "4c5917d7-10a2-40b4-9457-0f4fd7eac4ac"
+      }
+    },
+    {
+      "phase": "3",
+      "step": "Rules loaded",
+      "status": "PASS",
+      "request": {
+        "method": "GET_RUN_RULE_CONFIG",
+        "company_id": "063d0ae0-394a-4b22-b140-087d5979633b",
+        "runId": "4c5917d7-10a2-40b4-9457-0f4fd7eac4ac"
+      },
+      "response": {
+        "effectiveRulesCount": 12,
+        "catalogCount": 12
+      }
+    },
+    {
+      "phase": "3",
+      "step": "Calculation Pipeline executed",
+      "status": "PASS",
+      "request": {
+        "method": "GENERATE_PAYSLIPS",
+        "company_id": "063d0ae0-394a-4b22-b140-087d5979633b",
+        "runId": "4c5917d7-10a2-40b4-9457-0f4fd7eac4ac"
+      },
+      "response": {
+        "generated": 2,
+        "engine": "statutory_payroll_engine_v3",
+        "rules_applied": [
+          "basic_salary",
+          "paye",
+          "uif",
+          "uif_employer",
+          "sdl"
+        ]
+      },
+      "evidence": {
+        "runId": "4c5917d7-10a2-40b4-9457-0f4fd7eac4ac",
+        "generated": 2
+      }
+    },
+    {
+      "phase": "4",
+      "step": "Statutory: PAYE",
+      "status": "PASS",
+      "evidence": {
+        "taxYear": "2026/2027",
+        "ruleVersion": "2026.2.0",
+        "engineId": "directors_paye",
+        "skipped": true,
+        "skipReason": "Employee is not a director",
+        "employeeAmount": 0,
+        "employerAmount": 0,
+        "auditTrail": [
+          {
+            "step": "skip",
+            "inputs": {
+              "reason": "Employee is not a director"
+            },
+            "result": 0,
+            "formula": "engine disabled or not applicable"
+          }
+        ],
+        "finalResult": {
+          "skipped": true,
+          "breakdown": {},
+          "engine_id": "directors_paye",
+          "audit_trail": [
+            {
+              "step": "skip",
+              "inputs": {
+                "reason": "Employee is not a director"
+              },
+              "result": 0,
+              "formula": "engine disabled or not applicable"
+            }
+          ],
+          "skip_reason": "Employee is not a director",
+          "engine_version": "3.0.2",
+          "employee_amount": 0,
+          "employer_amount": 0,
+          "taxable_adjustment": 0
+        }
+      }
+    },
+    {
+      "phase": "4",
+      "step": "Statutory: UIF",
+      "status": "PASS",
+      "evidence": {
+        "taxYear": "2026/2027",
+        "ruleVersion": "2026.2.0",
+        "engineId": "uif",
+        "skipped": false,
+        "employeeAmount": 177.12,
+        "employerAmount": 0,
+        "auditTrail": [
+          {
+            "step": "uif_base",
+            "inputs": {
+              "ceiling": 17712,
+              "grossEarnings": 20000
+            },
+            "result": 17712,
+            "formula": "min(gross_remuneration, monthly_ceiling)"
+          },
+          {
+            "step": "uif_contribution",
+            "inputs": {
+              "rate": 0.01,
+              "taxYear": "2026/2027",
+              "ruleVersion": "2026.2.0",
+              "cappedRemuneration": 17712
+            },
+            "result": 177.12,
+            "formula": "capped_remuneration × uif_rate"
+          }
+        ],
+        "finalResult": {
+          "skipped": false,
+          "breakdown": {
+            "rate": 0.01,
+            "contribution": 177.12,
+            "cappedRemuneration": 17712
+          },
+          "engine_id": "uif",
+          "audit_trail": [
+            {
+              "step": "uif_base",
+              "inputs": {
+                "ceiling": 17712,
+                "grossEarnings": 20000
+              },
+              "result": 17712,
+              "formula": "min(gross_remuneration, monthly_ceiling)"
+            },
+            {
+              "step": "uif_contribution",
+              "inputs": {
+                "rate": 0.01,
+                "taxYear": "2026/2027",
+                "ruleVersion": "2026.2.0",
+                "cappedRemuneration": 17712
+              },
+              "result": 177.12,
+              "formula": "capped_remuneration × uif_rate"
+            }
+          ],
+          "engine_version": "3.0.2",
+          "employee_amount": 177.12,
+          "employer_amount": 0,
+          "taxable_adjustment": 0
+        }
+      }
+    },
+    {
+      "phase": "4",
+      "step": "Statutory: SDL",
+      "status": "PASS",
+      "evidence": {
+        "taxYear": "2026/2027",
+        "ruleVersion": "2026.2.0",
+        "engineId": "sdl",
+        "skipped": false,
+        "employeeAmount": 0,
+        "employerAmount": 200,
+        "auditTrail": [
+          {
+            "step": "sdl_levy",
+            "inputs": {
+              "rate": 0.01,
+              "taxYear": "2026/2027",
+              "ruleVersion": "2026.2.0",
+              "remuneration": 20000
+            },
+            "result": 200,
+            "formula": "gross_remuneration × sdl_rate"
+          }
+        ],
+        "finalResult": {
+          "skipped": false,
+          "breakdown": {
+            "rate": 0.01,
+            "sdlAmount": 200,
+            "remuneration": 20000
+          },
+          "engine_id": "sdl",
+          "audit_trail": [
+            {
+              "step": "sdl_levy",
+              "inputs": {
+                "rate": 0.01,
+                "taxYear": "2026/2027",
+                "ruleVersion": "2026.2.0",
+                "remuneration": 20000
+              },
+              "result": 200,
+              "formula": "gross_remuneration × sdl_rate"
+            }
+          ],
+          "engine_version": "3.0.2",
+          "employee_amount": 0,
+          "employer_amount": 200,
+          "taxable_adjustment": 0
+        }
+      }
+    },
+    {
+      "phase": "4",
+      "step": "Statutory: Medical Tax Credit",
+      "status": "PASS",
+      "evidence": {
+        "taxYear": "2026/2027",
+        "ruleVersion": "2026.2.0",
+        "engineId": "medical_tax_credit",
+        "skipped": true,
+        "skipReason": "No registered medical scheme contribution — Section 6A not applicable",
+        "employeeAmount": 0,
+        "employerAmount": 0,
+        "auditTrail": [
+          {
+            "step": "medical_credit",
+            "inputs": {
+              "entitled": false,
+              "dependants": 0
+            },
+            "result": 0,
+            "formula": "section_6a_requires_medical_scheme_contribution",
+            "intermediate": {
+              "annualCredit": 0
+            }
+          }
+        ],
+        "finalResult": {
+          "skipped": true,
+          "breakdown": {
+            "dependants": 0,
+            "annualCredit": 0,
+            "monthlyCredit": 0
+          },
+          "engine_id": "medical_tax_credit",
+          "audit_trail": [
+            {
+              "step": "medical_credit",
+              "inputs": {
+                "entitled": false,
+                "dependants": 0
+              },
+              "result": 0,
+              "formula": "section_6a_requires_medical_scheme_contribution",
+              "intermediate": {
+                "annualCredit": 0
+              }
+            }
+          ],
+          "skip_reason": "No registered medical scheme contribution — Section 6A not applicable",
+          "engine_version": "3.0.2",
+          "employee_amount": 0,
+          "employer_amount": 0,
+          "taxable_adjustment": 0
+        }
+      }
+    },
+    {
+      "phase": "4",
+      "step": "Statutory: Retirement Deduction",
+      "status": "PASS",
+      "evidence": {
+        "taxYear": "2026/2027",
+        "ruleVersion": "2026.2.0",
+        "engineId": "retirement_deduction",
+        "skipped": true,
+        "skipReason": "Retirement deduction engine disabled",
+        "employeeAmount": 0,
+        "employerAmount": 0,
+        "auditTrail": [
+          {
+            "step": "skip",
+            "inputs": {
+              "reason": "Retirement deduction engine disabled"
+            },
+            "result": 0,
+            "formula": "engine disabled or not applicable"
+          }
+        ],
+        "finalResult": {
+          "skipped": true,
+          "breakdown": {},
+          "engine_id": "retirement_deduction",
+          "audit_trail": [
+            {
+              "step": "skip",
+              "inputs": {
+                "reason": "Retirement deduction engine disabled"
+              },
+              "result": 0,
+              "formula": "engine disabled or not applicable"
+            }
+          ],
+          "skip_reason": "Retirement deduction engine disabled",
+          "engine_version": "3.0.2",
+          "employee_amount": 0,
+          "employer_amount": 0,
+          "taxable_adjustment": 0
+        }
+      }
+    },
+    {
+      "phase": "4",
+      "step": "Statutory: Fringe Benefits",
+      "status": "PASS",
+      "evidence": {
+        "taxYear": "2026/2027",
+        "ruleVersion": "2026.2.0",
+        "engineId": "fringe_benefit",
+        "skipped": true,
+        "skipReason": "Fringe benefit engine disabled",
+        "employeeAmount": 0,
+        "employerAmount": 0,
+        "auditTrail": [
+          {
+            "step": "skip",
+            "inputs": {
+              "reason": "Fringe benefit engine disabled"
+            },
+            "result": 0,
+            "formula": "engine disabled or not applicable"
+          }
+        ],
+        "finalResult": {
+          "skipped": true,
+          "breakdown": {},
+          "engine_id": "fringe_benefit",
+          "audit_trail": [
+            {
+              "step": "skip",
+              "inputs": {
+                "reason": "Fringe benefit engine disabled"
+              },
+              "result": 0,
+              "formula": "engine disabled or not applicable"
+            }
+          ],
+          "skip_reason": "Fringe benefit engine disabled",
+          "engine_version": "3.0.2",
+          "employee_amount": 0,
+          "employer_amount": 0,
+          "taxable_adjustment": 0
+        }
+      }
+    },
+    {
+      "phase": "4",
+      "step": "Statutory: Travel Allowance",
+      "status": "PASS",
+      "evidence": {
+        "taxYear": "2026/2027",
+        "ruleVersion": "2026.2.0",
+        "engineId": "travel_allowance",
+        "skipped": true,
+        "skipReason": "Travel allowance engine disabled",
+        "employeeAmount": 0,
+        "employerAmount": 0,
+        "auditTrail": [
+          {
+            "step": "skip",
+            "inputs": {
+              "reason": "Travel allowance engine disabled"
+            },
+            "result": 0,
+            "formula": "engine disabled or not applicable"
+          }
+        ],
+        "finalResult": {
+          "skipped": true,
+          "breakdown": {},
+          "engine_id": "travel_allowance",
+          "audit_trail": [
+            {
+              "step": "skip",
+              "inputs": {
+                "reason": "Travel allowance engine disabled"
+              },
+              "result": 0,
+              "formula": "engine disabled or not applicable"
+            }
+          ],
+          "skip_reason": "Travel allowance engine disabled",
+          "engine_version": "3.0.2",
+          "employee_amount": 0,
+          "employer_amount": 0,
+          "taxable_adjustment": 0
+        }
+      }
+    },
+    {
+      "phase": "4",
+      "step": "Statutory: Bonus Tax",
+      "status": "PASS",
+      "evidence": {
+        "taxYear": "2026/2027",
+        "ruleVersion": "2026.2.0",
+        "engineId": "bonus_tax",
+        "skipped": true,
+        "skipReason": "Bonus tax engine disabled",
+        "employeeAmount": 0,
+        "employerAmount": 0,
+        "auditTrail": [
+          {
+            "step": "skip",
+            "inputs": {
+              "reason": "Bonus tax engine disabled"
+            },
+            "result": 0,
+            "formula": "engine disabled or not applicable"
+          }
+        ],
+        "finalResult": {
+          "skipped": true,
+          "breakdown": {},
+          "engine_id": "bonus_tax",
+          "audit_trail": [
+            {
+              "step": "skip",
+              "inputs": {
+                "reason": "Bonus tax engine disabled"
+              },
+              "result": 0,
+              "formula": "engine disabled or not applicable"
+            }
+          ],
+          "skip_reason": "Bonus tax engine disabled",
+          "engine_version": "3.0.2",
+          "employee_amount": 0,
+          "employer_amount": 0,
+          "taxable_adjustment": 0
+        }
+      }
+    },
+    {
+      "phase": "4",
+      "step": "Statutory: Leave Encashment",
+      "status": "PASS",
+      "evidence": {
+        "taxYear": "2026/2027",
+        "ruleVersion": "2026.2.0",
+        "engineId": "leave_encashment",
+        "skipped": true,
+        "skipReason": "Leave encashment engine disabled",
+        "employeeAmount": 0,
+        "employerAmount": 0,
+        "auditTrail": [
+          {
+            "step": "skip",
+            "inputs": {
+              "reason": "Leave encashment engine disabled"
+            },
+            "result": 0,
+            "formula": "engine disabled or not applicable"
+          }
+        ],
+        "finalResult": {
+          "skipped": true,
+          "breakdown": {},
+          "engine_id": "leave_encashment",
+          "audit_trail": [
+            {
+              "step": "skip",
+              "inputs": {
+                "reason": "Leave encashment engine disabled"
+              },
+              "result": 0,
+              "formula": "engine disabled or not applicable"
+            }
+          ],
+          "skip_reason": "Leave encashment engine disabled",
+          "engine_version": "3.0.2",
+          "employee_amount": 0,
+          "employer_amount": 0,
+          "taxable_adjustment": 0
+        }
+      }
+    },
+    {
+      "phase": "4",
+      "step": "Statutory: Termination Tax",
+      "status": "PASS",
+      "evidence": {
+        "taxYear": "2026/2027",
+        "ruleVersion": "2026.2.0",
+        "engineId": "termination_tax",
+        "skipped": true,
+        "skipReason": "Termination tax engine disabled",
+        "employeeAmount": 0,
+        "employerAmount": 0,
+        "auditTrail": [
+          {
+            "step": "skip",
+            "inputs": {
+              "reason": "Termination tax engine disabled"
+            },
+            "result": 0,
+            "formula": "engine disabled or not applicable"
+          }
+        ],
+        "finalResult": {
+          "skipped": true,
+          "breakdown": {},
+          "engine_id": "termination_tax",
+          "audit_trail": [
+            {
+              "step": "skip",
+              "inputs": {
+                "reason": "Termination tax engine disabled"
+              },
+              "result": 0,
+              "formula": "engine disabled or not applicable"
+            }
+          ],
+          "skip_reason": "Termination tax engine disabled",
+          "engine_version": "3.0.2",
+          "employee_amount": 0,
+          "employer_amount": 0,
+          "taxable_adjustment": 0
+        }
+      }
+    },
+    {
+      "phase": "4",
+      "step": "Tax year in snapshot",
+      "status": "PASS",
+      "evidence": {
+        "tax_year": "2026/2027",
+        "rule_version": "2026.2.0",
+        "snapshotKeys": [
+          "engine",
+          "net_pay",
+          "tax_year",
+          "command_id",
+          "company_id",
+          "audit_trail",
+          "generated_at",
+          "generated_by",
+          "rule_version",
+          "employee_name",
+          "journal_lines",
+          "payslip_lines",
+          "correlation_id",
+          "engine_results",
+          "engine_version",
+          "gross_earnings",
+          "payroll_run_id",
+          "audit_reference",
+          "cost_to_company",
+          "employee_number",
+          "taxable_earnings",
+          "calculation_version",
+          "rules_engine_result",
+          "calculation_timestamp",
+          "total_employee_deductions",
+          "total_employer_contributions"
+        ],
+        "payslipId": "f918d552-1fc5-4104-ad30-2aec91a58055"
+      }
+    },
+    {
+      "phase": "4",
+      "step": "Rule version in snapshot",
+      "status": "PASS",
+      "evidence": {
+        "rule_version": "2026.2.0"
+      }
+    },
+    {
+      "phase": "5",
+      "step": "Approve Payroll",
+      "status": "PASS",
+      "request": {
+        "method": "APPROVE_RUN",
+        "company_id": "063d0ae0-394a-4b22-b140-087d5979633b",
+        "runId": "4c5917d7-10a2-40b4-9457-0f4fd7eac4ac"
+      },
+      "response": {
+        "id": "4c5917d7-10a2-40b4-9457-0f4fd7eac4ac",
+        "company_id": "063d0ae0-394a-4b22-b140-087d5979633b",
+        "pay_period_start": "2026-08-01",
+        "pay_period_end": "2026-08-31",
+        "pay_date": "2026-08-31",
+        "status": "draft",
+        "created_at": "2026-07-28T10:06:57.205048+00:00",
+        "journal_entry_id": null,
+        "approved_by": "908ad90e-ee0e-4957-943d-ed1ec2fb843a",
+        "approved_at": "2026-07-28T10:06:59.93+00:00",
+        "processed_by": null,
+        "processed_at": null,
+        "output_metadata": {},
+        "rule_config": {},
+        "posting_request_id": null
+      },
+      "evidence": {
+        "approved_at": "2026-07-28T10:06:59.93+00:00"
+      }
+    },
+    {
+      "phase": "5",
+      "step": "Approval audit entry",
+      "status": "PASS",
+      "evidence": [
+        {
+          "event_type": "run_approved",
+          "created_at": "2026-07-28T10:07:00.044528+00:00"
+        }
+      ]
+    },
+    {
+      "phase": "6",
+      "step": "Payslip data retrieved",
+      "status": "PASS",
+      "evidence": {
+        "payslipId": "f918d552-1fc5-4104-ad30-2aec91a58055",
+        "employeeNumber": "EMP-000001",
+        "employeeName": "CERT Employee",
+        "companyId": "063d0ae0-394a-4b22-b140-087d5979633b",
+        "payPeriod": "2026-08-01 to 2026-08-31",
+        "grossEarnings": 20000,
+        "totalDeductions": 2292.12,
+        "netPay": 17707.88,
+        "taxYear": "2026/2027",
+        "ruleVersion": "2026.2.0",
+        "calculationSnapshot": true,
+        "auditReference": "PAYSLIP:e87efaaa-7ea8-4b7d-b18e-c6dd79f93653:4c5917d7-10a2-40b4-9457-0f4fd7eac4ac",
+        "ytd": null,
+        "itemCount": 5,
+        "hasPaye": true,
+        "hasUif": true,
+        "hasSdl": true,
+        "hasEmployerContributions": true,
+        "htmlGenerated": true,
+        "pdfGenerated": true
+      }
+    },
+    {
+      "phase": "7",
+      "step": "GL accounts resolved",
+      "status": "PASS",
+      "evidence": {
+        "wageAccountId": "500c080e-7be4-492f-a76f-a966b5d63b2f",
+        "bankAccountId": "9474b681-da6a-469f-884e-1f33db55d010",
+        "liabilityAccountId": "814bcd02-9308-45fc-9dd2-ec6070860b02"
+      }
+    },
+    {
+      "phase": "7",
+      "step": "Process Payroll",
+      "status": "PASS",
+      "request": {
+        "method": "FINALIZE_RUN",
+        "company_id": "063d0ae0-394a-4b22-b140-087d5979633b",
+        "runId": "4c5917d7-10a2-40b4-9457-0f4fd7eac4ac",
+        "wageAccountId": "500c080e-7be4-492f-a76f-a966b5d63b2f",
+        "bankAccountId": "9474b681-da6a-469f-884e-1f33db55d010",
+        "liabilityAccountId": "814bcd02-9308-45fc-9dd2-ec6070860b02"
+      },
+      "response": {
+        "run": {
+          "id": "4c5917d7-10a2-40b4-9457-0f4fd7eac4ac",
+          "company_id": "063d0ae0-394a-4b22-b140-087d5979633b",
+          "pay_period_start": "2026-08-01",
+          "pay_period_end": "2026-08-31",
+          "pay_date": "2026-08-31",
+          "status": "finalized",
+          "created_at": "2026-07-28T10:06:57.205048+00:00",
+          "journal_entry_id": "a85aba4d-c75f-4434-b333-4fd3a22a3bcb",
+          "approved_by": "908ad90e-ee0e-4957-943d-ed1ec2fb843a",
+          "approved_at": "2026-07-28T10:06:59.93+00:00",
+          "processed_by": "908ad90e-ee0e-4957-943d-ed1ec2fb843a",
+          "processed_at": "2026-07-28T10:07:03.097353+00:00",
+          "output_metadata": {
+            "summary": {
+              "total_net": 46396.01,
+              "pay_period": "2026-08-01 to 2026-08-31",
+              "total_gross": 55000,
+              "payroll_cost": 55904.24,
+              "employees_paid": 2,
+              "total_deductions": 8603.99,
+              "employer_contributions": 904.24
+            },
+            "recovered": false,
+            "emails_sent": 0,
+            "processed_at": "2026-07-28T10:07:03.097353+00:00",
+            "email_failures": [],
+            "journal_posted": true,
+            "posting_engine": true,
+            "reports_generated": true,
+            "summary_generated": true,
+            "payslips_generated": 2,
+            "posting_request_id": "963c58b8-f7fd-438b-9f08-baab9d2c1567",
+            "register_generated": true
+          },
+          "rule_config": {},
+          "posting_request_id": "963c58b8-f7fd-438b-9f08-baab9d2c1567"
+        },
+        "journal_entry_id": "a85aba4d-c75f-4434-b333-4fd3a22a3bcb",
+        "posting_request_id": "963c58b8-f7fd-438b-9f08-baab9d2c1567",
+        "posting_status": "committed",
+        "summary": {
+          "employees_paid": 2,
+          "total_gross": 55000,
+          "total_net": 46396.01,
+          "total_paye": 0,
+          "total_uif": 0,
+          "total_sdl": 0,
+          "total_pension": 0,
+          "employer_contributions": 904.24,
+          "payroll_cost": 55904.24,
+          "variance_previous": null,
+          "variance_budget": null,
+          "pay_period": "2026-08-01 to 2026-08-31",
+          "total_deductions": 8603.99
+        },
+        "outputs": {
+          "payslips_generated": 2,
+          "reports_generated": true,
+          "register_generated": true,
+          "summary_generated": true,
+          "journal_posted": true,
+          "posting_engine": true,
+          "posting_request_id": "963c58b8-f7fd-438b-9f08-baab9d2c1567",
+          "emails_sent": 0,
+          "email_failures": [],
+          "processed_at": "2026-07-28T10:07:03.097353+00:00",
+          "summary": {
+            "employees_paid": 2,
+            "total_gross": 55000,
+            "total_net": 46396.01,
+            "total_paye": 0,
+            "total_uif": 0,
+            "total_sdl": 0,
+            "total_pension": 0,
+            "employer_contributions": 904.24,
+            "payroll_cost": 55904.24,
+            "variance_previous": null,
+            "variance_budget": null,
+            "pay_period": "2026-08-01 to 2026-08-31",
+            "total_deductions": 8603.99
+          },
+          "recovered": false
+        },
+        "recovered": false
+      },
+      "evidence": {
+        "journalId": "a85aba4d-c75f-4434-b333-4fd3a22a3bcb",
+        "status": "finalized"
+      }
+    },
+    {
+      "phase": "7",
+      "step": "Journal balanced",
+      "status": "PASS",
+      "evidence": {
+        "journalId": "a85aba4d-c75f-4434-b333-4fd3a22a3bcb",
+        "debits": 55904.24,
+        "credits": 55904.24,
+        "lines": [
+          {
+            "type": "debit",
+            "amount": 55000,
+            "chart_of_accounts": {
+              "name": "Salaries and Wages"
+            }
+          },
+          {
+            "type": "credit",
+            "amount": 46396.01,
+            "chart_of_accounts": {
+              "name": "Bank - Current Account"
+            }
+          },
+          {
+            "type": "credit",
+            "amount": 8603.99,
+            "chart_of_accounts": {
+              "name": "PAYE Payable"
+            }
+          },
+          {
+            "type": "debit",
+            "amount": 904.24,
+            "chart_of_accounts": {
+              "name": "Salaries and Wages"
+            }
+          },
+          {
+            "type": "credit",
+            "amount": 904.24,
+            "chart_of_accounts": {
+              "name": "PAYE Payable"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "phase": "8",
+      "step": "Bank file generated",
+      "status": "PASS",
+      "request": {
+        "method": "GENERATE_BANK_BATCH",
+        "company_id": "063d0ae0-394a-4b22-b140-087d5979633b",
+        "runId": "4c5917d7-10a2-40b4-9457-0f4fd7eac4ac",
+        "format": "csv"
+      },
+      "response": {
+        "run": {
+          "id": "4c5917d7-10a2-40b4-9457-0f4fd7eac4ac",
+          "company_id": "063d0ae0-394a-4b22-b140-087d5979633b",
+          "pay_period_start": "2026-08-01",
+          "pay_period_end": "2026-08-31",
+          "pay_date": "2026-08-31",
+          "status": "finalized",
+          "created_at": "2026-07-28T10:06:57.205048+00:00",
+          "journal_entry_id": "a85aba4d-c75f-4434-b333-4fd3a22a3bcb",
+          "approved_by": "908ad90e-ee0e-4957-943d-ed1ec2fb843a",
+          "approved_at": "2026-07-28T10:06:59.93+00:00",
+          "processed_by": "908ad90e-ee0e-4957-943d-ed1ec2fb843a",
+          "processed_at": "2026-07-28T10:07:03.097353+00:00",
+          "output_metadata": {
+            "summary": {
+              "total_net": 46396.01,
+              "pay_period": "2026-08-01 to 2026-08-31",
+              "total_gross": 55000,
+              "payroll_cost": 55904.24,
+              "employees_paid": 2,
+              "total_deductions": 8603.99,
+              "employer_contributions": 904.24
+            },
+            "recovered": false,
+            "bank_batch": {
+              "format": "csv",
+              "status": "generated",
+              "reference": "PAY-2026-08-31",
+              "generated_at": "2026-07-28T10:07:04.449Z",
+              "total_amount": 46396.01,
+              "employee_count": 2
+            },
+            "emails_sent": 0,
+            "processed_at": "2026-07-28T10:07:03.097353+00:00",
+            "email_failures": [],
+            "journal_posted": true,
+            "posting_engine": true,
+            "reports_generated": true,
+            "summary_generated": true,
+            "payslips_generated": 2,
+            "posting_request_id": "963c58b8-f7fd-438b-9f08-baab9d2c1567",
+            "register_generated": true,
+            "bank_file_generated": true
+          },
+          "rule_config": {},
+          "posting_request_id": "963c58b8-f7fd-438b-9f08-baab9d2c1567"
+        },
+        "bank_batch": {
+          "status": "generated",
+          "format": "csv",
+          "generated_at": "2026-07-28T10:07:04.449Z",
+          "employee_count": 2,
+          "total_amount": 46396.01,
+          "reference": "PAY-2026-08-31"
+        },
+        "persisted": true
+      },
+      "evidence": {
+        "status": "generated",
+        "format": "csv",
+        "generated_at": "2026-07-28T10:07:04.449Z",
+        "employee_count": 2,
+        "total_amount": 46396.01,
+        "reference": "PAY-2026-08-31"
+      }
+    },
+    {
+      "phase": "9",
+      "step": "Payroll Register",
+      "status": "PASS",
+      "response": {
+        "rowCount": 2
+      }
+    },
+    {
+      "phase": "9",
+      "step": "Payroll Summary",
+      "status": "PASS",
+      "response": {
+        "employees_paid": 2,
+        "total_gross": 55000,
+        "total_net": 46396.01,
+        "total_paye": 8249.75,
+        "total_uif": 708.48,
+        "total_sdl": 550,
+        "total_pension": 0,
+        "employer_contributions": 904.24,
+        "payroll_cost": 55904.24,
+        "variance_previous": 28756.210000000003,
+        "variance_budget": null,
+        "pay_period": "2026-08-01 to 2026-08-31",
+        "total_deductions": 8603.99
+      }
+    },
+    {
+      "phase": "9",
+      "step": "Period Reports",
+      "status": "PASS",
+      "response": {
+        "runCount": 1,
+        "payslipCount": 2
+      }
+    },
+    {
+      "phase": "10",
+      "step": "Audit events captured",
+      "status": "PASS",
+      "evidence": {
+        "eventTypes": [
+          "bank_batch_generated",
+          "run_processed",
+          "run_approved",
+          "payslips_generated",
+          "run_created"
+        ],
+        "count": 5
+      }
+    },
+    {
+      "phase": "10",
+      "step": "Dashboard workspace summary",
+      "status": "PASS",
+      "response": {
+        "employeeCount": 2,
+        "estimatedMonthlyPayroll": 55000,
+        "draftPayrollRuns": 0,
+        "pendingClaims": 0,
+        "approvedClaimsAwaitingReimbursement": 0,
+        "employeesNeedingAction": 1,
+        "upcomingPayDate": null,
+        "draftRunEstimatedCost": 0,
+        "lastProcessedNetPay": 46396.01,
+        "payrollVariance": 0,
+        "payrollReady": true,
+        "lastProcessedGross": 55000,
+        "lastProcessedPaye": 8249.75,
+        "lastProcessedUif": 708.48,
+        "lastProcessedSdl": 550,
+        "bankBatchStatus": "generated",
+        "payslipGenerationStatus": "2 generated",
+        "upcomingPayrollRunStatus": null,
+        "draftPayrollRunCount": 0
+      },
+      "evidence": {
+        "durationMs": 630
+      }
+    },
+    {
+      "phase": "11",
+      "step": "Historical values unchanged",
+      "status": "PASS",
+      "evidence": {
+        "firstNetPay": 17707.88,
+        "secondNetPay": 17707.88
+      }
+    },
+    {
+      "phase": "11",
+      "step": "Rule version preserved",
+      "status": "PASS",
+      "evidence": {
+        "first": "2026.2.0",
+        "second": "2026.2.0"
+      }
+    },
+    {
+      "phase": "11",
+      "step": "Tax year preserved",
+      "status": "PASS",
+      "evidence": {
+        "first": "2026/2027",
+        "second": "2026/2027"
+      }
+    }
+  ]
+}

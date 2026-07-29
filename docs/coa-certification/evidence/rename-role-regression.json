@@ -1,0 +1,123 @@
+{
+  "companyId": "3cbfd4eb-a095-43f3-837a-0b4f1e2c1752",
+  "before": {
+    "ar": {
+      "id": "eb5a9a02-7e79-44f6-b6b5-fe4fb2b0f674",
+      "name": "AR",
+      "account_role": "trade_receivable"
+    },
+    "bank": {
+      "id": "589b9e2b-9acc-4b63-ba88-a9765ee7a90f",
+      "name": "Bank",
+      "account_role": null,
+      "subcategory": "Cash and Cash Equivalents"
+    },
+    "sales": {
+      "id": "0cf0454c-77be-4cbc-ae8f-9c5947b22be7",
+      "name": "zuru",
+      "account_role": null
+    }
+  },
+  "renames": {
+    "ar": {
+      "status": 200,
+      "from": "AR",
+      "to": "AR Renamed 1785302292993",
+      "ok": true
+    },
+    "bank": {
+      "status": 200,
+      "from": "Bank",
+      "to": "Bank Renamed 1785302292993",
+      "ok": true
+    },
+    "sales": {
+      "status": 200,
+      "from": "zuru",
+      "to": "Sales Renamed 1785302292993",
+      "ok": true
+    }
+  },
+  "postRename": {
+    "ar": {
+      "id": "eb5a9a02-7e79-44f6-b6b5-fe4fb2b0f674",
+      "account_number": 3000,
+      "name": "AR Renamed 1785302292993",
+      "type": "Asset",
+      "balance": 1389935.5,
+      "account_role": "trade_receivable",
+      "tax_treatment": null,
+      "control_account": false,
+      "system_account": false,
+      "account_code": null,
+      "category": "Asset",
+      "subcategory": null,
+      "is_active": true,
+      "description": ""
+    },
+    "bank": {
+      "id": "589b9e2b-9acc-4b63-ba88-a9765ee7a90f",
+      "account_number": 3001,
+      "name": "Bank Renamed 1785302292993",
+      "type": "Asset",
+      "balance": -238145.49,
+      "account_role": null,
+      "tax_treatment": null,
+      "control_account": false,
+      "system_account": false,
+      "account_code": null,
+      "category": "Current Assets",
+      "subcategory": "Cash and Cash Equivalents",
+      "is_active": true,
+      "description": "Payroll "
+    },
+    "sales": {
+      "id": "0cf0454c-77be-4cbc-ae8f-9c5947b22be7",
+      "account_number": 1000,
+      "name": "Sales Renamed 1785302292993",
+      "type": "Income",
+      "balance": 107498.45,
+      "account_role": null,
+      "tax_treatment": null,
+      "control_account": false,
+      "system_account": false,
+      "account_code": null,
+      "category": "Income",
+      "subcategory": null,
+      "is_active": true,
+      "description": ""
+    }
+  },
+  "endpoints": {
+    "invoices": {
+      "status": 200,
+      "ok": true
+    },
+    "bills": {
+      "status": 200,
+      "ok": true
+    },
+    "payments": {
+      "status": 200,
+      "ok": true
+    },
+    "banking": {
+      "status": 200,
+      "ok": true
+    },
+    "financial-statements": {
+      "status": 200,
+      "ok": true
+    },
+    "accounting-health": {
+      "status": 400,
+      "ok": true
+    }
+  },
+  "roleResolution": {
+    "arByRole": true,
+    "bankStillCashEquivalent": true,
+    "salesByRoleOrId": true
+  },
+  "restored": true
+}

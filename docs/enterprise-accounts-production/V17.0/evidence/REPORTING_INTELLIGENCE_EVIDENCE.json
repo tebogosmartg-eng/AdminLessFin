@@ -1,0 +1,526 @@
+{
+  "version": "17.0",
+  "decision": "READY FOR CERTIFICATION",
+  "entityProfiles": {
+    "service_entity": "small_sme / service",
+    "retail_entity": "small_sme / retail",
+    "manufacturing_entity": "small_sme / manufacturing",
+    "investment_holding": "investment_entity / professional_practice",
+    "professional_practice": "micro_entity / professional_practice",
+    "npo": "micro_entity / npo",
+    "dormant_entity": "dormant_entity / retail",
+    "high_growth_entity": "small_sme / service",
+    "loss_making_entity": "micro_entity / manufacturing",
+    "asset_intensive_entity": "small_sme / service",
+    "debt_intensive_entity": "small_sme / construction"
+  },
+  "regressionResults": [
+    {
+      "scenarioId": "service_entity",
+      "entityProfile": {
+        "size": "small_sme",
+        "industry": "service",
+        "labels": [
+          "small sme",
+          "service"
+        ],
+        "confidence": 1,
+        "characteristics": {
+          "totalAssets": 4300000,
+          "totalRevenue": 12000000,
+          "totalLiabilities": 800000,
+          "netProfit": 1750000,
+          "assetIntensity": 0,
+          "debtRatio": 0.18604651162790697,
+          "revenueGrowth": 0,
+          "isLossMaking": false,
+          "isHighGrowth": false,
+          "isAssetIntensive": false,
+          "isDebtIntensive": false,
+          "isDormant": false
+        },
+        "factors": {
+          "ppeRatio": 0,
+          "inventoryRatio": 0,
+          "debtRatio": 0.18604651162790697,
+          "revenueGrowth": 0,
+          "investmentRatio": 0,
+          "natureOfBusiness": "Software and technology services.",
+          "frameworkKey": "IFRS_SME"
+        }
+      },
+      "disclosureCount": 14,
+      "suppressedCount": 0,
+      "expandedCount": 3,
+      "orderingValid": true,
+      "consistencyPassed": true,
+      "certified": true,
+      "pdfBytes": 127238,
+      "docxBytes": 277944,
+      "corporateInformationValid": true,
+      "levelOfAssurance": "Independent Audit"
+    },
+    {
+      "scenarioId": "retail_entity",
+      "entityProfile": {
+        "size": "small_sme",
+        "industry": "retail",
+        "labels": [
+          "small sme",
+          "retail"
+        ],
+        "confidence": 1,
+        "characteristics": {
+          "totalAssets": 5900000,
+          "totalRevenue": 28000000,
+          "totalLiabilities": 1800000,
+          "netProfit": 1625000,
+          "assetIntensity": 0,
+          "debtRatio": 0.3050847457627119,
+          "revenueGrowth": 0,
+          "isLossMaking": false,
+          "isHighGrowth": false,
+          "isAssetIntensive": false,
+          "isDebtIntensive": false,
+          "isDormant": false
+        },
+        "factors": {
+          "ppeRatio": 0,
+          "inventoryRatio": 0.7627118644067796,
+          "debtRatio": 0.3050847457627119,
+          "revenueGrowth": 0,
+          "investmentRatio": 0,
+          "natureOfBusiness": "Retail trading of consumer goods.",
+          "frameworkKey": "IFRS_SME"
+        }
+      },
+      "disclosureCount": 15,
+      "suppressedCount": 0,
+      "expandedCount": 4,
+      "orderingValid": true,
+      "consistencyPassed": true,
+      "certified": true,
+      "pdfBytes": 132101,
+      "docxBytes": 291907,
+      "corporateInformationValid": true,
+      "levelOfAssurance": "Independent Audit"
+    },
+    {
+      "scenarioId": "manufacturing_entity",
+      "entityProfile": {
+        "size": "small_sme",
+        "industry": "manufacturing",
+        "labels": [
+          "small sme",
+          "manufacturing",
+          "asset intensive"
+        ],
+        "confidence": 1,
+        "characteristics": {
+          "totalAssets": 24500000,
+          "totalRevenue": 45000000,
+          "totalLiabilities": 2000000,
+          "netProfit": 5250000,
+          "assetIntensity": 0.7346938775510204,
+          "debtRatio": 0.08163265306122448,
+          "revenueGrowth": 0,
+          "isLossMaking": false,
+          "isHighGrowth": false,
+          "isAssetIntensive": true,
+          "isDebtIntensive": false,
+          "isDormant": false
+        },
+        "factors": {
+          "ppeRatio": 0.7346938775510204,
+          "inventoryRatio": 0.1306122448979592,
+          "debtRatio": 0.08163265306122448,
+          "revenueGrowth": 0,
+          "investmentRatio": 0,
+          "natureOfBusiness": "Manufacturing of industrial components.",
+          "frameworkKey": "IFRS_SME"
+        }
+      },
+      "disclosureCount": 16,
+      "suppressedCount": 0,
+      "expandedCount": 5,
+      "orderingValid": true,
+      "consistencyPassed": true,
+      "certified": true,
+      "pdfBytes": 139268,
+      "docxBytes": 322091,
+      "corporateInformationValid": true,
+      "levelOfAssurance": "Independent Audit"
+    },
+    {
+      "scenarioId": "investment_holding",
+      "entityProfile": {
+        "size": "investment_entity",
+        "industry": "professional_practice",
+        "labels": [
+          "investment entity",
+          "professional practice"
+        ],
+        "confidence": 1,
+        "characteristics": {
+          "totalAssets": 87500000,
+          "totalRevenue": 8500000,
+          "totalLiabilities": 0,
+          "netProfit": 5200000,
+          "assetIntensity": 0,
+          "debtRatio": 0,
+          "revenueGrowth": 0,
+          "isLossMaking": false,
+          "isHighGrowth": false,
+          "isAssetIntensive": false,
+          "isDebtIntensive": false,
+          "isDormant": false
+        },
+        "factors": {
+          "ppeRatio": 0,
+          "inventoryRatio": 0,
+          "debtRatio": 0,
+          "revenueGrowth": 0,
+          "investmentRatio": 0.9714285714285714,
+          "natureOfBusiness": "Investment holding company.",
+          "frameworkKey": "IFRS_SME"
+        }
+      },
+      "disclosureCount": 12,
+      "suppressedCount": 0,
+      "expandedCount": 0,
+      "orderingValid": true,
+      "consistencyPassed": true,
+      "certified": true,
+      "pdfBytes": 119184,
+      "docxBytes": 253136,
+      "corporateInformationValid": true,
+      "levelOfAssurance": "Independent Audit"
+    },
+    {
+      "scenarioId": "professional_practice",
+      "entityProfile": {
+        "size": "micro_entity",
+        "industry": "professional_practice",
+        "labels": [
+          "micro entity",
+          "professional practice"
+        ],
+        "confidence": 1,
+        "characteristics": {
+          "totalAssets": 2700000,
+          "totalRevenue": 6500000,
+          "totalLiabilities": 500000,
+          "netProfit": 1275000,
+          "assetIntensity": 0,
+          "debtRatio": 0.18518518518518517,
+          "revenueGrowth": 0,
+          "isLossMaking": false,
+          "isHighGrowth": false,
+          "isAssetIntensive": false,
+          "isDebtIntensive": false,
+          "isDormant": false
+        },
+        "factors": {
+          "ppeRatio": 0,
+          "inventoryRatio": 0,
+          "debtRatio": 0.18518518518518517,
+          "revenueGrowth": 0,
+          "investmentRatio": 0,
+          "natureOfBusiness": "Professional audit and advisory practice.",
+          "frameworkKey": "IFRS_SME"
+        }
+      },
+      "disclosureCount": 14,
+      "suppressedCount": 0,
+      "expandedCount": 3,
+      "orderingValid": true,
+      "consistencyPassed": true,
+      "certified": true,
+      "pdfBytes": 126650,
+      "docxBytes": 277246,
+      "corporateInformationValid": true,
+      "levelOfAssurance": "Independent Review"
+    },
+    {
+      "scenarioId": "npo",
+      "entityProfile": {
+        "size": "micro_entity",
+        "industry": "npo",
+        "labels": [
+          "micro entity",
+          "npo"
+        ],
+        "confidence": 1,
+        "characteristics": {
+          "totalAssets": 570000,
+          "totalRevenue": 1200000,
+          "totalLiabilities": 0,
+          "netProfit": 50000,
+          "assetIntensity": 0,
+          "debtRatio": 0,
+          "revenueGrowth": 0,
+          "isLossMaking": false,
+          "isHighGrowth": false,
+          "isAssetIntensive": false,
+          "isDebtIntensive": false,
+          "isDormant": false
+        },
+        "factors": {
+          "ppeRatio": 0,
+          "inventoryRatio": 0,
+          "debtRatio": 0,
+          "revenueGrowth": 0,
+          "investmentRatio": 0,
+          "natureOfBusiness": "Non-profit organisation — community development.",
+          "frameworkKey": "IFRS_SME"
+        }
+      },
+      "disclosureCount": 12,
+      "suppressedCount": 1,
+      "expandedCount": 2,
+      "orderingValid": true,
+      "consistencyPassed": true,
+      "certified": true,
+      "pdfBytes": 116523,
+      "docxBytes": 244249,
+      "corporateInformationValid": true,
+      "levelOfAssurance": "Compilation Report"
+    },
+    {
+      "scenarioId": "dormant_entity",
+      "entityProfile": {
+        "size": "dormant_entity",
+        "industry": "retail",
+        "labels": [
+          "dormant entity",
+          "retail",
+          "dormant"
+        ],
+        "confidence": 0.95,
+        "characteristics": {
+          "totalAssets": 1000,
+          "totalRevenue": 0,
+          "totalLiabilities": 0,
+          "netProfit": 0,
+          "assetIntensity": 0,
+          "debtRatio": 0,
+          "revenueGrowth": 0,
+          "isLossMaking": false,
+          "isHighGrowth": false,
+          "isAssetIntensive": false,
+          "isDebtIntensive": false,
+          "isDormant": true
+        },
+        "factors": {
+          "ppeRatio": 0,
+          "inventoryRatio": 0,
+          "debtRatio": 0,
+          "revenueGrowth": 0,
+          "investmentRatio": 0,
+          "natureOfBusiness": "Dormant entity — no trading activity.",
+          "frameworkKey": "IFRS_SME"
+        }
+      },
+      "disclosureCount": 10,
+      "suppressedCount": 0,
+      "expandedCount": 1,
+      "orderingValid": true,
+      "consistencyPassed": true,
+      "certified": true,
+      "pdfBytes": 109197,
+      "docxBytes": 224789,
+      "corporateInformationValid": true,
+      "levelOfAssurance": "Unaudited Financial Statements"
+    },
+    {
+      "scenarioId": "high_growth_entity",
+      "entityProfile": {
+        "size": "small_sme",
+        "industry": "service",
+        "labels": [
+          "small sme",
+          "service",
+          "high growth"
+        ],
+        "confidence": 1,
+        "characteristics": {
+          "totalAssets": 8700000,
+          "totalRevenue": 25000000,
+          "totalLiabilities": 0,
+          "netProfit": 4250000,
+          "assetIntensity": 0,
+          "debtRatio": 0,
+          "revenueGrowth": 0.6666666666666666,
+          "isLossMaking": false,
+          "isHighGrowth": true,
+          "isAssetIntensive": false,
+          "isDebtIntensive": false,
+          "isDormant": false
+        },
+        "factors": {
+          "ppeRatio": 0,
+          "inventoryRatio": 0,
+          "debtRatio": 0,
+          "revenueGrowth": 0.6666666666666666,
+          "investmentRatio": 0,
+          "natureOfBusiness": "High-growth technology services.",
+          "frameworkKey": "IFRS_SME"
+        }
+      },
+      "disclosureCount": 13,
+      "suppressedCount": 0,
+      "expandedCount": 2,
+      "orderingValid": true,
+      "consistencyPassed": true,
+      "certified": true,
+      "pdfBytes": 122659,
+      "docxBytes": 265373,
+      "corporateInformationValid": true,
+      "levelOfAssurance": "Independent Audit"
+    },
+    {
+      "scenarioId": "loss_making_entity",
+      "entityProfile": {
+        "size": "micro_entity",
+        "industry": "manufacturing",
+        "labels": [
+          "micro entity",
+          "manufacturing",
+          "loss making",
+          "asset intensive"
+        ],
+        "confidence": 1,
+        "characteristics": {
+          "totalAssets": 10600000,
+          "totalRevenue": 8000000,
+          "totalLiabilities": 4000000,
+          "netProfit": -2500000,
+          "assetIntensity": 0.7547169811320755,
+          "debtRatio": 0.37735849056603776,
+          "revenueGrowth": 0,
+          "isLossMaking": true,
+          "isHighGrowth": false,
+          "isAssetIntensive": true,
+          "isDebtIntensive": false,
+          "isDormant": false
+        },
+        "factors": {
+          "ppeRatio": 0.7547169811320755,
+          "inventoryRatio": 0.14150943396226415,
+          "debtRatio": 0.37735849056603776,
+          "revenueGrowth": 0,
+          "investmentRatio": 0,
+          "natureOfBusiness": "Manufacturing — restructuring phase.",
+          "frameworkKey": "IFRS_SME"
+        }
+      },
+      "disclosureCount": 15,
+      "suppressedCount": 0,
+      "expandedCount": 5,
+      "orderingValid": true,
+      "consistencyPassed": true,
+      "certified": true,
+      "pdfBytes": 136552,
+      "docxBytes": 312477,
+      "corporateInformationValid": true,
+      "levelOfAssurance": "Independent Audit"
+    },
+    {
+      "scenarioId": "asset_intensive_entity",
+      "entityProfile": {
+        "size": "small_sme",
+        "industry": "service",
+        "labels": [
+          "small sme",
+          "service",
+          "asset intensive"
+        ],
+        "confidence": 1,
+        "characteristics": {
+          "totalAssets": 130000000,
+          "totalRevenue": 35000000,
+          "totalLiabilities": 10000000,
+          "netProfit": 4900000,
+          "assetIntensity": 0.9230769230769231,
+          "debtRatio": 0.07692307692307693,
+          "revenueGrowth": 0,
+          "isLossMaking": false,
+          "isHighGrowth": false,
+          "isAssetIntensive": true,
+          "isDebtIntensive": false,
+          "isDormant": false
+        },
+        "factors": {
+          "ppeRatio": 0.9230769230769231,
+          "inventoryRatio": 0.015384615384615385,
+          "debtRatio": 0.07692307692307693,
+          "revenueGrowth": 0,
+          "investmentRatio": 0,
+          "natureOfBusiness": "Asset-intensive mining services.",
+          "frameworkKey": "IFRS_SME"
+        }
+      },
+      "disclosureCount": 15,
+      "suppressedCount": 0,
+      "expandedCount": 4,
+      "orderingValid": true,
+      "consistencyPassed": true,
+      "certified": true,
+      "pdfBytes": 137085,
+      "docxBytes": 312576,
+      "corporateInformationValid": true,
+      "levelOfAssurance": "Independent Audit"
+    },
+    {
+      "scenarioId": "debt_intensive_entity",
+      "entityProfile": {
+        "size": "small_sme",
+        "industry": "construction",
+        "labels": [
+          "small sme",
+          "construction",
+          "asset intensive",
+          "debt intensive"
+        ],
+        "confidence": 1,
+        "characteristics": {
+          "totalAssets": 25500000,
+          "totalRevenue": 18000000,
+          "totalLiabilities": 20000000,
+          "netProfit": 2250000,
+          "assetIntensity": 0.5882352941176471,
+          "debtRatio": 0.7843137254901961,
+          "revenueGrowth": 0,
+          "isLossMaking": false,
+          "isHighGrowth": false,
+          "isAssetIntensive": true,
+          "isDebtIntensive": true,
+          "isDormant": false
+        },
+        "factors": {
+          "ppeRatio": 0.5882352941176471,
+          "inventoryRatio": 0.3137254901960784,
+          "debtRatio": 0.7843137254901961,
+          "revenueGrowth": 0,
+          "investmentRatio": 0,
+          "natureOfBusiness": "Property development and construction.",
+          "frameworkKey": "IFRS_SME"
+        }
+      },
+      "disclosureCount": 15,
+      "suppressedCount": 0,
+      "expandedCount": 5,
+      "orderingValid": true,
+      "consistencyPassed": true,
+      "certified": true,
+      "pdfBytes": 136890,
+      "docxBytes": 312578,
+      "corporateInformationValid": true,
+      "levelOfAssurance": "Independent Audit"
+    }
+  ],
+  "allCertified": true,
+  "totalScenarios": 11,
+  "passedScenarios": 11,
+  "contractFingerprint": "V17\nPROFILE|small_sme|manufacturing\nORDER|DISC.GENERAL,DISC.BASIS,DISC.POLICIES,DISC.JUDGEMENTS,DISC.REVENUE,DISC.PPE,DISC.INVENTORIES,DISC.RECEIVABLES,DISC.PAYABLES,DISC.FININST,DISC.BORROWINGS,DISC.TAX,DISC.BORROWINGCOST,DISC.RELATED,DISC.SHARECAPITAL,DISC.EVENTS,DISC.CASHFLOW\nDEC|DISC.GENERAL:present,DISC.BASIS:present,DISC.POLICIES:present,DISC.JUDGEMENTS:present,DISC.REVENUE:present,DISC.PPE:expand,DISC.INVENTORIES:expand,DISC.RECEIVABLES:expand,DISC.PAYABLES:expand,DISC.FININST:expand,DISC.BORROWINGS:collapse,DISC.TAX:present,DISC.SHARECAPITAL:present,DISC.CASHFLOW:present,DISC.RELATED:present,DISC.EVENTS:present,DISC.BORROWINGCOST:present\nCOMP|V16\nPH|1|front_matter|6\nSEC|front:cover|cover|Cover|1\nSEC|front:contents|contents|Contents|1\nSEC|front:directors_responsibilities|directors_responsibilities|Directors' Responsibilities and Approval|1\nSEC|front:directors_report|directors_report|Directors' Report|1\nSEC|front:independent_auditor|independent_auditor|Independent Auditor's Report|1\nSEC|front:corporate_information|corporate_information|Corporate Information|1\nPH|2|primary_statements|4\nSEC|stmt:financial_position|statement|Statement of Financial Position|1\nSEC|stmt:financial_performance|statement|Statement of Profit or Loss and Other Comprehensive Income|1\nSEC|stmt:changes_in_equity|statement|Statement of Changes in Equity|1\nSEC|stmt:cash_flows|statement|Statement of Cash Flows|1\nPH|3|accounting_policies|1\nSEC|policies:significant|policy_group|Significant Accounting Policies|1\nPOL|POL.BASIS\nPOL|POL.REVENUE\nPOL|POL.PPE\nPOL|POL.INTANGIBLES\nPOL|POL.INVPROP\nPOL|POL.LEASES\nPOL|POL.FININST\nPOL|POL.IMPAIRMENT\nPOL|POL.INVENTORY\nPOL|POL.PROVISIONS\nPOL|POL.EMPLOYEE\nPOL|POL.TAX\nPOL|POL.FOREX\nPOL|POL.BORROWINGCOST\nPOL|POL.GRANTS\nPOL|POL.ASSOCIATES\nPOL|POL.JOINTVENTURES\nPOL|POL.BUSCOMB\nPOL|POL.SBP\nPOL|POL.HYPERINFLATION\nPOL|POL.CONSOLIDATION\nPOL|POL.EQUITY\nPH|4|notes|17\nSEC|notes:header|disclosure_note|Notes to the Financial Statements|1\nSEC|note:fw:note:IFRS_SME:DISC.BASIS|disclosure_note|Note 1. Basis of preparation|1\nNOTE|1|DISC.BASIS\nSEC|note:fw:note:IFRS_SME:DISC.REVENUE|disclosure_note|Note 2. Revenue|1\nNOTE|2|DISC.REVENUE\nSEC|note:fw:note:IFRS_SME:DISC.PPE|disclosure_note|Note 3. Property, plant and equipment|1\nNOTE|3|DISC.PPE\nSEC|note:fw:note:IFRS_SME:DISC.RELATED|disclosure_note|Note 4. Related party disclosures|1\nNOTE|4|DISC.RELATED\nSEC|note:fw:note:IFRS_SME:DISC.EVENTS|disclosure_note|Note 5. Events after the end of the reporting period|1\nNOTE|5|DISC.EVENTS\nSEC|note:fw:note:IFRS_SME:DISC.BORROWINGCOST|disclosure_note|Note 6. Borrowing costs|1\nNOTE|6|DISC.BORROWINGCOST\nSEC|note:fw:note:IFRS_SME:DISC.BORROWINGS|disclosure_note|Note 7. Borrowings|1\nNOTE|7|DISC.BORROWINGS\nSEC|note:fw:note:IFRS_SME:DISC.FININST|disclosure_note|Note 8. Financial instruments|1\nNOTE|8|DISC.FININST\nSEC|note:fw:note:IFRS_SME:DISC.GENERAL|disclosure_note|Note 9. General information|1\nNOTE|9|DISC.GENERAL\nSEC|note:fw:note:IFRS_SME:DISC.TAX|disclosure_note|Note 10. Income tax|1\nNOTE|10|DISC.TAX\nSEC|note:fw:note:IFRS_SME:DISC.INVENTORIES|disclosure_note|Note 11. Inventories|1\nNOTE|11|DISC.INVENTORIES\nSEC|note:fw:note:IFRS_SME:DISC.CASHFLOW|disclosure_note|Note 12. Notes to the statement of cash flows|1\nNOTE|12|DISC.CASHFLOW\nSEC|note:fw:note:IFRS_SME:DISC.SHARECAPITAL|disclosure_note|Note 13. Share capital and equity|1\nNOTE|13|DISC.SHARECAPITAL\nSEC|note:fw:note:IFRS_SME:DISC.JUDGEMENTS|disclosure_note|Note 14. Significant judgements and sources of estimation uncertainty|1\nNOTE|14|DISC.JUDGEMENTS\nSEC|note:fw:note:IFRS_SME:DISC.PAYABLES|disclosure_note|Note 15. Trade and other payables|1\nNOTE|15|DISC.PAYABLES\nSEC|note:fw:note:IFRS_SME:DISC.RECEIVABLES|disclosure_note|Note 16. Trade and other receivables|1\nNOTE|16|DISC.RECEIVABLES\nPH|5|supplementary|3\nSEC|supp:schedules|schedule|Supplementary Information|1\nSEC|supp:SCH.PPE.MOVEMENT|schedule|Reconciliation of property, plant and equipment|1\nSEC|supp:SCH.BORROWINGS.MOVEMENT|schedule|Reconciliation of borrowings|1\nPH|6|approval|1\nSEC|approval:signatures|signatures|Approval of Annual Financial Statements|1\nNUM|DISC.BASIS:1,DISC.BORROWINGCOST:6,DISC.BORROWINGS:7,DISC.CASHFLOW:12,DISC.EVENTS:5,DISC.FININST:8,DISC.GENERAL:9,DISC.INVENTORIES:11,DISC.JUDGEMENTS:14,DISC.PAYABLES:15,DISC.PPE:3,DISC.RECEIVABLES:16,DISC.RELATED:4,DISC.REVENUE:2,DISC.SHARECAPITAL:13,DISC.TAX:10\nPOLS|POL.BASIS,POL.REVENUE,POL.PPE,POL.INTANGIBLES,POL.INVPROP,POL.LEASES,POL.FININST,POL.IMPAIRMENT,POL.INVENTORY,POL.PROVISIONS,POL.EMPLOYEE,POL.TAX,POL.FOREX,POL.BORROWINGCOST,POL.GRANTS,POL.ASSOCIATES,POL.JOINTVENTURES,POL.BUSCOMB,POL.SBP,POL.HYPERINFLATION,POL.CONSOLIDATION,POL.EQUITY\nCERT|1"
+}

@@ -1,0 +1,125 @@
+{
+  "companiesScanned": 6,
+  "findings": [
+    {
+      "company": "Spaceman",
+      "companyId": "3cbfd4eb-a095-43f3-837a-0b4f1e2c1752",
+      "invoiceCount": 25,
+      "sampleInvoice": "SILENT915408",
+      "journal_entries_shape": "object",
+      "frontend_getTotal_arrayAccess": 0,
+      "objectAccess_debitSum": 100,
+      "rawJournalEntries": {
+        "journal_entry_items": [
+          {
+            "type": "credit",
+            "amount": 100
+          },
+          {
+            "type": "debit",
+            "amount": 100
+          }
+        ]
+      },
+      "getOne_journal_entries_shape": "object",
+      "getOne_sampleItems": [
+        {
+          "type": "credit",
+          "amount": 100,
+          "acct": "zuru"
+        },
+        {
+          "type": "debit",
+          "amount": 100,
+          "acct": "AR"
+        }
+      ]
+    },
+    {
+      "company": "CERT TX 1785230285930",
+      "companyId": "0837027f-347a-455e-914b-995b96b34397",
+      "invoiceCount": 1,
+      "sampleInvoice": "INV-00001",
+      "journal_entries_shape": "object",
+      "frontend_getTotal_arrayAccess": 0,
+      "objectAccess_debitSum": 1150,
+      "rawJournalEntries": {
+        "journal_entry_items": [
+          {
+            "type": "credit",
+            "amount": 1000
+          },
+          {
+            "type": "credit",
+            "amount": 150
+          },
+          {
+            "type": "debit",
+            "amount": 1150
+          }
+        ]
+      },
+      "getOne_journal_entries_shape": "object",
+      "getOne_sampleItems": [
+        {
+          "type": "credit",
+          "amount": 1000,
+          "acct": "Sales Revenue"
+        },
+        {
+          "type": "credit",
+          "amount": 150,
+          "acct": "Accounts Payable"
+        },
+        {
+          "type": "debit",
+          "amount": 1150,
+          "acct": "Accounts Receivable"
+        }
+      ]
+    },
+    {
+      "company": "CERT TX 1785230470207",
+      "companyId": "62de66bf-f962-481e-8236-a8d0777b056a",
+      "invoiceCount": 1,
+      "sampleInvoice": "INV-00001",
+      "journal_entries_shape": "object",
+      "frontend_getTotal_arrayAccess": 0,
+      "objectAccess_debitSum": 1150,
+      "rawJournalEntries": {
+        "journal_entry_items": [
+          {
+            "type": "credit",
+            "amount": 1000
+          },
+          {
+            "type": "credit",
+            "amount": 150
+          },
+          {
+            "type": "debit",
+            "amount": 1150
+          }
+        ]
+      },
+      "getOne_journal_entries_shape": "object",
+      "getOne_sampleItems": [
+        {
+          "type": "credit",
+          "amount": 1000,
+          "acct": "Sales Revenue"
+        },
+        {
+          "type": "credit",
+          "amount": 150,
+          "acct": "Accounts Payable"
+        },
+        {
+          "type": "debit",
+          "amount": 1150,
+          "acct": "Accounts Receivable"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,9 @@
+﻿node.exe : Initialising login role...
+At C:\Program Files\nodejs\npx.ps1:29 char:3
++   & $NODE_EXE $NPX_CLI_JS $args
++   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (Initialising login role...:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+Connecting to remote database...
+{"migrations":[{"local":"20260702142900","remote":"20260702142900","time":"2026-07-02 14:29:00"},{"local":"20260702170000","remote":"20260702170000","time":"2026-07-02 17:00:00"},{"local":"20260703140000","remote":"","time":"2026-07-03 14:00:00"},{"local":"20260703150000","remote":"","time":"2026-07-03 15:00:00"},{"local":"20260705180000","remote":"","time":"2026-07-05 18:00:00"},{"local":"20260705180000","remote":"","time":"2026-07-05 18:00:00"},{"local":"20260707120000","remote":"20260707120000","time":"2026-07-07 12:00:00"},{"local":"20260707140000","remote":"20260707140000","time":"2026-07-07 14:00:00"},{"local":"20260707150000","remote":"","time":"2026-07-07 15:00:00"},{"local":"","remote":"20260708071540","time":"2026-07-08 07:15:40"},{"local":"20260712121817","remote":"20260712121817","time":"2026-07-12 12:18:17"}],"message":"Migrations listed"}

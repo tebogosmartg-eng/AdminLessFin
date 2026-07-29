@@ -1,0 +1,24 @@
+﻿{
+  "module": "Payroll Export",
+  "certified_at": "2026-07-29",
+  "project_ref": "zaulhnpohrgqqodvzhxp",
+  "edge_function": "payroll",
+  "deployed_version": 30,
+  "ezbr_sha256": "33cd1829165113263354da08ed97d5b12cee33dde7780338b7fcb767eb40ba35",
+  "migration": "20260729100000_employee_bank_branch_code.sql",
+  "live_run_id": "f97c851d-980d-4e4a-90e4-d94bc9b173f6",
+  "live_pay_date": "2027-01-31",
+  "generate_bank_batch": {
+    "http_status": 200,
+    "bank_rows_count": 2,
+    "persisted": true,
+    "fields_present": ["employee_name", "bank_name", "bank_branch_code", "bank_account_number", "net_pay", "payment_amount", "reference", "payment_reference"]
+  },
+  "csv_columns": ["Employee Name", "Bank Name", "Branch Code", "Account Number", "Amount", "Reference", "Payment Date"],
+  "master_data_match": {
+    "bank_name": "PASS",
+    "bank_account_number": "PASS",
+    "bank_branch_code": "PASS_NULL_IN_MASTER"
+  },
+  "status": "CERTIFIED_PRODUCTION_READY"
+}

@@ -1,0 +1,82 @@
+{
+  "version": "6.5.2",
+  "date": "2026-07-14",
+  "project_ref": "zaulhnpohrgqqodvzhxp",
+  "final_status": "ROOT_CAUSE_FIXED",
+  "production_readiness": "PRODUCTION_READY_INTERNAL_PREVIEW_RUNTIME",
+  "phases": {
+    "1_deployment": {
+      "pre": {
+        "financial_statements_listed": false,
+        "OPTIONS_status": 404,
+        "control_reports_OPTIONS_status": 200
+      },
+      "deploy_attempt_1": {
+        "result": "FAIL",
+        "error": "Failed to bundle: Expected ',', got ';' at index.ts:4040 — serve(withEnterprisePlatform(...)) closed as }); instead of }));"
+      },
+      "fix": "Changed trailing }); to })); matching reports/work pattern",
+      "deploy_attempt_2": {
+        "result": "PASS",
+        "command": "supabase functions deploy financial-statements --project-ref zaulhnpohrgqqodvzhxp --no-verify-jwt",
+        "status": "ACTIVE",
+        "verify_jwt": false
+      },
+      "secrets_set": ["EFS_MODULE=true", "EFCP_SILENT_BACKENDS=true"]
+    },
+    "2_options": {
+      "handler": "withEnterprisePlatform → optionsResponse before auth/env/DB/routing",
+      "post_fix_OPTIONS": {
+        "status": 200,
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-correlation-id, x-request-id",
+        "Access-Control-Allow-Methods": "POST, OPTIONS, GET"
+      }
+    },
+    "3_startup": {
+      "imports": "enterpriseEdgePlatform + efs* shared modules bundled",
+      "deno_compatibility": "deploy bundle succeeded after paren fix",
+      "env": "SUPABASE_* platform secrets present; EFS_MODULE/EFCP_SILENT_BACKENDS set"
+    },
+    "4_routing": {
+      "entry": "serve(withEnterprisePlatform('financial-statements','tenant', handler))",
+      "POST_reaches_index": true,
+      "method_routing": "body.method switch — unknown method throws after auth",
+      "note": "Unauth probes fail at getUser before method switch — expected"
+    },
+    "5_cors": {
+      "platform_headers": "ENTERPRISE_CORS_HEADERS applied on OPTIONS, success wrapper, edgeFailure",
+      "probes_with_cors": [
+        "OPTIONS_preflight",
+        "POST_missing_jwt",
+        "POST_unauthenticated_anon_bearer",
+        "POST_malformed_json",
+        "POST_unknown_method",
+        "POST_missing_company"
+      ]
+    },
+    "6_frontend_contract": {
+      "invoke": "supabase.functions.invoke('financial-statements', { body: { method, company_id, ...payload } })",
+      "file": "src/lib/financialStatements/api.ts",
+      "jwt": "supabase-js attaches session Authorization automatically",
+      "apikey": "createClient(url, anonKey)",
+      "business_logic_changed": false
+    },
+    "7_live_validation": {
+      "evidence_file": "evidence/edge-live-validation.json",
+      "OPTIONS": "HTTP 200 + complete CORS",
+      "error_paths": "HTTP 400 AUTHENTICATION_FAILED + complete CORS"
+    }
+  },
+  "root_cause_chain": [
+    "financial-statements never deployed (absent from functions list)",
+    "Local source could not deploy: serve() call missing closing paren — }); vs }));",
+    "Browser OPTIONS hit gateway 404 → preflight failed access control → POST net::ERR_FAILED surface as CORS"
+  ],
+  "non_causes_ruled_out": [
+    "ENTERPRISE_CORS_HEADERS missing in source (present; reports control OK)",
+    "withEnterprisePlatform OPTIONS ordering (correct before auth)",
+    "Frontend invoke contract malformed (matches platform pattern)",
+    "Business logic defects (no redesign; runtime recovery only)"
+  ]
+}

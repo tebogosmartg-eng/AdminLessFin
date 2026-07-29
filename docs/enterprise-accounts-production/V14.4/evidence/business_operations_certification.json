@@ -1,0 +1,206 @@
+{
+  "runAt": "2026-07-28T16:57:24.429Z",
+  "decision": "PASS",
+  "steps": [
+    {
+      "module": "Setup",
+      "step": "Company resolved",
+      "status": "PASS",
+      "evidence": {
+        "companyId": "3cbfd4eb-a095-43f3-837a-0b4f1e2c1752"
+      }
+    },
+    {
+      "module": "Setup",
+      "step": "Fixtures resolved",
+      "status": "PASS",
+      "evidence": {
+        "customer": "Itumeleng",
+        "vendor": "kudzanai",
+        "product": "E2E QA Service 1785245497252 EDITED",
+        "ar": "AR",
+        "ap": "AP",
+        "revenue": "zuru",
+        "taxRateId": "55cf5e8d-52a8-45da-9159-6155ed3b14cc",
+        "vatOut": "VAT Output",
+        "vatIn": "VAT Input"
+      }
+    },
+    {
+      "module": "Sales",
+      "step": "Post sales invoice with balanced journal",
+      "status": "PASS",
+      "evidence": {
+        "invoiceId": "da26d91d-010b-4a1f-90bd-e4588a7f26db",
+        "journalEntryId": "296b2fc4-22e8-4123-b12b-96a52b5bf47c",
+        "balance": {
+          "pass": true,
+          "debit": 1322.5,
+          "credit": 1322.5
+        }
+      }
+    },
+    {
+      "module": "Purchasing",
+      "step": "Record supplier bill with balanced journal",
+      "status": "PASS",
+      "evidence": {
+        "billId": null,
+        "journalEntryId": "20db985b-6390-46e2-b3b4-a0899b751e16",
+        "balance": {
+          "pass": true,
+          "debit": 661.25,
+          "credit": 661.25
+        }
+      }
+    },
+    {
+      "module": "Inventory",
+      "step": "Receive stock movement",
+      "status": "PASS",
+      "evidence": {
+        "journal_entry_id": "2ca3085d-7cb9-48e0-9a67-58ea7cc1c9df",
+        "amount": 200,
+        "unit_cost": 100
+      }
+    },
+    {
+      "module": "Banking",
+      "step": "Record bank transaction with balanced journal",
+      "status": "PASS",
+      "evidence": {
+        "response": {
+          "rule_id": null,
+          "warnings": [],
+          "timestamp": "2026-07-28T16:57:23.372195+00:00",
+          "journal_id": "99559ed6-7886-4c38-9ffc-331dfcc2b58d",
+          "rule_version": null,
+          "business_event": null,
+          "journal_number": "JE-000055",
+          "policy_results": {
+            "passed": [
+              {
+                "code": "coa.header_no_posting",
+                "name": "Header accounts cannot receive postings",
+                "domain": "chart_of_accounts",
+                "severity": "blocking"
+              },
+              {
+                "code": "gl.control_no_manual",
+                "name": "Control accounts cannot accept manual journals",
+                "domain": "general_ledger",
+                "severity": "blocking"
+              },
+              {
+                "code": "gl.retained_earnings_system",
+                "name": "Retained earnings is system controlled",
+                "domain": "general_ledger",
+                "severity": "blocking"
+              },
+              {
+                "code": "gl.suspense_zero_close",
+                "name": "Suspense account must be zero before period close",
+                "domain": "general_ledger",
+                "severity": "error"
+              },
+              {
+                "code": "tax.vat_control_no_manual",
+                "name": "VAT control cannot be manually adjusted",
+                "domain": "tax",
+                "severity": "blocking"
+              },
+              {
+                "code": "banking.bank_gl_one_to_one",
+                "name": "Bank GL must be linked to one bank account",
+                "domain": "banking",
+                "severity": "warning"
+              },
+              {
+                "code": "assets.depreciation_module_only",
+                "name": "Depreciation journals originate only from Asset module",
+                "domain": "assets",
+                "severity": "blocking"
+              },
+              {
+                "code": "inventory.inventory_module_only",
+                "name": "Inventory journals originate only from Inventory module",
+                "domain": "inventory",
+                "severity": "blocking"
+              },
+              {
+                "code": "journal.manual_requires_description",
+                "name": "Manual journals require a description",
+                "domain": "journal_entries",
+                "severity": "warning"
+              },
+              {
+                "code": "financial_statements.control_balance_integrity",
+                "name": "Control account balances must reconcile",
+                "domain": "financial_statements",
+                "severity": "information"
+              }
+            ],
+            "blocking": false,
+            "warnings": [],
+            "violations": [],
+            "evaluated_at": "2026-07-28T16:57:23.372195+00:00"
+          },
+          "posting_status": "committed",
+          "financial_year_id": "5cc2035d-d408-4ca0-b505-a045a1102395",
+          "posting_request_id": "9d881302-0d25-4498-a778-190c3a2df21d",
+          "bank_transaction_id": "243e8de8-c02f-4bd3-a5cf-c4cdf1c931d8",
+          "accounting_period_id": "13a5a35c-cad1-4c75-90a8-56767886430d"
+        },
+        "journalEntryId": "99559ed6-7886-4c38-9ffc-331dfcc2b58d",
+        "balance": {
+          "pass": true,
+          "debit": 250,
+          "credit": 250
+        }
+      }
+    },
+    {
+      "module": "VAT",
+      "step": "VAT control lines on posted transaction",
+      "status": "PASS",
+      "evidence": {
+        "vatItems": [
+          {
+            "id": "93224b5d-c5a0-4a6d-a6fc-0001de43209c",
+            "amount": 1150,
+            "chart_of_accounts": {
+              "name": "zuru",
+              "tax_treatment": null
+            }
+          },
+          {
+            "id": "8e47a540-845a-44c6-98fb-5fc8876a3c11",
+            "amount": 172.5,
+            "chart_of_accounts": {
+              "name": "VAT Output",
+              "tax_treatment": "vat_output"
+            }
+          },
+          {
+            "id": "a8a173b7-71ba-4702-a75a-77f171e82b6c",
+            "amount": 1322.5,
+            "chart_of_accounts": {
+              "name": "AR",
+              "tax_treatment": null
+            }
+          }
+        ],
+        "taxRateId": "55cf5e8d-52a8-45da-9159-6155ed3b14cc",
+        "hasVatLine": true
+      }
+    },
+    {
+      "module": "Financial Statements Publication",
+      "step": "EFS publication pipeline (see V6.6.0 certify:efs evidence)",
+      "status": "PASS",
+      "evidence": {
+        "evidenceFile": "docs/financial-statements-certification/V6.6.0/evidence/e2e-certification-evidence.json"
+      }
+    }
+  ]
+}

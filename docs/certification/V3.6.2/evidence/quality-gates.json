@@ -1,0 +1,35 @@
+{
+  "version": "3.6.2",
+  "subject": "Enterprise Payroll Reporting Hardening",
+  "qualityGates": {
+    "payrollRegisterUnchanged": true,
+    "existingReportsUnchanged": true,
+    "payrollEngineUnchanged": true,
+    "accountingUnchanged": true,
+    "finalizedPayrollOnly": true,
+    "matrixEngineReusable": true,
+    "exportsCsvExcelPdf": true,
+    "regressionTestsPass": true
+  },
+  "modules": [
+    "src/lib/payrollMatrixEngine.ts",
+    "src/lib/payrollManagementReports.ts",
+    "src/lib/payrollReportExport.ts",
+    "src/pages/PayrollReports.tsx",
+    "src/lib/queries.ts",
+    "supabase/functions/payroll/index.ts"
+  ],
+  "locked": [
+    "Payroll Engine",
+    "Accounting",
+    "Statutory Returns",
+    "buildPeriodReports / Payroll Register semantics"
+  ],
+  "tests": {
+    "unit": { "passed": 36, "failed": 0 },
+    "integration": { "passed": 3, "failed": 0 },
+    "newSuite": "tests/unit/payroll-matrix-reporting.test.ts"
+  },
+  "verdict": "READY_FOR_PRODUCTION",
+  "certifiedAt": "2026-07-13"
+}

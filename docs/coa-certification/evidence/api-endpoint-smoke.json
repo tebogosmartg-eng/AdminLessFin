@@ -1,0 +1,243 @@
+{
+  "login": true,
+  "userId": "908ad90e-ee0e-4957-943d-ed1ec2fb843a",
+  "memberships": [
+    {
+      "company_id": "063d0ae0-394a-4b22-b140-087d5979633b",
+      "role": "owner",
+      "companies": {
+        "id": "063d0ae0-394a-4b22-b140-087d5979633b",
+        "name": "CERT TX 1785231635647"
+      }
+    },
+    {
+      "company_id": "0837027f-347a-455e-914b-995b96b34397",
+      "role": "owner",
+      "companies": {
+        "id": "0837027f-347a-455e-914b-995b96b34397",
+        "name": "CERT TX 1785230285930"
+      }
+    },
+    {
+      "company_id": "0a2ff5bb-3796-4467-b227-a6dd4306bcdb",
+      "role": "owner",
+      "companies": {
+        "id": "0a2ff5bb-3796-4467-b227-a6dd4306bcdb",
+        "name": "CERT COA 1785230945189"
+      }
+    },
+    {
+      "company_id": "0b07df94-1868-4ed9-aaa2-6ac8b847234b",
+      "role": "owner",
+      "companies": {
+        "id": "0b07df94-1868-4ed9-aaa2-6ac8b847234b",
+        "name": "CERT TX 1785231040107"
+      }
+    },
+    {
+      "company_id": "14712eb7-01e0-4664-ae34-2cd52b2c795a",
+      "role": "owner",
+      "companies": {
+        "id": "14712eb7-01e0-4664-ae34-2cd52b2c795a",
+        "name": "CERT TX 1785230740094"
+      }
+    },
+    {
+      "company_id": "26014bd5-f03f-44ae-93bd-64b5add2e09f",
+      "role": "owner",
+      "companies": {
+        "id": "26014bd5-f03f-44ae-93bd-64b5add2e09f",
+        "name": "My's Company"
+      }
+    },
+    {
+      "company_id": "2f1aaf89-f52f-4f85-b13a-9b54594df26f",
+      "role": "owner",
+      "companies": {
+        "id": "2f1aaf89-f52f-4f85-b13a-9b54594df26f",
+        "name": "CERT TX 1785231821168"
+      }
+    },
+    {
+      "company_id": "3cbfd4eb-a095-43f3-837a-0b4f1e2c1752",
+      "role": "owner",
+      "companies": {
+        "id": "3cbfd4eb-a095-43f3-837a-0b4f1e2c1752",
+        "name": "Spaceman"
+      }
+    },
+    {
+      "company_id": "62de66bf-f962-481e-8236-a8d0777b056a",
+      "role": "owner",
+      "companies": {
+        "id": "62de66bf-f962-481e-8236-a8d0777b056a",
+        "name": "CERT TX 1785230470207"
+      }
+    },
+    {
+      "company_id": "a9988c29-9766-4de8-84bb-8823a9d868d0",
+      "role": "owner",
+      "companies": {
+        "id": "a9988c29-9766-4de8-84bb-8823a9d868d0",
+        "name": "CERT FY Fix 1785226265825"
+      }
+    },
+    {
+      "company_id": "b46f3ec6-82d5-4538-b000-4e192d54e7d1",
+      "role": "owner",
+      "companies": {
+        "id": "b46f3ec6-82d5-4538-b000-4e192d54e7d1",
+        "name": "CERT COA 1785230862080"
+      }
+    },
+    {
+      "company_id": "bae80005-212f-4fdd-8d39-758177845d2e",
+      "role": "owner",
+      "companies": {
+        "id": "bae80005-212f-4fdd-8d39-758177845d2e",
+        "name": "CERT New Customer 2026-07-28T08:08:07.174Z"
+      }
+    },
+    {
+      "company_id": "be3855e9-d11c-48a8-8c39-10e12a0ff2df",
+      "role": "owner",
+      "companies": {
+        "id": "be3855e9-d11c-48a8-8c39-10e12a0ff2df",
+        "name": "CERT TX 1785230675937"
+      }
+    },
+    {
+      "company_id": "ed2f2a92-a8f4-4496-a6fe-51d68bf9ba03",
+      "role": "owner",
+      "companies": {
+        "id": "ed2f2a92-a8f4-4496-a6fe-51d68bf9ba03",
+        "name": "CERT TX 1785230987178"
+      }
+    }
+  ],
+  "endpoints": {
+    "GET": {
+      "status": 200,
+      "count": 34,
+      "hasRoleMeta": true
+    },
+    "LIST_TEMPLATES": {
+      "status": 200,
+      "count": 1
+    },
+    "POST": {
+      "status": 200,
+      "id": "73acff6a-764e-44b8-a016-f236b92093a3",
+      "name": "COA CERT TMP 1785302141949"
+    },
+    "PUT": {
+      "status": 200,
+      "name": "COA CERT TMP 1785302141949 RENAMED"
+    },
+    "DELETE": {
+      "status": 200,
+      "ok": true
+    },
+    "GENERATE": {
+      "status": 500,
+      "body": "An unexpected platform error occurred."
+    }
+  },
+  "systemAccountApi": {
+    "deleteBlocked": {
+      "status": 500,
+      "body": "An unexpected platform error occurred."
+    },
+    "typeBlocked": {
+      "status": 500,
+      "body": "An unexpected platform error occurred."
+    },
+    "roleBlocked": {
+      "status": 500,
+      "body": "An unexpected platform error occurred."
+    },
+    "controlBlocked": {
+      "status": 500,
+      "body": "An unexpected platform error occurred."
+    },
+    "renameAllowed": {
+      "status": 200,
+      "name": "Retained Earnings [API-CERT]"
+    },
+    "deactivateAllowed": {
+      "status": 200,
+      "is_active": false
+    }
+  },
+  "roleAssign": {
+    "rounding": {
+      "status": 200,
+      "account_role": "rounding"
+    },
+    "bank": {
+      "status": 200,
+      "account_role": "bank"
+    },
+    "sales": {
+      "status": 200,
+      "account_role": "sales"
+    }
+  },
+  "systemAccountsVisible": [
+    {
+      "id": "54db6133-41e1-403f-97e0-aecaf0ab9c10",
+      "name": "Retained Earnings",
+      "company_id": "0a2ff5bb-3796-4467-b227-a6dd4306bcdb",
+      "type": "Equity",
+      "account_role": "retained_earnings",
+      "system_account": true,
+      "control_account": false,
+      "account_code": "3020",
+      "is_active": true
+    },
+    {
+      "id": "4e303a34-74e0-4704-abd5-d5ce08e8b9d6",
+      "name": "Retained Earnings",
+      "company_id": "ed2f2a92-a8f4-4496-a6fe-51d68bf9ba03",
+      "type": "Equity",
+      "account_role": "retained_earnings",
+      "system_account": true,
+      "control_account": false,
+      "account_code": "3020",
+      "is_active": true
+    },
+    {
+      "id": "14590906-d51f-4459-9f49-fbdeba4fada3",
+      "name": "Retained Earnings",
+      "company_id": "0b07df94-1868-4ed9-aaa2-6ac8b847234b",
+      "type": "Equity",
+      "account_role": "retained_earnings",
+      "system_account": true,
+      "control_account": false,
+      "account_code": "3020",
+      "is_active": true
+    },
+    {
+      "id": "1224feba-5d81-44bf-bd25-eaec253091bc",
+      "name": "Retained Earnings",
+      "company_id": "063d0ae0-394a-4b22-b140-087d5979633b",
+      "type": "Equity",
+      "account_role": "retained_earnings",
+      "system_account": true,
+      "control_account": false,
+      "account_code": "3020",
+      "is_active": true
+    },
+    {
+      "id": "21e9b778-fa29-4d4c-bd70-da70d479ed84",
+      "name": "Retained Earnings",
+      "company_id": "2f1aaf89-f52f-4f85-b13a-9b54594df26f",
+      "type": "Equity",
+      "account_role": "retained_earnings",
+      "system_account": true,
+      "control_account": false,
+      "account_code": "3020",
+      "is_active": true
+    }
+  ]
+}

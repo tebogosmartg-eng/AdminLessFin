@@ -1,0 +1,30 @@
+{
+  "timestamp": "2026-07-28T16:54:19.371Z",
+  "auth": "efs.certification.v6102@adminless.local",
+  "companyId": "3cbfd4eb-a095-43f3-837a-0b4f1e2c1752",
+  "accounts": {},
+  "GET_NEXT_INVOICE_NUMBER": {
+    "ok": true,
+    "ms": 961,
+    "error": null,
+    "data": "INV-00001"
+  },
+  "CREATE": {
+    "ok": false,
+    "ms": 598,
+    "error": "Edge Function returned a non-2xx status code",
+    "data": null
+  },
+  "GET_ONE": null,
+  "PUT": null,
+  "VOID": null,
+  "summary": {
+    "passed": false,
+    "failed": [
+      "CREATE",
+      "GET_ONE",
+      "PUT",
+      "VOID"
+    ]
+  }
+}

@@ -1,0 +1,36 @@
+{
+  "version": "3.6.1",
+  "module": "statutory_returns_hardening",
+  "executedAt": "2026-07-13",
+  "gates": {
+    "verifyLegislation": { "ok": true },
+    "certifyStatutory": {
+      "verification": "12/12",
+      "certification": "76/76",
+      "historical": "3/3",
+      "passed": true
+    },
+    "payrollUnitTests": { "passed": 28 },
+    "payrollIntegrationTests": { "passed": 3 },
+    "statutoryReturnsUnitTests": { "passed": 10 }
+  },
+  "isolation": {
+    "generation": true,
+    "validation": true,
+    "export": true,
+    "transmission": true,
+    "immutableSnapshots": true,
+    "appendOnlyLedger": true
+  },
+  "countryPlugins": {
+    "ZA": ["EMP201", "EMP501", "IRP5", "TAX_CERTIFICATE"]
+  },
+  "lockedModulesUnchanged": [
+    "src/lib/statutoryPayrollEngine",
+    "src/lib/payrollReports.ts",
+    "src/lib/payrollWorkflow.ts",
+    "src/lib/payrollJournal.ts",
+    "src/statutory/countries/south-africa/years (legislation)",
+    "accounting / journals"
+  ]
+}

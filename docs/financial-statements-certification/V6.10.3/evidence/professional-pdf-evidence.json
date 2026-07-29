@@ -1,0 +1,62 @@
+{
+  "version": "6.10.3",
+  "generatedAt": "2026-07-18T08:40:31.064Z",
+  "pdfPath": "C:\\Users\\TebogoM\\Desktop\\development projects\\SmartAccounting\\docs\\financial-statements-certification\\V6.10.3\\evidence\\AFS_V6.10.3_Spaceman_Professional.pdf",
+  "byteSize": 12165,
+  "layout": {
+    "ok": true,
+    "checks": {
+      "hasCoverEntity": true,
+      "hasContents": true,
+      "hasSfpTitle": true,
+      "hasPlTitle": true,
+      "hasEquityTitle": true,
+      "hasCfTitle": true,
+      "hasNumberedNotes": true,
+      "hasPoliciesNote": true,
+      "hasPageNumbers": true,
+      "noDebugMarkers": true,
+      "noDiscCodes": true,
+      "noFingerprint": true,
+      "noSnapshotTerms": true,
+      "noFrameworkKeyDump": true
+    }
+  },
+  "accounting": {
+    "ok": true,
+    "checks": [
+      {
+        "id": "SFP.BALANCE",
+        "label": "Statement of Financial Position balances (Assets = Liabilities + Equity)",
+        "pass": true,
+        "expected": 83300,
+        "actual": 83300,
+        "detail": "Total assets 83300 vs total liabilities and equity 83300"
+      },
+      {
+        "id": "PL.EQUITY",
+        "label": "Profit or Loss agrees to movements in Equity",
+        "pass": true,
+        "expected": 80189,
+        "actual": 80189
+      },
+      {
+        "id": "CF.RECONCILE",
+        "label": "Cash Flow reconciles movement in cash (operating + investing + financing)",
+        "pass": true,
+        "expected": -16900,
+        "actual": -16900,
+        "detail": "Components sum to -16900; net change reported -16900"
+      },
+      {
+        "id": "PL.RESULT",
+        "label": "Revenue and Expenses produce the reported Profit/(Loss)",
+        "pass": true,
+        "expected": 80189,
+        "actual": 80189,
+        "detail": "Revenue 200 − Expenses -79989 = 80189"
+      }
+    ]
+  },
+  "decision": "PROFESSIONAL ANNUAL FINANCIAL STATEMENTS CERTIFIED"
+}

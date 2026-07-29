@@ -1,0 +1,265 @@
+{
+  "at": "2026-07-29T11:00:49.326Z",
+  "user": "efs.certification.v6102@adminless.local",
+  "companyCount": 14,
+  "cert": {
+    "id": "be3855e9-d11c-48a8-8c39-10e12a0ff2df",
+    "name": "CERT TX 1785230675937"
+  },
+  "accountsError": null,
+  "accountCount": 10,
+  "accounts": [
+    {
+      "id": "03d1da8e-7838-4aba-b7e1-b59021beeb84",
+      "code": null,
+      "num": 1000,
+      "name": "Sales Revenue",
+      "type": "Income",
+      "role": null,
+      "control": false,
+      "sys": false,
+      "normal": "credit",
+      "fs": "Profit or Loss",
+      "cat": "Income",
+      "sub": null,
+      "active": true,
+      "blocked": false,
+      "manual": true
+    },
+    {
+      "id": "2b025c4a-a7c6-4f66-a281-c5924ea07614",
+      "code": null,
+      "num": 1010,
+      "name": "Service Revenue",
+      "type": "Income",
+      "role": null,
+      "control": false,
+      "sys": false,
+      "normal": "credit",
+      "fs": "Profit or Loss",
+      "cat": "Income",
+      "sub": null,
+      "active": true,
+      "blocked": false,
+      "manual": true
+    },
+    {
+      "id": "7bcb0bac-76c8-40f2-bf07-217cefed6d28",
+      "code": null,
+      "num": 1100,
+      "name": "CERT Bank Account",
+      "type": "Asset",
+      "role": null,
+      "control": false,
+      "sys": false,
+      "normal": "debit",
+      "fs": "Statement of Financial Position",
+      "cat": "Asset",
+      "sub": null,
+      "active": true,
+      "blocked": false,
+      "manual": true
+    },
+    {
+      "id": "65b4705d-2196-4c4e-aa9d-278988e057e0",
+      "code": null,
+      "num": 1300,
+      "name": "CERT Inventory Asset",
+      "type": "Asset",
+      "role": "inventory_asset",
+      "control": false,
+      "sys": false,
+      "normal": "debit",
+      "fs": "Statement of Financial Position",
+      "cat": "Asset",
+      "sub": null,
+      "active": true,
+      "blocked": false,
+      "manual": true
+    },
+    {
+      "id": "8e7669e1-b4eb-463a-85a1-3d768497f431",
+      "code": null,
+      "num": 2020,
+      "name": "Cost of Goods Sold",
+      "type": "Expense",
+      "role": "cogs",
+      "control": false,
+      "sys": false,
+      "normal": "debit",
+      "fs": "Profit or Loss",
+      "cat": "Expense",
+      "sub": null,
+      "active": true,
+      "blocked": false,
+      "manual": true
+    },
+    {
+      "id": "f71a465e-2588-4014-992b-9dece70d7f69",
+      "code": null,
+      "num": 2200,
+      "name": "CERT VAT Payable",
+      "type": "Liability",
+      "role": null,
+      "control": false,
+      "sys": false,
+      "normal": "credit",
+      "fs": "Statement of Financial Position",
+      "cat": "Liability",
+      "sub": null,
+      "active": true,
+      "blocked": false,
+      "manual": true
+    },
+    {
+      "id": "d89ea05c-1916-4b73-ae88-1ca29d3e9252",
+      "code": null,
+      "num": 3010,
+      "name": "Accounts Receivable",
+      "type": "Asset",
+      "role": "trade_receivable",
+      "control": false,
+      "sys": false,
+      "normal": "debit",
+      "fs": "Statement of Financial Position",
+      "cat": "Asset",
+      "sub": null,
+      "active": true,
+      "blocked": false,
+      "manual": true
+    },
+    {
+      "id": "9c851628-379f-44e6-9aff-b1128bb211ac",
+      "code": null,
+      "num": 4000,
+      "name": "Accounts Payable",
+      "type": "Liability",
+      "role": "trade_payable",
+      "control": false,
+      "sys": false,
+      "normal": "credit",
+      "fs": "Statement of Financial Position",
+      "cat": "Liability",
+      "sub": null,
+      "active": true,
+      "blocked": false,
+      "manual": true
+    },
+    {
+      "id": "6cce2961-9a90-4a26-81a8-a227d8bee84a",
+      "code": null,
+      "num": 4001,
+      "name": "VAT Control",
+      "type": "Liability",
+      "role": "vat_control",
+      "control": true,
+      "sys": false,
+      "normal": "credit",
+      "fs": null,
+      "cat": "Current Liabilities",
+      "sub": "Trade and Other Payables",
+      "active": true,
+      "blocked": false,
+      "manual": true
+    },
+    {
+      "id": "05791788-672c-45b1-a820-e50d98c58981",
+      "code": null,
+      "num": 5010,
+      "name": "Retained Earnings",
+      "type": "Equity",
+      "role": "retained_earnings",
+      "control": false,
+      "sys": false,
+      "normal": "credit",
+      "fs": "Statement of Financial Position",
+      "cat": "Equity",
+      "sub": null,
+      "active": true,
+      "blocked": false,
+      "manual": true
+    }
+  ],
+  "productsError": null,
+  "vendors": [],
+  "customers": [
+    {
+      "id": "467af1d0-e9a6-4377-a46e-c9e6b72775fc",
+      "name": "CERT Customer One"
+    },
+    {
+      "id": "ee47a7f0-0f50-4179-93aa-2a6a72e5c601",
+      "name": "SSCustomer 12384583"
+    },
+    {
+      "id": "9636f2f8-7625-4976-9636-666523607bc8",
+      "name": "SSCustomer 12461286"
+    },
+    {
+      "id": "d1fec6be-0df2-4402-8303-4752df955b2c",
+      "name": "INV Cust 18929349"
+    },
+    {
+      "id": "e15eb967-e848-4770-baa2-6c6585e9a21e",
+      "name": "INV Cust 22106646"
+    }
+  ],
+  "products": [
+    {
+      "id": "4775c16d-8f16-40bc-b4c4-ba4c71fe31a2",
+      "name": "CERT Widget",
+      "type": "inventory"
+    }
+  ],
+  "taxRates": [
+    {
+      "id": "bfa393f1-eb53-4271-b830-1832a49d5189",
+      "name": "CERT VAT 15%",
+      "rate": 15,
+      "is_default": false
+    }
+  ],
+  "bankAccounts": [],
+  "bankAccountsError": null,
+  "employees": [
+    {
+      "id": "52e4c760-df4f-4def-862a-1722a2de8260",
+      "first_name": "CERT",
+      "last_name": "Employee",
+      "employee_number": "EMP-000001",
+      "salary_amount": 20000,
+      "salary_period": "monthly",
+      "employment_type": "permanent",
+      "employment_status": "active"
+    }
+  ],
+  "employeesError": null,
+  "payrollRuns": [],
+  "billsSample": [],
+  "invoicesSample": [
+    {
+      "id": "82985c12-ba0f-4570-8ab4-e5291d053d77",
+      "invoice_number": "INV-00001",
+      "status": "sent",
+      "journal_entry_id": "d70d670c-1196-4be2-a1a9-8339784e0e30"
+    },
+    {
+      "id": "bf0d9ed2-0a70-4c8c-a189-b7be028cd91d",
+      "invoice_number": "INV-00002",
+      "status": "sent",
+      "journal_entry_id": "9ff17d33-8be3-4a3c-8407-00a47b4768e8"
+    },
+    {
+      "id": "a0c2fd86-8792-4ee9-909a-8684b5cde4ec",
+      "invoice_number": "INV-00003",
+      "status": "sent",
+      "journal_entry_id": "598bf908-5f92-4ecc-a990-5e9ead0b2d35"
+    }
+  ],
+  "journalEntryCount": 4,
+  "trialBalance": {
+    "totalDebits": 41750,
+    "totalCredits": 41750,
+    "net": 0
+  }
+}

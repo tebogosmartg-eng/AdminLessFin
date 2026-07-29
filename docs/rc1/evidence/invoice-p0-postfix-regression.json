@@ -1,0 +1,79 @@
+{
+  "timestamp": "2026-07-29T04:09:17.017Z",
+  "companyId": "3cbfd4eb-a095-43f3-837a-0b4f1e2c1752",
+  "ar": {
+    "id": "eb5a9a02-7e79-44f6-b6b5-fe4fb2b0f674",
+    "name": "AR"
+  },
+  "creates": [
+    {
+      "number": "REGA152916",
+      "status": 200,
+      "id": "c339baff-dfed-431d-b4df-1be170eb8fbe",
+      "err": null
+    },
+    {
+      "number": "REGB154022",
+      "status": 200,
+      "id": "aaea8c70-72c9-4c2b-981c-b996e5df9b43",
+      "err": null
+    },
+    {
+      "number": "REGC153830",
+      "status": 200,
+      "id": "2f4e32a5-a942-4348-989b-a5e452704085",
+      "err": null
+    }
+  ],
+  "details": [
+    {
+      "id": "c339baff-dfed-431d-b4df-1be170eb8fbe",
+      "getOneStatus": 200,
+      "hasJournal": true,
+      "journalItemCount": 2,
+      "dbRow": {
+        "id": "c339baff-dfed-431d-b4df-1be170eb8fbe",
+        "invoice_number": "REGA152916",
+        "status": "sent",
+        "journal_entry_id": "4220abbd-a8e9-4fc3-bdd6-b1c2790fd742",
+        "customer_id": "8b23e413-bd07-479e-bf59-28bff83fb7bb"
+      },
+      "dbError": null
+    },
+    {
+      "id": "aaea8c70-72c9-4c2b-981c-b996e5df9b43",
+      "getOneStatus": 200,
+      "hasJournal": true,
+      "journalItemCount": 2,
+      "dbRow": {
+        "id": "aaea8c70-72c9-4c2b-981c-b996e5df9b43",
+        "invoice_number": "REGB154022",
+        "status": "sent",
+        "journal_entry_id": "f48b38d8-55f0-4845-9ea4-d87c72478324",
+        "customer_id": "8b23e413-bd07-479e-bf59-28bff83fb7bb"
+      },
+      "dbError": null
+    },
+    {
+      "id": "2f4e32a5-a942-4348-989b-a5e452704085",
+      "getOneStatus": 200,
+      "hasJournal": true,
+      "journalItemCount": 2,
+      "dbRow": {
+        "id": "2f4e32a5-a942-4348-989b-a5e452704085",
+        "invoice_number": "REGC153830",
+        "status": "sent",
+        "journal_entry_id": "aaa830a8-0219-473a-8e12-f00fdbf72d71",
+        "customer_id": "8b23e413-bd07-479e-bf59-28bff83fb7bb"
+      },
+      "dbError": null
+    }
+  ],
+  "listHasAll": true,
+  "summary": {
+    "allCreated": true,
+    "allPersistInDb": true,
+    "concurrentOk": true,
+    "listHasAll": true
+  }
+}

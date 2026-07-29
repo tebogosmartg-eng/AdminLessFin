@@ -1,0 +1,63 @@
+{
+  "sys": {
+    "id": "54db6133-41e1-403f-97e0-aecaf0ab9c10",
+    "name": "Retained Earnings",
+    "company_id": "0a2ff5bb-3796-4467-b227-a6dd4306bcdb",
+    "is_active": true,
+    "system_account": true
+  },
+  "delete": {
+    "status": 500,
+    "body": {
+      "version": "1.0",
+      "code": "UNKNOWNPLATFORM_FAILED",
+      "category": "UnknownPlatformError",
+      "severity": "error",
+      "businessMessage": "An unexpected platform error occurred.",
+      "technicalMessage": "System account \"Retained Earnings\" cannot be deleted. Deactivate it instead if you no longer use it.",
+      "recoverySuggestion": "Contact support with the correlation ID shown below.",
+      "correlationId": "edge:68cde833-d0d3-4ece-80a9-250481f5a88d",
+      "companyId": "0a2ff5bb-3796-4467-b227-a6dd4306bcdb",
+      "timestamp": "2026-07-29T05:16:14.645Z",
+      "retryable": false,
+      "originalCause": "Error: System account \"Retained Earnings\" cannot be deleted. Deactivate it instead if you no longer use it.\n    at file:///var/tmp/sb-compile-edge-runtime/functions/chart-of-accounts/index.ts:113:19\n    at eventLoopTick (ext:core/01_core.js:175:7)\n    at async Server.<anonymous> (file:///var/tmp/sb-compile-edge-runtime/functions/_shared/enterpriseEdgePlatform.ts:273:19)\n    at async Server.#respond (https://deno.land/std@0.190.0/http/server.ts:220:18)",
+      "error": "An unexpected platform error occurred."
+    }
+  },
+  "type": {
+    "status": 500,
+    "body": {
+      "version": "1.0",
+      "code": "UNKNOWNPLATFORM_FAILED",
+      "category": "UnknownPlatformError",
+      "severity": "error",
+      "businessMessage": "An unexpected platform error occurred.",
+      "technicalMessage": "This is a system account. Its type cannot be changed. You can still rename or deactivate it.",
+      "recoverySuggestion": "Contact support with the correlation ID shown below.",
+      "correlationId": "edge:23ca5137-79e8-4a55-aa69-7ca915d8d07c",
+      "companyId": "0a2ff5bb-3796-4467-b227-a6dd4306bcdb",
+      "timestamp": "2026-07-29T05:16:15.169Z",
+      "retryable": false,
+      "originalCause": "Error: This is a system account. Its type cannot be changed. You can still rename or deactivate it.\n    at file:///var/tmp/sb-compile-edge-runtime/functions/chart-of-accounts/index.ts:101:23\n    at eventLoopTick (ext:core/01_core.js:175:7)\n    at async Server.<anonymous> (file:///var/tmp/sb-compile-edge-runtime/functions/_shared/enterpriseEdgePlatform.ts:273:19)\n    at async Server.#respond (https://deno.land/std@0.190.0/http/server.ts:220:18)",
+      "error": "An unexpected platform error occurred."
+    }
+  },
+  "generate": {
+    "status": 409,
+    "body": {
+      "version": "1.0",
+      "code": "CONFLICT_FAILED",
+      "category": "ConflictError",
+      "severity": "error",
+      "businessMessage": "This action conflicts with the current state of the record.",
+      "technicalMessage": "This company already has a generated Chart of Accounts. Generation is only available once.",
+      "recoverySuggestion": "Contact support with the correlation ID shown below.",
+      "correlationId": "edge:85271a00-4556-403c-b0db-aa5cb663811a",
+      "companyId": "0a2ff5bb-3796-4467-b227-a6dd4306bcdb",
+      "timestamp": "2026-07-29T05:16:15.659Z",
+      "retryable": false,
+      "originalCause": "Error: This company already has a generated Chart of Accounts. Generation is only available once.\n    at file:///var/tmp/sb-compile-edge-runtime/functions/chart-of-accounts/index.ts:139:21\n    at eventLoopTick (ext:core/01_core.js:175:7)\n    at async Server.<anonymous> (file:///var/tmp/sb-compile-edge-runtime/functions/_shared/enterpriseEdgePlatform.ts:273:19)\n    at async Server.#respond (https://deno.land/std@0.190.0/http/server.ts:220:18)",
+      "error": "This action conflicts with the current state of the record."
+    }
+  }
+}

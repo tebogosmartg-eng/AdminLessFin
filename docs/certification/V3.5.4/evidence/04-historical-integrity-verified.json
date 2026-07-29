@@ -1,0 +1,33 @@
+{
+  "baseline": "e2e.finalizedBefore (captured after migrations, before E2E mutations)",
+  "originalFinalizedCount": 6,
+  "runFieldMismatches": [],
+  "runsUnchanged": true,
+  "historicalPayslipCount": 6,
+  "historicalPayslipItemCount": 16,
+  "journals": {
+    "306cfe16-2acb-49bb-abd9-a1bd74c1191c": {
+      "debit": 10000,
+      "credit": 10000,
+      "count": 2
+    },
+    "78d1966f-8557-4fef-ba05-aba19982142a": {
+      "debit": 10200,
+      "credit": 10200,
+      "count": 5
+    }
+  },
+  "journalsBalanced": true,
+  "migrationPhaseIntegrity": {
+    "pre": {
+      "finalized_runs_fingerprint": "9a6f5e0930f42d85ac862178a0443111",
+      "payslips_fingerprint": "25a136cc433736018f2133a6b702152c",
+      "payslip_items_fingerprint": "a5f9bfc79a11bf3707049dfde7318341",
+      "je_items_amount_sum": "280864.00"
+    },
+    "postMigrationB": "IDENTICAL (01-post-B-integrity.json)",
+    "postMigrationA": "IDENTICAL (02-post-A-integrity.json)",
+    "migrationsDidNotMutateHistoricalData": true
+  },
+  "decision": "PASS"
+}

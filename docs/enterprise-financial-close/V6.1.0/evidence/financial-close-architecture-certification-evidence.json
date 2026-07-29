@@ -1,0 +1,65 @@
+{
+  "product": "AdminLess Fin",
+  "pillar": "Enterprise Financial Close Platform",
+  "acronym": "EFCP",
+  "version": "6.1.0",
+  "date": "2026-07-13",
+  "board": "Independent Principal Financial Close Architecture Board",
+  "verdict": "ENTERPRISE FINANCIAL CLOSE PLATFORM ARCHITECTURE CERTIFIED",
+  "implementation": "PROHIBITED until Implementation Approval cites V6.1.0",
+  "core_principle": "Accounting owns financial facts. Financial Close owns reporting readiness. Reporting owns presentation. Close produces certified Reporting Snapshots; EFRE consumes them.",
+  "event_namespace": "close.*",
+  "prerequisites": [
+    "EFRE V6.0.0",
+    "Reporting Snapshot Architecture V6.0.1",
+    "Accounting Engine SoT",
+    "Operational Financial Reporting dual-track (preserved live)",
+    "Edge V4.2.1",
+    "Business Event Platform V4.3.0",
+    "Evolution Governance V4.4.0",
+    "EGCP V5.0.0 (definitional)"
+  ],
+  "domains_certified": [
+    "Financial Close Workspace",
+    "Close Checklist",
+    "Close Tasks",
+    "Close Milestones",
+    "Close Approvals",
+    "Close Readiness",
+    "Blocking Issues",
+    "Lead Schedules",
+    "Working Papers",
+    "Reconciliations",
+    "Audit Adjustments",
+    "Review Notes",
+    "Manager Review",
+    "Partner Review",
+    "Publication Readiness"
+  ],
+  "verification": {
+    "accounting_owns_financial_facts": "PASS",
+    "financial_close_owns_reporting_readiness": "PASS",
+    "reporting_owns_presentation": "PASS",
+    "working_papers_linked_to_reporting_snapshots": "PASS",
+    "lead_schedules_remain_traceable": "PASS",
+    "audit_adjustments_remain_versioned": "PASS",
+    "publication_remains_fully_auditable": "PASS"
+  },
+  "pipeline": "Accounting → EFCP Close → Certified Reporting Snapshot → EFRE → Published Pack (Operational Reports remain live in parallel)",
+  "deliverables": [
+    "00_INDEX.md",
+    "01_FINANCIAL_CLOSE_ARCHITECTURE.md",
+    "02_FINANCIAL_CLOSE_DOMAIN_MODEL.md",
+    "03_WORKING_PAPER_ARCHITECTURE.md",
+    "04_LEAD_SCHEDULE_ARCHITECTURE.md",
+    "05_CLOSE_WORKFLOW.md",
+    "06_INTEGRATION_ARCHITECTURE.md",
+    "07_ENTERPRISE_READINESS_ASSESSMENT.md"
+  ],
+  "explicit_non_claims": [
+    "No implementation, schema, or UI",
+    "No Operational Financial Reporting redesign",
+    "No Accounting posting by Close",
+    "No EFRE statement assembly by Close"
+  ]
+}

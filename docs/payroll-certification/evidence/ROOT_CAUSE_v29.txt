@@ -1,0 +1,30 @@
+DEPLOYED payroll function evidence (project zaulhnpohrgqqodvzhxp, slug payroll, version 29)
+Downloaded via: npx supabase functions download payroll --project-ref zaulhnpohrgqqodvzhxp
+SHA256: 7D4323DA174AF045146375B6C3D132BCA5277F1AA1EBC40732E8413BDEEA837B
+Updated_at: 2026-07-28T... (ms 1785230460465)
+
+CRITICAL FINDINGS:
+1. GENERATE_BANK_BATCH response omits bank_rows (line ~1125):
+   data = { run: batchUpdated, bank_batch: bankBatch, persisted: true };
+
+2. Query selects employees with bank fields but discards them after totaling:
+   .select(
+et_pay, employees())
+   EMPLOYEE_EMBED_BANK = 'id, employee_number, first_name, last_name, department, bank_name, bank_account_number'
+   (NO bank_branch_code)
+
+3. GET_RUN_DETAIL uses EMPLOYEE_EMBED_BASIC without any bank fields:
+   EMPLOYEE_EMBED_BASIC = 'id, employee_number, first_name, last_name, department, branch, position, email'
+   .select(*, employees())
+
+CLIENT PATH (local working tree frontend):
+PayrollCommandCentre onClick -> handleDownloadBankFile('csv')
+-> invokePayroll({ method: 'GENERATE_BANK_BATCH' })  // edge: payroll
+-> batchResult.bank_rows missing -> fallback to payslips from GET_RUN_DETAIL
+-> payslips.employees has no bank_* -> CSV blanks
+-> downloadBankPaymentFile / buildBankPaymentFileContent
+
+WHY PRIOR 'FIXED' REPORT DIFFERED:
+Verification harness tmp/payroll-export-verify/run-verification.mts synthesized CSV from
+in-memory employee fixtures via mapEmployeeToBankPaymentRow — never called live GENERATE_BANK_BATCH.
+Local uncommitted edge changes returning bank_rows were never deployed (deployed v29 still omits bank_rows).

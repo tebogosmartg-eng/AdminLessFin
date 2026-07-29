@@ -1,0 +1,44 @@
+{
+  "targetId": "be3855e9-d11c-48a8-8c39-10e12a0ff2df",
+  "before": {
+    "activeFinancialYear": true,
+    "chartOfAccountsExists": true,
+    "mandatoryControlAccounts": true,
+    "coaIntegrity": true,
+    "taxConfigurationExists": true,
+    "bankAccountOrSkipped": true,
+    "openingBalancesComplete": true,
+    "controlAccounts": {
+      "trade_debtors": true,
+      "trade_creditors": true,
+      "vat_control": true,
+      "bank": true,
+      "retained_earnings": true,
+      "profit_loss": true
+    },
+    "missingControlAccounts": [],
+    "coaIntegrityErrors": [],
+    "errors": []
+  },
+  "after": {
+    "activeFinancialYear": true,
+    "chartOfAccountsExists": true,
+    "mandatoryControlAccounts": true,
+    "coaIntegrity": true,
+    "taxConfigurationExists": true,
+    "bankAccountOrSkipped": true,
+    "openingBalancesComplete": true,
+    "controlAccounts": {
+      "trade_debtors": true,
+      "trade_creditors": true,
+      "vat_control": true,
+      "bank": true,
+      "retained_earnings": true,
+      "profit_loss": true
+    },
+    "missingControlAccounts": [],
+    "coaIntegrityErrors": [],
+    "errors": []
+  },
+  "ready": true
+}

@@ -1,0 +1,13 @@
+{
+  "timestamp": "2026-07-29T10:48:27.160Z",
+  "customerName": "INV Cust 22106646",
+  "invoicesReady": true,
+  "invoiceNumber": "INV-00003",
+  "saved": true,
+  "listAmount": "R 20 000,00",
+  "detailShowsAmount": true,
+  "verdict": "PASS",
+  "failedRequests": [],
+  "pageErrors": [],
+  "consoleErrors": []
+}

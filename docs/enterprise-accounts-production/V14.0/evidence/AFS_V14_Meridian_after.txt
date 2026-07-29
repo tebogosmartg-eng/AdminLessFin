@@ -1,0 +1,638 @@
+Meridian Trading Solutions (Pty) Ltd
+Registration number 2016/348271/07
+Trading as Meridian Trading
+Annual Financial Statements
+Year ended 31 March 2026
+Prepared in accordance with IFRS for SMEs
+Figures are stated in South African Rand
+AdminLess Fin
+Enterprise Accounts Production
+20 July 2026
+Contents
+Directors' Responsibilities and Approval
+3
+................................................................................................
+Directors' Report
+4
+........................................................................................................................................
+Independent Auditor's Report
+5
+...................................................................................................................
+Statement of Financial Position
+6
+................................................................................................................
+Statement of Profit or Loss and Other Comprehensive Income
+7
+............................................................
+Statement of Changes in Equity
+8
+...............................................................................................................
+Statement of Cash Flows
+9
+...........................................................................................................................
+Notes to the Annual Financial Statements
+10
+.............................................................................................
+Supplementary Information
+15
+.....................................................................................................................
+Approval of Annual Financial Statements
+16
+.............................................................................................
+Meridian Trading Solutions (Pty) Ltd
+Registration number: 2016/348271/07
+Contents
+Year ended 31 March 2026
+AdminLess Fin
+2 / 16
+20 July 2026
+Directors' Responsibilities and Approval
+The directors are required by the Companies Act of South Africa to maintain adequate accounting records and are
+responsible for the content and integrity of the annual financial statements of Meridian Trading Solutions (Pty) Ltd
+and related financial information included in this report. It is their responsibility to ensure that the annual financial
+statements fairly present the state of affairs of the company as at the end of the financial year and the results of
+its operations and cash flows for the period then ended, in conformity with IFRS for SMEs.
+The directors acknowledge that they are ultimately responsible for the system of internal financial control
+established by the company and place considerable importance on maintaining a strong control environment. To
+enable the directors to meet these responsibilities, the board sets standards for internal control aimed at reducing
+the risk of error or loss in a cost-effective manner.
+The directors are of the opinion, based on the information and explanations given by management, that the
+system of internal control provides reasonable assurance that the financial records may be relied on for the
+preparation of the annual financial statements. However, any system of internal financial control can provide only
+reasonable, and not absolute, assurance against material misstatement or loss.
+The directors have reviewed the company's cash flow forecast for the year ahead and, in light of this review and
+the current financial position, they are satisfied that the company has access to adequate resources to continue in
+operational existence for the foreseeable future.
+The annual financial statements set out on the pages that follow, which have been prepared on the going concern
+basis, were approved by the board of directors and are signed on its behalf by the directors whose signatures
+appear in the approval section of this report.
+Meridian Trading Solutions (Pty) Ltd
+Registration number: 2016/348271/07
+Directors' Responsibilities and Approval
+Year ended 31 March 2026
+AdminLess Fin
+3 / 16
+20 July 2026
+Directors' Report
+The directors have pleasure in submitting their report on the annual financial statements of Meridian Trading
+Solutions (Pty) Ltd for the year ended 31 march 2026.
+1. Nature of business
+The wholesale distribution of industrial hardware and the provision of related logistics services
+2. Review of financial results and activities
+The financial results and position of the company are fully set out in the annual financial statements and require
+no further comment. The directors consider that the statements fairly present the financial affairs of the company.
+3. Going concern
+The directors believe that the company has adequate financial resources to continue in operation for the
+foreseeable future and accordingly the annual financial statements have been prepared on a going concern basis.
+The directors have satisfied themselves that the company is in a sound financial position and that it has access to
+sufficient borrowing facilities to meet its foreseeable cash requirements.
+4. Events after the reporting period
+The directors are not aware of any material event which occurred after the reporting date and up to the date of
+this report that would require adjustment to, or disclosure in, the annual financial statements, other than those
+disclosed in the notes.
+5. Directors
+The directors in office at the date of this report are R. van der Merwe, L. Khumalo and P. Naidoo.
+6. Company secretary
+The company secretary is T. Nkosi, and the registered office of the company is 18 Kyalami Boulevard, Midrand,
+1685.
+7. Auditors
+The company's auditors are Delport & Associates Incorporated, Registered Auditors.
+Meridian Trading Solutions (Pty) Ltd
+Registration number: 2016/348271/07
+Directors' Report
+Year ended 31 March 2026
+AdminLess Fin
+4 / 16
+20 July 2026
+Independent Auditor's Report
+To the shareholders of Meridian Trading Solutions (Pty) Ltd
+The independent auditors of the company are Delport & Associates Incorporated, Registered Auditors. Their
+report on these annual financial statements is addressed to the shareholders and will be issued upon completion
+of the audit engagement.
+Pending receipt of the signed auditor's report, this page is reserved for the independent auditor's report
+expressing an opinion on whether the annual financial statements present fairly, in all material respects, the
+financial position of the company as at the reporting date and its financial performance and cash flows for the year
+then ended, in accordance with the applicable financial reporting framework and the requirements of the
+Companies Act of South Africa.
+Meridian Trading Solutions (Pty) Ltd
+Registration number: 2016/348271/07
+Independent Auditor's Report
+Year ended 31 March 2026
+AdminLess Fin
+5 / 16
+20 July 2026
+Statement of Financial Position
+As at 31 March 2026
+Figures are stated in South African Rand
+Notes
+2025
+2026
+R
+R
+Assets
+Non-current assets
+Property, plant and equipment
+4
+3,684,200.00
+4,218,650.00
+Intangible assets
+298,100.00
+312,400.00
+Deferred tax
+152,800.00
+186,300.00
+Total non-current assets
+4,135,100.00
+4,717,350.00
+Current assets
+Inventories
+2,510,800.00
+2,864,100.00
+Trade and other receivables
+2,789,300.00
+3,120,540.00
+Cash and cash equivalents
+1,119,520.00
+1,458,920.00
+Total current assets
+6,419,620.00
+7,443,560.00
+Total assets
+10,554,720.00
+12,160,910.00
+Equity and liabilities
+Equity
+Share capital
+100,000.00
+100,000.00
+Retained earnings
+5,180,705.00
+6,842,910.00
+Total equity
+5,280,705.00
+6,942,910.00
+Non-current liabilities
+Borrowings
+1,980,000.00
+1,650,000.00
+Total non-current liabilities
+1,980,000.00
+1,650,000.00
+Current liabilities
+Trade and other payables
+2,642,015.00
+2,918,000.00
+Current portion of borrowings
+520,000.00
+550,000.00
+Current tax payable
+9
+132,000.00
+100,000.00
+Total current liabilities
+3,294,015.00
+3,568,000.00
+Total equity and liabilities
+10,554,720.00
+12,160,910.00
+Meridian Trading Solutions (Pty) Ltd
+Registration number: 2016/348271/07
+Statement of Financial Position
+Year ended 31 March 2026
+AdminLess Fin
+6 / 16
+20 July 2026
+Statement of Profit or Loss and Other Comprehensive Income
+For the year ended 31 March 2026
+Figures are stated in South African Rand
+Notes
+2025
+2026
+R
+R
+Revenue
+3
+25,128,400.00
+28,450,300.00
+Cost of sales
+(16,981,200.00)
+(19,122,400.00)
+Gross profit
+8,147,200.00
+9,327,900.00
+Other income
+186,300.00
+214,600.00
+Operating expenses
+(6,128,400.00)
+(6,890,120.00)
+Operating profit
+2,205,100.00
+2,652,380.00
+Finance costs
+(265,100.00)
+(238,400.00)
+Profit before taxation
+1,940,000.00
+2,413,980.00
+Taxation
+9
+(523,800.00)
+(651,775.00)
+Profit for the year
+1,416,200.00
+1,762,205.00
+Other comprehensive income
+-
+-
+Total comprehensive income for the year
+1,416,200.00
+1,762,205.00
+Meridian Trading Solutions (Pty) Ltd
+Registration number: 2016/348271/07
+Statement of Profit or Loss and Other Compre...
+Year ended 31 March 2026
+AdminLess Fin
+7 / 16
+20 July 2026
+Statement of Changes in Equity
+For the year ended 31 March 2026
+Figures are stated in South African Rand
+Notes
+2026
+R
+Balance at 1 April 2025
+5,180,705.00
+Profit for the year
+1,762,205.00
+Dividends declared
+-
+Balance at 31 March 2026
+6,942,910.00
+Meridian Trading Solutions (Pty) Ltd
+Registration number: 2016/348271/07
+Statement of Changes in Equity
+Year ended 31 March 2026
+AdminLess Fin
+8 / 16
+20 July 2026
+Statement of Cash Flows
+For the year ended 31 March 2026
+Figures are stated in South African Rand
+Notes
+2026
+R
+Cash flows from operating activities
+Cash generated from operations
+2,984,100.00
+Finance costs paid
+(238,400.00)
+Taxation paid
+(602,300.00)
+Net cash from operating activities
+2,143,400.00
+Cash flows from investing activities
+Acquisition of property, plant and equipment
+(1,284,000.00)
+Net cash used in investing activities
+(1,284,000.00)
+Cash flows from financing activities
+Repayment of borrowings
+(520,000.00)
+Net cash used in financing activities
+(520,000.00)
+Net increase in cash and cash equivalents
+339,400.00
+Cash and cash equivalents at the beginning of the year
+1,119,520.00
+Cash and cash equivalents at the end of the year
+1,458,920.00
+Meridian Trading Solutions (Pty) Ltd
+Registration number: 2016/348271/07
+Statement of Cash Flows
+Year ended 31 March 2026
+AdminLess Fin
+9 / 16
+20 July 2026
+Notes to the Annual Financial Statements
+Note 1. Basis of preparation
+The annual financial statements have been prepared in accordance with the IFRS for SMEs and are presented in
+the functional and presentation currency of the entity. They have been prepared on the historical cost basis,
+except for financial instruments and other items measured at fair value or revalued amounts where required or
+elected, and are drawn up on the going concern and accrual bases of accounting.
+Note 2. Significant accounting policies
+The principal accounting policies applied in the preparation of these annual financial statements are set out below.
+These policies have been applied consistently to all periods presented, unless otherwise stated, and are
+consistent with those applied in the previous reporting period.
+Basis of preparation
+The financial statements have been prepared in accordance with the IFRS for SMEs on the going concern basis,
+under the historical cost convention except where a standard requires or permits measurement at fair value,
+revalued amount or recoverable amount. Assets and liabilities are presented as current or non-current, and
+income and expenses are presented by nature or function, on a consistent basis between periods.
+Revenue from contracts with customers
+Revenue is recognised when the entity satisfies a performance obligation by transferring control of a promised
+good or service to a customer, either over time or at a point in time. Revenue is measured at the transaction price
+allocated to the performance obligation, being the consideration the entity expects to be entitled to, net of value
+added tax, discounts, rebates and returns, and adjusted for the effects of any significant financing component and
+variable consideration. Judgement is applied in identifying performance obligations, determining whether control
+transfers over time or at a point in time, and estimating variable consideration.
+Property, plant and equipment
+An item of property, plant and equipment is recognised as an asset when it is probable that future economic
+benefits associated with the item will flow to the entity and its cost can be measured reliably. Items are measured
+initially at cost, comprising the purchase price, import duties, non-refundable taxes and any costs directly
+attributable to bringing the asset to the location and condition necessary for it to operate. After recognition, items
+are carried at cost less accumulated depreciation and accumulated impairment losses. Depreciation is recognised
+on a straight-line basis over the estimated useful life of each significant component to its residual value. An item is
+derecognised on disposal or when no future economic benefits are expected from its use or disposal; the resulting
+gain or loss is recognised in profit or loss. Useful lives, residual values and depreciation methods are reviewed at
+each reporting date and adjusted prospectively where appropriate.
+Intangible assets
+An intangible asset is recognised when it is identifiable, the entity controls it, future economic benefits are
+probable and its cost can be measured reliably. Research expenditure is expensed as incurred; development
+expenditure is capitalised only when strict recognition criteria are met. Intangible assets are measured initially at
+cost. Intangible assets with finite useful lives are carried at cost less accumulated amortisation and impairment
+and amortised over their useful lives; those with indefinite useful lives are not amortised but tested annually for
+impairment.
+Investment property
+Investment property is property held to earn rentals or for capital appreciation and is distinguished from
+owner-occupied property. Investment property whose fair value can be measured reliably without undue cost or
+effort is measured at fair value through profit or loss; all other investment property is accounted for as property,
+Meridian Trading Solutions (Pty) Ltd
+Registration number: 2016/348271/07
+Notes to the Annual Financial Statements
+Year ended 31 March 2026
+AdminLess Fin
+10 / 16
+20 July 2026
+Note 2. Significant accounting policies (continued)
+plant and equipment at cost less depreciation and impairment.
+Leases
+At the commencement date of a lease the entity recognises a right-of-use asset and a corresponding lease
+liability, except for short-term leases and leases of low-value assets which are expensed on a straight-line basis.
+The lease liability is measured at the present value of the lease payments that are not paid at the commencement
+date, discounted using the interest rate implicit in the lease or the incremental borrowing rate. The right-of-use
+asset is measured at cost. The right-of-use asset is depreciated over the shorter of the lease term and the useful
+life of the asset, and the lease liability is increased by the finance charge and reduced by lease payments.
+Financial instruments
+Financial assets and financial liabilities are recognised when the entity becomes a party to the contractual
+provisions of the instrument. Basic financial instruments are measured initially at the transaction price, including
+transaction costs, unless the arrangement constitutes a financing transaction, in which case they are measured at
+the present value of future payments. Basic debt instruments are subsequently measured at amortised cost using
+the effective interest method, less impairment; other financial instruments are measured at fair value through profit
+or loss.
+Impairment of non-financial assets
+At each reporting date the entity assesses whether there is any indication that a non-financial asset may be
+impaired; goodwill and indefinite-life intangibles are tested annually. Where an indication exists, the recoverable
+amount of the asset is estimated as the higher of its fair value less costs of disposal and its value in use; an
+impairment loss is recognised where the carrying amount exceeds the recoverable amount.
+Inventories
+Inventories are measured initially at cost, comprising all costs of purchase, costs of conversion and other costs
+incurred in bringing them to their present location and condition. Inventories are subsequently measured at the
+lower of cost and net realisable value, with cost determined on the first-in-first-out or weighted-average basis.
+Provisions and contingencies
+A provision is recognised when the entity has a present legal or constructive obligation as a result of a past event,
+it is probable that an outflow of resources will be required to settle the obligation and a reliable estimate can be
+made of the amount. Provisions are measured at the best estimate of the expenditure required to settle the
+present obligation, discounted to present value where the effect is material.
+Employee benefits
+The cost of short-term employee benefits is recognised in the period in which the service is rendered; a liability is
+recognised for the amount expected to be paid in respect of accumulated leave and short-term bonuses.
+Contributions to defined contribution plans are recognised as an expense as employees render service;
+obligations under defined benefit plans are measured using the projected unit credit method.
+Taxation
+Current tax is the expected tax payable or receivable on the taxable income or loss for the year, using tax rates
+enacted or substantively enacted at the reporting date. Deferred tax is recognised on temporary differences
+between the carrying amounts of assets and liabilities and their tax bases, using the liability method. A deferred
+tax asset is recognised only to the extent that it is probable that future taxable profit will be available against which
+it can be utilised.
+Foreign currencies
+Meridian Trading Solutions (Pty) Ltd
+Registration number: 2016/348271/07
+Notes to the Annual Financial Statements
+Year ended 31 March 2026
+AdminLess Fin
+11 / 16
+20 July 2026
+Note 2. Significant accounting policies (continued)
+Transactions in foreign currencies are recorded at the spot exchange rate at the date of the transaction. Monetary
+items denominated in foreign currencies are retranslated at the closing rate at the reporting date, with exchange
+differences recognised in profit or loss; non-monetary items measured at historical cost are not retranslated.
+Government grants
+Government grants are recognised when there is reasonable assurance that the entity will comply with the
+conditions attaching to them and that the grants will be received. Grants are recognised in profit or loss on a
+systematic basis over the periods in which the entity recognises as expenses the related costs for which the
+grants are intended to compensate.
+Note 3. Revenue
+Revenue represents the transfer of promised goods and services to customers in the ordinary course of business,
+measured at the transaction price net of value added tax, discounts and returns. Revenue is disaggregated below
+by major category and timing of transfer.
+Disaggregation of revenue
+Description
+Current year
+Prior year
+Total revenue from contracts with customers
+[ - ]
+[ - ]
+Sale of goods
+[ - ]
+[ - ]
+Rendering of services
+[ - ]
+[ - ]
+Royalties, licences and other
+[ - ]
+[ - ]
+Revenue recognised at a point in time
+[ - ]
+[ - ]
+Revenue recognised over time
+[ - ]
+[ - ]
+Note 4. Property, plant and equipment
+The carrying amount of property, plant and equipment is reconciled below. Additions, disposals and the
+depreciation charge for the year are recorded in the fixed asset register and agreed to that register.
+Property, plant and equipment
+Description
+Current year
+Prior year
+Carrying amount at the end of the year
+4,218,650.00
+[ - ]
+Cost at the beginning of the year
+[ - ]
+[ - ]
+Additions
+[ - ]
+[ - ]
+Disposals
+[ - ]
+[ - ]
+Cost at the end of the year
+[ - ]
+[ - ]
+Accumulated depreciation at the beginning of the year
+[ - ]
+[ - ]
+Depreciation charge for the year
+[ - ]
+[ - ]
+Accumulated depreciation on disposals
+[ - ]
+[ - ]
+Impairment losses recognised
+[ - ]
+[ - ]
+Accumulated depreciation at the end of the year
+[ - ]
+[ - ]
+Note 5. Related parties
+Related party relationships exist between the entity and its holding company, fellow subsidiaries, directors and
+key management personnel, and entities controlled by them. Transactions with related parties are concluded in
+the ordinary course of business.
+Meridian Trading Solutions (Pty) Ltd
+Registration number: 2016/348271/07
+Notes to the Annual Financial Statements
+Year ended 31 March 2026
+AdminLess Fin
+12 / 16
+20 July 2026
+Note 5. Related parties (continued)
+Transactions and outstanding balances with related parties, and the remuneration of key management personnel,
+are set out below.
+Related party transactions and balances
+Related party / nature
+Transactions for the year
+Outstanding balance
+Holding company
+[ - ]
+[ - ]
+Fellow subsidiaries
+[ - ]
+[ - ]
+Directors and key management
+[ - ]
+[ - ]
+Entities controlled by key management
+[ - ]
+[ - ]
+Key management remuneration
+Description
+Current year
+Prior year
+Short-term employee benefits
+[ - ]
+[ - ]
+Post-employment benefits
+[ - ]
+[ - ]
+Other long-term benefits
+[ - ]
+[ - ]
+Termination benefits
+[ - ]
+[ - ]
+Total
+[ - ]
+[ - ]
+Note 6. Events after the reporting period
+The entity evaluates events occurring between the reporting date and the date of authorisation for issue. Adjusting
+events are reflected in the financial statements, and material non-adjusting events are disclosed. The directors
+are not aware of any matter or circumstance arising since the reporting date, not otherwise dealt with, that would
+materially affect the financial statements.
+Note 7. General information
+The entity is incorporated and domiciled in its country of registration. These annual financial statements present
+the financial position, financial performance and cash flows of the entity for the reporting period, and were
+authorised for issue by the directors.
+Note 8. Significant judgements and sources of estimation uncertainty
+In applying the accounting policies, management is required to make judgements, estimates and assumptions
+that affect the reported amounts of assets, liabilities, income and expenses. These estimates and associated
+assumptions are based on historical experience and other factors considered reasonable in the circumstances.
+Actual results may differ from these estimates, which are reviewed on an ongoing basis. Significant areas of
+judgement and estimation include the useful lives and residual values of assets, impairment assessments, the
+measurement of expected credit losses, the recognition and measurement of provisions, and the recoverability of
+deferred tax assets.
+Note 9. Taxation
+The taxation charge comprises current and deferred taxation. A reconciliation of the tax expense to the amount
+that would arise using the standard rate of taxation is set out below.
+Reconciliation of the effective tax rate
+Description
+Current year
+Prior year
+Accounting profit / (loss) before tax
+[ - ]
+[ - ]
+Tax at the standard rate
+[ - ]
+[ - ]
+Meridian Trading Solutions (Pty) Ltd
+Registration number: 2016/348271/07
+Notes to the Annual Financial Statements
+Year ended 31 March 2026
+AdminLess Fin
+13 / 16
+20 July 2026
+Note 9. Taxation (continued)
+Description
+Current year
+Prior year
+Non-deductible expenses
+[ - ]
+[ - ]
+Exempt income
+[ - ]
+[ - ]
+Assessed losses not recognised
+[ - ]
+[ - ]
+Total tax expense
+[ - ]
+[ - ]
+Meridian Trading Solutions (Pty) Ltd
+Registration number: 2016/348271/07
+Notes to the Annual Financial Statements
+Year ended 31 March 2026
+AdminLess Fin
+14 / 16
+20 July 2026
+Supplementary Information
+The schedules set out in this section do not form part of the audited annual financial statements and are
+presented as supplementary information for the use of the directors and management.
+Where prepared, the detailed income statement and the taxation computation of the company are presented in
+this section. These schedules are unaudited and are provided to support the analysis of the results disclosed in
+the primary statements.
+Meridian Trading Solutions (Pty) Ltd
+Registration number: 2016/348271/07
+Supplementary Information
+Year ended 31 March 2026
+AdminLess Fin
+15 / 16
+20 July 2026
+Approval of Annual Financial Statements
+The annual financial statements were approved by the board of directors and are signed on its behalf by:
+Prepared By
+[Signature]
+A. Petersen CA(SA)
+Prepared by
+[Date]
+Reviewed By
+[Signature]
+S. Moloi CA(SA)
+Reviewer
+[Date]
+Approved By
+[Signature]
+R. van der Merwe
+Partner
+2026-06-24
+Authorised Representative
+[Signature]
+T. Nkosi
+Company Secretary
+2026-06-24
+Meridian Trading Solutions (Pty) Ltd
+Registration number: 2016/348271/07
+Approval of Annual Financial Statements
+Year ended 31 March 2026
+AdminLess Fin
+16 / 16
+20 July 2026

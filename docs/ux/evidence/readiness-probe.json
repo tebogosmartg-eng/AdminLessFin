@@ -1,0 +1,254 @@
+[
+  {
+    "name": "My's Company",
+    "id": "26014bd5-f03f-44ae-93bd-64b5add2e09f",
+    "ready": true,
+    "progress": 50,
+    "fy": true,
+    "coa": true,
+    "ctrl": false,
+    "integrity": true,
+    "tax": false,
+    "bank": true,
+    "ob": true,
+    "missingCtrl": [
+      "vat_control"
+    ],
+    "integrityErrors": []
+  },
+  {
+    "name": "Spaceman",
+    "id": "3cbfd4eb-a095-43f3-837a-0b4f1e2c1752",
+    "ready": true,
+    "progress": 67,
+    "fy": true,
+    "coa": true,
+    "ctrl": false,
+    "integrity": false,
+    "tax": true,
+    "bank": true,
+    "ob": true,
+    "missingCtrl": [
+      "trade_debtors",
+      "retained_earnings",
+      "inventory",
+      "fixed_assets",
+      "payroll_clearing"
+    ],
+    "integrityErrors": [
+      "Missing foundational account type: Equity."
+    ]
+  },
+  {
+    "name": "CERT New Customer 2026-07-28T08:08:07.174Z",
+    "id": "bae80005-212f-4fdd-8d39-758177845d2e",
+    "ready": true,
+    "progress": 50,
+    "fy": true,
+    "coa": true,
+    "ctrl": false,
+    "integrity": true,
+    "tax": false,
+    "bank": true,
+    "ob": true,
+    "missingCtrl": [
+      "vat_control"
+    ],
+    "integrityErrors": []
+  },
+  {
+    "name": "CERT FY Fix 1785226265825",
+    "id": "a9988c29-9766-4de8-84bb-8823a9d868d0",
+    "ready": true,
+    "progress": 50,
+    "fy": true,
+    "coa": true,
+    "ctrl": false,
+    "integrity": true,
+    "tax": false,
+    "bank": true,
+    "ob": true,
+    "missingCtrl": [
+      "vat_control"
+    ],
+    "integrityErrors": []
+  },
+  {
+    "name": "CERT TX 1785230285930",
+    "id": "0837027f-347a-455e-914b-995b96b34397",
+    "ready": false,
+    "progress": 33,
+    "fy": true,
+    "coa": true,
+    "ctrl": false,
+    "integrity": true,
+    "tax": true,
+    "bank": false,
+    "ob": false,
+    "missingCtrl": [
+      "vat_control",
+      "bank"
+    ],
+    "integrityErrors": []
+  },
+  {
+    "name": "CERT TX 1785230470207",
+    "id": "62de66bf-f962-481e-8236-a8d0777b056a",
+    "ready": false,
+    "progress": 33,
+    "fy": true,
+    "coa": true,
+    "ctrl": false,
+    "integrity": true,
+    "tax": true,
+    "bank": false,
+    "ob": false,
+    "missingCtrl": [
+      "vat_control",
+      "bank"
+    ],
+    "integrityErrors": []
+  },
+  {
+    "name": "CERT TX 1785230675937",
+    "id": "be3855e9-d11c-48a8-8c39-10e12a0ff2df",
+    "ready": false,
+    "progress": 33,
+    "fy": true,
+    "coa": true,
+    "ctrl": false,
+    "integrity": true,
+    "tax": true,
+    "bank": false,
+    "ob": false,
+    "missingCtrl": [
+      "vat_control"
+    ],
+    "integrityErrors": []
+  },
+  {
+    "name": "CERT TX 1785230740094",
+    "id": "14712eb7-01e0-4664-ae34-2cd52b2c795a",
+    "ready": false,
+    "progress": 33,
+    "fy": true,
+    "coa": true,
+    "ctrl": false,
+    "integrity": true,
+    "tax": true,
+    "bank": false,
+    "ob": false,
+    "missingCtrl": [
+      "vat_control"
+    ],
+    "integrityErrors": []
+  },
+  {
+    "name": "CERT TX 1785230987178",
+    "id": "ed2f2a92-a8f4-4496-a6fe-51d68bf9ba03",
+    "ready": false,
+    "progress": 33,
+    "fy": true,
+    "coa": true,
+    "ctrl": true,
+    "integrity": false,
+    "tax": true,
+    "bank": false,
+    "ob": false,
+    "missingCtrl": [],
+    "integrityErrors": [
+      "Provision for Doubtful Debts: A Asset account normally carries a debit balance.",
+      "Closing Stock: A Expense account normally carries a debit balance."
+    ]
+  },
+  {
+    "name": "CERT TX 1785231040107",
+    "id": "0b07df94-1868-4ed9-aaa2-6ac8b847234b",
+    "ready": false,
+    "progress": 33,
+    "fy": true,
+    "coa": true,
+    "ctrl": true,
+    "integrity": false,
+    "tax": true,
+    "bank": false,
+    "ob": false,
+    "missingCtrl": [],
+    "integrityErrors": [
+      "Provision for Doubtful Debts: A Asset account normally carries a debit balance.",
+      "Closing Stock: A Expense account normally carries a debit balance."
+    ]
+  },
+  {
+    "name": "CERT TX 1785231635647",
+    "id": "063d0ae0-394a-4b22-b140-087d5979633b",
+    "ready": false,
+    "progress": 33,
+    "fy": true,
+    "coa": true,
+    "ctrl": true,
+    "integrity": false,
+    "tax": true,
+    "bank": false,
+    "ob": false,
+    "missingCtrl": [],
+    "integrityErrors": [
+      "Provision for Doubtful Debts: A Asset account normally carries a debit balance.",
+      "Closing Stock: A Expense account normally carries a debit balance."
+    ]
+  },
+  {
+    "name": "CERT TX 1785231821168",
+    "id": "2f1aaf89-f52f-4f85-b13a-9b54594df26f",
+    "ready": false,
+    "progress": 33,
+    "fy": true,
+    "coa": true,
+    "ctrl": true,
+    "integrity": false,
+    "tax": true,
+    "bank": false,
+    "ob": false,
+    "missingCtrl": [],
+    "integrityErrors": [
+      "Provision for Doubtful Debts: A Asset account normally carries a debit balance.",
+      "Closing Stock: A Expense account normally carries a debit balance."
+    ]
+  },
+  {
+    "name": "CERT COA 1785230862080",
+    "id": "b46f3ec6-82d5-4538-b000-4e192d54e7d1",
+    "ready": false,
+    "progress": 0,
+    "fy": false,
+    "coa": true,
+    "ctrl": false,
+    "integrity": true,
+    "tax": false,
+    "bank": false,
+    "ob": false,
+    "missingCtrl": [
+      "vat_control",
+      "bank"
+    ],
+    "integrityErrors": []
+  },
+  {
+    "name": "CERT COA 1785230945189",
+    "id": "0a2ff5bb-3796-4467-b227-a6dd4306bcdb",
+    "ready": false,
+    "progress": 0,
+    "fy": false,
+    "coa": true,
+    "ctrl": true,
+    "integrity": false,
+    "tax": false,
+    "bank": false,
+    "ob": false,
+    "missingCtrl": [],
+    "integrityErrors": [
+      "Closing Stock: A Expense account normally carries a debit balance.",
+      "Provision for Doubtful Debts: A Asset account normally carries a debit balance."
+    ]
+  }
+]

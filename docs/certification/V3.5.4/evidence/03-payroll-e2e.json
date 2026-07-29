@@ -1,0 +1,504 @@
+{
+  "startedAt": "2026-07-12T16:47:11.299Z",
+  "steps": [
+    {
+      "step": "Auth",
+      "status": "PASS",
+      "detail": {
+        "userId": "3cbfd4eb-a095-43f3-837a-0b4f1e2c1752"
+      }
+    },
+    {
+      "step": "Company",
+      "status": "PASS",
+      "detail": {
+        "companyId": "3cbfd4eb-a095-43f3-837a-0b4f1e2c1752"
+      }
+    },
+    {
+      "step": "GL accounts",
+      "status": "PASS",
+      "detail": {
+        "wage": "Wages and Salaries",
+        "bank": "Bank",
+        "liability": "AP"
+      }
+    },
+    {
+      "step": "CREATE_RUN",
+      "status": "PASS",
+      "detail": {
+        "runId": "4474253a-9dbf-4ac6-8f13-ef758d995f03",
+        "pay_date": "2026-07-31",
+        "http": 200
+      }
+    },
+    {
+      "step": "GENERATE_PAYSLIPS",
+      "status": "PASS",
+      "detail": {
+        "http": 200,
+        "generated": 2,
+        "engine": "statutory_payroll_engine_v3"
+      }
+    },
+    {
+      "step": "Payslips generated",
+      "status": "PASS",
+      "detail": {
+        "count": 2
+      }
+    },
+    {
+      "step": "Employer contributions persist",
+      "status": "PASS",
+      "detail": {
+        "count": 2,
+        "items": [
+          {
+            "id": "1fc90f38-332d-4e05-865b-4ed4e7d4650f",
+            "type": "employer_contribution",
+            "amount": 177.12,
+            "payslip_id": "2986fe09-855e-4424-a1ca-9abbd81786bd",
+            "description": "UIF Employer"
+          },
+          {
+            "id": "fe979fac-ffa2-4d66-b815-e3192f91630d",
+            "type": "employer_contribution",
+            "amount": 354.6,
+            "payslip_id": "2986fe09-855e-4424-a1ca-9abbd81786bd",
+            "description": "SDL"
+          }
+        ]
+      }
+    },
+    {
+      "step": "2026/2027 legislation resolves",
+      "status": "PASS",
+      "detail": {
+        "taxYear": "2026/2027",
+        "rule_version": "2026.2.0"
+      }
+    },
+    {
+      "step": "APPROVE_RUN",
+      "status": "PASS",
+      "detail": {
+        "http": 200,
+        "approved_at": "2026-07-12T16:47:15.745+00:00"
+      }
+    },
+    {
+      "step": "FINALIZE_RUN / Journal",
+      "status": "PASS",
+      "detail": {
+        "http": 200,
+        "journal_entry_id": "306cfe16-2acb-49bb-abd9-a1bd74c1191c",
+        "status": "finalized"
+      }
+    },
+    {
+      "step": "Journal balances",
+      "status": "PASS",
+      "detail": {
+        "debit": 10000,
+        "credit": 10000
+      }
+    },
+    {
+      "step": "Generate Bank File",
+      "status": "PASS",
+      "detail": {
+        "http": 200,
+        "bank_batch": {
+          "status": "generated",
+          "format": "csv",
+          "generated_at": "2026-07-12T16:47:17.602Z",
+          "employee_count": 2,
+          "total_amount": 38590.53,
+          "reference": "PAY-2026-07-31"
+        }
+      }
+    },
+    {
+      "step": "Payroll Summary",
+      "status": "PASS",
+      "detail": {
+        "employees_paid": 2,
+        "total_gross": 45460,
+        "total_net": 38590.53,
+        "total_paye": 6592.35,
+        "total_uif": 554.24,
+        "total_sdl": 454.6,
+        "total_pension": 0,
+        "employer_contributions": 731.72,
+        "payroll_cost": 46191.72,
+        "variance_previous": null,
+        "variance_budget": null,
+        "pay_period": "2026-07-01 to 2026-07-31",
+        "total_deductions": 6869.47
+      }
+    },
+    {
+      "step": "Payroll Reports",
+      "status": "PASS",
+      "detail": {
+        "http": 200,
+        "run_count": 4,
+        "summary": {
+          "employees_paid": 5,
+          "total_gross": 75460,
+          "total_net": 68390.53,
+          "total_paye": 6592.35,
+          "total_uif": 754.24,
+          "total_sdl": 454.6,
+          "total_pension": 0,
+          "employer_contributions": 1131.72,
+          "payroll_cost": 76591.72,
+          "variance_previous": null,
+          "variance_budget": null,
+          "pay_period": "2026-07-01 to 2026-07-31",
+          "total_deductions": 7069.47
+        }
+      }
+    },
+    {
+      "step": "Historical Retrieval",
+      "status": "PASS",
+      "detail": {
+        "runId": "2df193ac-3f9b-48ac-b3e5-4506fa3fe739",
+        "status": "finalized",
+        "payslipCount": 1
+      }
+    },
+    {
+      "step": "Trial Balance (historical journals)",
+      "status": "PASS",
+      "detail": {
+        "journalsChecked": 2
+      }
+    },
+    {
+      "step": "No HTTP 500 on critical path",
+      "status": "PASS"
+    }
+  ],
+  "finalizedBefore": [
+    {
+      "id": "2df193ac-3f9b-48ac-b3e5-4506fa3fe739",
+      "status": "finalized",
+      "journal_entry_id": "306cfe16-2acb-49bb-abd9-a1bd74c1191c",
+      "processed_at": "2026-07-03T12:25:08.49+00:00",
+      "approved_at": "2026-07-02T19:22:36.94+00:00",
+      "output_metadata": {
+        "summary": {
+          "total_net": 10000,
+          "total_sdl": 0,
+          "total_uif": 0,
+          "pay_period": "2026-07-01 to 2026-07-31",
+          "total_paye": 0,
+          "total_gross": 10000,
+          "payroll_cost": 10000,
+          "total_pension": 0,
+          "employees_paid": 1,
+          "variance_budget": null,
+          "total_deductions": 0,
+          "variance_previous": null,
+          "employer_contributions": 0
+        },
+        "recovered": true,
+        "bank_batch": {
+          "format": "eft",
+          "status": "downloaded",
+          "reference": "PAY-2026-07-31",
+          "generated_at": "2026-07-03T12:28:08.605Z",
+          "total_amount": 10000,
+          "downloaded_at": "2026-07-03T12:28:09.371Z",
+          "employee_count": 1
+        },
+        "emails_sent": 0,
+        "processed_at": "2026-07-03T12:25:08.490Z",
+        "email_failures": [],
+        "journal_posted": true,
+        "reports_generated": true,
+        "summary_generated": true,
+        "payslips_generated": 1,
+        "register_generated": true,
+        "bank_file_generated": true,
+        "bank_file_downloaded": true,
+        "distribution_complete": true
+      }
+    },
+    {
+      "id": "539b44f6-ef5f-4441-8eac-a0cd016463bf",
+      "status": "finalized",
+      "journal_entry_id": "306cfe16-2acb-49bb-abd9-a1bd74c1191c",
+      "processed_at": "2026-07-07T07:25:55.351+00:00",
+      "approved_at": "2026-07-07T07:25:53.353+00:00",
+      "output_metadata": {
+        "summary": {
+          "total_net": 9900,
+          "total_sdl": 0,
+          "total_uif": 0,
+          "pay_period": "2026-07-01 to 2026-07-31",
+          "total_paye": 0,
+          "total_gross": 10000,
+          "payroll_cost": 10000,
+          "total_pension": 0,
+          "employees_paid": 1,
+          "variance_budget": null,
+          "total_deductions": 100,
+          "variance_previous": null,
+          "employer_contributions": 0
+        },
+        "recovered": true,
+        "bank_batch": {
+          "format": "csv",
+          "status": "generated",
+          "reference": "PAY-2026-07-31",
+          "generated_at": "2026-07-07T07:25:56.501Z",
+          "total_amount": 9900,
+          "employee_count": 1
+        },
+        "emails_sent": 0,
+        "processed_at": "2026-07-07T07:25:55.351Z",
+        "email_failures": [],
+        "journal_posted": true,
+        "reports_generated": true,
+        "summary_generated": true,
+        "payslips_generated": 1,
+        "register_generated": true,
+        "bank_file_generated": true,
+        "distribution_complete": true
+      }
+    },
+    {
+      "id": "b0d74849-106b-4e58-9e0e-05bcbd24489a",
+      "status": "finalized",
+      "journal_entry_id": "78d1966f-8557-4fef-ba05-aba19982142a",
+      "processed_at": "2026-07-07T07:47:06.452+00:00",
+      "approved_at": "2026-07-07T07:47:04.086+00:00",
+      "output_metadata": {
+        "summary": {
+          "total_net": 9900,
+          "total_sdl": 0,
+          "total_uif": 0,
+          "pay_period": "2026-08-01 to 2026-08-31",
+          "total_paye": 0,
+          "total_gross": 10000,
+          "payroll_cost": 10200,
+          "total_pension": 0,
+          "employees_paid": 1,
+          "variance_budget": null,
+          "total_deductions": 100,
+          "variance_previous": null,
+          "employer_contributions": 200
+        },
+        "recovered": false,
+        "bank_batch": {
+          "format": "csv",
+          "status": "generated",
+          "reference": "PAY-2026-08-31",
+          "generated_at": "2026-07-07T07:47:07.771Z",
+          "total_amount": 9900,
+          "employee_count": 1
+        },
+        "emails_sent": 0,
+        "processed_at": "2026-07-07T07:47:06.452Z",
+        "email_failures": [],
+        "journal_posted": true,
+        "reports_generated": true,
+        "summary_generated": true,
+        "payslips_generated": 1,
+        "register_generated": true,
+        "bank_file_generated": true
+      }
+    },
+    {
+      "id": "e2627366-641b-4635-8191-61f4b344cf57",
+      "status": "finalized",
+      "journal_entry_id": "78d1966f-8557-4fef-ba05-aba19982142a",
+      "processed_at": "2026-07-07T08:16:37.259+00:00",
+      "approved_at": "2026-07-07T08:16:34.867+00:00",
+      "output_metadata": {
+        "summary": {
+          "total_net": 9900,
+          "total_sdl": 0,
+          "total_uif": 0,
+          "pay_period": "2026-08-01 to 2026-08-31",
+          "total_paye": 0,
+          "total_gross": 10000,
+          "payroll_cost": 10200,
+          "total_pension": 0,
+          "employees_paid": 1,
+          "variance_budget": null,
+          "total_deductions": 100,
+          "variance_previous": null,
+          "employer_contributions": 200
+        },
+        "recovered": true,
+        "bank_batch": {
+          "format": "csv",
+          "status": "generated",
+          "reference": "PAY-2026-08-31",
+          "generated_at": "2026-07-07T08:16:38.657Z",
+          "total_amount": 9900,
+          "employee_count": 1
+        },
+        "emails_sent": 0,
+        "processed_at": "2026-07-07T08:16:37.259Z",
+        "email_failures": [],
+        "journal_posted": true,
+        "reports_generated": true,
+        "summary_generated": true,
+        "payslips_generated": 1,
+        "register_generated": true,
+        "bank_file_generated": true
+      }
+    },
+    {
+      "id": "f79627df-3ec3-4f90-9285-1dfdc813b22a",
+      "status": "finalized",
+      "journal_entry_id": "78d1966f-8557-4fef-ba05-aba19982142a",
+      "processed_at": "2026-07-07T08:15:05.384+00:00",
+      "approved_at": "2026-07-07T08:15:00.097+00:00",
+      "output_metadata": {
+        "summary": {
+          "total_net": 9900,
+          "total_sdl": 0,
+          "total_uif": 0,
+          "pay_period": "2026-08-01 to 2026-08-31",
+          "total_paye": 0,
+          "total_gross": 10000,
+          "payroll_cost": 10200,
+          "total_pension": 0,
+          "employees_paid": 1,
+          "variance_budget": null,
+          "total_deductions": 100,
+          "variance_previous": null,
+          "employer_contributions": 200
+        },
+        "recovered": true,
+        "bank_batch": {
+          "format": "csv",
+          "status": "generated",
+          "reference": "PAY-2026-08-31",
+          "generated_at": "2026-07-07T08:15:06.835Z",
+          "total_amount": 9900,
+          "employee_count": 1
+        },
+        "emails_sent": 0,
+        "processed_at": "2026-07-07T08:15:05.384Z",
+        "email_failures": [],
+        "journal_posted": true,
+        "reports_generated": true,
+        "summary_generated": true,
+        "payslips_generated": 1,
+        "register_generated": true,
+        "bank_file_generated": true
+      }
+    },
+    {
+      "id": "fe17b893-53a1-4235-abbb-5d5a503dc470",
+      "status": "finalized",
+      "journal_entry_id": "306cfe16-2acb-49bb-abd9-a1bd74c1191c",
+      "processed_at": "2026-07-07T07:46:29.183+00:00",
+      "approved_at": "2026-07-07T07:46:26.804+00:00",
+      "output_metadata": {
+        "summary": {
+          "total_net": 9900,
+          "total_sdl": 0,
+          "total_uif": 0,
+          "pay_period": "2026-07-01 to 2026-07-31",
+          "total_paye": 0,
+          "total_gross": 10000,
+          "payroll_cost": 10200,
+          "total_pension": 0,
+          "employees_paid": 1,
+          "variance_budget": null,
+          "total_deductions": 100,
+          "variance_previous": null,
+          "employer_contributions": 200
+        },
+        "recovered": true,
+        "bank_batch": {
+          "format": "csv",
+          "status": "generated",
+          "reference": "PAY-2026-07-31",
+          "generated_at": "2026-07-07T07:46:30.503Z",
+          "total_amount": 9900,
+          "employee_count": 1
+        },
+        "emails_sent": 0,
+        "processed_at": "2026-07-07T07:46:29.183Z",
+        "email_failures": [],
+        "journal_posted": true,
+        "reports_generated": true,
+        "summary_generated": true,
+        "payslips_generated": 1,
+        "register_generated": true,
+        "bank_file_generated": true
+      }
+    }
+  ],
+  "samplePayslip": {
+    "id": "2986fe09-855e-4424-a1ca-9abbd81786bd",
+    "taxYear": "2026/2027",
+    "ruleVersion": "2026.2.0",
+    "employerItemCount": 2,
+    "employerItems": [
+      {
+        "id": "1fc90f38-332d-4e05-865b-4ed4e7d4650f",
+        "type": "employer_contribution",
+        "amount": 177.12,
+        "payslip_id": "2986fe09-855e-4424-a1ca-9abbd81786bd",
+        "description": "UIF Employer"
+      },
+      {
+        "id": "fe979fac-ffa2-4d66-b815-e3192f91630d",
+        "type": "employer_contribution",
+        "amount": 354.6,
+        "payslip_id": "2986fe09-855e-4424-a1ca-9abbd81786bd",
+        "description": "SDL"
+      }
+    ],
+    "itemTypes": [
+      "earning",
+      "deduction",
+      "employer_contribution"
+    ],
+    "total_employer_contributions": 531.72
+  },
+  "journal": {
+    "journalId": "306cfe16-2acb-49bb-abd9-a1bd74c1191c",
+    "debit": 10000,
+    "credit": 10000,
+    "items": [
+      {
+        "type": "debit",
+        "amount": 10000
+      },
+      {
+        "type": "credit",
+        "amount": 10000
+      }
+    ]
+  },
+  "runSummary": {
+    "employees_paid": 2,
+    "total_gross": 45460,
+    "total_net": 38590.53,
+    "total_paye": 6592.35,
+    "total_uif": 554.24,
+    "total_sdl": 454.6,
+    "total_pension": 0,
+    "employer_contributions": 731.72,
+    "payroll_cost": 46191.72,
+    "variance_previous": null,
+    "variance_budget": null,
+    "pay_period": "2026-07-01 to 2026-07-31",
+    "total_deductions": 6869.47
+  },
+  "finishedAt": "2026-07-12T16:47:20.349Z",
+  "decision": "PASSED"
+}

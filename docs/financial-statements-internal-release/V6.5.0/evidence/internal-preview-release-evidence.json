@@ -1,0 +1,63 @@
+{
+  "pack": "financial-statements-internal-release",
+  "version": "6.5.0",
+  "date": "2026-07-13",
+  "board": "Independent Principal Enterprise Release Board",
+  "release_class": "internal_preview",
+  "final_status": "INTERNAL_RELEASE_APPROVED",
+  "public_production": false,
+  "architecture_frozen": true,
+  "prerequisites": [
+    "V6.4.0",
+    "V6.4.1",
+    "V6.4.2",
+    "V6.4.3",
+    "V6.4.4",
+    "V6.4.5",
+    "V6.4.6"
+  ],
+  "navigation": {
+    "item": "Financial Statements",
+    "position": "immediately_below_Accounting_above_Assets_And_Loans",
+    "gate": "shouldShowFinancialStatementsNav",
+    "flag": "VITE_EFS_NAV_SIDEBAR",
+    "operational_reports_path_unchanged": "/financial-statements"
+  },
+  "visibility": {
+    "system_administrator": "owner",
+    "finance_manager": "admin",
+    "accountant": "member + VITE_EFS_ALLOWLIST",
+    "internal_tester": "any_role + VITE_EFS_ALLOWLIST",
+    "others": "hidden"
+  },
+  "surfaces_exposed": [
+    "reporting_workspaces",
+    "reporting_periods",
+    "reporting_snapshots",
+    "statement_dashboard",
+    "working_papers",
+    "lead_schedules",
+    "disclosures",
+    "validation",
+    "review_workflow"
+  ],
+  "surfaces_hidden": ["publication", "xbrl", "ai_assistance"],
+  "quality_gates": {
+    "accounting_unchanged": "PASS",
+    "reports_unchanged": "PASS",
+    "navigation_only_approved_addition": "PASS",
+    "feature_flags_available": "PASS",
+    "permission_enforced": "PASS",
+    "no_duplicated_accounting_calcs": "PASS",
+    "no_live_gl_for_statutory": "PASS"
+  },
+  "code_artefacts": [
+    "src/lib/financialStatements/flags.ts",
+    "src/components/SidebarNav.tsx",
+    "src/components/financialStatements/FinancialStatementsGate.tsx",
+    "src/pages/financialStatements/FinancialStatementsWorkspaceDashboard.tsx",
+    "src/pages/financialStatements/FinancialStatementsWorkspaceHome.tsx",
+    ".env.example"
+  ],
+  "declaration": "The Financial Statements module is approved for controlled internal use while Publication, XBRL, and AI remain under implementation."
+}

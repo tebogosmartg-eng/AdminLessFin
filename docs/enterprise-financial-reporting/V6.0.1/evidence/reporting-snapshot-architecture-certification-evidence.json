@@ -1,0 +1,58 @@
+{
+  "product": "AdminLess Fin",
+  "pillar": "Enterprise Financial Reporting Engine",
+  "pack": "Reporting Snapshot & Period Architecture",
+  "version": "6.0.1",
+  "date": "2026-07-13",
+  "board": "Independent Principal Financial Reporting Data Architecture Board",
+  "verdict": "REPORTING SNAPSHOT ARCHITECTURE CERTIFIED",
+  "implementation": "PROHIBITED until Implementation Approval cites V6.0.1",
+  "prerequisite": "EFRE V6.0.0 CERTIFIED",
+  "core_principle": "Statutory financial statements consume certified Reporting Snapshots only; never live General Ledger. Operational Reports remain live.",
+  "concepts_certified": [
+    "Reporting Period",
+    "Reporting Snapshot",
+    "Snapshot Version",
+    "Reporting Dataset",
+    "Audit Adjustment",
+    "Reporting Adjustment",
+    "Fact Snapshot",
+    "Comparative Snapshot",
+    "Reporting Freeze",
+    "Publication Snapshot",
+    "Restatement",
+    "Subsequent Events"
+  ],
+  "verification": {
+    "accounting_owns_financial_balances": "PASS",
+    "reporting_owns_immutable_reporting_snapshots": "PASS",
+    "operational_reports_remain_live": "PASS",
+    "reporting_snapshots_are_versioned": "PASS",
+    "audit_adjustments_remain_traceable": "PASS",
+    "comparative_periods_are_immutable": "PASS",
+    "multi_framework_support": "PASS",
+    "fully_auditable": "PASS"
+  },
+  "adjustment_model": {
+    "audit_adjustment_owner": "Accounting (posts to GL)",
+    "reporting_adjustment_owner": "EFRE (presentation/classification on snapshot)",
+    "reporting_must_not_invent_balances": true
+  },
+  "dual_track": {
+    "operational_financial_reporting": "live Accounting facts — snapshot not mandatory",
+    "enterprise_financial_reporting": "Fact Snapshot → Reporting Snapshot → Freeze → Publication Snapshot"
+  },
+  "deliverables": [
+    "00_INDEX.md",
+    "01_REPORTING_SNAPSHOT_ARCHITECTURE.md",
+    "02_REPORTING_LIFECYCLE.md",
+    "03_SNAPSHOT_VERSIONING_STRATEGY.md",
+    "04_REPORTING_ADJUSTMENT_MODEL.md",
+    "05_AUDIT_READINESS_ASSESSMENT.md"
+  ],
+  "explicit_non_claims": [
+    "No implementation, schema, UI, or DDL",
+    "No redesign of Operational Financial Reporting",
+    "No Accounting posting algorithm changes"
+  ]
+}

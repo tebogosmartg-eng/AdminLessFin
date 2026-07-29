@@ -1,0 +1,90 @@
+{
+  "certifiedAt": "2026-07-21T13:21:32.115Z",
+  "version": "16.1",
+  "project": {
+    "url": "https://zaulhnpohrgqqodvzhxp.supabase.co",
+    "ref": "zaulhnpohrgqqodvzhxp",
+    "linked_name": "Smart Accounting"
+  },
+  "openapi": {
+    "http_status": 401,
+    "definition_count": 0,
+    "efs_table_count": 0,
+    "efs_tables": [],
+    "efs_company_master_data_in_schema": false
+  },
+  "table_probe": {
+    "http_status": 404,
+    "body": {
+      "code": "PGRST205",
+      "details": null,
+      "hint": "Perhaps you meant the table 'public.company_users'",
+      "message": "Could not find the table 'public.efs_company_master_data' in the schema cache"
+    }
+  },
+  "column_probe": null,
+  "edge": {
+    "VERIFY_V161_DEPLOYMENT": {
+      "http_status": 500,
+      "code": "UNKNOWNPLATFORM_FAILED",
+      "error": "An unexpected platform error occurred.",
+      "has_empty_addresses": false,
+      "keys": [
+        "version",
+        "code",
+        "category",
+        "severity",
+        "businessMessage",
+        "technicalMessage",
+        "recoverySuggestion",
+        "correlationId",
+        "companyId",
+        "timestamp",
+        "retryable",
+        "originalCause",
+        "error"
+      ]
+    },
+    "GET_COMPANY_MASTER_DATA": {
+      "http_status": 200,
+      "has_empty_addresses": true,
+      "keys": [
+        "company_id",
+        "company_profile",
+        "addresses",
+        "tax_registrations",
+        "directors",
+        "governance",
+        "officers",
+        "principal_bankers",
+        "updated_at"
+      ]
+    },
+    "LIST_WORKSPACES": {
+      "http_status": 200,
+      "has_empty_addresses": false,
+      "keys": null
+    }
+  },
+  "local_migrations": {
+    "total": 30,
+    "v161": [
+      "20260721120000_efs_v161_company_master_data.sql",
+      "20260721130000_efs_v161_legacy_master_data_migration.sql"
+    ],
+    "expected": [
+      "20260721120000_efs_v161_company_master_data.sql",
+      "20260721130000_efs_v161_legacy_master_data_migration.sql"
+    ],
+    "expected_present_locally": [
+      {
+        "file": "20260721120000_efs_v161_company_master_data.sql",
+        "exists": true
+      },
+      {
+        "file": "20260721130000_efs_v161_legacy_master_data_migration.sql",
+        "exists": true
+      }
+    ]
+  }
+}

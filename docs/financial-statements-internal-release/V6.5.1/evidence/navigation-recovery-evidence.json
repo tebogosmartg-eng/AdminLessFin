@@ -1,0 +1,243 @@
+{
+  "version": "6.5.1",
+  "date": "2026-07-13",
+  "envAfterFix": {
+    "VITE_EFS_MODULE": "true",
+    "VITE_EFS_WORKSPACE_UI": "true",
+    "VITE_EFS_NAV_SIDEBAR": "true",
+    "VITE_EFS_ALLOWLIST": "(unset/empty)"
+  },
+  "rootCause": {
+    "primary": "VITE_EFS_MODULE / VITE_EFS_WORKSPACE_UI / VITE_EFS_NAV_SIDEBAR were unset in .env → defaults false → shouldShowFinancialStatementsNav() always false",
+    "secondary": "envFlag used dynamic import.meta.env[key] which Vite does not statically replace — latent miss even when .env is set"
+  },
+  "sidebarNav": {
+    "financialStatementsGroupRegistered": true,
+    "showGatePresent": true,
+    "showConditionalRender": true,
+    "order": {
+      "accountingIndex": 12059,
+      "financialStatementsIndex": 12317,
+      "assetsAndLoansIndex": 12605,
+      "orderCorrect": true
+    },
+    "operationalReportsFsUnchanged": true
+  },
+  "workspaceRoute": {
+    "pathRegistered": true,
+    "detailPathRegistered": true,
+    "gateWrapped": true
+  },
+  "flagEvaluation": {
+    "staticEnvAccess": true,
+    "dynamicEnvAccessRemoved": false,
+    "diagnoseHelperPresent": true
+  },
+  "gateMatrix": [
+    {
+      "mode": "before_unset",
+      "role": "owner",
+      "allowlisted": false,
+      "flags": {
+        "module": false,
+        "workspace": false,
+        "nav": false
+      },
+      "persona": true,
+      "route": false,
+      "navVisible": false
+    },
+    {
+      "mode": "before_unset",
+      "role": "admin",
+      "allowlisted": false,
+      "flags": {
+        "module": false,
+        "workspace": false,
+        "nav": false
+      },
+      "persona": true,
+      "route": false,
+      "navVisible": false
+    },
+    {
+      "mode": "before_unset",
+      "role": "member",
+      "allowlisted": false,
+      "flags": {
+        "module": false,
+        "workspace": false,
+        "nav": false
+      },
+      "persona": false,
+      "route": false,
+      "navVisible": false
+    },
+    {
+      "mode": "before_unset",
+      "role": "guest",
+      "allowlisted": false,
+      "flags": {
+        "module": false,
+        "workspace": false,
+        "nav": false
+      },
+      "persona": false,
+      "route": false,
+      "navVisible": false
+    },
+    {
+      "mode": "before_unset",
+      "role": "member",
+      "allowlisted": true,
+      "note": "simulated allowlist email (only if VITE_EFS_ALLOWLIST set)",
+      "flags": {
+        "module": false,
+        "workspace": false,
+        "nav": false
+      },
+      "persona": false,
+      "route": false,
+      "navVisible": false
+    },
+    {
+      "mode": "dynamic_miss",
+      "role": "owner",
+      "allowlisted": false,
+      "flags": {
+        "module": false,
+        "workspace": false,
+        "nav": false
+      },
+      "persona": true,
+      "route": false,
+      "navVisible": false
+    },
+    {
+      "mode": "dynamic_miss",
+      "role": "admin",
+      "allowlisted": false,
+      "flags": {
+        "module": false,
+        "workspace": false,
+        "nav": false
+      },
+      "persona": true,
+      "route": false,
+      "navVisible": false
+    },
+    {
+      "mode": "dynamic_miss",
+      "role": "member",
+      "allowlisted": false,
+      "flags": {
+        "module": false,
+        "workspace": false,
+        "nav": false
+      },
+      "persona": false,
+      "route": false,
+      "navVisible": false
+    },
+    {
+      "mode": "dynamic_miss",
+      "role": "guest",
+      "allowlisted": false,
+      "flags": {
+        "module": false,
+        "workspace": false,
+        "nav": false
+      },
+      "persona": false,
+      "route": false,
+      "navVisible": false
+    },
+    {
+      "mode": "dynamic_miss",
+      "role": "member",
+      "allowlisted": true,
+      "note": "simulated allowlist email (only if VITE_EFS_ALLOWLIST set)",
+      "flags": {
+        "module": false,
+        "workspace": false,
+        "nav": false
+      },
+      "persona": false,
+      "route": false,
+      "navVisible": false
+    },
+    {
+      "mode": "after_static_env",
+      "role": "owner",
+      "allowlisted": false,
+      "flags": {
+        "module": true,
+        "workspace": true,
+        "nav": true
+      },
+      "persona": true,
+      "route": true,
+      "navVisible": true
+    },
+    {
+      "mode": "after_static_env",
+      "role": "admin",
+      "allowlisted": false,
+      "flags": {
+        "module": true,
+        "workspace": true,
+        "nav": true
+      },
+      "persona": true,
+      "route": true,
+      "navVisible": true
+    },
+    {
+      "mode": "after_static_env",
+      "role": "member",
+      "allowlisted": false,
+      "flags": {
+        "module": true,
+        "workspace": true,
+        "nav": true
+      },
+      "persona": false,
+      "route": false,
+      "navVisible": false
+    },
+    {
+      "mode": "after_static_env",
+      "role": "guest",
+      "allowlisted": false,
+      "flags": {
+        "module": true,
+        "workspace": true,
+        "nav": true
+      },
+      "persona": false,
+      "route": false,
+      "navVisible": false
+    },
+    {
+      "mode": "after_static_env",
+      "role": "member",
+      "allowlisted": true,
+      "note": "simulated allowlist email (only if VITE_EFS_ALLOWLIST set)",
+      "flags": {
+        "module": true,
+        "workspace": true,
+        "nav": true
+      },
+      "persona": false,
+      "route": false,
+      "navVisible": false
+    }
+  ],
+  "postFix": {
+    "ownerNav": true,
+    "adminNavFinanceManager": true,
+    "memberNoAllowlistNav": false,
+    "otherRoleNav": false
+  },
+  "finalStatus": "NAVIGATION_READY"
+}

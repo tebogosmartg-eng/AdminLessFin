@@ -1,0 +1,679 @@
+{
+  "startedAt": "2026-07-12T16:13:55.522Z",
+  "url": "https://zaulhnpohrgqqodvzhxp.supabase.co",
+  "calls": [
+    {
+      "method": "GET_RUNS",
+      "http": 200,
+      "ms": 643,
+      "headers": {
+        "content-type": "application/json",
+        "sb-request-id": "019f571b-6782-73d4-a751-c4aab91571f9"
+      },
+      "body": [
+        {
+          "id": "8071fc56-caaa-4091-b2cd-e3482c90f749",
+          "company_id": "3cbfd4eb-a095-43f3-837a-0b4f1e2c1752",
+          "pay_period_start": "2026-12-01",
+          "pay_period_end": "2026-12-31",
+          "pay_date": "2026-12-31",
+          "status": "draft",
+          "created_at": "2026-07-12T16:09:13.135722+00:00",
+          "journal_entry_id": null,
+          "approved_by": null,
+          "approved_at": null,
+          "processed_by": null,
+          "processed_at": null,
+          "output_metadata": {},
+          "rule_config": {}
+        },
+        {
+          "id": "77e198cb-b145-493c-90d2-48b60392da2f",
+          "company_id": "3cbfd4eb-a095-43f3-837a-0b4f1e2c1752",
+          "pay_period_start": "2026-09-01",
+          "pay_period_end": "2026-09-30",
+          "pay_date": "2026-09-30",
+          "status": "draft",
+          "created_at": "2026-07-07T12:00:13.62608+00:00",
+          "journal_entry_id": null,
+          "approved_by": null,
+          "approved_at": null,
+          "processed_by": null,
+          "processed_at": null,
+          "output_metadata": {},
+          "rule_config": {}
+        },
+        {
+          "id": "f79627df-3ec3-4f90-9285-1dfdc813b22a",
+          "company_id": "3cbfd4eb-a095-43f3-837a-0b4f1e2c1752",
+          "pay_period_start": "2026-08-01",
+          "pay_period_end": "2026-08-31",
+          "pay_date": "2026-08-31",
+          "status": "finalized",
+          "created_at": "2026-07-07T08:14:57.274691+00:00",
+          "journal_entry_id": "78d1966f-8557-4fef-ba05-aba19982142a",
+          "approved_by": "3cbfd4eb-a095-43f3-837a-0b4f1e2c1752",
+          "approved_at": "2026-07-07T08:15:00.097+00:00",
+          "processed_by": "3cbfd4eb-a095-43f3-837a-0b4f1e2c1752",
+          "processed_at": "2026-07-07T08:15:05.384+00:00",
+          "output_metadata": {
+            "summary": {
+              "total_net": 9900,
+              "total_sdl": 0,
+              "total_uif": 0,
+              "pay_period": "2026-08-01 to 2026-08-31",
+              "total_paye": 0,
+              "total_gross": 10000,
+              "payroll_cost": 10200,
+              "total_pension": 0,
+              "employees_paid": 1,
+              "variance_budget": null,
+              "total_deductions": 100,
+              "variance_previous": null,
+              "employer_contributions": 200
+            },
+            "recovered": true,
+            "bank_batch": {
+              "format": "csv",
+              "status": "generated",
+              "reference": "PAY-2026-08-31",
+              "generated_at": "2026-07-07T08:15:06.835Z",
+              "total_amount": 9900,
+              "employee_count": 1
+            },
+            "emails_sent": 0,
+            "processed_at": "2026-07-07T08:15:05.384Z",
+            "email_failures": [],
+            "journal_posted": true,
+            "reports_generated": true,
+            "summary_generated": true,
+            "payslips_generated": 1,
+            "register_generated": true,
+            "bank_file_generated": true
+          },
+          "rule_config": {}
+        },
+        {
+          "id": "ce81530b-bb33-4b1c-a176-987329c4296d",
+          "company_id": "3cbfd4eb-a095-43f3-837a-0b4f1e2c1752",
+          "pay_period_start": "2026-08-01",
+          "pay_period_end": "2026-08-31",
+          "pay_date": "2026-08-31",
+          "status": "draft",
+          "created_at": "2026-07-07T09:12:17.009605+00:00",
+          "journal_entry_id": null,
+          "approved_by": null,
+          "approved_at": null,
+          "processed_by": null,
+          "processed_at": null,
+          "output_metadata": {},
+          "rule_config": {}
+        },
+        {
+          "id": "e2627366-641b-4635-8191-61f4b344cf57",
+          "company_id": "3cbfd4eb-a095-43f3-837a-0b4f1e2c1752",
+          "pay_period_start": "2026-08-01",
+          "pay_period_end": "2026-08-31",
+          "pay_date": "2026-08-31",
+          "status": "finalized",
+          "created_at": "2026-07-07T08:16:32.311726+00:00",
+          "journal_entry_id": "78d1966f-8557-4fef-ba05-aba19982142a",
+          "approved_by": "3cbfd4eb-a095-43f3-837a-0b4f1e2c1752",
+          "approved_at": "2026-07-07T08:16:34.867+00:00",
+          "processed_by": "3cbfd4eb-a095-43f3-837a-0b4f1e2c1752",
+          "processed_at": "2026-07-07T08:16:37.259+00:00",
+          "output_metadata": {
+            "summary": {
+              "total_net": 9900,
+              "total_sdl": 0,
+              "total_uif": 0,
+              "pay_period": "2026-08-01 to 2026-08-31",
+              "total_paye": 0,
+              "total_gross": 10000,
+              "payroll_cost": 10200,
+              "total_pension": 0,
+              "employees_paid": 1,
+              "variance_budget": null,
+              "total_deductions": 100,
+              "variance_previous": null,
+              "employer_contributions": 200
+            },
+            "recovered": true,
+            "bank_batch": {
+              "format": "csv",
+              "status": "generated",
+              "reference": "PAY-2026-08-31",
+              "generated_at": "2026-07-07T08:16:38.657Z",
+              "total_amount": 9900,
+              "employee_count": 1
+            },
+            "emails_sent": 0,
+            "processed_at": "2026-07-07T08:16:37.259Z",
+            "email_failures": [],
+            "journal_posted": true,
+            "reports_generated": true,
+            "summary_generated": true,
+            "payslips_generated": 1,
+            "register_generated": true,
+            "bank_file_generated": true
+          },
+          "rule_config": {}
+        },
+        {
+          "id": "b0d74849-106b-4e58-9e0e-05bcbd24489a",
+          "company_id": "3cbfd4eb-a095-43f3-837a-0b4f1e2c1752",
+          "pay_period_start": "2026-08-01",
+          "pay_period_end": "2026-08-31",
+          "pay_date": "2026-08-31",
+          "status": "finalized",
+          "created_at": "2026-07-07T07:47:01.589308+00:00",
+          "journal_entry_id": "78d1966f-8557-4fef-ba05-aba19982142a",
+          "approved_by": "3cbfd4eb-a095-43f3-837a-0b4f1e2c1752",
+          "approved_at": "2026-07-07T07:47:04.086+00:00",
+          "processed_by": "3cbfd4eb-a095-43f3-837a-0b4f1e2c1752",
+          "processed_at": "2026-07-07T07:47:06.452+00:00",
+          "output_metadata": {
+            "summary": {
+              "total_net": 9900,
+              "total_sdl": 0,
+              "total_uif": 0,
+              "pay_period": "2026-08-01 to 2026-08-31",
+              "total_paye": 0,
+              "total_gross": 10000,
+              "payroll_cost": 10200,
+              "total_pension": 0,
+              "employees_paid": 1,
+              "variance_budget": null,
+              "total_deductions": 100,
+              "variance_previous": null,
+              "employer_contributions": 200
+            },
+            "recovered": false,
+            "bank_batch": {
+              "format": "csv",
+              "status": "generated",
+              "reference": "PAY-2026-08-31",
+              "generated_at": "2026-07-07T07:47:07.771Z",
+              "total_amount": 9900,
+              "employee_count": 1
+            },
+            "emails_sent": 0,
+            "processed_at": "2026-07-07T07:47:06.452Z",
+            "email_failures": [],
+            "journal_posted": true,
+            "reports_generated": true,
+            "summary_generated": true,
+            "payslips_generated": 1,
+            "register_generated": true,
+            "bank_file_generated": true
+          },
+          "rule_config": {}
+        },
+        {
+          "id": "e6182af7-64d3-40d4-be57-7ab5e839f383",
+          "company_id": "3cbfd4eb-a095-43f3-837a-0b4f1e2c1752",
+          "pay_period_start": "2026-07-01",
+          "pay_period_end": "2026-07-31",
+          "pay_date": "2026-07-31",
+          "status": "draft",
+          "created_at": "2026-07-07T07:15:47.536186+00:00",
+          "journal_entry_id": null,
+          "approved_by": "3cbfd4eb-a095-43f3-837a-0b4f1e2c1752",
+          "approved_at": "2026-07-07T09:09:41.748+00:00",
+          "processed_by": null,
+          "processed_at": null,
+          "output_metadata": {},
+          "rule_config": {}
+        },
+        {
+          "id": "cc19b905-8f83-46b2-bc3f-fa29132d2b8d",
+          "company_id": "3cbfd4eb-a095-43f3-837a-0b4f1e2c1752",
+          "pay_period_start": "2026-07-01",
+          "pay_period_end": "2026-07-31",
+          "pay_date": "2026-07-31",
+          "status": "draft",
+          "created_at": "2026-07-07T07:21:29.843564+00:00",
+          "journal_entry_id": null,
+          "approved_by": "3cbfd4eb-a095-43f3-837a-0b4f1e2c1752",
+          "approved_at": "2026-07-07T09:10:30.498+00:00",
+          "processed_by": null,
+          "processed_at": null,
+          "output_metadata": {},
+          "rule_config": {}
+        },
+        {
+          "id": "e84d9ec6-bb7e-4014-8351-5eadb295d176",
+          "company_id": "3cbfd4eb-a095-43f3-837a-0b4f1e2c1752",
+          "pay_period_start": "2026-07-01",
+          "pay_period_end": "2026-07-31",
+          "pay_date": "2026-07-31",
+          "status": "draft",
+          "created_at": "2026-07-07T09:11:16.72958+00:00",
+          "journal_entry_id": null,
+          "approved_by": null,
+          "approved_at": null,
+          "processed_by": null,
+          "processed_at": null,
+          "output_metadata": {},
+          "rule_config": {}
+        },
+        {
+          "id": "7afba5ed-acf4-4136-a6e1-60935f9ebd5f",
+          "company_id": "3cbfd4eb-a095-43f3-837a-0b4f1e2c1752",
+          "pay_period_start": "2026-07-01",
+          "pay_period_end": "2026-07-31",
+          "pay_date": "2026-08-01",
+          "status": "draft",
+          "created_at": "2026-07-07T09:42:17.466726+00:00",
+          "journal_entry_id": null,
+          "approved_by": null,
+          "approved_at": null,
+          "processed_by": null,
+          "processed_at": null,
+          "output_metadata": {},
+          "rule_config": {}
+        },
+        {
+          "id": "bd17d9b2-85f6-4a27-b566-dea08b5751ee",
+          "company_id": "3cbfd4eb-a095-43f3-837a-0b4f1e2c1752",
+          "pay_period_start": "2026-07-01",
+          "pay_period_end": "2026-07-31",
+          "pay_date": "2026-07-31",
+          "status": "draft",
+          "created_at": "2026-07-12T16:08:15.401554+00:00",
+          "journal_entry_id": null,
+          "approved_by": null,
+          "approved_at": null,
+          "processed_by": null,
+          "processed_at": null,
+          "output_metadata": {},
+          "rule_config": {}
+        },
+        {
+          "id": "d26a5374-d4d4-4341-8f80-90de667d9afe",
+          "company_id": "3cbfd4eb-a095-43f3-837a-0b4f1e2c1752",
+          "pay_period_start": "2026-07-01",
+          "pay_period_end": "2026-07-31",
+          "pay_date": "2026-07-31",
+          "status": "draft",
+          "created_at": "2026-07-07T07:25:30.941626+00:00",
+          "journal_entry_id": null,
+          "approved_by": "3cbfd4eb-a095-43f3-837a-0b4f1e2c1752",
+          "approved_at": "2026-07-07T07:25:33.46+00:00",
+          "processed_by": null,
+          "processed_at": null,
+          "output_metadata": {},
+          "rule_config": {}
+        },
+        {
+          "id": "539b44f6-ef5f-4441-8eac-a0cd016463bf",
+          "company_id": "3cbfd4eb-a095-43f3-837a-0b4f1e2c1752",
+          "pay_period_start": "2026-07-01",
+          "pay_period_end": "2026-07-31",
+          "pay_date": "2026-07-31",
+          "status": "finalized",
+          "created_at": "2026-07-07T07:25:50.773235+00:00",
+          "journal_entry_id": "306cfe16-2acb-49bb-abd9-a1bd74c1191c",
+          "approved_by": "3cbfd4eb-a095-43f3-837a-0b4f1e2c1752",
+          "approved_at": "2026-07-07T07:25:53.353+00:00",
+          "processed_by": "3cbfd4eb-a095-43f3-837a-0b4f1e2c1752",
+          "processed_at": "2026-07-07T07:25:55.351+00:00",
+          "output_metadata": {
+            "summary": {
+              "total_net": 9900,
+              "total_sdl": 0,
+              "total_uif": 0,
+              "pay_period": "2026-07-01 to 2026-07-31",
+              "total_paye": 0,
+              "total_gross": 10000,
+              "payroll_cost": 10000,
+              "total_pension": 0,
+              "employees_paid": 1,
+              "variance_budget": null,
+              "total_deductions": 100,
+              "variance_previous": null,
+              "employer_contributions": 0
+            },
+            "recovered": true,
+            "bank_batch": {
+              "format": "csv",
+              "status": "generated",
+              "reference": "PAY-2026-07-31",
+              "generated_at": "2026-07-07T07:25:56.501Z",
+              "total_amount": 9900,
+              "employee_count": 1
+            },
+            "emails_sent": 0,
+            "processed_at": "2026-07-07T07:25:55.351Z",
+            "email_failures": [],
+            "journal_posted": true,
+            "reports_generated": true,
+            "summary_generated": true,
+            "payslips_generated": 1,
+            "register_generated": true,
+            "bank_file_generated": true,
+            "distribution_complete": true
+          },
+          "rule_config": {}
+        },
+        {
+          "id": "2df193ac-3f9b-48ac-b3e5-4506fa3fe739",
+          "company_id": "3cbfd4eb-a095-43f3-837a-0b4f1e2c1752",
+          "pay_period_start": "2026-07-01",
+          "pay_period_end": "2026-07-31",
+          "pay_date": "2026-07-31",
+          "status": "finalized",
+          "created_at": "2026-07-02T19:22:14.129465+00:00",
+          "journal_entry_id": "306cfe16-2acb-49bb-abd9-a1bd74c1191c",
+          "approved_by": "3cbfd4eb-a095-43f3-837a-0b4f1e2c1752",
+          "approved_at": "2026-07-02T19:22:36.94+00:00",
+          "processed_by": "3cbfd4eb-a095-43f3-837a-0b4f1e2c1752",
+          "processed_at": "2026-07-03T12:25:08.49+00:00",
+          "output_metadata": {
+            "summary": {
+              "total_net": 10000,
+              "total_sdl": 0,
+              "total_uif": 0,
+              "pay_period": "2026-07-01 to 2026-07-31",
+              "total_paye": 0,
+              "total_gross": 10000,
+              "payroll_cost": 10000,
+              "total_pension": 0,
+              "employees_paid": 1,
+              "variance_budget": null,
+              "total_deductions": 0,
+              "variance_previous": null,
+              "employer_contributions": 0
+            },
+            "recovered": true,
+            "bank_batch": {
+              "format": "eft",
+              "status": "downloaded",
+              "reference": "PAY-2026-07-31",
+              "generated_at": "2026-07-03T12:28:08.605Z",
+              "total_amount": 10000,
+              "downloaded_at": "2026-07-03T12:28:09.371Z",
+              "employee_count": 1
+            },
+            "emails_sent": 0,
+            "processed_at": "2026-07-03T12:25:08.490Z",
+            "email_failures": [],
+            "journal_posted": true,
+            "reports_generated": true,
+            "summary_generated": true,
+            "payslips_generated": 1,
+            "register_generated": true,
+            "bank_file_generated": true,
+            "bank_file_downloaded": true,
+            "distribution_complete": true
+          },
+          "rule_config": {}
+        },
+        {
+          "id": "603036e7-a2a2-45d2-8647-2ef7e27b4eda",
+          "company_id": "3cbfd4eb-a095-43f3-837a-0b4f1e2c1752",
+          "pay_period_start": "2026-07-01",
+          "pay_period_end": "2026-07-31",
+          "pay_date": "2026-07-31",
+          "status": "draft",
+          "created_at": "2026-07-07T07:10:53.449691+00:00",
+          "journal_entry_id": null,
+          "approved_by": null,
+          "approved_at": null,
+          "processed_by": null,
+          "processed_at": null,
+          "output_metadata": {},
+          "rule_config": {}
+        },
+        {
+          "id": "cf3fa44d-2f6c-4eba-8a41-39dfa21187d4",
+          "company_id": "3cbfd4eb-a095-43f3-837a-0b4f1e2c1752",
+          "pay_period_start": "2026-07-01",
+          "pay_period_end": "2026-07-31",
+          "pay_date": "2026-07-31",
+          "status": "draft",
+          "created_at": "2026-07-07T07:23:31.116331+00:00",
+          "journal_entry_id": null,
+          "approved_by": null,
+          "approved_at": null,
+          "processed_by": null,
+          "processed_at": null,
+          "output_metadata": {},
+          "rule_config": {}
+        },
+        {
+          "id": "fe17b893-53a1-4235-abbb-5d5a503dc470",
+          "company_id": "3cbfd4eb-a095-43f3-837a-0b4f1e2c1752",
+          "pay_period_start": "2026-07-01",
+          "pay_period_end": "2026-07-31",
+          "pay_date": "2026-07-31",
+          "status": "finalized",
+          "created_at": "2026-07-07T07:46:23.04769+00:00",
+          "journal_entry_id": "306cfe16-2acb-49bb-abd9-a1bd74c1191c",
+          "approved_by": "3cbfd4eb-a095-43f3-837a-0b4f1e2c1752",
+          "approved_at": "2026-07-07T07:46:26.804+00:00",
+          "processed_by": "3cbfd4eb-a095-43f3-837a-0b4f1e2c1752",
+          "processed_at": "2026-07-07T07:46:29.183+00:00",
+          "output_metadata": {
+            "summary": {
+              "total_net": 9900,
+              "total_sdl": 0,
+              "total_uif": 0,
+              "pay_period": "2026-07-01 to 2026-07-31",
+              "total_paye": 0,
+              "total_gross": 10000,
+              "payroll_cost": 10200,
+              "total_pension": 0,
+              "employees_paid": 1,
+              "variance_budget": null,
+              "total_deductions": 100,
+              "variance_previous": null,
+              "employer_contributions": 200
+            },
+            "recovered": true,
+            "bank_batch": {
+              "format": "csv",
+              "status": "generated",
+              "reference": "PAY-2026-07-31",
+              "generated_at": "2026-07-07T07:46:30.503Z",
+              "total_amount": 9900,
+              "employee_count": 1
+            },
+            "emails_sent": 0,
+            "processed_at": "2026-07-07T07:46:29.183Z",
+            "email_failures": [],
+            "journal_posted": true,
+            "reports_generated": true,
+            "summary_generated": true,
+            "payslips_generated": 1,
+            "register_generated": true,
+            "bank_file_generated": true
+          },
+          "rule_config": {}
+        },
+        {
+          "id": "6f1efa9f-dc30-4447-971a-b01b45d64588",
+          "company_id": "3cbfd4eb-a095-43f3-837a-0b4f1e2c1752",
+          "pay_period_start": "2026-01-01",
+          "pay_period_end": "2026-01-31",
+          "pay_date": "2026-01-31",
+          "status": "draft",
+          "created_at": "2026-01-13T19:22:38.43183+00:00",
+          "journal_entry_id": null,
+          "approved_by": "3cbfd4eb-a095-43f3-837a-0b4f1e2c1752",
+          "approved_at": "2026-07-12T16:08:33.302+00:00",
+          "processed_by": null,
+          "processed_at": null,
+          "output_metadata": {},
+          "rule_config": {
+            "rules": {}
+          }
+        }
+      ]
+    },
+    {
+      "method": "GET_RUN_DETAIL",
+      "http": 200,
+      "ms": 742,
+      "headers": {
+        "content-type": "application/json",
+        "sb-request-id": "019f571b-6a01-70ea-8fb8-42e1cd49bb69"
+      },
+      "body": {
+        "run": {
+          "id": "8071fc56-caaa-4091-b2cd-e3482c90f749",
+          "company_id": "3cbfd4eb-a095-43f3-837a-0b4f1e2c1752",
+          "pay_period_start": "2026-12-01",
+          "pay_period_end": "2026-12-31",
+          "pay_date": "2026-12-31",
+          "status": "draft",
+          "created_at": "2026-07-12T16:09:13.135722+00:00",
+          "journal_entry_id": null,
+          "approved_by": null,
+          "approved_at": null,
+          "processed_by": null,
+          "processed_at": null,
+          "output_metadata": {},
+          "rule_config": {}
+        },
+        "payslips": [],
+        "journal_entry": null,
+        "audit_events": [
+          {
+            "id": "01d903a7-7a15-4d85-b5b9-9ea5eb24b564",
+            "company_id": "3cbfd4eb-a095-43f3-837a-0b4f1e2c1752",
+            "payroll_run_id": "8071fc56-caaa-4091-b2cd-e3482c90f749",
+            "payslip_id": null,
+            "event_type": "run_created",
+            "event_data": {
+              "pay_period_end": "2026-12-31",
+              "pay_period_start": "2026-12-01"
+            },
+            "created_by": "3cbfd4eb-a095-43f3-837a-0b4f1e2c1752",
+            "created_at": "2026-07-12T16:09:13.220727+00:00"
+          }
+        ]
+      }
+    },
+    {
+      "method": "GENERATE_PAYSLIPS",
+      "http": 500,
+      "ms": 1151,
+      "headers": {
+        "content-type": "application/json",
+        "sb-request-id": "019f571b-6ce8-7d6d-92db-c25139bbb7ee"
+      },
+      "body": {
+        "error": "No payroll_tax_year_config row matches pay date 2026-12-31. Cannot resolve SARS tax year.",
+        "stage": "unknown",
+        "code": "INTERNAL_ERROR",
+        "recovery": "Retry the operation. Contact support if the error persists."
+      }
+    },
+    {
+      "method": "APPROVE_RUN",
+      "http": 500,
+      "ms": 741,
+      "headers": {
+        "content-type": "application/json",
+        "sb-request-id": "019f571b-716b-790f-b96e-1e4dbc663795"
+      },
+      "body": {
+        "error": "Generate payslips before approving.",
+        "stage": "unknown",
+        "code": "INTERNAL_ERROR",
+        "recovery": "Retry the operation. Contact support if the error persists."
+      }
+    }
+  ],
+  "userId": "3cbfd4eb-a095-43f3-837a-0b4f1e2c1752",
+  "memberships": [
+    {
+      "company_id": "3cbfd4eb-a095-43f3-837a-0b4f1e2c1752",
+      "role": "owner"
+    }
+  ],
+  "runs": [
+    {
+      "id": "8071fc56-caaa-4091-b2cd-e3482c90f749",
+      "status": "draft",
+      "pay_date": "2026-12-31",
+      "pay_period_start": "2026-12-01",
+      "pay_period_end": "2026-12-31",
+      "approved_at": null,
+      "created_at": "2026-07-12T16:09:13.135722+00:00"
+    },
+    {
+      "id": "bd17d9b2-85f6-4a27-b566-dea08b5751ee",
+      "status": "draft",
+      "pay_date": "2026-07-31",
+      "pay_period_start": "2026-07-01",
+      "pay_period_end": "2026-07-31",
+      "approved_at": null,
+      "created_at": "2026-07-12T16:08:15.401554+00:00"
+    },
+    {
+      "id": "77e198cb-b145-493c-90d2-48b60392da2f",
+      "status": "draft",
+      "pay_date": "2026-09-30",
+      "pay_period_start": "2026-09-01",
+      "pay_period_end": "2026-09-30",
+      "approved_at": null,
+      "created_at": "2026-07-07T12:00:13.62608+00:00"
+    },
+    {
+      "id": "7afba5ed-acf4-4136-a6e1-60935f9ebd5f",
+      "status": "draft",
+      "pay_date": "2026-08-01",
+      "pay_period_start": "2026-07-01",
+      "pay_period_end": "2026-07-31",
+      "approved_at": null,
+      "created_at": "2026-07-07T09:42:17.466726+00:00"
+    },
+    {
+      "id": "ce81530b-bb33-4b1c-a176-987329c4296d",
+      "status": "draft",
+      "pay_date": "2026-08-31",
+      "pay_period_start": "2026-08-01",
+      "pay_period_end": "2026-08-31",
+      "approved_at": null,
+      "created_at": "2026-07-07T09:12:17.009605+00:00"
+    },
+    {
+      "id": "e84d9ec6-bb7e-4014-8351-5eadb295d176",
+      "status": "draft",
+      "pay_date": "2026-07-31",
+      "pay_period_start": "2026-07-01",
+      "pay_period_end": "2026-07-31",
+      "approved_at": null,
+      "created_at": "2026-07-07T09:11:16.72958+00:00"
+    },
+    {
+      "id": "e2627366-641b-4635-8191-61f4b344cf57",
+      "status": "finalized",
+      "pay_date": "2026-08-31",
+      "pay_period_start": "2026-08-01",
+      "pay_period_end": "2026-08-31",
+      "approved_at": "2026-07-07T08:16:34.867+00:00",
+      "created_at": "2026-07-07T08:16:32.311726+00:00"
+    },
+    {
+      "id": "f79627df-3ec3-4f90-9285-1dfdc813b22a",
+      "status": "finalized",
+      "pay_date": "2026-08-31",
+      "pay_period_start": "2026-08-01",
+      "pay_period_end": "2026-08-31",
+      "approved_at": "2026-07-07T08:15:00.097+00:00",
+      "created_at": "2026-07-07T08:14:57.274691+00:00"
+    }
+  ],
+  "targetRun": {
+    "id": "8071fc56-caaa-4091-b2cd-e3482c90f749",
+    "status": "draft",
+    "pay_date": "2026-12-31",
+    "pay_period_start": "2026-12-01",
+    "pay_period_end": "2026-12-31",
+    "approved_at": null,
+    "created_at": "2026-07-12T16:09:13.135722+00:00"
+  }
+}

@@ -1,0 +1,42 @@
+{
+  "product": "AdminLess Fin",
+  "pack": "Financial Statement Structure Implementation",
+  "version": "6.4.2",
+  "phase": "C1",
+  "date": "2026-07-13",
+  "board": "Independent Principal Enterprise Implementation Board",
+  "verdict": "PHASE C1 COMPLETE",
+  "awaiting": "Approval before Working Papers / Lead Schedules",
+  "implemented": [
+    "Statement Definition / Section / Subsection / Line Item",
+    "Statement Node hierarchy",
+    "Disclosure Node / Placeholder / Reference",
+    "Attachment points for WP, Leads, Evidence, Review, Validation, Cross Ref, Notes, Publication anchors"
+  ],
+  "hard_rule": "Nothing may attach directly to Statement Instances",
+  "not_implemented": [
+    "Working Papers",
+    "Lead Schedules",
+    "Notes content",
+    "Disclosure content",
+    "Validation",
+    "Review",
+    "Publication"
+  ],
+  "unmodified": [
+    "Statement Engine",
+    "Financial Facts Adapter",
+    "Reporting Snapshots",
+    "Accounting",
+    "Reports",
+    "Navigation"
+  ],
+  "migration": "supabase/migrations/20260713210000_efs_v642_statement_structure.sql",
+  "edge_methods": [
+    "GET_STATEMENT_STRUCTURE",
+    "GET_DISCLOSURE_STRUCTURE",
+    "LIST_ATTACHMENT_POINTS",
+    "RESOLVE_ATTACHMENT_TARGET"
+  ],
+  "quality_gates": "PASS"
+}

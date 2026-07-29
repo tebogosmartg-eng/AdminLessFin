@@ -1,0 +1,11 @@
+﻿[
+  {"step":"code_change_allowed","passed":true,"detail":"code changed"},
+  {"step":"control_flag_blocked","passed":true,"detail":"Cannot change the control-account flag on system account \"Retained Earnings\"."},
+  {"step":"deactivate_allowed","passed":true,"detail":"deactivated"},
+  {"step":"delete_blocked","passed":true,"detail":"System account \"Retained Earnings\" (role retained_earnings) cannot be deleted. Deactivate it instead (set is_active = false)."},
+  {"step":"rename_allowed","passed":true,"detail":"renamed"},
+  {"step":"restored","passed":true,"detail":"identity restored"},
+  {"step":"role_blocked","passed":true,"detail":"Cannot change the account role of system account \"Retained Earnings\"."},
+  {"step":"system_flag_blocked","passed":true,"detail":"Cannot clear the system flag on account \"Retained Earnings\"."},
+  {"step":"type_blocked","passed":true,"detail":"Cannot change the account type of system account \"Retained Earnings\"."}
+]

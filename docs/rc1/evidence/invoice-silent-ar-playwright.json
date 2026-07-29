@@ -1,0 +1,35 @@
+{
+  "timestamp": "2026-07-29T04:38:44.267Z",
+  "invNum": "SILENT915408",
+  "dialogHidden": true,
+  "rowVisible": true,
+  "persistAfterReload": true,
+  "arErrorVisible": false,
+  "createHttp200WithId": true,
+  "invoicePosts": [
+    {
+      "status": 200,
+      "body": "[{\"id\":\"aaea8c70-72c9-4c2b-981c-b996e5df9b43\",\"invoice_number\":\"REGB154022\",\"invoice_date\":\"2026-07-29\",\"due_date\":\"2026-08-28\",\"status\":\"sent\",\"notes\":\"post-fix regression\",\"customers\":{\"name\":\"Itumeleng\"},\"journal_entries\":{\"journal_entry_items\":[{\"type\":\"credit\",\"amount\":175},{\"type\":\"debit\",\"amount\":175}]}},{\"id\":\"2f4e32a5-a942-4348-989b-a5e452704085\",\"invoice_number\":\"REGC153830\",\"invoice_date\":\"2026-07-29\",\"due_date\":\"2026-08-28\",\"status\":\"sent\",\"notes\":\"post-fix regression\",\"customers\":{\"name\":\"Itumeleng\"},\"journal_entries\":{\"journal_entry_items\":[{\"type\":\"credit\",\"amount\":175},{\"type\":\"debit\",\"amount\":175}]}},{\"id\":\"116e9e9e-1bb4-4efb-9947-238020beb979\",\"invoice_number\":\"SILENT178354\",\"invoice_date\":\"2026-07-29\",\"due_date\":\"2026-08-28\",\"status\":\"sent\",\"notes\":\"E2E QA terms 17852968"
+    },
+    {
+      "status": 200,
+      "body": "\"INV-00001\""
+    },
+    {
+      "status": 200,
+      "body": "{\"id\":\"2a64e892-6e4e-40a6-ba5e-243f121699f9\"}"
+    },
+    {
+      "status": 200,
+      "body": "[{\"id\":\"71eb5f26-acb0-47d3-ba62-cb38050bbaff\",\"invoice_number\":\"INV-000011\",\"invoice_date\":\"2026-07-29\",\"due_date\":\"2026-08-28\",\"status\":\"sent\",\"notes\":\"E2E QA terms 1785296801601 — payment due 30 days\",\"customers\":{\"name\":\"Meat and Veg\"},\"journal_entries\":{\"journal_entry_items\":[{\"type\":\"credit\",\"amount\":100000},{\"type\":\"credit\",\"amount\":15000},{\"type\":\"debit\",\"amount\":115000}]}},{\"id\":\"aaea8c70-72c9-4c2b-981c-b996e5df9b43\",\"invoice_number\":\"REGB154022\",\"invoice_date\":\"2026-07-29\",\"due_date\":\"2026-08-28\",\"status\":\"sent\",\"notes\":\"post-fix regression\",\"customers\":{\"name\":\"Itumeleng\"},\"journal_entries\":{\"journal_entry_items\":[{\"type\":\"credit\",\"amount\":175},{\"type\":\"debit\",\"amount\":175}]}},{\"id\":\"2f4e32a5-a942-4348-989b-a5e452704085\",\"invoice_number\":\"REGC153830\",\"invoice_date\":\"2026-07-29\",\""
+    },
+    {
+      "status": 200,
+      "body": "[{\"id\":\"71eb5f26-acb0-47d3-ba62-cb38050bbaff\",\"invoice_number\":\"INV-000011\",\"invoice_date\":\"2026-07-29\",\"due_date\":\"2026-08-28\",\"status\":\"sent\",\"notes\":\"E2E QA terms 1785296801601 — payment due 30 days\",\"customers\":{\"name\":\"Meat and Veg\"},\"journal_entries\":{\"journal_entry_items\":[{\"type\":\"credit\",\"amount\":100000},{\"type\":\"credit\",\"amount\":15000},{\"type\":\"debit\",\"amount\":115000}]}},{\"id\":\"aaea8c70-72c9-4c2b-981c-b996e5df9b43\",\"invoice_number\":\"REGB154022\",\"invoice_date\":\"2026-07-29\",\"due_date\":\"2026-08-28\",\"status\":\"sent\",\"notes\":\"post-fix regression\",\"customers\":{\"name\":\"Itumeleng\"},\"journal_entries\":{\"journal_entry_items\":[{\"type\":\"credit\",\"amount\":175},{\"type\":\"debit\",\"amount\":175}]}},{\"id\":\"2f4e32a5-a942-4348-989b-a5e452704085\",\"invoice_number\":\"REGC153830\",\"invoice_date\":\"2026-07-29\",\""
+    }
+  ],
+  "failedRequests": [],
+  "pageErrors": [],
+  "failure": null,
+  "verdict": "PASS"
+}

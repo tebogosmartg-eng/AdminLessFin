@@ -1,0 +1,86 @@
+{
+  "at": "2026-07-22T08:15:33.210Z",
+  "auth": {
+    "ok": true,
+    "userId": "908ad90e-ee0e-4957-943d-ed1ec2fb843a"
+  },
+  "companyId": "3cbfd4eb-a095-43f3-837a-0b4f1e2c1752",
+  "request": {
+    "method": "POST",
+    "company_id": "3cbfd4eb-a095-43f3-837a-0b4f1e2c1752",
+    "assetData": {
+      "asset_code": "AST-2026-F135367",
+      "description": "EAM-FORENSICS-1784708135367",
+      "category_id": "d29eedac-f26f-4583-baa3-0a36ea1589f4",
+      "purchase_date": "2026-01-20",
+      "purchase_cost": 25000,
+      "asset_account_id": "eb5a9a02-7e79-44f6-b6b5-fe4fb2b0f674",
+      "payment_account_id": "589b9e2b-9acc-4b63-ba88-a9765ee7a90f",
+      "depreciation_method": "straight-line",
+      "useful_life_years": 5,
+      "residual_value": 0,
+      "accumulated_depreciation_account_id": "eb5a9a02-7e79-44f6-b6b5-fe4fb2b0f674",
+      "depreciation_expense_account_id": "b5c3cac9-5fd3-4427-af0f-202fecc5ada1",
+      "note": "accounts",
+      "assetAcct": "eb5a9a02-7e79-44f6-b6b5-fe4fb2b0f674",
+      "paymentAcct": "589b9e2b-9acc-4b63-ba88-a9765ee7a90f"
+    }
+  },
+  "http": {
+    "status": 200,
+    "statusText": "OK",
+    "headers": {
+      "access-control-allow-headers": "authorization, x-client-info, apikey, content-type, x-correlation-id, x-request-id",
+      "access-control-allow-methods": "POST, OPTIONS, GET",
+      "access-control-allow-origin": "*",
+      "access-control-max-age": "86400",
+      "alt-svc": "h3=\":443\"; ma=86400",
+      "cf-cache-status": "DYNAMIC",
+      "cf-ray": "a1f0ff93de7e0de1-JNB",
+      "connection": "keep-alive",
+      "content-encoding": "gzip",
+      "content-type": "application/json",
+      "date": "Wed, 22 Jul 2026 08:15:35 GMT",
+      "endpoint-load-metrics": "application_utilization:10,named_metrics.queue_depth:10",
+      "sb-gateway-version": "1",
+      "sb-project-ref": "zaulhnpohrgqqodvzhxp",
+      "sb-request-id": "019f88e4-f869-7dd7-966c-db79ab1533b7",
+      "server": "cloudflare",
+      "set-cookie": "__cf_bm=cuW12zT.7JiNV9cHR80tV8ZxZINZ6vWTVJMqUhh5dus-1784708135.013489-1.0.1.1-rvv73dSUeGllDnjHQ6jRQERFzFuUCq6rRsiHM5idSQHJC2_4ec3yRKNWyp4auJMgEamYpGtwQdK.M355.gs6W8ua5tyo8YWwnTUoQE3uLw27LUCZ.QpXfDaN7jAvhdAN; HttpOnly; SameSite=None; Secure; Path=/; Domain=supabase.co; Expires=Wed, 22 Jul 2026 08:45:35 GMT",
+      "strict-transport-security": "max-age=31536000; includeSubDomains; preload",
+      "transfer-encoding": "chunked",
+      "vary": "Accept-Encoding",
+      "x-content-type-options": "nosniff",
+      "x-correlation-id": "edge:316bb276-ef8d-43aa-8706-f91b3f92dfd1",
+      "x-deno-execution-id": "81038363-1452-4cae-8ff0-20591ac644fd",
+      "x-function-name": "fixed-assets",
+      "x-platform-version": "4.2.1",
+      "x-sb-edge-region": "eu-central-2",
+      "x-served-by": "supabase-edge-runtime"
+    }
+  },
+  "responseBody": {
+    "id": "a1b3fc8d-2db0-4728-9ec2-2978fc8abfa0"
+  },
+  "responseBodyRaw": "{\"id\":\"a1b3fc8d-2db0-4728-9ec2-2978fc8abfa0\"}",
+  "supabaseJsInvoke": {
+    "errorMessage": null,
+    "data": {
+      "id": "0854f8ac-fdf7-4a91-b038-e58e9f11f211"
+    }
+  },
+  "probe_GET_REGISTER": {
+    "status": 500,
+    "body": "{\"version\":\"1.0\",\"code\":\"UNKNOWNPLATFORM_FAILED\",\"category\":\"UnknownPlatformError\",\"severity\":\"error\",\"businessMessage\":\"An unexpected platform error occurred.\",\"technicalMessage\":\"Unsupported method: GET_REGISTER\",\"recoverySuggestion\":\"Contact support with the correlation ID shown below.\",\"correlationId\":\"edge:14b8d50a-2692-4bf4-beed-476968e26ffb\",\"companyId\":\"3cbfd4eb-a095-43f3-837a-0b4f1e2c1752\",\"timestamp\":\"2026-07-22T08:15:36.934Z\",\"retryable\":false,\"originalCause\":\"Error: Unsupported method: GET_REGISTER\\n    at file:///var/tmp/sb-compile-edge-runtime/functions/fixed-assets/index.ts:1091:15\\n    at eventLoopTick (ext:core/01_core.js:175:7)\\n    at async Server.<anonymous> (file:///var/tmp/sb-compile-edge-runtime/functions/_shared/enterpriseEdgePlatform.ts:241:19)\\n    at async Server.#respond (https://deno.land/std@0.190.0/http/server.ts:220:18)\",\"error\":\"An unexpected platform error occurred.\"}"
+  },
+  "probe_PEEK_NEXT_ASSET_CODE": {
+    "status": 500,
+    "body": "{\"version\":\"1.0\",\"code\":\"UNKNOWNPLATFORM_FAILED\",\"category\":\"UnknownPlatformError\",\"severity\":\"error\",\"businessMessage\":\"An unexpected platform error occurred.\",\"technicalMessage\":\"Unsupported method: PEEK_NEXT_ASSET_CODE\",\"recoverySuggestion\":\"Contact support with the correlation ID shown below.\",\"correlationId\":\"edge:31a69fc8-13f3-416d-8795-e9fd094e0513\",\"companyId\":\"3cbfd4eb-a095-43f3-837a-0b4f1e2c1752\",\"timestamp\":\"2026-07-22T08:15:37.340Z\",\"retryable\":false,\"originalCause\":\"Error: Unsupported method: PEEK_NEXT_ASSET_CODE\\n    at file:///var/tmp/sb-compile-edge-runtime/functions/fixed-assets/index.ts:1091:15\\n    at eventLoopTick (ext:core/01_core.js:175:7)\\n    at async Server.<anonymous> (file:///var/tmp/sb-compile-edge-runtime/functions/_shared/enterpriseEdgePlatform.ts:241:19)\\n    at async Server.#respond (https://deno.land/std@0.190.0/http/server.ts:220:18)\",\"error\":\"An unexpected platform error occurred.\"}"
+  },
+  "probe_GET_ALL": {
+    "status": 200,
+    "body": "[{\"id\":\"14e05aac-9ef1-483d-b8ef-3ab112d074e8\",\"company_id\":\"3cbfd4eb-a095-43f3-837a-0b4f1e2c1752\",\"asset_code\":\"AST-2026-F919521\",\"description\":\"EAM-FORENSICS-1784707919521\",\"category_id\":\"d29eedac-f26f-4583-baa3-0a36ea1589f4\",\"purchase_date\":\"2026-01-20\",\"purchase_cost\":25000,\"vendor_id\":null,\"location\":null,\"assigned_to_employee_id\":null,\"serial_number\":null,\"status\":\"active\",\"depreciation_method\":\"straight-line\",\"useful_life_years\":5,\"residual_value\":0,\"accumulated_depreciation\":0,\"asset_account_id\":\"eb5a9a02-7e79-44f6-b6b5-fe4fb2b0f674\",\"accumulated_depreciation_account_id\":\"eb5a9a02-7e79-44f6-b6b5-fe4fb2b0f674\",\"depreciation_expense_account_id\":\"b5c3cac9-5fd3-4427-af0f-202fecc5ada1\",\"created_at\":\"2026-07-22T08:11:59.578849+00:00\",\"last_depreciation_date\":null,\"department\":null,\"custodian_name\":null,\"impairment_amount\":0,\"depreciation_ytd\":0,\"depreciation_ytd_year\":null,\"qr_code\":\"QR-AST-2026-F919521\",\"barcode\":\"BC-AST-2026-F919521\",\"asset_tag\":\"AST-2026-F919521\",\"verification_status\":\"unverified\",\"last_verified_at\":null,\"next_verification_due\":null,\"verified_by_user_id\":null,\"verified_by_name\":null,\"disposal_account_id\":null,\"revaluation_reserve_account_id\":null,\"impairment_account_id\":null,\"updated_at\":\"2026-07-22T08:11:59.578849+00:00\",\"parent_asset_id\":null,\"is_component\":false,\"lifecycle_stage\":\"in_service\",\"health_score\":null,\"health_risk\":null,\"revaluation_amount\":0,\"last_revaluation_date\":null,\"asset_categories\":{\"name\":\"Forensics Cat 1784707918932\"},\"employees\":null},{\"id\":\"9248ed11-93ab-4414-b4bf-de88317924e5\",\"company_id\":\"3cbfd4eb-a095-43f3-837a-0b4f1e2c1752\",\"asset_code\":\"AST-2026-F919521\",\"description\":\"EAM-FORENSICS-1784707919521\",\"category_id\":\"d29eedac-f26f-4583-baa3-0a36ea1589f4\",\"purchase_date\":\"2026-01-20\",\"purchase_cost\":25000,\"vendor_id\":null,\"location\":null,\"assigned_to_employee_id\":null,\"serial_number\":null,\"status\":\"active\",\"depreciation_method\":\"straight-line\",\"useful_life_years\":5,\"residual_value\":0,\"accumulated_depreciation\":0,\"asset_"
+  },
+  "localFixedAssetsSha256": "8c875ab2cc27b8ccf47a6acda06bde9c4d61062ab79faf6ef2d5407a3c0723c4",
+  "localFixedAssetsBytes": 45752
+}

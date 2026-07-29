@@ -1,0 +1,285 @@
+{
+  "version": "16.6",
+  "verdict": "CERTIFIED WITH OBSERVATIONS",
+  "generatedAt": "2026-07-28T10:03:08.074Z",
+  "steps": [
+    {
+      "phase": "1",
+      "step": "TypeScript",
+      "status": "PASS"
+    },
+    {
+      "phase": "9",
+      "step": "EAM unit regression",
+      "status": "PASS"
+    },
+    {
+      "phase": "1",
+      "step": "Login",
+      "status": "PASS"
+    },
+    {
+      "phase": "2",
+      "step": "Company",
+      "status": "PASS",
+      "evidence": {
+        "companyId": "3cbfd4eb-a095-43f3-837a-0b4f1e2c1752",
+        "companyName": "Spaceman",
+        "role": "owner",
+        "resolution": "env_company_id"
+      }
+    },
+    {
+      "phase": "3",
+      "step": "Chart of accounts",
+      "status": "PASS"
+    },
+    {
+      "phase": "10",
+      "step": "Create category",
+      "status": "PASS",
+      "evidence": {
+        "categoryId": "0cc156ed-ff57-4d1b-9447-c867f0b89408"
+      }
+    },
+    {
+      "phase": "10",
+      "step": "Acquire asset",
+      "status": "PASS",
+      "evidence": {
+        "assetId": "87375ef4-4247-4f02-8602-896dec15d1d1",
+        "assetCode": "AST-2026-000004"
+      }
+    },
+    {
+      "phase": "3",
+      "step": "Asset numbering",
+      "status": "PASS",
+      "evidence": {
+        "assetCode": "AST-2026-000004"
+      }
+    },
+    {
+      "phase": "1",
+      "step": "Server register API",
+      "status": "PASS"
+    },
+    {
+      "phase": "10",
+      "step": "Appear in register",
+      "status": "PASS"
+    },
+    {
+      "phase": "10",
+      "step": "Generate QR",
+      "status": "PASS"
+    },
+    {
+      "phase": "10",
+      "step": "Verify asset",
+      "status": "PASS"
+    },
+    {
+      "phase": "10",
+      "step": "Upload document",
+      "status": "PASS"
+    },
+    {
+      "phase": "10",
+      "step": "Maintenance",
+      "status": "PASS"
+    },
+    {
+      "phase": "10",
+      "step": "Transfer department",
+      "status": "PASS"
+    },
+    {
+      "phase": "10",
+      "step": "Impair / Revalue",
+      "status": "PASS"
+    },
+    {
+      "phase": "7",
+      "step": "Depreciation engine",
+      "status": "SKIP",
+      "error": "run-depreciation is system cron — fields configured on asset"
+    },
+    {
+      "phase": "7",
+      "step": "Acquisition journal",
+      "status": "PASS",
+      "evidence": {
+        "ok": true,
+        "entryId": "967c4eef-32b2-4fbb-9569-79e6e9bc59e7",
+        "dr": 25000,
+        "cr": 25000
+      }
+    },
+    {
+      "phase": "7",
+      "step": "Trial balance (pre-dispose)",
+      "status": "PASS",
+      "evidence": {
+        "ok": true,
+        "debits": 2798266.4799999995,
+        "credits": 2798266.4899999998,
+        "diff": 0.01000000024214387
+      }
+    },
+    {
+      "phase": "10",
+      "step": "Dispose asset",
+      "status": "PASS"
+    },
+    {
+      "phase": "7",
+      "step": "Trial balance (post-dispose)",
+      "status": "PASS",
+      "evidence": {
+        "ok": true,
+        "debits": 2823266.4799999995,
+        "credits": 2823266.4899999998,
+        "diff": 0.01000000024214387
+      }
+    },
+    {
+      "phase": "14",
+      "step": "Cross-company denied",
+      "status": "PASS"
+    },
+    {
+      "phase": "8",
+      "step": "Performance benchmark",
+      "status": "PASS",
+      "evidence": {
+        "current_tenant": {
+          "queryMs": 493.08,
+          "searchMs": 507.38,
+          "totalCount": 15,
+          "ok": true
+        },
+        "sprint6Recertification": {
+          "verdict": "PASS",
+          "steps": [
+            {
+              "phase": "10",
+              "step": "Acquire asset",
+              "status": "PASS",
+              "evidence": {
+                "assetId": "87375ef4-4247-4f02-8602-896dec15d1d1",
+                "assetCode": "AST-2026-000004"
+              }
+            },
+            {
+              "phase": "10",
+              "step": "Appear in register",
+              "status": "PASS"
+            },
+            {
+              "phase": "7",
+              "step": "Acquisition journal",
+              "status": "PASS",
+              "evidence": {
+                "ok": true,
+                "entryId": "967c4eef-32b2-4fbb-9569-79e6e9bc59e7",
+                "dr": 25000,
+                "cr": 25000
+              }
+            },
+            {
+              "phase": "3",
+              "step": "Asset numbering",
+              "status": "PASS",
+              "evidence": {
+                "assetCode": "AST-2026-000004"
+              }
+            },
+            {
+              "phase": "7",
+              "step": "Trial balance (pre-dispose)",
+              "status": "PASS",
+              "evidence": {
+                "ok": true,
+                "debits": 2798266.4799999995,
+                "credits": 2798266.4899999998,
+                "diff": 0.01000000024214387
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "phase": "6",
+      "step": "HTML screenshot evidence",
+      "status": "PASS",
+      "evidence": {
+        "dir": "C:\\Users\\TebogoM\\Desktop\\development projects\\SmartAccounting\\docs\\eam-v164"
+      }
+    },
+    {
+      "phase": "6",
+      "step": "PNG screenshots",
+      "status": "SKIP",
+      "error": "Set EAM_CERT_SCREENSHOTS=true and EAM_CERT_PREVIEW_URL with vite preview running"
+    }
+  ],
+  "benchmarks": {
+    "current_tenant": {
+      "queryMs": 493.08,
+      "searchMs": 507.38,
+      "totalCount": 15,
+      "ok": true
+    },
+    "sprint6Recertification": {
+      "verdict": "PASS",
+      "steps": [
+        {
+          "phase": "10",
+          "step": "Acquire asset",
+          "status": "PASS",
+          "evidence": {
+            "assetId": "87375ef4-4247-4f02-8602-896dec15d1d1",
+            "assetCode": "AST-2026-000004"
+          }
+        },
+        {
+          "phase": "10",
+          "step": "Appear in register",
+          "status": "PASS"
+        },
+        {
+          "phase": "7",
+          "step": "Acquisition journal",
+          "status": "PASS",
+          "evidence": {
+            "ok": true,
+            "entryId": "967c4eef-32b2-4fbb-9569-79e6e9bc59e7",
+            "dr": 25000,
+            "cr": 25000
+          }
+        },
+        {
+          "phase": "3",
+          "step": "Asset numbering",
+          "status": "PASS",
+          "evidence": {
+            "assetCode": "AST-2026-000004"
+          }
+        },
+        {
+          "phase": "7",
+          "step": "Trial balance (pre-dispose)",
+          "status": "PASS",
+          "evidence": {
+            "ok": true,
+            "debits": 2798266.4799999995,
+            "credits": 2798266.4899999998,
+            "diff": 0.01000000024214387
+          }
+        }
+      ]
+    }
+  }
+}

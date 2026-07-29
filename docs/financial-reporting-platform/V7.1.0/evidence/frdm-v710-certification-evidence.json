@@ -1,0 +1,78 @@
+{
+  "product": "AdminLess Fin",
+  "board": "Independent Principal Enterprise Financial Reporting Board",
+  "version": "7.1.0",
+  "pack": "Financial Reporting Data Model Certification",
+  "date": "2026-07-18",
+  "nature": "data_modelling_only",
+  "prerequisite": "NOT_YET_READY_FOR_CASEWARE_CLASS_CERTIFICATION",
+  "final_status": "READY_FOR_IMPLEMENTATION",
+  "primary_question": "What information must exist in the reporting model so that ANY professional Annual Financial Statement can be produced?",
+  "quality_gates": {
+    "professional_afs": "PASS",
+    "professional_working_papers": "PASS",
+    "dynamic_notes": "PASS",
+    "comparative_reporting": "PASS",
+    "future_xbrl": "PASS",
+    "multiple_frameworks": "PASS",
+    "multiple_industries": "PASS",
+    "multiple_jurisdictions": "PASS",
+    "multi_year": "PASS",
+    "full_traceability": "PASS",
+    "professional_publication": "PASS",
+    "no_accounting_redesign": "PASS",
+    "decade_extensibility": "PASS"
+  },
+  "trace_chain": [
+    "journal",
+    "ledger",
+    "trial_balance",
+    "canonical_trial_balance",
+    "reporting_taxonomy",
+    "statement_line",
+    "disclosure",
+    "document_section",
+    "publication"
+  ],
+  "critical_model_additions": [
+    "ReportingTaxonomyNode_hierarchy",
+    "LineCalculationRule",
+    "AmountFact_dimensions",
+    "ReportingAdjustment_physical",
+    "DisclosureCondition",
+    "DocumentInstance",
+    "CrossReferenceRule",
+    "XbrlConceptBinding_readiness"
+  ],
+  "preserved_modules": [
+    "general_ledger",
+    "journals",
+    "chart_of_accounts",
+    "canonical_trial_balance_v700",
+    "statement_engine_boundary",
+    "validation",
+    "review",
+    "publication_seals",
+    "working_papers"
+  ],
+  "non_claims": [
+    "not_caseware_class_platform_certification",
+    "not_schema_implemented_in_this_pack",
+    "not_xbrl_filing_engine",
+    "not_consolidation_engine"
+  ],
+  "deliverables": [
+    "00_INDEX.md",
+    "01_FINANCIAL_REPORTING_DATA_MODEL.md",
+    "02_ENTITY_RELATIONSHIP_DIAGRAM.md",
+    "03_OBJECT_HIERARCHY.md",
+    "04_RELATIONSHIP_MATRIX.md",
+    "05_REPORTING_TAXONOMY_MODEL.md",
+    "06_STATEMENT_LINE_MODEL.md",
+    "07_DISCLOSURE_MODEL.md",
+    "08_DOCUMENT_MODEL.md",
+    "09_FRAMEWORK_EXTENSION_STRATEGY.md",
+    "10_GAP_ANALYSIS.md",
+    "11_MIGRATION_STRATEGY.md"
+  ]
+}

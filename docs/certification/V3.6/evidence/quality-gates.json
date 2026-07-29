@@ -1,0 +1,26 @@
+{
+  "version": "3.6",
+  "module": "statutory_returns",
+  "executedAt": "2026-07-12",
+  "gates": {
+    "verifyLegislation": { "ok": true },
+    "certifyStatutory": {
+      "verification": "12/12",
+      "certification": "76/76",
+      "historical": "3/3",
+      "passed": true
+    },
+    "payrollUnitTests": { "passed": 24 },
+    "payrollIntegrationTests": { "passed": 3 },
+    "statutoryReturnsUnitTests": { "passed": 6 }
+  },
+  "lockedModulesUnchanged": [
+    "src/lib/statutoryPayrollEngine",
+    "src/lib/payrollReports.ts",
+    "src/lib/payrollJournal.ts",
+    "src/statutory (legislation packages)",
+    "accounting / journals"
+  ],
+  "packagesRegistered": ["ZA/EMP201", "ZA/EMP501", "ZA/IRP5", "ZA/TAX_CERTIFICATE"],
+  "pipeline": "Payroll Engine → Finalized Payroll Run → Statutory Returns"
+}

@@ -1,0 +1,35 @@
+[
+  {
+    "label": "2026-12-31",
+    "runId": "8071fc56-caaa-4091-b2cd-e3482c90f749",
+    "http": 500,
+    "body": {
+      "error": "No payroll_tax_year_config row matches pay date 2026-12-31. Cannot resolve SARS tax year.",
+      "stage": "unknown",
+      "code": "INTERNAL_ERROR",
+      "recovery": "Retry the operation. Contact support if the error persists."
+    }
+  },
+  {
+    "label": "2026-07-31",
+    "runId": "bd17d9b2-85f6-4a27-b566-dea08b5751ee",
+    "http": 500,
+    "body": {
+      "error": "No payroll_tax_year_config row matches pay date 2026-07-31. Cannot resolve SARS tax year.",
+      "stage": "unknown",
+      "code": "INTERNAL_ERROR",
+      "recovery": "Retry the operation. Contact support if the error persists."
+    }
+  },
+  {
+    "label": "2026-01-31",
+    "runId": "6f1efa9f-dc30-4447-971a-b01b45d64588",
+    "http": 500,
+    "body": {
+      "error": "invalid input value for enum payslip_item_type: \"employer_contribution\"",
+      "stage": "unknown",
+      "code": "INTERNAL_ERROR",
+      "recovery": "Retry the operation. Contact support if the error persists."
+    }
+  }
+]

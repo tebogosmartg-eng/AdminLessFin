@@ -1,0 +1,241 @@
+{
+  "version": "6.5.2",
+  "date": "2026-07-14T07:00:53.550Z",
+  "project_ref": "zaulhnpohrgqqodvzhxp",
+  "endpoint": "https://zaulhnpohrgqqodvzhxp.supabase.co/functions/v1/financial-statements",
+  "probes": [
+    {
+      "name": "OPTIONS_preflight",
+      "ok": true,
+      "status": 200,
+      "elapsedMs": 1176,
+      "cors": {
+        "allowOrigin": "*",
+        "allowHeaders": "authorization, x-client-info, apikey, content-type, x-correlation-id, x-request-id",
+        "allowMethods": "POST, OPTIONS, GET",
+        "maxAge": "86400",
+        "complete": true
+      },
+      "headers": {
+        "access-control-allow-origin": "*",
+        "access-control-allow-headers": "authorization, x-client-info, apikey, content-type, x-correlation-id, x-request-id",
+        "access-control-allow-methods": "POST, OPTIONS, GET",
+        "access-control-max-age": "86400",
+        "x-correlation-id": "edge:13337c00-a8b9-4805-a045-3bdf71b65a6d",
+        "x-platform-version": "4.2.1"
+      },
+      "bodyPreview": ""
+    },
+    {
+      "name": "POST_missing_jwt",
+      "ok": false,
+      "status": 400,
+      "elapsedMs": 591,
+      "cors": {
+        "allowOrigin": "*",
+        "allowHeaders": "authorization, x-client-info, apikey, content-type, x-correlation-id, x-request-id",
+        "allowMethods": "POST, OPTIONS, GET",
+        "maxAge": "86400",
+        "complete": true
+      },
+      "headers": {
+        "access-control-allow-origin": "*",
+        "access-control-allow-headers": "authorization, x-client-info, apikey, content-type, x-correlation-id, x-request-id",
+        "access-control-allow-methods": "POST, OPTIONS, GET",
+        "access-control-max-age": "86400",
+        "content-type": "application/json",
+        "x-correlation-id": "edge:40c0ef5f-1935-49c5-983c-8663a90577a5",
+        "x-platform-version": "4.2.1",
+        "x-function-name": "financial-statements"
+      },
+      "bodyPreview": {
+        "message": "Your session has expired. Please sign in again.",
+        "code": "AUTHENTICATION_FAILED",
+        "keys": [
+          "version",
+          "code",
+          "category",
+          "severity",
+          "businessMessage",
+          "technicalMessage",
+          "recoverySuggestion",
+          "correlationId",
+          "timestamp",
+          "retryable",
+          "originalCause",
+          "error"
+        ]
+      }
+    },
+    {
+      "name": "POST_unauthenticated_anon_bearer",
+      "ok": false,
+      "status": 400,
+      "elapsedMs": 510,
+      "cors": {
+        "allowOrigin": "*",
+        "allowHeaders": "authorization, x-client-info, apikey, content-type, x-correlation-id, x-request-id",
+        "allowMethods": "POST, OPTIONS, GET",
+        "maxAge": "86400",
+        "complete": true
+      },
+      "headers": {
+        "access-control-allow-origin": "*",
+        "access-control-allow-headers": "authorization, x-client-info, apikey, content-type, x-correlation-id, x-request-id",
+        "access-control-allow-methods": "POST, OPTIONS, GET",
+        "access-control-max-age": "86400",
+        "content-type": "application/json",
+        "x-correlation-id": "edge:716f30dd-e12c-40db-8522-83709308beb0",
+        "x-platform-version": "4.2.1",
+        "x-function-name": "financial-statements"
+      },
+      "bodyPreview": {
+        "message": "Your session has expired. Please sign in again.",
+        "code": "AUTHENTICATION_FAILED",
+        "keys": [
+          "version",
+          "code",
+          "category",
+          "severity",
+          "businessMessage",
+          "technicalMessage",
+          "recoverySuggestion",
+          "correlationId",
+          "timestamp",
+          "retryable",
+          "originalCause",
+          "error"
+        ]
+      }
+    },
+    {
+      "name": "POST_malformed_json",
+      "ok": false,
+      "status": 400,
+      "elapsedMs": 396,
+      "cors": {
+        "allowOrigin": "*",
+        "allowHeaders": "authorization, x-client-info, apikey, content-type, x-correlation-id, x-request-id",
+        "allowMethods": "POST, OPTIONS, GET",
+        "maxAge": "86400",
+        "complete": true
+      },
+      "headers": {
+        "access-control-allow-origin": "*",
+        "access-control-allow-headers": "authorization, x-client-info, apikey, content-type, x-correlation-id, x-request-id",
+        "access-control-allow-methods": "POST, OPTIONS, GET",
+        "access-control-max-age": "86400",
+        "content-type": "application/json",
+        "x-correlation-id": "edge:8ade9ee2-4152-4947-ba39-c498deecdf20",
+        "x-platform-version": "4.2.1",
+        "x-function-name": "financial-statements"
+      },
+      "bodyPreview": {
+        "message": "Your session has expired. Please sign in again.",
+        "code": "AUTHENTICATION_FAILED",
+        "keys": [
+          "version",
+          "code",
+          "category",
+          "severity",
+          "businessMessage",
+          "technicalMessage",
+          "recoverySuggestion",
+          "correlationId",
+          "timestamp",
+          "retryable",
+          "originalCause",
+          "error"
+        ]
+      }
+    },
+    {
+      "name": "POST_unknown_method",
+      "ok": false,
+      "status": 400,
+      "elapsedMs": 642,
+      "cors": {
+        "allowOrigin": "*",
+        "allowHeaders": "authorization, x-client-info, apikey, content-type, x-correlation-id, x-request-id",
+        "allowMethods": "POST, OPTIONS, GET",
+        "maxAge": "86400",
+        "complete": true
+      },
+      "headers": {
+        "access-control-allow-origin": "*",
+        "access-control-allow-headers": "authorization, x-client-info, apikey, content-type, x-correlation-id, x-request-id",
+        "access-control-allow-methods": "POST, OPTIONS, GET",
+        "access-control-max-age": "86400",
+        "content-type": "application/json",
+        "x-correlation-id": "edge:ef7bfa8b-c309-434e-ab2f-46d0a1928541",
+        "x-platform-version": "4.2.1",
+        "x-function-name": "financial-statements"
+      },
+      "bodyPreview": {
+        "message": "Your session has expired. Please sign in again.",
+        "code": "AUTHENTICATION_FAILED",
+        "keys": [
+          "version",
+          "code",
+          "category",
+          "severity",
+          "businessMessage",
+          "technicalMessage",
+          "recoverySuggestion",
+          "correlationId",
+          "timestamp",
+          "retryable",
+          "originalCause",
+          "error"
+        ]
+      }
+    },
+    {
+      "name": "POST_missing_company",
+      "ok": false,
+      "status": 400,
+      "elapsedMs": 547,
+      "cors": {
+        "allowOrigin": "*",
+        "allowHeaders": "authorization, x-client-info, apikey, content-type, x-correlation-id, x-request-id",
+        "allowMethods": "POST, OPTIONS, GET",
+        "maxAge": "86400",
+        "complete": true
+      },
+      "headers": {
+        "access-control-allow-origin": "*",
+        "access-control-allow-headers": "authorization, x-client-info, apikey, content-type, x-correlation-id, x-request-id",
+        "access-control-allow-methods": "POST, OPTIONS, GET",
+        "access-control-max-age": "86400",
+        "content-type": "application/json",
+        "x-correlation-id": "edge:cdf0c10c-fa22-4f40-8024-f88a43e355f6",
+        "x-platform-version": "4.2.1",
+        "x-function-name": "financial-statements"
+      },
+      "bodyPreview": {
+        "message": "Your session has expired. Please sign in again.",
+        "code": "AUTHENTICATION_FAILED",
+        "keys": [
+          "version",
+          "code",
+          "category",
+          "severity",
+          "businessMessage",
+          "technicalMessage",
+          "recoverySuggestion",
+          "correlationId",
+          "timestamp",
+          "retryable",
+          "originalCause",
+          "error"
+        ]
+      }
+    }
+  ],
+  "summary": {
+    "optionsHttp200": true,
+    "optionsCorsComplete": true,
+    "allProbesHaveCors": true,
+    "functionReachable": true
+  }
+}

@@ -1,0 +1,186 @@
+{
+  "scannedAt": "2026-07-29T10:25:26.507Z",
+  "companies": [
+    {
+      "name": "My's Company",
+      "id": "26014bd5-f03f-44ae-93bd-64b5add2e09f",
+      "jeCount": 1,
+      "itemCount": 2,
+      "totalDebit": 100,
+      "totalCredit": 100,
+      "ledgerImbalance": 0,
+      "unbalancedEntryCount": 0,
+      "unbalancedSample": [],
+      "capped": false
+    },
+    {
+      "name": "Spaceman",
+      "id": "3cbfd4eb-a095-43f3-837a-0b4f1e2c1752",
+      "jeCount": 117,
+      "itemCount": 269,
+      "totalDebit": 3172224.2,
+      "totalCredit": 3172224.21,
+      "ledgerImbalance": -0.01,
+      "unbalancedEntryCount": 1,
+      "unbalancedSample": [
+        {
+          "id": "0156d907-ba5d-45b7-b21a-a28e37c810eb",
+          "debit": 46144.92,
+          "credit": 46144.93
+        }
+      ],
+      "capped": false
+    },
+    {
+      "name": "CERT New Customer 2026-07-28T08:08:07.174Z",
+      "id": "bae80005-212f-4fdd-8d39-758177845d2e",
+      "jeCount": 0,
+      "itemCount": 0,
+      "totalDebit": 0,
+      "totalCredit": 0,
+      "ledgerImbalance": 0,
+      "unbalancedEntryCount": 0,
+      "unbalancedSample": [],
+      "capped": false
+    },
+    {
+      "name": "CERT FY Fix 1785226265825",
+      "id": "a9988c29-9766-4de8-84bb-8823a9d868d0",
+      "jeCount": 1,
+      "itemCount": 0,
+      "totalDebit": 0,
+      "totalCredit": 0,
+      "ledgerImbalance": 0,
+      "unbalancedEntryCount": 0,
+      "unbalancedSample": [],
+      "capped": false
+    },
+    {
+      "name": "CERT TX 1785230285930",
+      "id": "0837027f-347a-455e-914b-995b96b34397",
+      "jeCount": 1,
+      "itemCount": 3,
+      "totalDebit": 1150,
+      "totalCredit": 1150,
+      "ledgerImbalance": 0,
+      "unbalancedEntryCount": 0,
+      "unbalancedSample": [],
+      "capped": false
+    },
+    {
+      "name": "CERT TX 1785230470207",
+      "id": "62de66bf-f962-481e-8236-a8d0777b056a",
+      "jeCount": 1,
+      "itemCount": 3,
+      "totalDebit": 1150,
+      "totalCredit": 1150,
+      "ledgerImbalance": 0,
+      "unbalancedEntryCount": 0,
+      "unbalancedSample": [],
+      "capped": false
+    },
+    {
+      "name": "CERT TX 1785230675937",
+      "id": "be3855e9-d11c-48a8-8c39-10e12a0ff2df",
+      "jeCount": 3,
+      "itemCount": 7,
+      "totalDebit": 21750,
+      "totalCredit": 21750,
+      "ledgerImbalance": 0,
+      "unbalancedEntryCount": 0,
+      "unbalancedSample": [],
+      "capped": false
+    },
+    {
+      "name": "CERT TX 1785230740094",
+      "id": "14712eb7-01e0-4664-ae34-2cd52b2c795a",
+      "jeCount": 2,
+      "itemCount": 5,
+      "totalDebit": 1750,
+      "totalCredit": 1750,
+      "ledgerImbalance": 0,
+      "unbalancedEntryCount": 0,
+      "unbalancedSample": [],
+      "capped": false
+    },
+    {
+      "name": "CERT COA 1785230862080",
+      "id": "b46f3ec6-82d5-4538-b000-4e192d54e7d1",
+      "jeCount": 0,
+      "itemCount": 0,
+      "totalDebit": 0,
+      "totalCredit": 0,
+      "ledgerImbalance": 0,
+      "unbalancedEntryCount": 0,
+      "unbalancedSample": [],
+      "capped": false
+    },
+    {
+      "name": "CERT COA 1785230945189",
+      "id": "0a2ff5bb-3796-4467-b227-a6dd4306bcdb",
+      "jeCount": 0,
+      "itemCount": 0,
+      "totalDebit": 0,
+      "totalCredit": 0,
+      "ledgerImbalance": 0,
+      "unbalancedEntryCount": 0,
+      "unbalancedSample": [],
+      "capped": false
+    },
+    {
+      "name": "CERT TX 1785230987178",
+      "id": "ed2f2a92-a8f4-4496-a6fe-51d68bf9ba03",
+      "jeCount": 1,
+      "itemCount": 3,
+      "totalDebit": 1150,
+      "totalCredit": 1150,
+      "ledgerImbalance": 0,
+      "unbalancedEntryCount": 0,
+      "unbalancedSample": [],
+      "capped": false
+    },
+    {
+      "name": "CERT TX 1785231040107",
+      "id": "0b07df94-1868-4ed9-aaa2-6ac8b847234b",
+      "jeCount": 2,
+      "itemCount": 5,
+      "totalDebit": 1750,
+      "totalCredit": 1750,
+      "ledgerImbalance": 0,
+      "unbalancedEntryCount": 0,
+      "unbalancedSample": [],
+      "capped": false
+    },
+    {
+      "name": "CERT TX 1785231635647",
+      "id": "063d0ae0-394a-4b22-b140-087d5979633b",
+      "jeCount": 4,
+      "itemCount": 15,
+      "totalDebit": 78031.36,
+      "totalCredit": 78031.36,
+      "ledgerImbalance": 0,
+      "unbalancedEntryCount": 0,
+      "unbalancedSample": [],
+      "capped": false
+    },
+    {
+      "name": "CERT TX 1785231821168",
+      "id": "2f1aaf89-f52f-4f85-b13a-9b54594df26f",
+      "jeCount": 3,
+      "itemCount": 10,
+      "totalDebit": 22127.12,
+      "totalCredit": 22127.12,
+      "ledgerImbalance": 0,
+      "unbalancedEntryCount": 0,
+      "unbalancedSample": [],
+      "capped": false
+    }
+  ],
+  "summary": {
+    "companiesScanned": 14,
+    "totalJournalEntries": 136,
+    "totalItems": 322,
+    "anyImbalanceDetected": true,
+    "verdict": "DOUBLE-ENTRY VIOLATION"
+  }
+}

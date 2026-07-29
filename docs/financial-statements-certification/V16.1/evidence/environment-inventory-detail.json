@@ -1,0 +1,166 @@
+{
+  "at": "2026-07-21T13:23:27.458Z",
+  "project_ref": "zaulhnpohrgqqodvzhxp",
+  "table_inventory": [
+    {
+      "table": "public.efs_company_master_data",
+      "status": 404,
+      "code": "PGRST205",
+      "message": "Could not find the table 'public.efs_company_master_data' in the schema cache",
+      "present": false
+    },
+    {
+      "table": "public.efs_engagement_general_information",
+      "status": 200,
+      "present": true
+    },
+    {
+      "table": "public.efs_reporting_workspaces",
+      "status": 200,
+      "present": true
+    },
+    {
+      "table": "public.efs_reporting_periods",
+      "status": 200,
+      "present": true
+    },
+    {
+      "table": "public.efs_reporting_entities",
+      "status": 200,
+      "present": true
+    },
+    {
+      "table": "public.efs_framework_packs",
+      "status": 200,
+      "present": true
+    },
+    {
+      "table": "public.efs_framework_bindings",
+      "status": 200,
+      "present": true
+    },
+    {
+      "table": "public.efs_snapshot_versions",
+      "status": 200,
+      "present": true
+    },
+    {
+      "table": "public.efs_statement_instances",
+      "status": 200,
+      "present": true
+    },
+    {
+      "table": "public.efs_statement_lines",
+      "status": 404,
+      "code": "PGRST205",
+      "message": "Could not find the table 'public.efs_statement_lines' in the schema cache",
+      "present": false
+    },
+    {
+      "table": "public.efs_publication_packs",
+      "status": 200,
+      "present": true
+    },
+    {
+      "table": "public.efs_publication_records",
+      "status": 200,
+      "present": true
+    },
+    {
+      "table": "public.efs_publication_artifacts",
+      "status": 200,
+      "present": true
+    },
+    {
+      "table": "public.efs_working_papers",
+      "status": 200,
+      "present": true
+    },
+    {
+      "table": "public.efs_review_packs",
+      "status": 404,
+      "code": "PGRST205",
+      "message": "Could not find the table 'public.efs_review_packs' in the schema cache",
+      "present": false
+    },
+    {
+      "table": "public.efs_validation_runs",
+      "status": 200,
+      "present": true
+    },
+    {
+      "table": "public.efs_disclosure_nodes",
+      "status": 200,
+      "present": true
+    },
+    {
+      "table": "public.efs_note_instances",
+      "status": 404,
+      "code": "PGRST205",
+      "message": "Could not find the table 'public.efs_note_instances' in the schema cache",
+      "present": false
+    },
+    {
+      "table": "public.efs_activity_log",
+      "status": 404,
+      "code": "PGRST205",
+      "message": "Could not find the table 'public.efs_activity_log' in the schema cache",
+      "present": false
+    },
+    {
+      "table": "public.efs_canonical_trial_balances",
+      "status": 200,
+      "present": true
+    }
+  ],
+  "present_efs_tables": [
+    "public.efs_engagement_general_information",
+    "public.efs_reporting_workspaces",
+    "public.efs_reporting_periods",
+    "public.efs_reporting_entities",
+    "public.efs_framework_packs",
+    "public.efs_framework_bindings",
+    "public.efs_snapshot_versions",
+    "public.efs_statement_instances",
+    "public.efs_publication_packs",
+    "public.efs_publication_records",
+    "public.efs_publication_artifacts",
+    "public.efs_working_papers",
+    "public.efs_validation_runs",
+    "public.efs_disclosure_nodes",
+    "public.efs_canonical_trial_balances"
+  ],
+  "missing_efs_candidates": [
+    "public.efs_company_master_data",
+    "public.efs_statement_lines",
+    "public.efs_review_packs",
+    "public.efs_note_instances",
+    "public.efs_activity_log"
+  ],
+  "openapi_efs_tables": [],
+  "openapi_status": 401,
+  "edge_detail": {
+    "VERIFY_V161_DEPLOYMENT": {
+      "method": "VERIFY_V161_DEPLOYMENT",
+      "http_status": 500,
+      "code": "UNKNOWNPLATFORM_FAILED",
+      "category": "UnknownPlatformError",
+      "technicalMessage": "Unknown method: VERIFY_V161_DEPLOYMENT",
+      "businessMessage": "An unexpected platform error occurred.",
+      "error": "An unexpected platform error occurred.",
+      "originalCause": "Error: Unknown method: VERIFY_V161_DEPLOYMENT\n    at file:///var/tmp/sb-compile-edge-runtime/functions/financial-statements/index.ts:4290:15\n    at eventLoopTick (ext:core/01_core.js:175:7)\n    at async Server.<anonymous> (file:///var/tmp/sb-compile-edge-runtime/functions/_shared/enterpriseEdgePlatform.ts:241:19)\n    at async Server.#respond (https://deno.land/std@0.190.0/http/server.ts:220:18)"
+    },
+    "GET_COMPANY_MASTER_DATA": {
+      "method": "GET_COMPANY_MASTER_DATA",
+      "http_status": 200,
+      "sample": {
+        "addresses": {},
+        "updated_at": "2026-07-21T13:23:24.849Z"
+      }
+    },
+    "GET_ENGAGEMENT_GENERAL_INFORMATION": {
+      "method": "GET_ENGAGEMENT_GENERAL_INFORMATION",
+      "http_status": 200
+    }
+  }
+}

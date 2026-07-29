@@ -1,0 +1,145 @@
+{
+  "version": "3.2.22",
+  "mission": "PRODUCTION_EMPLOYEE_DELETE_PROTECTION",
+  "phases": {
+    "phase1": [
+      {
+        "employee_number": "EMP-000001",
+        "employee_id": "3151ddc4-39bb-4b30-897b-1271eb940b3b",
+        "name": "Tebogo Matlala",
+        "business_records": {
+          "payslips": 15,
+          "payroll_history": 15,
+          "payroll_audit_events": 0,
+          "journal_entries_company_payrollish": 4,
+          "expense_claims": 0,
+          "leave_signal_payslips": 13,
+          "audit_logs_employee": 8,
+          "timeline_events": 0,
+          "payroll_rule_settings": 0
+        }
+      },
+      {
+        "employee_number": "EMP-000002",
+        "employee_id": "6a72f977-35a7-4a15-9559-b58a0dd13d4e",
+        "name": "Puba Man",
+        "business_records": {
+          "payslips": 4,
+          "payroll_history": 4,
+          "payroll_audit_events": 0,
+          "journal_entries_company_payrollish": 4,
+          "expense_claims": 0,
+          "leave_signal_payslips": 4,
+          "audit_logs_employee": 3,
+          "timeline_events": 0,
+          "payroll_rule_settings": 0
+        }
+      }
+    ],
+    "phase2": {
+      "target": {
+        "employee_number": "EMP-000001",
+        "employee_id": "3151ddc4-39bb-4b30-897b-1271eb940b3b",
+        "name": "Tebogo Matlala",
+        "business_records": {
+          "payslips": 15,
+          "payroll_history": 15,
+          "payroll_audit_events": 0,
+          "journal_entries_company_payrollish": 4,
+          "expense_claims": 0,
+          "leave_signal_payslips": 13,
+          "audit_logs_employee": 8,
+          "timeline_events": 0,
+          "payroll_rule_settings": 0
+        }
+      },
+      "http_status": 500,
+      "delete_result": {
+        "error": "Cannot delete employee: linked payroll, expense, or asset records exist. Terminate or archive instead."
+      },
+      "business_validation": "Cannot delete employee: linked payroll, expense, or asset records exist. Terminate or archive instead.",
+      "database_response": "{\"error\":\"Cannot delete employee: linked payroll, expense, or asset records exist. Terminate or archive instead.\"}"
+    },
+    "phase3": {
+      "delete_rejected": true,
+      "employee_remains": true,
+      "payslips_remain": true,
+      "payslips_before": 15,
+      "payslips_after": 15,
+      "journals_before": 10,
+      "journals_after": 10,
+      "journals_remain": true,
+      "audit_before": 189,
+      "audit_after": 189,
+      "audit_remain": true,
+      "payroll_runs_before": 16,
+      "payroll_runs_after": 16,
+      "payroll_remain": true,
+      "timeline_after": 0,
+      "before_counts": {
+        "employee": {
+          "id": "3151ddc4-39bb-4b30-897b-1271eb940b3b",
+          "employee_number": "EMP-000001",
+          "first_name": "Tebogo",
+          "last_name": "Matlala"
+        },
+        "payslips": 15,
+        "expense_claims": 0,
+        "timeline_events": 0,
+        "payroll_rule_settings": 0,
+        "audit_logs_employee": 0,
+        "journal_entries_payrollish": 0,
+        "payroll_history_len": 15
+      }
+    },
+    "phase4": {
+      "create": {
+        "httpStatus": 200,
+        "body": {
+          "id": "99d7af3f-1320-4fa6-8735-e33d21fed6ea",
+          "company_id": "3cbfd4eb-a095-43f3-837a-0b4f1e2c1752",
+          "first_name": "Val",
+          "last_name": "DeleteProt1783858867400",
+          "email": null,
+          "phone": null,
+          "id_number": null,
+          "tax_number": null,
+          "bank_name": null,
+          "bank_account_number": null,
+          "employment_type": "permanent",
+          "department": null,
+          "position": null,
+          "start_date": "2026-07-12",
+          "end_date": null,
+          "created_at": "2026-07-12T12:21:08.084156+00:00",
+          "salary_amount": null,
+          "salary_period": null,
+          "employee_number": "EMP-000018",
+          "branch": null,
+          "manager_id": null,
+          "employment_status": "active"
+        }
+      },
+      "timeline_before_delete": 2,
+      "delete": {
+        "httpStatus": 200,
+        "body": null
+      },
+      "employee_removed": true,
+      "timeline_after_delete": 0,
+      "orphan_payslips": 0,
+      "timeline_cascaded": true
+    }
+  },
+  "quality_gates": {
+    "validation_employees_deletable": true,
+    "production_employees_protected": true,
+    "payroll_history_protected": true,
+    "journal_history_protected": true,
+    "audit_history_protected": true,
+    "timeline_integrity_preserved": true,
+    "no_orphan_records": true,
+    "no_regression": true
+  },
+  "verdict": "CERTIFIED"
+}

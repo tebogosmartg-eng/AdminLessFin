@@ -1,0 +1,121 @@
+{
+  "companyId": "3cbfd4eb-a095-43f3-837a-0b4f1e2c1752",
+  "accountTypes": {
+    "Liability": 3,
+    "Income": 1,
+    "Expense": 14,
+    "Asset": 16
+  },
+  "assetNames": [
+    "AR",
+    "Bank",
+    "E2E QA GL Account 1785296801600 EDITED",
+    "Accounts payables",
+    "Spaceman Operating Account",
+    "VAT Input",
+    "E2E QA Account 1785244776970",
+    "E2E QA Account 1785244832245",
+    "E2E QA Account 1785245497253",
+    "E2E QA Account 1785245780762",
+    "E2E QA Account 1785246905214",
+    "E2E QA Account 1785247104006",
+    "E2E QA Account 1785247972680",
+    "E2E QA Account 1785257847289",
+    "E2E QA Account 1785261864464",
+    "E2E QA Account 1785296801599"
+  ],
+  "incomeNames": [
+    "zuru"
+  ],
+  "liabilityNames": [
+    "VAT Output",
+    "AP",
+    "Due to Owner"
+  ],
+  "selectedAr": {
+    "id": "eb5a9a02-7e79-44f6-b6b5-fe4fb2b0f674",
+    "name": "AR"
+  },
+  "selectedIncome": {
+    "id": "0cf0454c-77be-4cbc-ae8f-9c5947b22be7",
+    "name": "zuru"
+  },
+  "custMethods": {
+    "GET": {
+      "status": 200,
+      "count": 2,
+      "first": "Itumeleng"
+    },
+    "GET_ALL": {
+      "status": 400,
+      "keys": [
+        "version",
+        "code",
+        "category",
+        "severity",
+        "businessMessage",
+        "technicalMessage",
+        "recoverySuggestion",
+        "correlationId",
+        "companyId",
+        "timestamp",
+        "retryable",
+        "originalCause",
+        "error"
+      ],
+      "sample": "{\"version\":\"1.0\",\"code\":\"VALIDATION_FAILED\",\"category\":\"ValidationError\",\"severity\":\"error\",\"businessMessage\":\"Some information is missing or invalid. Please review and try again.\",\"technicalMessage\":\"Unsupported method: GET_ALL\",\"recoverySuggestion\":\"Correct the highlighted fields and submit again."
+    },
+    "LIST": {
+      "status": 400,
+      "keys": [
+        "version",
+        "code",
+        "category",
+        "severity",
+        "businessMessage",
+        "technicalMessage",
+        "recoverySuggestion",
+        "correlationId",
+        "companyId",
+        "timestamp",
+        "retryable",
+        "originalCause",
+        "error"
+      ],
+      "sample": "{\"version\":\"1.0\",\"code\":\"VALIDATION_FAILED\",\"category\":\"ValidationError\",\"severity\":\"error\",\"businessMessage\":\"Some information is missing or invalid. Please review and try again.\",\"technicalMessage\":\"Unsupported method: LIST\",\"recoverySuggestion\":\"Correct the highlighted fields and submit again.\",\""
+    },
+    "get": {
+      "status": 400,
+      "keys": [
+        "version",
+        "code",
+        "category",
+        "severity",
+        "businessMessage",
+        "technicalMessage",
+        "recoverySuggestion",
+        "correlationId",
+        "companyId",
+        "timestamp",
+        "retryable",
+        "originalCause",
+        "error"
+      ],
+      "sample": "{\"version\":\"1.0\",\"code\":\"VALIDATION_FAILED\",\"category\":\"ValidationError\",\"severity\":\"error\",\"businessMessage\":\"Some information is missing or invalid. Please review and try again.\",\"technicalMessage\":\"Unsupported method: get\",\"recoverySuggestion\":\"Correct the highlighted fields and submit again.\",\"c"
+    }
+  },
+  "createdCustomer": null,
+  "customerId": "8b23e413-bd07-479e-bf59-28bff83fb7bb",
+  "create": {
+    "status": 200,
+    "body": {
+      "id": "c41c1ef4-566f-4d0d-94d2-a3417bef97b4"
+    }
+  },
+  "invoiceNumber": "P0INV828988",
+  "listHasInvoice": true,
+  "periodProbe": {
+    "data": null,
+    "error": null
+  }
+}

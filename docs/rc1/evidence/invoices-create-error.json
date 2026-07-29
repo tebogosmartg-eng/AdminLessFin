@@ -1,0 +1,14 @@
+{
+  "timestamp": "2026-07-28T16:57:20.667Z",
+  "user": "efs.certification.v6102@adminless.local",
+  "companyId": "3cbfd4eb-a095-43f3-837a-0b4f1e2c1752",
+  "accounts": {},
+  "create": {
+    "status": 500,
+    "body": "{\"version\":\"1.0\",\"code\":\"UNKNOWNPLATFORM_FAILED\",\"category\":\"UnknownPlatformError\",\"severity\":\"error\",\"businessMessage\":\"An unexpected platform error occurred.\",\"technicalMessage\":\"Could not find the function public.post_sales_invoice_atomic(p_actor_user_id, p_company_id, p_description, p_inventory_asset_account_id, p_items, p_notes, p_quote_id, p_tax_payable_account_id) in the schema cache\",\"recoverySuggestion\":\"Contact support with the correlation ID shown below.\",\"correlationId\":\"edge:01b1e0b1-4799-45ad-949c-3fc9738abb3b\",\"companyId\":\"3cbfd4eb-a095-43f3-837a-0b4f1e2c1752\",\"timestamp\":\"2026-07-28T16:57:19.541Z\",\"retryable\":false,\"originalCause\":\"{\\\"message\\\":\\\"Could not find the function public.post_sales_invoice_atomic(p_actor_user_id, p_company_id, p_description, p_inventory_asset_account_id, p_items, p_notes, p_quote_id, p_tax_payable_account_id) in the schema cache\\\",\\\"details\\\":\\\"Searched for the function public.post_sales_invoice_atomic with parameters p_actor_user_id, p_company_id, p_description, p_inventory_asset_account_id, p_items, p_notes, p_quote_id, p_tax_payable_account_id or with a single unnamed json/jsonb parameter, but no matches were found in the schema cache.\\\",\\\"hint\\\":\\\"Perhaps you meant to call the function public.post_sales_invoice_atomic(p_actor_user_id, p_ar_account_id, p_company_id, p_customer_id, p_description, p_due_date, p_inventory_asset_account_id, p_invoice_date, p_invoice_number, p_items, p_notes, p_quote_id, p_tax_payable_account_id)\\\"}\",\"error\":\"An unexpected platform error occurred.\"}"
+  },
+  "getNext": {
+    "status": 200,
+    "body": "\"INV-00001\""
+  }
+}

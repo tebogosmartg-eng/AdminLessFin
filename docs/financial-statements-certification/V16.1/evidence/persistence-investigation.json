@@ -1,0 +1,195 @@
+{
+  "company_id": "3cbfd4eb-a095-43f3-837a-0b4f1e2c1752",
+  "workspace_id": "66a7ad84-2eaf-4b9e-8423-89019ba3c6b3",
+  "project_url": "https://zaulhnpohrgqqodvzhxp.supabase.co",
+  "steps": [
+    {
+      "name": "1. IMMEDIATE SELECT before (PostgREST)",
+      "at": "2026-07-21T13:07:26.320Z",
+      "data": {
+        "http_status": 404,
+        "content_range": null,
+        "body": {
+          "code": "PGRST205",
+          "details": null,
+          "hint": "Perhaps you meant the table 'public.company_users'",
+          "message": "Could not find the table 'public.efs_company_master_data' in the schema cache"
+        }
+      }
+    },
+    {
+      "name": "2. COLUMN PROBE legacy_migration_completed_at",
+      "at": "2026-07-21T13:07:26.925Z",
+      "data": {
+        "http_status": 404,
+        "body": {
+          "code": "PGRST205",
+          "details": null,
+          "hint": "Perhaps you meant the table 'public.company_users'",
+          "message": "Could not find the table 'public.efs_company_master_data' in the schema cache"
+        }
+      }
+    },
+    {
+      "name": "3. GET_ENGAGEMENT_GENERAL_INFORMATION (triggers migration path)",
+      "at": "2026-07-21T13:07:28.258Z",
+      "data": {
+        "http_status": 200,
+        "registered_office": "A118 Mandela Village\nHammanskraal\n0400",
+        "registration_number": "2025/521566/08"
+      }
+    },
+    {
+      "name": "4. Client SELECT master (authenticated role)",
+      "at": "2026-07-21T13:07:28.480Z",
+      "data": {
+        "error": {
+          "code": "PGRST205",
+          "details": null,
+          "hint": "Perhaps you meant the table 'public.company_users'",
+          "message": "Could not find the table 'public.efs_company_master_data' in the schema cache"
+        },
+        "row": null,
+        "is_empty": true,
+        "needs_hydration": true
+      }
+    },
+    {
+      "name": "5. Expected UPSERT payload (buildLegacyHydratedMasterRow)",
+      "at": "2026-07-21T13:07:28.480Z",
+      "data": {
+        "company_id": "3cbfd4eb-a095-43f3-837a-0b4f1e2c1752",
+        "company_profile": {
+          "registered_name": "Spaceman PTY(LTD)",
+          "trading_name": "Spaceman",
+          "registration_number": "2025/521566/08",
+          "nature_of_business": "Provision of security services",
+          "country_of_incorporation": null,
+          "entity_type": null
+        },
+        "addresses": {
+          "registered_office": "A118 Mandela Village\nHammanskraal\n0400",
+          "business_address": "A118 Mandela Village\nHammanskraal\n0400",
+          "postal_address": "A118 Mandela Village\nHammanskraal\n0400",
+          "physical_address": null,
+          "website": null,
+          "email": "07175212566",
+          "telephone": null
+        },
+        "tax_registrations": {
+          "vat_number": "4013356565",
+          "income_tax_number": "9842121323",
+          "paye_number": null,
+          "sdl_number": null,
+          "uif_number": null,
+          "custom_tax_registrations": []
+        },
+        "directors": [],
+        "governance": {
+          "company_secretary": "Rorisang Letebe;e",
+          "auditor": "Choppa Moatshe",
+          "independent_reviewer": null,
+          "accounting_officer": null
+        },
+        "officers": [
+          {
+            "role": "preparer",
+            "name": "Tebogo Matlala"
+          },
+          {
+            "role": "reviewer",
+            "name": "Takalani Mtengwe"
+          },
+          {
+            "role": "partner",
+            "name": "Puba Mantsha"
+          }
+        ],
+        "principal_bankers": [],
+        "legacy_migration_completed_at": "2026-07-21T13:07:28.480Z",
+        "updated_at": "2026-07-21T13:07:28.480Z"
+      }
+    },
+    {
+      "name": "6. AUTHENTICATED UPSERT (PostgREST) — same SQL surface as edge",
+      "at": "2026-07-21T13:07:29.056Z",
+      "data": {
+        "http_status": 404,
+        "prefer": null,
+        "content_range": null,
+        "body": {
+          "code": "PGRST205",
+          "details": null,
+          "hint": "Perhaps you meant the table 'public.company_users'",
+          "message": "Could not find the table 'public.efs_company_master_data' in the schema cache"
+        }
+      }
+    },
+    {
+      "name": "7. IMMEDIATE SELECT after UPSERT",
+      "at": "2026-07-21T13:07:29.278Z",
+      "data": {
+        "http_status": 404,
+        "content_range": null,
+        "body": {
+          "code": "PGRST205",
+          "details": null,
+          "hint": "Perhaps you meant the table 'public.company_users'",
+          "message": "Could not find the table 'public.efs_company_master_data' in the schema cache"
+        }
+      }
+    },
+    {
+      "name": "8. GET_COMPANY_MASTER_DATA edge response",
+      "at": "2026-07-21T13:07:30.118Z",
+      "data": {
+        "http_status": 200,
+        "body": {
+          "company_id": "3cbfd4eb-a095-43f3-837a-0b4f1e2c1752",
+          "company_profile": {},
+          "addresses": {},
+          "tax_registrations": {},
+          "directors": [],
+          "governance": {},
+          "officers": [],
+          "principal_bankers": [],
+          "updated_at": "2026-07-21T13:07:28.288Z"
+        }
+      }
+    },
+    {
+      "name": "9. UPSERT without legacy_migration_completed_at",
+      "at": "2026-07-21T13:07:30.357Z",
+      "data": {
+        "http_status": 404,
+        "body": {
+          "code": "PGRST205",
+          "details": null,
+          "hint": "Perhaps you meant the table 'public.company_users'",
+          "message": "Could not find the table 'public.efs_company_master_data' in the schema cache"
+        }
+      }
+    },
+    {
+      "name": "10. SELECT after UPSERT without marker",
+      "at": "2026-07-21T13:07:30.572Z",
+      "data": {
+        "http_status": 404,
+        "body": {
+          "code": "PGRST205",
+          "details": null,
+          "hint": "Perhaps you meant the table 'public.company_users'",
+          "message": "Could not find the table 'public.efs_company_master_data' in the schema cache"
+        }
+      }
+    },
+    {
+      "name": "11. PostgREST OpenAPI columns for efs_company_master_data",
+      "at": "2026-07-21T13:07:30.596Z",
+      "data": {
+        "properties": null,
+        "required": null
+      }
+    }
+  ]
+}

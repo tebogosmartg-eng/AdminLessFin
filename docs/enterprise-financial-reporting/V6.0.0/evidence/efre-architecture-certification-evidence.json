@@ -1,0 +1,130 @@
+{
+  "product": "AdminLess Fin",
+  "pillar": "Enterprise Financial Reporting Engine",
+  "acronym": "EFRE",
+  "version": "6.0.0",
+  "date": "2026-07-13",
+  "board": "Independent Principal Financial Reporting Architecture Board",
+  "verdict": "ENTERPRISE FINANCIAL REPORTING ENGINE ARCHITECTURE CERTIFIED",
+  "implementation": "PROHIBITED until Implementation Approval cites V6.0.0",
+  "core_principle": "Accounting owns financial facts. Operational Reports own operational presentation. Enterprise Financial Reporting owns statutory financial reporting.",
+  "event_namespace": "fre.*",
+  "dual_track": {
+    "operational_financial_reporting": {
+      "status": "PRESERVED",
+      "deprecated": false,
+      "deleted": false,
+      "owns": [
+        "Live Income Statement",
+        "Live Balance Sheet",
+        "Live Cash Flow",
+        "Live Trial Balance",
+        "Live Ratio Analysis"
+      ],
+      "consumes": "Live Accounting balance/activity/cash-flow facts",
+      "surfaces": "Existing Reports / Financial Statements module and reports edge methods"
+    },
+    "enterprise_financial_reporting": {
+      "status": "ADDITIVE_PILLAR",
+      "owns": [
+        "Statement preparation",
+        "Disclosure management",
+        "Notes",
+        "Accounting policies (presentation)",
+        "Comparative figures (statutory)",
+        "Validation",
+        "Review workflow",
+        "Version control",
+        "Publication"
+      ],
+      "consumes": "Sealed AccountingFact Snapshots"
+    }
+  },
+  "migration_rules": {
+    "do_not_delete_existing_financial_statements": true,
+    "do_not_redesign_existing_reporting_engine": true,
+    "do_not_break_existing_integrations": true,
+    "do_not_duplicate_accounting_calculations": true,
+    "backwards_compatibility_required": true,
+    "progressive_elevation_to_efre_for_statutory_packs": true
+  },
+  "distinction": {
+    "accounting": "Journals, recognition, balances, period close (SoT for financial facts)",
+    "operational_financial_reporting": "Live operational presentation of Accounting facts — preserved forever under migration strategy",
+    "v3_6_reporting_platform": "Generic registry/matrix/export substrate — not FS framework semantics",
+    "egcp_v5_0_0": "Legislation, policy, DoA, obligations — must not own financial statements",
+    "v4_4_0": "Product evolution / change-control governance (orthogonal)",
+    "efre_v6_0_0": "Standards-based / statutory financial statements, disclosures, publication"
+  },
+  "framework_packs": [
+    "IFRS",
+    "IFRS for SMEs",
+    "GRAP",
+    "Modified Cash Standard",
+    "IPSAS",
+    "Future Framework Packs"
+  ],
+  "domains_certified": [
+    "Statement Engine",
+    "Disclosure Engine",
+    "Notes Engine",
+    "Mapping Engine",
+    "Accounting Policy Engine",
+    "Comparative Figures Engine",
+    "Cross Reference Engine",
+    "Materiality Engine",
+    "Validation Engine",
+    "Review Workflow",
+    "Publication Engine",
+    "Version Control",
+    "XBRL Readiness",
+    "Framework Management"
+  ],
+  "verification": {
+    "accounting_owns_balances": "PASS",
+    "operational_reports_own_operational_presentation": "PASS",
+    "reporting_owns_statutory_presentation": "PASS",
+    "no_duplicated_accounting_calculations": "PASS",
+    "existing_financial_statements_preserved": "PASS",
+    "backwards_compatibility_required": "PASS",
+    "multi_framework_ready": "PASS",
+    "versioned_reporting_frameworks": "PASS",
+    "multi_company_ready": "PASS",
+    "fully_auditable": "PASS",
+    "publication_ready": "PASS",
+    "future_xbrl_ready": "PASS"
+  },
+  "prerequisites": [
+    "Accounting Engine (journals/balances/periods) — SoT",
+    "Existing Financial Statements / Reports — Operational Financial Reporting (preserved)",
+    "Enterprise Reporting Platform V3.6.3+",
+    "Payroll/Statutory freeze V3.x",
+    "EWM V4.0–V4.1.5",
+    "Edge Platform V4.2.1",
+    "Business Event Platform V4.3.0",
+    "Evolution Governance V4.4.0",
+    "EGCP V5.0.0 (definitional; implementation deferred)"
+  ],
+  "deliverables": [
+    "00_INDEX.md",
+    "01_ENTERPRISE_FINANCIAL_REPORTING_ARCHITECTURE.md",
+    "02_DOMAIN_MODEL.md",
+    "03_REPORTING_BOUNDARIES.md",
+    "04_CONSUMER_MATRIX.md",
+    "05_BUSINESS_EVENT_CATALOGUE.md",
+    "06_INTEGRATION_ARCHITECTURE.md",
+    "07_ENTERPRISE_READINESS_ASSESSMENT.md",
+    "08_MIGRATION_STRATEGY.md"
+  ],
+  "explicit_non_claims": [
+    "No services, schema, Edge Functions, or UI implemented",
+    "No Accounting posting rule changes",
+    "No payroll formula changes",
+    "No EGCP implementation",
+    "No replacement of V3.6 payroll/VIP reporting",
+    "No deletion/deprecation of existing Financial Statements",
+    "No redesign of existing operational reporting engine",
+    "No IFRS taxonomy binaries or regulator gateways shipped",
+    "Consolidation reserved — not certified for implementation scope"
+  ]
+}

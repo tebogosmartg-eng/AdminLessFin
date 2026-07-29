@@ -1,0 +1,92 @@
+{
+  "timestamp": "2026-07-29T04:02:55.757Z",
+  "phases": {
+    "auth": {
+      "status": 200,
+      "hasCompany": true
+    },
+    "coa": {
+      "status": 200,
+      "count": 34,
+      "ar": null,
+      "income": {
+        "id": "0cf0454c-77be-4cbc-ae8f-9c5947b22be7",
+        "name": "zuru",
+        "type": "Income"
+      }
+    },
+    "customers": {
+      "status": 400,
+      "count": 0
+    },
+    "getNext": {
+      "status": 200,
+      "number": "INV-00001"
+    },
+    "requestPayload": {
+      "method": "CREATE_WITH_TIMESHEETS",
+      "company_id": "3cbfd4eb-a095-43f3-837a-0b4f1e2c1752",
+      "invoiceDataKeys": [
+        "invoice_number",
+        "invoice_date",
+        "due_date",
+        "customer_id",
+        "accounts_receivable_id",
+        "inventory_asset_account_id",
+        "tax_payable_account_id",
+        "description",
+        "notes",
+        "items",
+        "p_items"
+      ],
+      "mappedRpc": {
+        "p_invoice_date": "2026-07-29",
+        "p_due_date": "2026-08-28",
+        "p_invoice_number": "P0INV781811",
+        "p_items_len": 1
+      }
+    },
+    "create": {
+      "status": 500,
+      "ms": 692,
+      "body": {
+        "version": "1.0",
+        "code": "UNKNOWNPLATFORM_FAILED",
+        "category": "UnknownPlatformError",
+        "severity": "error",
+        "businessMessage": "An unexpected platform error occurred.",
+        "technicalMessage": "Could not find the function public.post_sales_invoice_atomic(p_actor_user_id, p_company_id, p_description, p_due_date, p_inventory_asset_account_id, p_invoice_date, p_invoice_number, p_items, p_notes, p_quote_id, p_tax_payable_account_id) in the schema cache",
+        "recoverySuggestion": "Contact support with the correlation ID shown below.",
+        "correlationId": "edge:1cd5fdbc-58ca-4de8-b423-f668de8efd2c",
+        "companyId": "3cbfd4eb-a095-43f3-837a-0b4f1e2c1752",
+        "timestamp": "2026-07-29T04:03:02.307Z",
+        "retryable": false,
+        "originalCause": "{\"message\":\"Could not find the function public.post_sales_invoice_atomic(p_actor_user_id, p_company_id, p_description, p_due_date, p_inventory_asset_account_id, p_invoice_date, p_invoice_number, p_items, p_notes, p_quote_id, p_tax_payable_account_id) in the schema cache\",\"details\":\"Searched for the function public.post_sales_invoice_atomic with parameters p_actor_user_id, p_company_id, p_description, p_due_date, p_inventory_asset_account_id, p_invoice_date, p_invoice_number, p_items, p_notes, p_quote_id, p_tax_payable_account_id or with a single unnamed json/jsonb parameter, but no matches were found in the schema cache.\",\"hint\":\"Perhaps you meant to call the function public.post_sales_invoice_atomic(p_actor_user_id, p_ar_account_id, p_company_id, p_customer_id, p_description, p_due_date, p_inventory_asset_account_id, p_invoice_date, p_invoice_number, p_items, p_notes, p_quote_id, p_tax_payable_account_id)\"}",
+        "error": "An unexpected platform error occurred."
+      }
+    },
+    "wrongPayloadComparison": {
+      "status": 500,
+      "body": {
+        "version": "1.0",
+        "code": "UNKNOWNPLATFORM_FAILED",
+        "category": "UnknownPlatformError",
+        "severity": "error",
+        "businessMessage": "An unexpected platform error occurred.",
+        "technicalMessage": "Could not find the function public.post_sales_invoice_atomic(p_actor_user_id, p_company_id, p_description, p_inventory_asset_account_id, p_items, p_notes, p_quote_id, p_tax_payable_account_id) in the schema cache",
+        "recoverySuggestion": "Contact support with the correlation ID shown below.",
+        "correlationId": "edge:d563f1f9-a3bb-4628-b216-0e5a84b3df7c",
+        "companyId": "3cbfd4eb-a095-43f3-837a-0b4f1e2c1752",
+        "timestamp": "2026-07-29T04:03:02.912Z",
+        "retryable": false,
+        "originalCause": "{\"message\":\"Could not find the function public.post_sales_invoice_atomic(p_actor_user_id, p_company_id, p_description, p_inventory_asset_account_id, p_items, p_notes, p_quote_id, p_tax_payable_account_id) in the schema cache\",\"details\":\"Searched for the function public.post_sales_invoice_atomic with parameters p_actor_user_id, p_company_id, p_description, p_inventory_asset_account_id, p_items, p_notes, p_quote_id, p_tax_payable_account_id or with a single unnamed json/jsonb parameter, but no matches were found in the schema cache.\",\"hint\":\"Perhaps you meant to call the function public.post_sales_invoice_atomic(p_actor_user_id, p_ar_account_id, p_company_id, p_customer_id, p_description, p_due_date, p_inventory_asset_account_id, p_invoice_date, p_invoice_number, p_items, p_notes, p_quote_id, p_tax_payable_account_id)\"}",
+        "error": "An unexpected platform error occurred."
+      }
+    }
+  },
+  "user": "efs.certification.v6102@adminless.local",
+  "userId": "908ad90e-ee0e-4957-943d-ed1ec2fb843a",
+  "companyId": "3cbfd4eb-a095-43f3-837a-0b4f1e2c1752",
+  "invoiceId": null,
+  "invoiceNumber": "P0INV781811"
+}

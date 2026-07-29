@@ -1,0 +1,1479 @@
+{
+  "runAt": "2026-07-18T08:48:06.921Z",
+  "version": "6.10.3",
+  "board": "Independent Principal Enterprise Certification Board",
+  "product": "AdminLess Fin",
+  "reportingPeriod": {
+    "period_key": "FY2025-26",
+    "label": "Financial Year 2025/26",
+    "start_date": "2025-04-01",
+    "end_date": "2026-03-31"
+  },
+  "decision": "PROFESSIONAL ANNUAL FINANCIAL STATEMENTS CERTIFIED",
+  "exportedPdfPath": "C:\\Users\\TebogoM\\Desktop\\development projects\\SmartAccounting\\docs\\financial-statements-certification\\V6.10.3\\evidence\\AFS_V6.10.3_Spaceman_run1.pdf",
+  "summary": {
+    "totalSteps": 42,
+    "passed": 42,
+    "failed": 0,
+    "blocked": 0,
+    "skipped": 0,
+    "blockingIssues": []
+  },
+  "issues": [
+    {
+      "id": "ISSUE-001",
+      "phase": "3",
+      "step": "Framework pack resolution",
+      "layer": "API layer / certification harness",
+      "rootCause": "LIST_FRAMEWORK_PACKS returns a bare array; harness initially expected { packs: [] }",
+      "fix": "Normalize bare-array and wrapped response shapes in asArray()",
+      "filesChanged": [
+        "tests/e2e/run-efs-e2e-certification.ts"
+      ],
+      "redeployed": [],
+      "status": "fixed"
+    }
+  ],
+  "traceability": {
+    "company": {
+      "id": "3cbfd4eb-a095-43f3-837a-0b4f1e2c1752",
+      "name": "Spaceman"
+    },
+    "reportingPeriod": {
+      "id": "edcf2b42-6798-47de-abe3-1bd22d8ed901",
+      "period_key": "FY2025-26",
+      "label": "Financial Year 2025/26",
+      "start_date": "2025-04-01",
+      "end_date": "2026-03-31"
+    },
+    "workspace": {
+      "id": "66a7ad84-2eaf-4b9e-8423-89019ba3c6b3",
+      "name": "V6.10.3 Professional Annual Financial Statements Certification"
+    },
+    "statements": [
+      {
+        "type": "changes_in_equity",
+        "content_hash": "f637c07ffafdfdaf8fc230b90816a36324e345a78f372359d19f7e30aaf208c0",
+        "lineCount": 4
+      },
+      {
+        "type": "cash_flows",
+        "content_hash": "2c4f89a6d4dc2a6c292fb46965eff5ac9e12604315f6a8a9ecd47486f0f26097",
+        "lineCount": 4
+      },
+      {
+        "type": "financial_performance",
+        "content_hash": "0b36f9bf896635f0acfacbbfb24232f992809ece3e3879c9811ac33d37023edd",
+        "lineCount": 5
+      },
+      {
+        "type": "financial_position",
+        "content_hash": "20ee25a6e2d532488f95f1dac71330b91b218b42ef8153f45e6e6dbd05e10d41",
+        "lineCount": 8
+      }
+    ],
+    "disclosures": {
+      "count": 7
+    },
+    "validation": {
+      "run": {
+        "id": "23aff894-f71e-4beb-8919-409cf2c9f045",
+        "company_id": "3cbfd4eb-a095-43f3-837a-0b4f1e2c1752",
+        "workspace_id": "66a7ad84-2eaf-4b9e-8423-89019ba3c6b3",
+        "framework_pack_id": "88b72727-a66a-4f87-8e33-a86f5bfe42dc",
+        "snapshot_version_id": "c9d5ee93-0162-4394-819e-bdc176c94459",
+        "run_type": "full",
+        "status": "passed_with_advisories",
+        "blocking_count": 0,
+        "significant_count": 6,
+        "advisory_count": 0,
+        "total_issues": 6,
+        "ready_for_review": true,
+        "engine_version": "6.4.5",
+        "mutates_financial_data": false,
+        "live_gl_read": false,
+        "started_at": "2026-07-18T08:47:59.70558+00:00",
+        "completed_at": "2026-07-18T08:47:59.913+00:00",
+        "started_by": "908ad90e-ee0e-4957-943d-ed1ec2fb843a",
+        "summary": {
+          "status": "passed_with_advisories",
+          "live_gl_read": false,
+          "total_issues": 6,
+          "framework_key": "IFRS_SME",
+          "advisory_count": 0,
+          "blocking_count": 0,
+          "framework_count": 4,
+          "technical_count": 2,
+          "ready_for_review": true,
+          "significant_count": 6,
+          "approves_statements": false,
+          "snapshot_version_id": "c9d5ee93-0162-4394-819e-bdc176c94459",
+          "mutates_financial_data": false
+        },
+        "created_at": "2026-07-18T08:47:59.70558+00:00"
+      },
+      "issues": [
+        {
+          "rule_id": "6153b3fb-c4e5-474a-9068-0d6a859c580e",
+          "rule_code": "TECH.MISSING_EVIDENCE",
+          "issue_code": "EV.WP_NO_EVIDENCE",
+          "title": "Finalized Working Paper lacks evidence reference",
+          "message": "Finalized WP 'Lead WP — Total Assets (V6.10.2)' has no Supporting Evidence reference.",
+          "severity": "significant",
+          "recommendation": "Attach Supporting Evidence and evidence references to finalized Working Papers.",
+          "structure_node_id": "0c8ad17c-9f47-40d5-9b07-89def1866c3f",
+          "disclosure_instance_id": null,
+          "working_paper_id": "84db7bdf-d061-46fa-9983-d826e2da60c9",
+          "statement_instance_id": null,
+          "resolution_status": "open",
+          "payload": {}
+        },
+        {
+          "rule_id": "6153b3fb-c4e5-474a-9068-0d6a859c580e",
+          "rule_code": "TECH.MISSING_EVIDENCE",
+          "issue_code": "EV.WP_NO_EVIDENCE",
+          "title": "Finalized Working Paper lacks evidence reference",
+          "message": "Finalized WP 'Lead WP — Total Assets (V6.10.2)' has no Supporting Evidence reference.",
+          "severity": "significant",
+          "recommendation": "Attach Supporting Evidence and evidence references to finalized Working Papers.",
+          "structure_node_id": "0c8ad17c-9f47-40d5-9b07-89def1866c3f",
+          "disclosure_instance_id": null,
+          "working_paper_id": "9b78fafc-7afb-48f8-94ce-1f46b854a2be",
+          "statement_instance_id": null,
+          "resolution_status": "open",
+          "payload": {}
+        },
+        {
+          "rule_id": "de70a4f3-d368-4ece-b630-8444faaf0924",
+          "rule_code": "FW.DISCLOSURE_COMPLETE",
+          "issue_code": "FW.DISC.DRAFT.DISC.BASIS",
+          "title": "Required disclosure still draft: DISC.BASIS",
+          "message": "Disclosure 'Basis of preparation' is required but remains in draft.",
+          "severity": "significant",
+          "recommendation": "Move required disclosure instances to in_progress or complete.",
+          "structure_node_id": "a097b7d2-cc69-40c9-aec6-7271c1ed985c",
+          "disclosure_instance_id": "181ef5f8-749d-403b-b513-8074449da1cf",
+          "working_paper_id": null,
+          "statement_instance_id": null,
+          "resolution_status": "open",
+          "payload": {}
+        },
+        {
+          "rule_id": "de70a4f3-d368-4ece-b630-8444faaf0924",
+          "rule_code": "FW.DISCLOSURE_COMPLETE",
+          "issue_code": "FW.DISC.DRAFT.DISC.POLICIES",
+          "title": "Required disclosure still draft: DISC.POLICIES",
+          "message": "Disclosure 'Significant accounting policies' is required but remains in draft.",
+          "severity": "significant",
+          "recommendation": "Move required disclosure instances to in_progress or complete.",
+          "structure_node_id": "a097b7d2-cc69-40c9-aec6-7271c1ed985c",
+          "disclosure_instance_id": "1c1a0e26-41fe-48cd-8e8d-7b50edea7d2a",
+          "working_paper_id": null,
+          "statement_instance_id": null,
+          "resolution_status": "open",
+          "payload": {}
+        },
+        {
+          "rule_id": "de70a4f3-d368-4ece-b630-8444faaf0924",
+          "rule_code": "FW.DISCLOSURE_COMPLETE",
+          "issue_code": "FW.DISC.DRAFT.DISC.REVENUE",
+          "title": "Required disclosure still draft: DISC.REVENUE",
+          "message": "Disclosure 'Revenue' is required but remains in draft.",
+          "severity": "significant",
+          "recommendation": "Move required disclosure instances to in_progress or complete.",
+          "structure_node_id": "75b57ae2-033d-4f38-bb63-4c18e3d68e28",
+          "disclosure_instance_id": "4c8cfc41-e86f-4f0f-ab90-c8281468019e",
+          "working_paper_id": null,
+          "statement_instance_id": null,
+          "resolution_status": "open",
+          "payload": {}
+        },
+        {
+          "rule_id": "de70a4f3-d368-4ece-b630-8444faaf0924",
+          "rule_code": "FW.DISCLOSURE_COMPLETE",
+          "issue_code": "FW.DISC.DRAFT.DISC.RELATED",
+          "title": "Required disclosure still draft: DISC.RELATED",
+          "message": "Disclosure 'Related parties' is required but remains in draft.",
+          "severity": "significant",
+          "recommendation": "Move required disclosure instances to in_progress or complete.",
+          "structure_node_id": "a097b7d2-cc69-40c9-aec6-7271c1ed985c",
+          "disclosure_instance_id": "1e169948-cbd0-4845-8475-6738e066dffc",
+          "working_paper_id": null,
+          "statement_instance_id": null,
+          "resolution_status": "open",
+          "payload": {}
+        }
+      ],
+      "ready_for_review": true,
+      "approves_statements": false,
+      "mutates_financial_data": false,
+      "live_gl_read": false,
+      "manager_review": false,
+      "partner_review": false,
+      "publication": false,
+      "xbrl": false,
+      "ai": false
+    },
+    "countsBeforePublication": {
+      "snapshots": 1,
+      "publications": 1,
+      "disclosures": 7
+    },
+    "priorSnapshotCount": 1,
+    "publication_run_1": {
+      "recordId": "183edfa9-5dd3-49ee-9585-5e2c694de7b4",
+      "artifactId": "a31920a6-4c8f-4bc9-b704-8f3c495e8b5b",
+      "contentHash": "ca4ec3e479c7ee3595d94919c6ac451c0eaed1afd8810965fa55b767ee7a58da",
+      "sha256": "4bc6909afe289afc0348d4594bed56d76eaf7af229c065e51a4f5a68e3c8808e",
+      "path": "C:\\Users\\TebogoM\\Desktop\\development projects\\SmartAccounting\\docs\\financial-statements-certification\\V6.10.3\\evidence\\AFS_V6.10.3_Spaceman_run1.pdf",
+      "formats": [
+        "pdf",
+        "docx",
+        "xlsx"
+      ]
+    },
+    "publication_run_2": {
+      "recordId": "183edfa9-5dd3-49ee-9585-5e2c694de7b4",
+      "artifactId": "a31920a6-4c8f-4bc9-b704-8f3c495e8b5b",
+      "contentHash": "ca4ec3e479c7ee3595d94919c6ac451c0eaed1afd8810965fa55b767ee7a58da",
+      "sha256": "4bc6909afe289afc0348d4594bed56d76eaf7af229c065e51a4f5a68e3c8808e",
+      "path": "C:\\Users\\TebogoM\\Desktop\\development projects\\SmartAccounting\\docs\\financial-statements-certification\\V6.10.3\\evidence\\AFS_V6.10.3_Spaceman_run2.pdf",
+      "formats": [
+        "pdf",
+        "docx",
+        "xlsx"
+      ]
+    },
+    "countsAfterPublication": {
+      "snapshots": 1,
+      "publications": 1,
+      "disclosures": 7
+    }
+  },
+  "steps": [
+    {
+      "phase": "0",
+      "step": "VITE_SUPABASE_URL loaded",
+      "status": "PASS"
+    },
+    {
+      "phase": "0",
+      "step": "VITE_SUPABASE_ANON_KEY loaded",
+      "status": "PASS"
+    },
+    {
+      "phase": "0",
+      "step": "E2E_EMAIL loaded",
+      "status": "PASS"
+    },
+    {
+      "phase": "0",
+      "step": "E2E_PASSWORD loaded",
+      "status": "PASS"
+    },
+    {
+      "phase": "0",
+      "step": "financial-statements edge reachable",
+      "status": "PASS",
+      "evidence": {
+        "status": 200
+      }
+    },
+    {
+      "phase": "1",
+      "step": "Login",
+      "status": "PASS",
+      "evidence": {
+        "userId": "908ad90e-ee0e-4957-943d-ed1ec2fb843a",
+        "email": "efs.certification.v6102@adminless.local"
+      }
+    },
+    {
+      "phase": "2",
+      "step": "Select company",
+      "status": "PASS",
+      "evidence": {
+        "companyId": "3cbfd4eb-a095-43f3-837a-0b4f1e2c1752",
+        "companyName": "Spaceman",
+        "role": "owner",
+        "membershipCount": 2
+      }
+    },
+    {
+      "phase": "3",
+      "step": "Open Financial Statements (LIST_FRAMEWORKS)",
+      "status": "PASS",
+      "response": [
+        {
+          "framework_key": "GRAP",
+          "name": "GRAP (South Africa)",
+          "jurisdiction_scope": "ZA",
+          "status": "active",
+          "created_at": "2026-07-14T05:55:07.198482+00:00",
+          "efs_framework_packs": [
+            {
+              "id": "183b3c08-b006-4934-8d5c-86003706fd70",
+              "label": "GRAP Pack 2026.1",
+              "status": "active",
+              "created_at": "2026-07-14T05:55:07.198482+00:00",
+              "version_id": "2026.1",
+              "content_ref": "platform://frameworks/GRAP/2026.1",
+              "effective_to": null,
+              "framework_key": "GRAP",
+              "effective_from": "2026-01-01"
+            }
+          ]
+        },
+        {
+          "framework_key": "IFRS",
+          "name": "IFRS",
+          "jurisdiction_scope": "global",
+          "status": "active",
+          "created_at": "2026-07-14T05:55:07.198482+00:00",
+          "efs_framework_packs": [
+            {
+              "id": "76f212eb-89b9-434f-9b95-400b718736b3",
+              "label": "IFRS Pack 2026.1",
+              "status": "active",
+              "created_at": "2026-07-14T05:55:07.198482+00:00",
+              "version_id": "2026.1",
+              "content_ref": "platform://frameworks/IFRS/2026.1",
+              "effective_to": null,
+              "framework_key": "IFRS",
+              "effective_from": "2026-01-01"
+            }
+          ]
+        },
+        {
+          "framework_key": "IFRS_SME",
+          "name": "IFRS for SMEs",
+          "jurisdiction_scope": "global",
+          "status": "active",
+          "created_at": "2026-07-14T05:55:07.198482+00:00",
+          "efs_framework_packs": [
+            {
+              "id": "88b72727-a66a-4f87-8e33-a86f5bfe42dc",
+              "label": "IFRS for SMEs Pack 2026.1",
+              "status": "active",
+              "created_at": "2026-07-14T05:55:07.198482+00:00",
+              "version_id": "2026.1",
+              "content_ref": "platform://frameworks/IFRS_SME/2026.1",
+              "effective_to": null,
+              "framework_key": "IFRS_SME",
+              "effective_from": "2026-01-01"
+            }
+          ]
+        },
+        {
+          "framework_key": "IPSAS",
+          "name": "IPSAS",
+          "jurisdiction_scope": "global",
+          "status": "active",
+          "created_at": "2026-07-14T05:55:07.198482+00:00",
+          "efs_framework_packs": [
+            {
+              "id": "8655efcf-887f-4f86-be1e-f3c7ec11b956",
+              "label": "IPSAS Pack 2026.1",
+              "status": "active",
+              "created_at": "2026-07-14T05:55:07.198482+00:00",
+              "version_id": "2026.1",
+              "content_ref": "platform://frameworks/IPSAS/2026.1",
+              "effective_to": null,
+              "framework_key": "IPSAS",
+              "effective_from": "2026-01-01"
+            }
+          ]
+        },
+        {
+          "framework_key": "MCS",
+          "name": "Modified Cash Standard",
+          "jurisdiction_scope": "ZA",
+          "status": "active",
+          "created_at": "2026-07-14T05:55:07.198482+00:00",
+          "efs_framework_packs": [
+            {
+              "id": "ea382d5a-1acd-4ffe-9b26-3524ee02a9d3",
+              "label": "MCS Pack 2026.1",
+              "status": "active",
+              "created_at": "2026-07-14T05:55:07.198482+00:00",
+              "version_id": "2026.1",
+              "content_ref": "platform://frameworks/MCS/2026.1",
+              "effective_to": null,
+              "framework_key": "MCS",
+              "effective_from": "2026-01-01"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "phase": "3",
+      "step": "Framework pack resolved (IFRS_SME)",
+      "status": "PASS",
+      "evidence": {
+        "id": "88b72727-a66a-4f87-8e33-a86f5bfe42dc",
+        "framework_key": "IFRS_SME",
+        "version_id": "2026.1",
+        "label": "IFRS for SMEs Pack 2026.1",
+        "effective_from": "2026-01-01",
+        "effective_to": null,
+        "status": "active",
+        "content_ref": "platform://frameworks/IFRS_SME/2026.1",
+        "created_at": "2026-07-14T05:55:07.198482+00:00",
+        "efs_frameworks": {
+          "name": "IFRS for SMEs",
+          "framework_key": "IFRS_SME"
+        }
+      },
+      "response": {
+        "packCount": 5,
+        "packs": [
+          {
+            "id": "183b3c08-b006-4934-8d5c-86003706fd70",
+            "framework_key": "GRAP",
+            "version_id": "2026.1",
+            "label": "GRAP Pack 2026.1",
+            "effective_from": "2026-01-01",
+            "effective_to": null,
+            "status": "active",
+            "content_ref": "platform://frameworks/GRAP/2026.1",
+            "created_at": "2026-07-14T05:55:07.198482+00:00",
+            "efs_frameworks": {
+              "name": "GRAP (South Africa)",
+              "framework_key": "GRAP"
+            }
+          },
+          {
+            "id": "76f212eb-89b9-434f-9b95-400b718736b3",
+            "framework_key": "IFRS",
+            "version_id": "2026.1",
+            "label": "IFRS Pack 2026.1",
+            "effective_from": "2026-01-01",
+            "effective_to": null,
+            "status": "active",
+            "content_ref": "platform://frameworks/IFRS/2026.1",
+            "created_at": "2026-07-14T05:55:07.198482+00:00",
+            "efs_frameworks": {
+              "name": "IFRS",
+              "framework_key": "IFRS"
+            }
+          },
+          {
+            "id": "88b72727-a66a-4f87-8e33-a86f5bfe42dc",
+            "framework_key": "IFRS_SME",
+            "version_id": "2026.1",
+            "label": "IFRS for SMEs Pack 2026.1",
+            "effective_from": "2026-01-01",
+            "effective_to": null,
+            "status": "active",
+            "content_ref": "platform://frameworks/IFRS_SME/2026.1",
+            "created_at": "2026-07-14T05:55:07.198482+00:00",
+            "efs_frameworks": {
+              "name": "IFRS for SMEs",
+              "framework_key": "IFRS_SME"
+            }
+          },
+          {
+            "id": "8655efcf-887f-4f86-be1e-f3c7ec11b956",
+            "framework_key": "IPSAS",
+            "version_id": "2026.1",
+            "label": "IPSAS Pack 2026.1",
+            "effective_from": "2026-01-01",
+            "effective_to": null,
+            "status": "active",
+            "content_ref": "platform://frameworks/IPSAS/2026.1",
+            "created_at": "2026-07-14T05:55:07.198482+00:00",
+            "efs_frameworks": {
+              "name": "IPSAS",
+              "framework_key": "IPSAS"
+            }
+          },
+          {
+            "id": "ea382d5a-1acd-4ffe-9b26-3524ee02a9d3",
+            "framework_key": "MCS",
+            "version_id": "2026.1",
+            "label": "MCS Pack 2026.1",
+            "effective_from": "2026-01-01",
+            "effective_to": null,
+            "status": "active",
+            "content_ref": "platform://frameworks/MCS/2026.1",
+            "created_at": "2026-07-14T05:55:07.198482+00:00",
+            "efs_frameworks": {
+              "name": "Modified Cash Standard",
+              "framework_key": "MCS"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "phase": "4",
+      "step": "Reporting period FY2025/26 exists",
+      "status": "PASS",
+      "evidence": {
+        "id": "edcf2b42-6798-47de-abe3-1bd22d8ed901",
+        "company_id": "3cbfd4eb-a095-43f3-837a-0b4f1e2c1752",
+        "reporting_entity_id": "7d1d8302-11c6-4f1e-b43f-a50c8db57ab0",
+        "period_key": "FY2025-26",
+        "label": "Financial Year 2025/26",
+        "start_date": "2025-04-01",
+        "end_date": "2026-03-31",
+        "status": "open_for_reporting",
+        "opened_by": "908ad90e-ee0e-4957-943d-ed1ec2fb843a",
+        "opened_at": "2026-07-18T08:21:31.939+00:00",
+        "closed_at": null,
+        "created_at": "2026-07-18T08:21:31.97378+00:00",
+        "updated_at": "2026-07-18T08:21:31.97378+00:00"
+      }
+    },
+    {
+      "phase": "4",
+      "step": "Engagement / workspace exists (reuse for period)",
+      "status": "PASS",
+      "evidence": {
+        "id": "66a7ad84-2eaf-4b9e-8423-89019ba3c6b3",
+        "name": "V6.10.2 Annual Financial Statements Certification"
+      }
+    },
+    {
+      "phase": "5",
+      "step": "Complete engagement information",
+      "status": "PASS",
+      "response": {
+        "id": "f3ddba4b-b01b-4bfc-8e20-114fa7862141",
+        "company_id": "3cbfd4eb-a095-43f3-837a-0b4f1e2c1752",
+        "workspace_id": "66a7ad84-2eaf-4b9e-8423-89019ba3c6b3",
+        "registered_name": "Spaceman",
+        "trading_name": "Spaceman",
+        "registration_number": null,
+        "vat_number": null,
+        "income_tax_number": null,
+        "financial_year_end": "2026-03-31",
+        "business_address": null,
+        "postal_address": null,
+        "contact_information": null,
+        "nature_of_business": "V6.10.3 professional AFS certification engagement",
+        "reporting_currency": "ZAR",
+        "reporting_framework": "IFRS_SME",
+        "auditor": null,
+        "prepared_by": "Independent Principal Enterprise Certification Board",
+        "reviewed_by": null,
+        "approved_by": null,
+        "directors": [],
+        "company_secretary": null,
+        "registered_office": null,
+        "share_information": {},
+        "principal_bankers": [],
+        "created_at": "2026-07-18T08:21:34.032251+00:00",
+        "updated_at": "2026-07-18T08:47:44.399+00:00",
+        "comparative_period": "FY2024-25",
+        "functional_currency": "ZAR",
+        "approval_date": "2026-07-18",
+        "authorisation_date": "2026-07-18"
+      }
+    },
+    {
+      "phase": "6",
+      "step": "Reporting snapshot certified version exists",
+      "status": "PASS",
+      "evidence": {
+        "snapshotId": "bce92bae-613e-4538-8e43-f452b5a27c06",
+        "snapshotVersionId": "c9d5ee93-0162-4394-819e-bdc176c94459",
+        "status": "certified"
+      }
+    },
+    {
+      "phase": "7",
+      "step": "EXTRACT_FACT_SNAPSHOT",
+      "status": "PASS",
+      "evidence": {
+        "skipped": true,
+        "reason": "already certified"
+      }
+    },
+    {
+      "phase": "7",
+      "step": "CERTIFY_SNAPSHOT_VERSION",
+      "status": "PASS",
+      "evidence": {
+        "skipped": true,
+        "reason": "already certified"
+      }
+    },
+    {
+      "phase": "8",
+      "step": "GENERATE_STATEMENTS (build statements)",
+      "status": "PASS",
+      "response": {
+        "snapshot_version_id": "c9d5ee93-0162-4394-819e-bdc176c94459",
+        "fact_snapshot_id": "be250d6d-8236-44fa-a6c5-308a3a131d0a",
+        "framework_pack": {
+          "id": "88b72727-a66a-4f87-8e33-a86f5bfe42dc",
+          "label": "IFRS for SMEs Pack 2026.1",
+          "version_id": "2026.1",
+          "framework_key": "IFRS_SME"
+        },
+        "live_gl": false,
+        "statements": [
+          {
+            "id": "51dc2713-f198-44ad-ae09-072ac5aa335d",
+            "statement_type": "financial_position",
+            "title": "Statement of Financial Position",
+            "content_hash": "20ee25a6e2d532488f95f1dac71330b91b218b42ef8153f45e6e6dbd05e10d41",
+            "generated_at": "2026-07-18T08:47:45.933+00:00",
+            "provenance": {
+              "live_gl": false,
+              "mapping": "default_type_map+optional_tenant",
+              "content_hash": "b66f8cc248da554f4b9e301f6ec78bdc2def9d06ea8fdbf9941ca46c547b6ded",
+              "fact_snapshot_id": "be250d6d-8236-44fa-a6c5-308a3a131d0a",
+              "snapshot_version_id": "c9d5ee93-0162-4394-819e-bdc176c94459"
+            },
+            "lines": [
+              {
+                "label": "Assets",
+                "amount": 83300,
+                "section": "assets",
+                "accounts": [
+                  {
+                    "id": "e2e3bb08-f2c4-4fcb-8ee7-5da2f9565324",
+                    "name": "Accounts payables",
+                    "type": "Asset",
+                    "amount": 100200
+                  },
+                  {
+                    "id": "eb5a9a02-7e79-44f6-b6b5-fe4fb2b0f674",
+                    "name": "AR",
+                    "type": "Asset",
+                    "amount": -8450
+                  },
+                  {
+                    "id": "589b9e2b-9acc-4b63-ba88-a9765ee7a90f",
+                    "name": "Bank",
+                    "type": "Asset",
+                    "amount": -8450
+                  }
+                ],
+                "is_total": false,
+                "line_code": "sfp.assets"
+              },
+              {
+                "label": "Total Assets",
+                "amount": 83300,
+                "section": "assets",
+                "accounts": [],
+                "is_total": true,
+                "line_code": "sfp.total_assets"
+              },
+              {
+                "label": "Liabilities",
+                "amount": 3111,
+                "section": "liabilities",
+                "accounts": [
+                  {
+                    "id": "6b4d2c01-e9f4-4a5f-b306-c088af94e70a",
+                    "name": "AP",
+                    "type": "Liability",
+                    "amount": 3111
+                  }
+                ],
+                "is_total": false,
+                "line_code": "sfp.liabilities"
+              },
+              {
+                "label": "Total Liabilities",
+                "amount": 3111,
+                "section": "liabilities",
+                "accounts": [],
+                "is_total": true,
+                "line_code": "sfp.total_liabilities"
+              },
+              {
+                "label": "Equity",
+                "amount": 0,
+                "section": "equity",
+                "accounts": [],
+                "is_total": false,
+                "line_code": "sfp.equity"
+              },
+              {
+                "label": "Profit / (Loss) for the period",
+                "amount": 80189,
+                "section": "equity",
+                "accounts": [],
+                "is_total": false,
+                "line_code": "sfp.current_period_result"
+              },
+              {
+                "label": "Total Equity",
+                "amount": 80189,
+                "section": "equity",
+                "accounts": [],
+                "is_total": true,
+                "line_code": "sfp.total_equity"
+              },
+              {
+                "label": "Total Liabilities and Equity",
+                "amount": 83300,
+                "section": "totals",
+                "accounts": [],
+                "is_total": true,
+                "line_code": "sfp.total_liabilities_and_equity"
+              }
+            ]
+          },
+          {
+            "id": "f3595a12-d299-4be3-83f6-bc9b2ddf6ed6",
+            "statement_type": "financial_performance",
+            "title": "Statement of Comprehensive Income",
+            "content_hash": "0b36f9bf896635f0acfacbbfb24232f992809ece3e3879c9811ac33d37023edd",
+            "generated_at": "2026-07-18T08:47:45.98+00:00",
+            "provenance": {
+              "live_gl": false,
+              "mapping": "default_type_map+optional_tenant",
+              "content_hash": "b66f8cc248da554f4b9e301f6ec78bdc2def9d06ea8fdbf9941ca46c547b6ded",
+              "fact_snapshot_id": "be250d6d-8236-44fa-a6c5-308a3a131d0a",
+              "snapshot_version_id": "c9d5ee93-0162-4394-819e-bdc176c94459"
+            },
+            "lines": [
+              {
+                "label": "Revenue",
+                "amount": 200,
+                "section": "revenue",
+                "accounts": [
+                  {
+                    "id": "0cf0454c-77be-4cbc-ae8f-9c5947b22be7",
+                    "name": "zuru",
+                    "type": "Income",
+                    "amount": 200
+                  }
+                ],
+                "is_total": false,
+                "line_code": "perf.revenue"
+              },
+              {
+                "label": "Total Revenue",
+                "amount": 200,
+                "section": "revenue",
+                "accounts": [],
+                "is_total": true,
+                "line_code": "perf.total_revenue"
+              },
+              {
+                "label": "Expenses",
+                "amount": -79989,
+                "section": "expenses",
+                "accounts": [
+                  {
+                    "id": "59f04848-62e2-4979-a345-7dfe558ddacb",
+                    "name": "Motor vehicle expenses",
+                    "type": "Expense",
+                    "amount": 0
+                  },
+                  {
+                    "id": "04c7dbe7-ac5e-498c-8e74-8296ec1f3a5b",
+                    "name": "Subscription fees",
+                    "type": "Expense",
+                    "amount": 0
+                  },
+                  {
+                    "id": "b4f89ac7-1564-434e-ab36-e5c4ef13b766",
+                    "name": "Secretarial ",
+                    "type": "Expense",
+                    "amount": 0
+                  },
+                  {
+                    "id": "5564d069-f8ab-4dcd-81aa-1752814936c2",
+                    "name": "IT Expenses",
+                    "type": "Expense",
+                    "amount": 0
+                  },
+                  {
+                    "id": "42a687dc-adbc-497d-ba3e-ae344d35a251",
+                    "name": "Stationary",
+                    "type": "Expense",
+                    "amount": 0
+                  },
+                  {
+                    "id": "796fdacf-cfd5-44f7-b0ee-ea928079f538",
+                    "name": "Admin and Management fees",
+                    "type": "Expense",
+                    "amount": 10000
+                  },
+                  {
+                    "id": "b5c3cac9-5fd3-4427-af0f-202fecc5ada1",
+                    "name": "Fuel",
+                    "type": "Expense",
+                    "amount": -99989
+                  },
+                  {
+                    "id": "950b09bd-74d9-4ad1-8749-660aabab4618",
+                    "name": "Wages and Salaries",
+                    "type": "Expense",
+                    "amount": 10000
+                  }
+                ],
+                "is_total": false,
+                "line_code": "perf.expenses"
+              },
+              {
+                "label": "Total Expenses",
+                "amount": -79989,
+                "section": "expenses",
+                "accounts": [],
+                "is_total": true,
+                "line_code": "perf.total_expenses"
+              },
+              {
+                "label": "Profit / (Loss) for the period",
+                "amount": 80189,
+                "section": "result",
+                "accounts": [],
+                "is_total": true,
+                "line_code": "perf.result"
+              }
+            ]
+          },
+          {
+            "id": "8c301177-0d58-472a-9c05-8b102353571a",
+            "statement_type": "cash_flows",
+            "title": "Statement of Cash Flows",
+            "content_hash": "2c4f89a6d4dc2a6c292fb46965eff5ac9e12604315f6a8a9ecd47486f0f26097",
+            "generated_at": "2026-07-18T08:47:46.023+00:00",
+            "provenance": {
+              "live_gl": false,
+              "mapping": "default_type_map+optional_tenant",
+              "content_hash": "b66f8cc248da554f4b9e301f6ec78bdc2def9d06ea8fdbf9941ca46c547b6ded",
+              "fact_snapshot_id": "be250d6d-8236-44fa-a6c5-308a3a131d0a",
+              "snapshot_version_id": "c9d5ee93-0162-4394-819e-bdc176c94459"
+            },
+            "lines": [
+              {
+                "label": "Operating activities",
+                "amount": -8450,
+                "section": "operating",
+                "accounts": [
+                  {
+                    "id": null,
+                    "name": "Wages and Salaries",
+                    "type": "Operating",
+                    "amount": -8450
+                  }
+                ],
+                "is_total": false,
+                "line_code": "cf.operating"
+              },
+              {
+                "label": "Investing activities",
+                "amount": 0,
+                "section": "investing",
+                "accounts": [],
+                "is_total": false,
+                "line_code": "cf.investing"
+              },
+              {
+                "label": "Financing activities",
+                "amount": -8450,
+                "section": "financing",
+                "accounts": [
+                  {
+                    "id": null,
+                    "name": "AP",
+                    "type": "Financing",
+                    "amount": -8450
+                  }
+                ],
+                "is_total": false,
+                "line_code": "cf.financing"
+              },
+              {
+                "label": "Net increase / (decrease) in cash",
+                "amount": -16900,
+                "section": "totals",
+                "accounts": [],
+                "is_total": true,
+                "line_code": "cf.net_change"
+              }
+            ]
+          },
+          {
+            "id": "a70bfbc7-9da9-46b6-8163-31339bc5ac17",
+            "statement_type": "changes_in_equity",
+            "title": "Statement of Changes in Equity",
+            "content_hash": "f637c07ffafdfdaf8fc230b90816a36324e345a78f372359d19f7e30aaf208c0",
+            "generated_at": "2026-07-18T08:47:46.073+00:00",
+            "provenance": {
+              "live_gl": false,
+              "mapping": "default_type_map+optional_tenant",
+              "content_hash": "b66f8cc248da554f4b9e301f6ec78bdc2def9d06ea8fdbf9941ca46c547b6ded",
+              "fact_snapshot_id": "be250d6d-8236-44fa-a6c5-308a3a131d0a",
+              "snapshot_version_id": "c9d5ee93-0162-4394-819e-bdc176c94459"
+            },
+            "lines": [
+              {
+                "label": "Opening Equity",
+                "amount": 0,
+                "section": "opening",
+                "accounts": [],
+                "is_total": true,
+                "line_code": "eq.opening"
+              },
+              {
+                "label": "Profit / (Loss) for the period",
+                "amount": 80189,
+                "section": "movements",
+                "accounts": [],
+                "is_total": false,
+                "line_code": "eq.period_result"
+              },
+              {
+                "label": "Total changes in equity",
+                "amount": 0,
+                "section": "movements",
+                "accounts": [],
+                "is_total": false,
+                "line_code": "eq.other_movements"
+              },
+              {
+                "label": "Closing Equity",
+                "amount": 80189,
+                "section": "closing",
+                "accounts": [],
+                "is_total": true,
+                "line_code": "eq.closing"
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "phase": "8",
+      "step": "Statement: financial_position",
+      "status": "PASS",
+      "evidence": {
+        "content_hash": "20ee25a6e2d532488f95f1dac71330b91b218b42ef8153f45e6e6dbd05e10d41",
+        "lineCount": 8
+      }
+    },
+    {
+      "phase": "8",
+      "step": "Statement: financial_performance",
+      "status": "PASS",
+      "evidence": {
+        "content_hash": "0b36f9bf896635f0acfacbbfb24232f992809ece3e3879c9811ac33d37023edd",
+        "lineCount": 5
+      }
+    },
+    {
+      "phase": "8",
+      "step": "Statement: cash_flows",
+      "status": "PASS",
+      "evidence": {
+        "content_hash": "2c4f89a6d4dc2a6c292fb46965eff5ac9e12604315f6a8a9ecd47486f0f26097",
+        "lineCount": 4
+      }
+    },
+    {
+      "phase": "8",
+      "step": "Statement: changes_in_equity",
+      "status": "PASS",
+      "evidence": {
+        "content_hash": "f637c07ffafdfdaf8fc230b90816a36324e345a78f372359d19f7e30aaf208c0",
+        "lineCount": 4
+      }
+    },
+    {
+      "phase": "10",
+      "step": "CREATE_WORKING_PAPER (supporting schedules)",
+      "status": "PASS",
+      "evidence": {
+        "wpId": "f7bb8440-7e0a-40cd-9c6f-40648fb9ec19",
+        "structure_node_id": "0c8ad17c-9f47-40d5-9b07-89def1866c3f",
+        "node_code": "NODE.LI.SFP.TOTAL_ASSETS"
+      }
+    },
+    {
+      "phase": "10",
+      "step": "TRANSITION_WORKING_PAPER → finalized",
+      "status": "PASS"
+    },
+    {
+      "phase": "10",
+      "step": "CREATE_LEAD_SCHEDULE",
+      "status": "PASS"
+    },
+    {
+      "phase": "10",
+      "step": "CREATE_SUPPORTING_EVIDENCE",
+      "status": "PASS",
+      "response": {
+        "id": "d97dd03d-69cf-47d0-a039-f4037775b3f3",
+        "company_id": "3cbfd4eb-a095-43f3-837a-0b4f1e2c1752",
+        "workspace_id": "66a7ad84-2eaf-4b9e-8423-89019ba3c6b3",
+        "attachment_point_id": "f273358a-ff4d-4d8b-a312-42af71d0580b",
+        "structure_node_id": "0c8ad17c-9f47-40d5-9b07-89def1866c3f",
+        "disclosure_node_id": null,
+        "title": "Trial balance extract — Assets (V6.10.3)",
+        "evidence_type": "document",
+        "storage_ref": null,
+        "content_hash": null,
+        "prepared_by": "908ad90e-ee0e-4957-943d-ed1ec2fb843a",
+        "created_at": "2026-07-18T08:47:52.006714+00:00"
+      }
+    },
+    {
+      "phase": "9",
+      "step": "ASSEMBLE_DISCLOSURES_FROM_FRAMEWORK",
+      "status": "PASS",
+      "response": {
+        "created": [],
+        "skipped": [
+          {
+            "id": "181ef5f8-749d-403b-b513-8074449da1cf",
+            "disclosure_code": "DISC.BASIS",
+            "status": "draft"
+          },
+          {
+            "id": "1c1a0e26-41fe-48cd-8e8d-7b50edea7d2a",
+            "disclosure_code": "DISC.POLICIES",
+            "status": "draft"
+          },
+          {
+            "id": "4c8cfc41-e86f-4f0f-ab90-c8281468019e",
+            "disclosure_code": "DISC.REVENUE",
+            "status": "draft"
+          },
+          {
+            "id": "cf5af035-0dfe-42f3-839f-cc356fa0d3ed",
+            "disclosure_code": "DISC.PPE",
+            "status": "draft"
+          },
+          {
+            "id": "1e169948-cbd0-4845-8475-6738e066dffc",
+            "disclosure_code": "DISC.RELATED",
+            "status": "draft"
+          },
+          {
+            "id": "13fd8b00-4417-48a3-ada8-61f7cc7079c7",
+            "disclosure_code": "DISC.EVENTS",
+            "status": "draft"
+          },
+          {
+            "id": "49a6834e-9ae7-43e5-a83a-3a95736a6f1f",
+            "disclosure_code": "DISC.CONTINGENT",
+            "status": "draft"
+          }
+        ],
+        "validation_engine": false,
+        "completeness_validated": false
+      }
+    },
+    {
+      "phase": "9",
+      "step": "CREATE_ACCOUNTING_POLICY_SET",
+      "status": "PASS",
+      "evidence": {
+        "id": "94b145f5-832a-432e-8fa0-ac537f6dcf57",
+        "company_id": "3cbfd4eb-a095-43f3-837a-0b4f1e2c1752",
+        "workspace_id": "66a7ad84-2eaf-4b9e-8423-89019ba3c6b3",
+        "framework_pack_id": "88b72727-a66a-4f87-8e33-a86f5bfe42dc",
+        "title": "Accounting Policies — IFRS_SME FY2025/26",
+        "status": "draft",
+        "version_no": 1,
+        "prepared_by": "908ad90e-ee0e-4957-943d-ed1ec2fb843a",
+        "prepared_at": "2026-07-18T08:47:53.675+00:00",
+        "created_by": "908ad90e-ee0e-4957-943d-ed1ec2fb843a",
+        "created_at": "2026-07-18T08:47:53.698177+00:00",
+        "updated_at": "2026-07-18T08:47:53.698177+00:00"
+      }
+    },
+    {
+      "phase": "9",
+      "step": "Disclosure instances advanced",
+      "status": "PASS",
+      "evidence": {
+        "count": 7
+      }
+    },
+    {
+      "phase": "11",
+      "step": "RUN_VALIDATION",
+      "status": "PASS",
+      "response": {
+        "run": {
+          "id": "23aff894-f71e-4beb-8919-409cf2c9f045",
+          "company_id": "3cbfd4eb-a095-43f3-837a-0b4f1e2c1752",
+          "workspace_id": "66a7ad84-2eaf-4b9e-8423-89019ba3c6b3",
+          "framework_pack_id": "88b72727-a66a-4f87-8e33-a86f5bfe42dc",
+          "snapshot_version_id": "c9d5ee93-0162-4394-819e-bdc176c94459",
+          "run_type": "full",
+          "status": "passed_with_advisories",
+          "blocking_count": 0,
+          "significant_count": 6,
+          "advisory_count": 0,
+          "total_issues": 6,
+          "ready_for_review": true,
+          "engine_version": "6.4.5",
+          "mutates_financial_data": false,
+          "live_gl_read": false,
+          "started_at": "2026-07-18T08:47:59.70558+00:00",
+          "completed_at": "2026-07-18T08:47:59.913+00:00",
+          "started_by": "908ad90e-ee0e-4957-943d-ed1ec2fb843a",
+          "summary": {
+            "status": "passed_with_advisories",
+            "live_gl_read": false,
+            "total_issues": 6,
+            "framework_key": "IFRS_SME",
+            "advisory_count": 0,
+            "blocking_count": 0,
+            "framework_count": 4,
+            "technical_count": 2,
+            "ready_for_review": true,
+            "significant_count": 6,
+            "approves_statements": false,
+            "snapshot_version_id": "c9d5ee93-0162-4394-819e-bdc176c94459",
+            "mutates_financial_data": false
+          },
+          "created_at": "2026-07-18T08:47:59.70558+00:00"
+        },
+        "issues": [
+          {
+            "rule_id": "6153b3fb-c4e5-474a-9068-0d6a859c580e",
+            "rule_code": "TECH.MISSING_EVIDENCE",
+            "issue_code": "EV.WP_NO_EVIDENCE",
+            "title": "Finalized Working Paper lacks evidence reference",
+            "message": "Finalized WP 'Lead WP — Total Assets (V6.10.2)' has no Supporting Evidence reference.",
+            "severity": "significant",
+            "recommendation": "Attach Supporting Evidence and evidence references to finalized Working Papers.",
+            "structure_node_id": "0c8ad17c-9f47-40d5-9b07-89def1866c3f",
+            "disclosure_instance_id": null,
+            "working_paper_id": "84db7bdf-d061-46fa-9983-d826e2da60c9",
+            "statement_instance_id": null,
+            "resolution_status": "open",
+            "payload": {}
+          },
+          {
+            "rule_id": "6153b3fb-c4e5-474a-9068-0d6a859c580e",
+            "rule_code": "TECH.MISSING_EVIDENCE",
+            "issue_code": "EV.WP_NO_EVIDENCE",
+            "title": "Finalized Working Paper lacks evidence reference",
+            "message": "Finalized WP 'Lead WP — Total Assets (V6.10.2)' has no Supporting Evidence reference.",
+            "severity": "significant",
+            "recommendation": "Attach Supporting Evidence and evidence references to finalized Working Papers.",
+            "structure_node_id": "0c8ad17c-9f47-40d5-9b07-89def1866c3f",
+            "disclosure_instance_id": null,
+            "working_paper_id": "9b78fafc-7afb-48f8-94ce-1f46b854a2be",
+            "statement_instance_id": null,
+            "resolution_status": "open",
+            "payload": {}
+          },
+          {
+            "rule_id": "de70a4f3-d368-4ece-b630-8444faaf0924",
+            "rule_code": "FW.DISCLOSURE_COMPLETE",
+            "issue_code": "FW.DISC.DRAFT.DISC.BASIS",
+            "title": "Required disclosure still draft: DISC.BASIS",
+            "message": "Disclosure 'Basis of preparation' is required but remains in draft.",
+            "severity": "significant",
+            "recommendation": "Move required disclosure instances to in_progress or complete.",
+            "structure_node_id": "a097b7d2-cc69-40c9-aec6-7271c1ed985c",
+            "disclosure_instance_id": "181ef5f8-749d-403b-b513-8074449da1cf",
+            "working_paper_id": null,
+            "statement_instance_id": null,
+            "resolution_status": "open",
+            "payload": {}
+          },
+          {
+            "rule_id": "de70a4f3-d368-4ece-b630-8444faaf0924",
+            "rule_code": "FW.DISCLOSURE_COMPLETE",
+            "issue_code": "FW.DISC.DRAFT.DISC.POLICIES",
+            "title": "Required disclosure still draft: DISC.POLICIES",
+            "message": "Disclosure 'Significant accounting policies' is required but remains in draft.",
+            "severity": "significant",
+            "recommendation": "Move required disclosure instances to in_progress or complete.",
+            "structure_node_id": "a097b7d2-cc69-40c9-aec6-7271c1ed985c",
+            "disclosure_instance_id": "1c1a0e26-41fe-48cd-8e8d-7b50edea7d2a",
+            "working_paper_id": null,
+            "statement_instance_id": null,
+            "resolution_status": "open",
+            "payload": {}
+          },
+          {
+            "rule_id": "de70a4f3-d368-4ece-b630-8444faaf0924",
+            "rule_code": "FW.DISCLOSURE_COMPLETE",
+            "issue_code": "FW.DISC.DRAFT.DISC.REVENUE",
+            "title": "Required disclosure still draft: DISC.REVENUE",
+            "message": "Disclosure 'Revenue' is required but remains in draft.",
+            "severity": "significant",
+            "recommendation": "Move required disclosure instances to in_progress or complete.",
+            "structure_node_id": "75b57ae2-033d-4f38-bb63-4c18e3d68e28",
+            "disclosure_instance_id": "4c8cfc41-e86f-4f0f-ab90-c8281468019e",
+            "working_paper_id": null,
+            "statement_instance_id": null,
+            "resolution_status": "open",
+            "payload": {}
+          },
+          {
+            "rule_id": "de70a4f3-d368-4ece-b630-8444faaf0924",
+            "rule_code": "FW.DISCLOSURE_COMPLETE",
+            "issue_code": "FW.DISC.DRAFT.DISC.RELATED",
+            "title": "Required disclosure still draft: DISC.RELATED",
+            "message": "Disclosure 'Related parties' is required but remains in draft.",
+            "severity": "significant",
+            "recommendation": "Move required disclosure instances to in_progress or complete.",
+            "structure_node_id": "a097b7d2-cc69-40c9-aec6-7271c1ed985c",
+            "disclosure_instance_id": "1e169948-cbd0-4845-8475-6738e066dffc",
+            "working_paper_id": null,
+            "statement_instance_id": null,
+            "resolution_status": "open",
+            "payload": {}
+          }
+        ],
+        "ready_for_review": true,
+        "approves_statements": false,
+        "mutates_financial_data": false,
+        "live_gl_read": false,
+        "manager_review": false,
+        "partner_review": false,
+        "publication": false,
+        "xbrl": false,
+        "ai": false
+      }
+    },
+    {
+      "phase": "12",
+      "step": "GET_OR_CREATE_PACK_REVIEW",
+      "status": "PASS",
+      "evidence": {
+        "packReviewId": "324bd63d-ffc0-4bda-a995-3ce4e44641e2",
+        "stage": "publication_ready"
+      }
+    },
+    {
+      "phase": "12",
+      "step": "ASSIGN_PACK_REVIEWER (manager)",
+      "status": "PASS"
+    },
+    {
+      "phase": "12",
+      "step": "ASSIGN_PACK_REVIEWER (partner)",
+      "status": "PASS"
+    },
+    {
+      "phase": "12",
+      "step": "Review already publication_ready",
+      "status": "PASS",
+      "evidence": {
+        "stage": "publication_ready"
+      }
+    },
+    {
+      "phase": "13",
+      "step": "EXECUTE_PUBLICATION run #1",
+      "status": "PASS",
+      "response": {
+        "publication_executed": true,
+        "publication_record_id": "183edfa9-5dd3-49ee-9585-5e2c694de7b4",
+        "publication_pack_id": "cb3c64f5-cefa-4191-b0d8-73c318cc3ad6",
+        "artifacts": [
+          {
+            "id": "a31920a6-4c8f-4bc9-b704-8f3c495e8b5b",
+            "format": "pdf",
+            "content_hash": "ca4ec3e479c7ee3595d94919c6ac451c0eaed1afd8810965fa55b767ee7a58da",
+            "byte_size": 2264,
+            "generated_at": "2026-07-18T08:31:32.982629+00:00",
+            "publication_record_id": "183edfa9-5dd3-49ee-9585-5e2c694de7b4",
+            "publication_pack_id": "cb3c64f5-cefa-4191-b0d8-73c318cc3ad6"
+          },
+          {
+            "id": "5670a519-8110-4648-b186-f3b61c458a47",
+            "format": "docx",
+            "content_hash": "66cf6b66ea20ac3af6ac59fe68c42d3a4e7d81f0a9c36868ccf92f874d0c2acb",
+            "byte_size": 1453,
+            "generated_at": "2026-07-18T08:31:32.982629+00:00",
+            "publication_record_id": "183edfa9-5dd3-49ee-9585-5e2c694de7b4",
+            "publication_pack_id": "cb3c64f5-cefa-4191-b0d8-73c318cc3ad6"
+          },
+          {
+            "id": "344bca86-af78-439b-8595-fa2f5aa1c1df",
+            "format": "xlsx",
+            "content_hash": "b264c931f953e4cae15eb3d30a9a900c516095130e96cf07a449abd7dec14205",
+            "byte_size": 26832,
+            "generated_at": "2026-07-18T08:31:32.982629+00:00",
+            "publication_record_id": "183edfa9-5dd3-49ee-9585-5e2c694de7b4",
+            "publication_pack_id": "cb3c64f5-cefa-4191-b0d8-73c318cc3ad6"
+          }
+        ],
+        "idempotent_replay": true,
+        "mutates_accounting": false,
+        "live_gl": false
+      },
+      "evidence": {
+        "idempotent_replay": true
+      }
+    },
+    {
+      "phase": "13",
+      "step": "GET_PUBLICATION_ARTIFACT run #1",
+      "status": "PASS",
+      "evidence": {
+        "id": "a31920a6-4c8f-4bc9-b704-8f3c495e8b5b",
+        "format": "pdf",
+        "content_hash": "ca4ec3e479c7ee3595d94919c6ac451c0eaed1afd8810965fa55b767ee7a58da",
+        "byte_size": 12173,
+        "generated_at": "2026-07-18T08:31:32.982629+00:00"
+      }
+    },
+    {
+      "phase": "14",
+      "step": "Verify PDF contents run #1",
+      "status": "PASS",
+      "evidence": {
+        "path": "C:\\Users\\TebogoM\\Desktop\\development projects\\SmartAccounting\\docs\\financial-statements-certification\\V6.10.3\\evidence\\AFS_V6.10.3_Spaceman_run1.pdf",
+        "byteSize": 12173,
+        "sha256": "4bc6909afe289afc0348d4594bed56d76eaf7af229c065e51a4f5a68e3c8808e",
+        "checks": {
+          "isPdf": true,
+          "hasCompanyName": true,
+          "hasReportingPeriod": true,
+          "hasFinancialPosition": true,
+          "hasPerformance": true,
+          "hasCashFlows": true,
+          "hasEquity": true,
+          "hasContents": true,
+          "hasNumberedNotes": true,
+          "hasPageNumbers": true,
+          "noDebugMarkers": true,
+          "noDiscCodes": true,
+          "noFingerprint": true,
+          "noSnapshotTerms": true,
+          "noPlaceholder": true,
+          "hasContent": true
+        },
+        "textSample": "Spaceman\nAnnual Financial Statements\nFor the year ended 31 March 2026\nIFRS for SMEs\nFigures are stated in South African Rand (R)\nPrepared in accordance with the applicable financial reporting framework\nPage 1 of 7\nContents\nStatement of Financial Position ................................................................... 3\nStatement of Profit or Loss and Other Comprehensive Income ........................................ 4\nStatement of Changes in Equity .................................................................... 5\nStatement of Cash Flows ........................................................................... 6\nNotes to the Annual Financial Statements .......................................................... 7\nSpaceman\nFinancial Year 2025/26\nAnnual Financial Statements\nIFRS for SMEs\nPage 2 of 7\nStatement of Financial Position\nAs at 31 March 2026\nFigures are stated in South African Rand (R)\nR\nAssets\n83,300.00\nTotal Assets\n83,300.00\nLiabilities\n3,111.00\nTotal Liabilities\n3,111.00\nEquity\n0.00\nProfit / (Loss) for the period\n80,189.00\nTotal Equity\n80,189.00\nTotal Liabilities and Equity\n83,300.00\nSpaceman\nFinancial Year 2025/26\nAnnual Financial Statements\nIFRS for SMEs\nPage 3 of 7\nStatement of Profit or Loss and Other Comprehensive Income\nFor the year ended 31 March 2026\nFigures are stated in South African Rand (R)\nR\nRevenue\n200.00\nTotal Revenue\n200.00\nExpenses\n(79,989.00)\nTotal Expenses\n(79,989.00)\nProfit / (Loss) for the period\n80,189.00\nSpaceman\nFinancial Year 2025/26\nAnnual Financial Statements\nIFRS for SMEs\nPage 4 of 7\nStatement of Changes in Equity\nFor the year ended 31 March 2026\nFigures are stated in South African Rand (R)\nR\nOpening Equity\n0.00\nProfit / (Loss) for the period\n80,189.00\nTotal changes in equity\n0.00\nClosing Equity\n80,189.00\nSpaceman\nFinancial Year 2025/26\nAnnual Financial Statements\nIFRS for SMEs\nPage 5 of 7\nStatement of Cash Flows\nFor the year ended 31 March 2026\nFigures are stated in South African Rand (R)\nR\nOperating activities\n(8,450"
+      }
+    },
+    {
+      "phase": "13",
+      "step": "EXECUTE_PUBLICATION run #2",
+      "status": "PASS",
+      "response": {
+        "publication_executed": true,
+        "publication_record_id": "183edfa9-5dd3-49ee-9585-5e2c694de7b4",
+        "publication_pack_id": "cb3c64f5-cefa-4191-b0d8-73c318cc3ad6",
+        "artifacts": [
+          {
+            "id": "a31920a6-4c8f-4bc9-b704-8f3c495e8b5b",
+            "format": "pdf",
+            "content_hash": "ca4ec3e479c7ee3595d94919c6ac451c0eaed1afd8810965fa55b767ee7a58da",
+            "byte_size": 2264,
+            "generated_at": "2026-07-18T08:31:32.982629+00:00",
+            "publication_record_id": "183edfa9-5dd3-49ee-9585-5e2c694de7b4",
+            "publication_pack_id": "cb3c64f5-cefa-4191-b0d8-73c318cc3ad6"
+          },
+          {
+            "id": "5670a519-8110-4648-b186-f3b61c458a47",
+            "format": "docx",
+            "content_hash": "66cf6b66ea20ac3af6ac59fe68c42d3a4e7d81f0a9c36868ccf92f874d0c2acb",
+            "byte_size": 1453,
+            "generated_at": "2026-07-18T08:31:32.982629+00:00",
+            "publication_record_id": "183edfa9-5dd3-49ee-9585-5e2c694de7b4",
+            "publication_pack_id": "cb3c64f5-cefa-4191-b0d8-73c318cc3ad6"
+          },
+          {
+            "id": "344bca86-af78-439b-8595-fa2f5aa1c1df",
+            "format": "xlsx",
+            "content_hash": "b264c931f953e4cae15eb3d30a9a900c516095130e96cf07a449abd7dec14205",
+            "byte_size": 26832,
+            "generated_at": "2026-07-18T08:31:32.982629+00:00",
+            "publication_record_id": "183edfa9-5dd3-49ee-9585-5e2c694de7b4",
+            "publication_pack_id": "cb3c64f5-cefa-4191-b0d8-73c318cc3ad6"
+          }
+        ],
+        "idempotent_replay": true,
+        "mutates_accounting": false,
+        "live_gl": false
+      },
+      "evidence": {
+        "idempotent_replay": true
+      }
+    },
+    {
+      "phase": "13",
+      "step": "GET_PUBLICATION_ARTIFACT run #2",
+      "status": "PASS",
+      "evidence": {
+        "id": "a31920a6-4c8f-4bc9-b704-8f3c495e8b5b",
+        "format": "pdf",
+        "content_hash": "ca4ec3e479c7ee3595d94919c6ac451c0eaed1afd8810965fa55b767ee7a58da",
+        "byte_size": 12173,
+        "generated_at": "2026-07-18T08:31:32.982629+00:00"
+      }
+    },
+    {
+      "phase": "14",
+      "step": "Verify PDF contents run #2",
+      "status": "PASS",
+      "evidence": {
+        "path": "C:\\Users\\TebogoM\\Desktop\\development projects\\SmartAccounting\\docs\\financial-statements-certification\\V6.10.3\\evidence\\AFS_V6.10.3_Spaceman_run2.pdf",
+        "byteSize": 12173,
+        "sha256": "4bc6909afe289afc0348d4594bed56d76eaf7af229c065e51a4f5a68e3c8808e",
+        "checks": {
+          "isPdf": true,
+          "hasCompanyName": true,
+          "hasReportingPeriod": true,
+          "hasFinancialPosition": true,
+          "hasPerformance": true,
+          "hasCashFlows": true,
+          "hasEquity": true,
+          "hasContents": true,
+          "hasNumberedNotes": true,
+          "hasPageNumbers": true,
+          "noDebugMarkers": true,
+          "noDiscCodes": true,
+          "noFingerprint": true,
+          "noSnapshotTerms": true,
+          "noPlaceholder": true,
+          "hasContent": true
+        },
+        "textSample": "Spaceman\nAnnual Financial Statements\nFor the year ended 31 March 2026\nIFRS for SMEs\nFigures are stated in South African Rand (R)\nPrepared in accordance with the applicable financial reporting framework\nPage 1 of 7\nContents\nStatement of Financial Position ................................................................... 3\nStatement of Profit or Loss and Other Comprehensive Income ........................................ 4\nStatement of Changes in Equity .................................................................... 5\nStatement of Cash Flows ........................................................................... 6\nNotes to the Annual Financial Statements .......................................................... 7\nSpaceman\nFinancial Year 2025/26\nAnnual Financial Statements\nIFRS for SMEs\nPage 2 of 7\nStatement of Financial Position\nAs at 31 March 2026\nFigures are stated in South African Rand (R)\nR\nAssets\n83,300.00\nTotal Assets\n83,300.00\nLiabilities\n3,111.00\nTotal Liabilities\n3,111.00\nEquity\n0.00\nProfit / (Loss) for the period\n80,189.00\nTotal Equity\n80,189.00\nTotal Liabilities and Equity\n83,300.00\nSpaceman\nFinancial Year 2025/26\nAnnual Financial Statements\nIFRS for SMEs\nPage 3 of 7\nStatement of Profit or Loss and Other Comprehensive Income\nFor the year ended 31 March 2026\nFigures are stated in South African Rand (R)\nR\nRevenue\n200.00\nTotal Revenue\n200.00\nExpenses\n(79,989.00)\nTotal Expenses\n(79,989.00)\nProfit / (Loss) for the period\n80,189.00\nSpaceman\nFinancial Year 2025/26\nAnnual Financial Statements\nIFRS for SMEs\nPage 4 of 7\nStatement of Changes in Equity\nFor the year ended 31 March 2026\nFigures are stated in South African Rand (R)\nR\nOpening Equity\n0.00\nProfit / (Loss) for the period\n80,189.00\nTotal changes in equity\n0.00\nClosing Equity\n80,189.00\nSpaceman\nFinancial Year 2025/26\nAnnual Financial Statements\nIFRS for SMEs\nPage 5 of 7\nStatement of Cash Flows\nFor the year ended 31 March 2026\nFigures are stated in South African Rand (R)\nR\nOperating activities\n(8,450"
+      }
+    },
+    {
+      "phase": "15",
+      "step": "Regression: no duplicate snapshots",
+      "status": "PASS",
+      "evidence": {
+        "before": 1,
+        "after": 1
+      }
+    },
+    {
+      "phase": "15",
+      "step": "Regression: publication records bounded (≤1 new; 2nd run idempotent)",
+      "status": "PASS",
+      "evidence": {
+        "before": 1,
+        "after": 1,
+        "delta": 0
+      }
+    },
+    {
+      "phase": "15",
+      "step": "Regression: no duplicate disclosures",
+      "status": "PASS",
+      "evidence": {
+        "before": 7,
+        "after": 7
+      }
+    },
+    {
+      "phase": "15",
+      "step": "Exported PDF saved",
+      "status": "PASS",
+      "evidence": {
+        "path": "C:\\Users\\TebogoM\\Desktop\\development projects\\SmartAccounting\\docs\\financial-statements-certification\\V6.10.3\\evidence\\AFS_V6.10.3_Spaceman_run1.pdf",
+        "sha256": "4bc6909afe289afc0348d4594bed56d76eaf7af229c065e51a4f5a68e3c8808e"
+      }
+    }
+  ]
+}

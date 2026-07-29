@@ -1,0 +1,500 @@
+{
+  "section": "PAYROLL",
+  "at": "2026-07-29T11:11:31.375Z",
+  "company": "be3855e9-d11c-48a8-8c39-10e12a0ff2df",
+  "steps": {
+    "employees": [
+      {
+        "id": "52e4c760-df4f-4def-862a-1722a2de8260",
+        "first_name": "CERT",
+        "last_name": "Employee",
+        "salary_amount": 20000,
+        "salary_period": "monthly",
+        "employment_status": "active"
+      }
+    ],
+    "createRun": {
+      "ok": true,
+      "error": null,
+      "id": "07aee0e1-0f1f-4c7f-b09d-4d784712e987"
+    },
+    "generate": {
+      "ok": true,
+      "error": null,
+      "data": {
+        "generated": 1,
+        "results": [
+          {
+            "employee_id": "52e4c760-df4f-4def-862a-1722a2de8260",
+            "payslip_id": "d85e8673-d30f-4c47-873c-c1a525c8b5e5",
+            "calculation": {
+              "grossPay": 20000,
+              "taxableIncome": 20000,
+              "employeeDeductions": {
+                "paye": 2115,
+                "uif": 177.12
+              },
+              "employerContributions": {
+                "uif_employer": 177.12,
+                "sdl": 200
+              },
+              "totalEmployeeDeductions": 2292.12,
+              "totalEmployerContributions": 377.12,
+              "netPay": 17707.88,
+              "costToCompany": 20377.12,
+              "lineItems": [
+                {
+                  "ruleId": "basic_salary",
+                  "description": "Basic Salary",
+                  "type": "earning",
+                  "amount": 20000,
+                  "taxableImpact": "taxable",
+                  "accountingImpact": "wages"
+                },
+                {
+                  "ruleId": "paye",
+                  "description": "PAYE",
+                  "type": "deduction",
+                  "amount": 2115,
+                  "taxableImpact": "none",
+                  "accountingImpact": "employee_deduction"
+                },
+                {
+                  "ruleId": "uif",
+                  "description": "UIF",
+                  "type": "deduction",
+                  "amount": 177.12,
+                  "taxableImpact": "none",
+                  "accountingImpact": "employee_deduction"
+                },
+                {
+                  "ruleId": "uif_employer",
+                  "description": "UIF Employer",
+                  "type": "employer_contribution",
+                  "amount": 177.12,
+                  "taxableImpact": "none",
+                  "accountingImpact": "employer_liability"
+                },
+                {
+                  "ruleId": "sdl",
+                  "description": "SDL",
+                  "type": "employer_contribution",
+                  "amount": 200,
+                  "taxableImpact": "none",
+                  "accountingImpact": "employer_expense"
+                }
+              ],
+              "ruleExecutionSummary": [
+                {
+                  "ruleId": "basic_salary",
+                  "ruleName": "Basic Salary",
+                  "enabled": true,
+                  "skipped": false,
+                  "employeeAmount": 0,
+                  "employerAmount": 0,
+                  "lineItems": [
+                    {
+                      "ruleId": "basic_salary",
+                      "description": "Basic Salary",
+                      "type": "earning",
+                      "amount": 20000,
+                      "taxableImpact": "taxable",
+                      "accountingImpact": "wages"
+                    }
+                  ],
+                  "taxableAdjustment": 20000
+                },
+                {
+                  "ruleId": "pension",
+                  "ruleName": "Pension Fund",
+                  "enabled": false,
+                  "skipped": true,
+                  "skipReason": "Rule disabled",
+                  "employeeAmount": 0,
+                  "employerAmount": 0,
+                  "lineItems": [],
+                  "taxableAdjustment": 0
+                },
+                {
+                  "ruleId": "provident_fund",
+                  "ruleName": "Provident Fund",
+                  "enabled": false,
+                  "skipped": true,
+                  "skipReason": "Rule disabled",
+                  "employeeAmount": 0,
+                  "employerAmount": 0,
+                  "lineItems": [],
+                  "taxableAdjustment": 0
+                },
+                {
+                  "ruleId": "medical_aid",
+                  "ruleName": "Medical Aid",
+                  "enabled": false,
+                  "skipped": true,
+                  "skipReason": "Rule disabled",
+                  "employeeAmount": 0,
+                  "employerAmount": 0,
+                  "lineItems": [],
+                  "taxableAdjustment": 0
+                },
+                {
+                  "ruleId": "paye",
+                  "ruleName": "PAYE",
+                  "enabled": true,
+                  "skipped": false,
+                  "employeeAmount": 2115,
+                  "employerAmount": 0,
+                  "lineItems": [
+                    {
+                      "ruleId": "paye",
+                      "description": "PAYE",
+                      "type": "deduction",
+                      "amount": 2115,
+                      "taxableImpact": "none",
+                      "accountingImpact": "employee_deduction"
+                    }
+                  ],
+                  "taxableAdjustment": 0
+                },
+                {
+                  "ruleId": "uif",
+                  "ruleName": "UIF (Employee)",
+                  "enabled": true,
+                  "skipped": false,
+                  "employeeAmount": 177.12,
+                  "employerAmount": 0,
+                  "lineItems": [
+                    {
+                      "ruleId": "uif",
+                      "description": "UIF",
+                      "type": "deduction",
+                      "amount": 177.12,
+                      "taxableImpact": "none",
+                      "accountingImpact": "employee_deduction"
+                    }
+                  ],
+                  "taxableAdjustment": 0
+                },
+                {
+                  "ruleId": "uif_employer",
+                  "ruleName": "UIF (Employer)",
+                  "enabled": true,
+                  "skipped": false,
+                  "employeeAmount": 0,
+                  "employerAmount": 177.12,
+                  "lineItems": [
+                    {
+                      "ruleId": "uif_employer",
+                      "description": "UIF Employer",
+                      "type": "employer_contribution",
+                      "amount": 177.12,
+                      "taxableImpact": "none",
+                      "accountingImpact": "employer_liability"
+                    }
+                  ],
+                  "taxableAdjustment": 0
+                },
+                {
+                  "ruleId": "sdl",
+                  "ruleName": "SDL",
+                  "enabled": true,
+                  "skipped": false,
+                  "employeeAmount": 0,
+                  "employerAmount": 200,
+                  "lineItems": [
+                    {
+                      "ruleId": "sdl",
+                      "description": "SDL",
+                      "type": "employer_contribution",
+                      "amount": 200,
+                      "taxableImpact": "none",
+                      "accountingImpact": "employer_expense"
+                    }
+                  ],
+                  "taxableAdjustment": 0
+                },
+                {
+                  "ruleId": "custom_employer_contribution",
+                  "ruleName": "Custom Employer Contribution",
+                  "enabled": false,
+                  "skipped": true,
+                  "skipReason": "Rule disabled",
+                  "employeeAmount": 0,
+                  "employerAmount": 0,
+                  "lineItems": [],
+                  "taxableAdjustment": 0
+                },
+                {
+                  "ruleId": "union_fees",
+                  "ruleName": "Union Fees",
+                  "enabled": false,
+                  "skipped": true,
+                  "skipReason": "Rule disabled",
+                  "employeeAmount": 0,
+                  "employerAmount": 0,
+                  "lineItems": [],
+                  "taxableAdjustment": 0
+                },
+                {
+                  "ruleId": "garnishee",
+                  "ruleName": "Garnishee Order",
+                  "enabled": false,
+                  "skipped": true,
+                  "skipReason": "Rule disabled",
+                  "employeeAmount": 0,
+                  "employerAmount": 0,
+                  "lineItems": [],
+                  "taxableAdjustment": 0
+                },
+                {
+                  "ruleId": "custom_deduction",
+                  "ruleName": "Custom Deduction",
+                  "enabled": false,
+                  "skipped": true,
+                  "skipReason": "Rule disabled",
+                  "employeeAmount": 0,
+                  "employerAmount": 0,
+                  "lineItems": [],
+                  "taxableAdjustment": 0
+                }
+              ]
+            }
+          }
+        ],
+        "engine": "statutory_payroll_engine_v3",
+        "rules_applied": [
+          "basic_salary",
+          "paye",
+          "uif",
+          "uif_employer",
+          "sdl"
+        ]
+      }
+    },
+    "payslip": {
+      "gross": 20000,
+      "deductions": 2292.12,
+      "net": 17707.88,
+      "snapshotKeys": [
+        "engine",
+        "net_pay",
+        "tax_year",
+        "command_id",
+        "company_id",
+        "audit_trail",
+        "generated_at",
+        "generated_by",
+        "rule_version",
+        "employee_name",
+        "journal_lines",
+        "payslip_lines",
+        "correlation_id",
+        "engine_results",
+        "engine_version",
+        "gross_earnings",
+        "payroll_run_id",
+        "audit_reference",
+        "cost_to_company",
+        "employee_number",
+        "taxable_earnings",
+        "calculation_version",
+        "rules_engine_result",
+        "calculation_timestamp",
+        "total_employee_deductions",
+        "total_employer_contributions"
+      ]
+    },
+    "runSummary": {
+      "employees_paid": 1,
+      "total_gross": 20000,
+      "total_net": 17707.88,
+      "total_paye": 2115,
+      "total_uif": 354.24,
+      "total_sdl": 200,
+      "total_pension": 0,
+      "employer_contributions": 377.12,
+      "payroll_cost": 20377.12,
+      "variance_previous": null,
+      "variance_budget": null,
+      "pay_period": "2026-07-01 to 2026-07-31",
+      "total_deductions": 2292.12
+    },
+    "approve": {
+      "ok": true,
+      "error": null
+    },
+    "finalize": {
+      "ok": true,
+      "error": null,
+      "data": {
+        "run": {
+          "id": "07aee0e1-0f1f-4c7f-b09d-4d784712e987",
+          "company_id": "be3855e9-d11c-48a8-8c39-10e12a0ff2df",
+          "pay_period_start": "2026-07-01",
+          "pay_period_end": "2026-07-31",
+          "pay_date": "2026-07-31",
+          "status": "finalized",
+          "created_at": "2026-07-29T11:11:35.16713+00:00",
+          "journal_entry_id": "241d751a-bf1d-4397-939a-f124f3c02d2b",
+          "approved_by": "908ad90e-ee0e-4957-943d-ed1ec2fb843a",
+          "approved_at": "2026-07-29T11:11:37.905+00:00",
+          "processed_by": "908ad90e-ee0e-4957-943d-ed1ec2fb843a",
+          "processed_at": "2026-07-29T11:11:38.566161+00:00",
+          "output_metadata": {
+            "summary": {
+              "total_net": 17707.88,
+              "pay_period": "2026-07-01 to 2026-07-31",
+              "total_gross": 20000,
+              "payroll_cost": 20377.12,
+              "employees_paid": 1,
+              "total_deductions": 2292.12,
+              "employer_contributions": 377.12
+            },
+            "recovered": false,
+            "emails_sent": 0,
+            "processed_at": "2026-07-29T11:11:38.566161+00:00",
+            "email_failures": [],
+            "journal_posted": true,
+            "posting_engine": true,
+            "reports_generated": true,
+            "summary_generated": true,
+            "payslips_generated": 1,
+            "posting_request_id": "ae6e6738-a2c6-46c1-a0bd-268dbeaf9735",
+            "register_generated": true
+          },
+          "rule_config": {},
+          "posting_request_id": "ae6e6738-a2c6-46c1-a0bd-268dbeaf9735"
+        },
+        "journal_entry_id": "241d751a-bf1d-4397-939a-f124f3c02d2b",
+        "posting_request_id": "ae6e6738-a2c6-46c1-a0bd-268dbeaf9735",
+        "posting_status": "committed",
+        "summary": {
+          "employees_paid": 1,
+          "total_gross": 20000,
+          "total_net": 17707.88,
+          "total_paye": 0,
+          "total_uif": 0,
+          "total_sdl": 0,
+          "total_pension": 0,
+          "employer_contributions": 377.12,
+          "payroll_cost": 20377.12,
+          "variance_previous": null,
+          "variance_budget": null,
+          "pay_period": "2026-07-01 to 2026-07-31",
+          "total_deductions": 2292.12
+        },
+        "outputs": {
+          "payslips_generated": 1,
+          "reports_generated": true,
+          "register_generated": true,
+          "summary_generated": true,
+          "journal_posted": true,
+          "posting_engine": true,
+          "posting_request_id": "ae6e6738-a2c6-46c1-a0bd-268dbeaf9735",
+          "emails_sent": 0,
+          "email_failures": [],
+          "processed_at": "2026-07-29T11:11:38.566161+00:00",
+          "summary": {
+            "employees_paid": 1,
+            "total_gross": 20000,
+            "total_net": 17707.88,
+            "total_paye": 0,
+            "total_uif": 0,
+            "total_sdl": 0,
+            "total_pension": 0,
+            "employer_contributions": 377.12,
+            "payroll_cost": 20377.12,
+            "variance_previous": null,
+            "variance_budget": null,
+            "pay_period": "2026-07-01 to 2026-07-31",
+            "total_deductions": 2292.12
+          },
+          "recovered": false
+        },
+        "recovered": false
+      }
+    },
+    "payrollJournal": {
+      "lines": [
+        {
+          "acct": "CERT Salaries & Wages",
+          "type": "debit",
+          "amount": 20000
+        },
+        {
+          "acct": "CERT Bank Account",
+          "type": "credit",
+          "amount": 17707.88
+        },
+        {
+          "acct": "CERT Payroll Liabilities",
+          "type": "credit",
+          "amount": 2292.12
+        },
+        {
+          "acct": "CERT Salaries & Wages",
+          "type": "debit",
+          "amount": 377.12
+        },
+        {
+          "acct": "CERT Payroll Liabilities",
+          "type": "credit",
+          "amount": 377.12
+        }
+      ],
+      "dr": 20377.12,
+      "cr": 20377.12,
+      "journalEntryId": "241d751a-bf1d-4397-939a-f124f3c02d2b"
+    }
+  },
+  "failures": [],
+  "resolved": {
+    "WAGE": "6100 CERT Salaries & Wages",
+    "PAYLIAB": "4100 CERT Payroll Liabilities",
+    "BANK": "1100 CERT Bank Account"
+  },
+  "trialBalanceBefore": {
+    "net": 0
+  },
+  "statutoryPresence": {
+    "paye": true,
+    "uif": true,
+    "sdl": true
+  },
+  "trialBalanceAfter": {
+    "net": 0
+  },
+  "deltas": {
+    "WAGE": 20377.12,
+    "BANK": -17707.88,
+    "PAYLIAB": -2669.24
+  },
+  "verdict": "PASS",
+  "reverifiedAt": "2026-07-29T11:12:51.483Z",
+  "statutoryBreakdown": {
+    "paye": [
+      {
+        "amount": 2115
+      }
+    ],
+    "uif": [
+      {
+        "amount": 177.12
+      },
+      {
+        "amount": 177.12
+      }
+    ],
+    "sdl": [
+      {
+        "amount": 200
+      }
+    ],
+    "taxYear": "2026/2027",
+    "engine": "statutory_payroll_engine",
+    "ruleVersion": "2026.2.0",
+    "costToCompany": 20377.12,
+    "totalEmployeeDeductions": 2292.12,
+    "totalEmployerContributions": 377.12
+  }
+}
