@@ -10,7 +10,45 @@ lerna-debug.log*
 node_modules
 dist
 dist-ssr
+coverage
 *.local
+
+# Secrets — never commit real credentials
+.env
+.env.local
+.env.*.local
+!.env.example
+
+# Local tooling and IDE
+.cursor/
+.claude/
+
+# Supabase CLI scratch output
+supabase/.temp/
+
+# Playwright — auth state, run artifacts, and HTML reports
+tests/e2e/.auth/
+tests/e2e/artifacts/
+tests/e2e/report/
+
+# Certification probes, lint dumps, and scratch output
+tmp/
+test-results/
+playwright-report/
+certification-output.json
+lint-src.json
+
+# Script probe outputs and runtime snapshots
+scripts/.token.tmp
+scripts/.token-meta.json
+scripts/tmp-qc-*.sql
+scripts/tmp-receipt-*.jpg
+scripts/tmp-receipt-*.png
+scripts/frp-live-proof-output/
+scripts/variance-snapshot.json
+
+# Large local-only assets (OCR model downloaded at runtime in dev)
+eng.traineddata
 
 # Editor directories and files
 .vscode/*

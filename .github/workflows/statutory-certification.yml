@@ -1,0 +1,42 @@
+name: Statutory Payroll Certification Gate
+
+on:
+  push:
+    branches: [main, master, develop]
+  pull_request:
+    branches: [main, master, develop]
+
+jobs:
+  certify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: TypeScript build
+        run: npm run build
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Unit tests
+        run: npm run test
+
+      - name: Integration tests
+        run: npm run test:integration
+
+      - name: Statutory certification suite
+        run: |
+          npx --yes tsx -e "
+          import { runCertificationProgramme, formatProgrammeSummary, certificationGatePassed } from './src/lib/statutoryPayrollEngine/certificationRunner.ts';
+          const r = runCertificationProgramme();
+          console.log(formatProgrammeSummary(r));
+          if (!certificationGatePassed(r)) process.exit(1);
+          "
