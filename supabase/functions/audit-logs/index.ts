@@ -1,16 +1,16 @@
 // @ts-nocheck
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0'
+import {
+  ENTERPRISE_CORS_HEADERS,
+  withEnterprisePlatform,
+  edgeFailure,
+} from '../_shared/enterpriseEdgePlatform.ts'
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-}
 
-serve(async (req) => {
-  if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders })
-  }
+const corsHeaders = ENTERPRISE_CORS_HEADERS
+
+serve(withEnterprisePlatform('audit-logs', 'tenant', async (req, _ctx) => {
 
   try {
     const supabase = createClient(
@@ -46,12 +46,11 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
+    // audit_logs.changed_by has no foreign key to profiles, so PostgREST cannot
+    // embed it. The actor is resolved with a second lookup instead.
     let query = supabaseAdmin
       .from('audit_logs')
-      .select(`
-        *,
-        profiles:changed_by ( full_name, email )
-      `)
+      .select('*')
       .eq('company_id', company_id)
       .order('created_at', { ascending: false })
       .limit(limit);
@@ -60,9 +59,30 @@ serve(async (req) => {
       query = query.eq('table_name', table_name);
     }
 
-    const { data, error } = await query;
+    const { data: logs, error } = await query;
 
     if (error) throw error;
+
+    const actorIds = [...new Set((logs || []).map((l) => l.changed_by).filter(Boolean))];
+    let actorMap = {};
+
+    if (actorIds.length > 0) {
+      const { data: actors, error: actorsError } = await supabaseAdmin
+        .from('profiles')
+        .select('id, full_name, email')
+        .in('id', actorIds);
+
+      if (actorsError) throw actorsError;
+
+      actorMap = Object.fromEntries(
+        (actors || []).map((p) => [p.id, { full_name: p.full_name, email: p.email }])
+      );
+    }
+
+    const data = (logs || []).map((log) => ({
+      ...log,
+      profiles: log.changed_by ? actorMap[log.changed_by] || null : null,
+    }));
 
     return new Response(JSON.stringify(data), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -70,9 +90,6 @@ serve(async (req) => {
     });
 
   } catch (error) {
-    return new Response(JSON.stringify({ error: error.message }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      status: 500,
-    });
+    return edgeFailure(_ctx, error);
   }
-})
+}))

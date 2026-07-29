@@ -1,16 +1,21 @@
 // @ts-nocheck
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0'
+import {
+  ENTERPRISE_CORS_HEADERS,
+  withEnterprisePlatform,
+  edgeFailure,
+} from '../_shared/enterpriseEdgePlatform.ts'
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+
+const corsHeaders = ENTERPRISE_CORS_HEADERS
+
+function billNumberFromRelation(bills: { bill_number?: string } | { bill_number?: string }[] | null | undefined) {
+  if (!bills) return undefined;
+  return Array.isArray(bills) ? bills[0]?.bill_number : bills.bill_number;
 }
 
-serve(async (req) => {
-  if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders })
-  }
+serve(withEnterprisePlatform('vendors', 'tenant', async (req, _ctx) => {
 
   try {
     const supabase = createClient(
@@ -28,6 +33,7 @@ serve(async (req) => {
     if (!company_id) {
       throw new Error("Company ID is required.");
     }
+    _ctx.companyId = company_id;
 
     const { data: companyMember, error: memberError } = await supabase
       .from('company_users')
@@ -40,9 +46,14 @@ serve(async (req) => {
       throw new Error("Permission denied: User is not a member of this company.");
     }
 
+    const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+    if (!serviceRoleKey) {
+      throw new Error("Missing SUPABASE_SERVICE_ROLE_KEY edge function secret.");
+    }
+
     const supabaseAdmin = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+      serviceRoleKey
     );
 
     let data, error;
@@ -51,66 +62,65 @@ serve(async (req) => {
       case 'GET':
         ({ data, error } = await supabaseAdmin
           .from('vendors')
-          .select('*')
+          .select('id, name, contact_name, email, phone, address, tax_id, payment_terms, company_id, created_at')
           .eq('company_id', company_id)
           .order('name', { ascending: true }));
         break;
       
-      case 'GET_DETAILS':
+      case 'GET_DETAILS': {
         const { vendorId, date_from, date_to } = body;
+
+        if (!vendorId) {
+          throw new Error("Vendor ID is required.");
+        }
         
-        // 1. Get Vendor
         const { data: vendor, error: venError } = await supabaseAdmin
           .from('vendors')
-          .select('*')
+          .select('id, name, contact_name, email, phone, address, tax_id, payment_terms, company_id, created_at')
           .eq('id', vendorId)
           .eq('company_id', company_id)
-          .single();
+          .maybeSingle();
         if (venError) throw venError;
+        if (!vendor) throw new Error("Vendor not found.");
 
-        // 2. Identify AP Accounts
         const { data: apAccounts } = await supabaseAdmin
           .from('chart_of_accounts')
           .select('id')
           .eq('company_id', company_id)
           .eq('type', 'Liability')
-          .ilike('name', '%payable%');
+          .eq('account_role', 'trade_payable');
         const apAccountIds = new Set(apAccounts?.map((a: any) => a.id) || []);
 
-        // 3. Calculate Opening Balance
         let opening_balance = 0;
         if (date_from) {
-            const { data: openingMoves, error: openingError } = await supabaseAdmin
-                .from('journal_entry_items')
-                .select('amount, type, account_id')
-                .eq('journal_entries.company_id', company_id)
-                .eq('journal_entries.vendor_id', vendorId)
-                .lt('journal_entries.entry_date', date_from)
-                .select(`
-                    amount, type, account_id,
-                    journal_entries!inner (company_id, vendor_id, entry_date)
-                `);
+          const { data: openingMoves, error: openingError } = await supabaseAdmin
+            .from('journal_entry_items')
+            .select(`
+              amount, type, account_id,
+              journal_entries!inner (company_id, vendor_id, entry_date)
+            `)
+            .eq('journal_entries.company_id', company_id)
+            .eq('journal_entries.vendor_id', vendorId)
+            .lt('journal_entries.entry_date', date_from);
             
-            if (openingError) throw openingError;
+          if (openingError) throw openingError;
 
-            openingMoves.forEach((item: any) => {
-                // In AP (Liability): Credit = +Balance (Owe more), Debit = -Balance (Owe less)
-                if (apAccountIds.has(item.account_id)) {
-                    opening_balance += item.type === 'credit' ? item.amount : -item.amount;
-                } else {
-                    opening_balance += item.type === 'credit' ? item.amount : -item.amount;
-                }
-            });
+          (openingMoves || []).forEach((item: any) => {
+            if (apAccountIds.has(item.account_id)) {
+              opening_balance += item.type === 'credit' ? item.amount : -item.amount;
+            } else {
+              opening_balance += item.type === 'credit' ? item.amount : -item.amount;
+            }
+          });
         }
 
-        // 4. Get Transactions
         let query = supabaseAdmin
           .from('journal_entries')
           .select(`
             id,
             entry_date,
             description,
-            bills ( bill_number ),
+            bills!journal_entry_id ( bill_number ),
             journal_entry_items (
               amount,
               type,
@@ -127,11 +137,11 @@ serve(async (req) => {
         const { data: transactions, error: transError } = await query;
         if (transError) throw transError;
 
-        const statement = transactions.map((t: any) => {
+        const statement = (transactions || []).map((t: any) => {
           let amount = 0;
           let type = 'other';
 
-          const apItems = t.journal_entry_items.filter((item: any) => apAccountIds.has(item.account_id));
+          const apItems = (t.journal_entry_items || []).filter((item: any) => apAccountIds.has(item.account_id));
 
           if (apItems.length > 0) {
             const debits = apItems.filter((i: any) => i.type === 'debit').reduce((sum: number, i: any) => sum + i.amount, 0);
@@ -139,29 +149,28 @@ serve(async (req) => {
             
             if (credits > 0) {
               amount = credits;
-              type = 'bill'; // Increases AP
+              type = 'bill';
             } else {
               amount = debits;
-              type = 'payment'; // Decreases AP
+              type = 'payment';
             }
           } else {
-             // Fallback
-             const debits = t.journal_entry_items.filter((i: any) => i.type === 'debit').reduce((sum: number, i: any) => sum + i.amount, 0);
-             const credits = t.journal_entry_items.filter((i: any) => i.type === 'credit').reduce((sum: number, i: any) => sum + i.amount, 0);
-             if (credits > debits) {
-                 amount = credits;
-                 type = 'bill';
-             } else {
-                 amount = debits;
-                 type = 'payment';
-             }
+            const debits = (t.journal_entry_items || []).filter((i: any) => i.type === 'debit').reduce((sum: number, i: any) => sum + i.amount, 0);
+            const credits = (t.journal_entry_items || []).filter((i: any) => i.type === 'credit').reduce((sum: number, i: any) => sum + i.amount, 0);
+            if (credits > debits) {
+              amount = credits;
+              type = 'bill';
+            } else {
+              amount = debits;
+              type = 'payment';
+            }
           }
 
           return {
             id: t.id,
             date: t.entry_date,
             description: t.description,
-            bill_number: t.bills?.[0]?.bill_number,
+            bill_number: billNumberFromRelation(t.bills),
             type,
             amount,
           };
@@ -169,6 +178,7 @@ serve(async (req) => {
 
         data = { vendor, statement, opening_balance };
         break;
+      }
 
       case 'POST':
         ({ data, error } = await supabaseAdmin
@@ -208,9 +218,6 @@ serve(async (req) => {
     });
 
   } catch (error) {
-    return new Response(JSON.stringify({ error: error.message }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      status: 500,
-    });
+    return edgeFailure(_ctx, error);
   }
-})
+}))

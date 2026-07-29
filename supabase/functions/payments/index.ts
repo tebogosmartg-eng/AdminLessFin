@@ -1,16 +1,80 @@
-// @ts-nocheck
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0'
+import {
+  ENTERPRISE_CORS_HEADERS,
+  withEnterprisePlatform,
+  edgeFailure,
+} from '../_shared/enterpriseEdgePlatform.ts'
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+
+const corsHeaders = ENTERPRISE_CORS_HEADERS
+
+type PaymentMethod =
+  | 'GET_AR_BALANCES'
+  | 'GET_AP_BALANCES'
+  | 'RECORD_CUSTOMER_PAYMENT'
+  | 'RECORD_VENDOR_PAYMENT'
+  | 'RECORD_INVOICE_PAYMENT';
+
+type CustomerPaymentData = {
+  payment_date: string;
+  deposit_account_id: string;
+  accounts_receivable_id: string;
+  amount: number;
+  description?: string;
+};
+
+type VendorPaymentData = {
+  payment_date: string;
+  payment_account_id: string;
+  accounts_payable_id: string;
+  amount: number;
+  description?: string;
+};
+
+type PaymentsRequestBody = {
+  method: PaymentMethod;
+  company_id: string;
+  customerId?: string;
+  vendorId?: string;
+  billId?: string;
+  paymentData?: CustomerPaymentData | VendorPaymentData;
+  invoice_id?: string;
+  payment_date?: string;
+  asset_account_id?: string;
+  ar_account_id?: string;
+  amount?: number;
+};
+
+function isPaymentsRequestBody(value: unknown): value is PaymentsRequestBody {
+  if (!value || typeof value !== 'object') return false;
+  const body = value as Record<string, unknown>;
+  return typeof body.method === 'string' && typeof body.company_id === 'string';
 }
 
-serve(async (req) => {
-  if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders })
-  }
+function isCustomerPaymentData(value: unknown): value is CustomerPaymentData {
+  if (!value || typeof value !== 'object') return false;
+  const data = value as Record<string, unknown>;
+  return (
+    typeof data.payment_date === 'string' &&
+    typeof data.deposit_account_id === 'string' &&
+    typeof data.accounts_receivable_id === 'string' &&
+    typeof data.amount === 'number'
+  );
+}
+
+function isVendorPaymentData(value: unknown): value is VendorPaymentData {
+  if (!value || typeof value !== 'object') return false;
+  const data = value as Record<string, unknown>;
+  return (
+    typeof data.payment_date === 'string' &&
+    typeof data.payment_account_id === 'string' &&
+    typeof data.accounts_payable_id === 'string' &&
+    typeof data.amount === 'number'
+  );
+}
+
+serve(withEnterprisePlatform('payments', 'tenant', async (req, _ctx) => {
 
   try {
     const supabase = createClient(
@@ -22,12 +86,17 @@ serve(async (req) => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error("User not authenticated.");
 
-    const body = await req.json();
+    const rawBody: unknown = await req.json();
+    if (!isPaymentsRequestBody(rawBody)) {
+      throw new Error("Invalid request payload.");
+    }
+    const body = rawBody;
     const { method, company_id } = body;
 
     if (!company_id) {
       throw new Error("Company ID is required.");
     }
+    _ctx.companyId = company_id;
 
     // Security Check
     const { data: companyMember, error: memberError } = await supabase
@@ -53,42 +122,42 @@ serve(async (req) => {
       { auth: { autoRefreshToken: false, persistSession: false }, global: { headers: { Authorization: req.headers.get('Authorization')! } } }
     );
 
-    let data, error;
+    let data: unknown = null;
+    let error: unknown = null;
 
     switch (method) {
-      case 'GET_AR_BALANCES':
+      case 'GET_AR_BALANCES': {
         ({ data, error } = await userSupabase.rpc('get_customer_ar_balances'));
         break;
+      }
 
-      case 'GET_AP_BALANCES':
+      case 'GET_AP_BALANCES': {
         ({ data, error } = await userSupabase.rpc('get_vendor_ap_balances'));
         break;
+      }
 
-      case 'RECORD_CUSTOMER_PAYMENT':
+      case 'RECORD_CUSTOMER_PAYMENT': {
         // General Payment on Account (not linked to specific invoice)
         const { customerId, paymentData } = body;
-        const { data: entry, error: entryError } = await supabaseAdmin
-          .from('journal_entries')
-          .insert({
-            company_id: company_id,
-            entry_date: paymentData.payment_date,
-            description: paymentData.description,
-            customer_id: customerId,
-          })
-          .select('id')
-          .single();
-        if (entryError) throw entryError;
-
-        const customerJournalItems = [
-          { journal_entry_id: entry.id, account_id: paymentData.deposit_account_id, type: 'debit', amount: paymentData.amount },
-          { journal_entry_id: entry.id, account_id: paymentData.accounts_receivable_id, type: 'credit', amount: paymentData.amount },
-        ];
-        ({ data, error } = await supabaseAdmin.from('journal_entry_items').insert(customerJournalItems));
+        if (!customerId) throw new Error("customerId is required.");
+        if (!isCustomerPaymentData(paymentData)) throw new Error("Invalid customer payment data.");
+        ({ data, error } = await supabaseAdmin.rpc('record_customer_payment_on_account_atomic', {
+          p_company_id: company_id,
+          p_customer_id: customerId,
+          p_payment_date: paymentData.payment_date,
+          p_deposit_account_id: paymentData.deposit_account_id,
+          p_accounts_receivable_id: paymentData.accounts_receivable_id,
+          p_amount: paymentData.amount,
+          p_description: paymentData.description ?? null,
+          p_actor_user_id: user.id,
+        }));
         break;
+      }
 
-      case 'RECORD_VENDOR_PAYMENT':
+      case 'RECORD_VENDOR_PAYMENT': {
         // General Payment on Account or Specific Bill
         const { vendorId, billId, paymentData: vendorPaymentData } = body;
+        if (!isVendorPaymentData(vendorPaymentData)) throw new Error("Invalid vendor payment data.");
         
         if (billId) {
           // Paying a specific bill
@@ -101,27 +170,27 @@ serve(async (req) => {
           }));
         } else {
           // General payment to vendor (Balance Forward)
-          const { data: vendorEntry, error: vendorEntryError } = await supabaseAdmin
-            .from('journal_entries')
-            .insert({
-              company_id: company_id,
-              entry_date: vendorPaymentData.payment_date,
-              description: vendorPaymentData.description,
-              vendor_id: vendorId,
-            })
-            .select('id')
-            .single();
-          if (vendorEntryError) throw vendorEntryError;
-
-          const vendorJournalItems = [
-            { journal_entry_id: vendorEntry.id, account_id: vendorPaymentData.accounts_payable_id, type: 'debit', amount: vendorPaymentData.amount },
-            { journal_entry_id: vendorEntry.id, account_id: vendorPaymentData.payment_account_id, type: 'credit', amount: vendorPaymentData.amount },
-          ];
-          ({ data, error } = await supabaseAdmin.from('journal_entry_items').insert(vendorJournalItems));
+          if (!vendorId) throw new Error("vendorId is required.");
+          ({ data, error } = await supabaseAdmin.rpc('record_vendor_payment_on_account_atomic', {
+            p_company_id: company_id,
+            p_vendor_id: vendorId,
+            p_payment_date: vendorPaymentData.payment_date,
+            p_payment_account_id: vendorPaymentData.payment_account_id,
+            p_accounts_payable_id: vendorPaymentData.accounts_payable_id,
+            p_amount: vendorPaymentData.amount,
+            p_description: vendorPaymentData.description ?? null,
+            p_actor_user_id: user.id,
+          }));
         }
         break;
+      }
 
-      case 'RECORD_INVOICE_PAYMENT':
+      case 'RECORD_INVOICE_PAYMENT': {
+        if (!body.invoice_id) throw new Error("invoice_id is required.");
+        if (!body.payment_date) throw new Error("payment_date is required.");
+        if (!body.asset_account_id) throw new Error("asset_account_id is required.");
+        if (!body.ar_account_id) throw new Error("ar_account_id is required.");
+        if (typeof body.amount !== 'number') throw new Error("amount is required.");
         ({ data, error } = await userSupabase.rpc('record_invoice_payment', {
           p_invoice_id: body.invoice_id,
           p_payment_date: body.payment_date,
@@ -130,6 +199,7 @@ serve(async (req) => {
           p_amount: body.amount,
         }));
         break;
+      }
 
       default:
         throw new Error(`Unsupported method: ${method}`);
@@ -142,10 +212,7 @@ serve(async (req) => {
       status: 200,
     });
 
-  } catch (error) {
-    return new Response(JSON.stringify({ error: error.message }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      status: 500,
-    });
+  } catch (error: unknown) {
+    return edgeFailure(_ctx, error);
   }
-})
+}))

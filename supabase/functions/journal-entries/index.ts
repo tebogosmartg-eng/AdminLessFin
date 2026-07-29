@@ -1,16 +1,65 @@
-// @ts-nocheck
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0'
+import {
+  ENTERPRISE_CORS_HEADERS,
+  withEnterprisePlatform,
+  edgeFailure,
+} from '../_shared/enterpriseEdgePlatform.ts'
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+
+const corsHeaders = ENTERPRISE_CORS_HEADERS
+
+type JournalEntryMethod = 'GET' | 'GET_RELATED_TO_INVOICE' | 'POST' | 'PUT' | 'DELETE';
+
+type JournalEntryFilters = {
+  id?: string;
+  account_id?: string;
+  date_from?: string;
+  date_to?: string;
+  vendor_id?: string;
+  customer_id?: string;
+};
+
+type JournalEntryItemInput = {
+  account_id: string;
+  type: 'debit' | 'credit';
+  amount: number;
+  project_id?: string | null;
+};
+
+type JournalEntryInput = {
+  entry_date: string;
+  description?: string | null;
+  vendor_id?: string | null;
+  customer_id?: string | null;
+  attachment_url?: string | null;
+  items: JournalEntryItemInput[];
+};
+
+type JournalEntryRequestBody = {
+  method: JournalEntryMethod;
+  company_id: string;
+  select?: string;
+  filters?: JournalEntryFilters;
+  entryId?: string;
+  invoiceId?: string;
+  entryData?: JournalEntryInput;
+};
+
+type JournalEntryItemRow = {
+  journal_entry_id: string;
+};
+
+function isJournalEntryRequestBody(value: unknown): value is JournalEntryRequestBody {
+  if (!value || typeof value !== 'object') return false;
+  const body = value as Record<string, unknown>;
+  return (
+    typeof body.method === 'string' &&
+    typeof body.company_id === 'string'
+  );
 }
 
-serve(async (req) => {
-  if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders })
-  }
+serve(withEnterprisePlatform('journal-entries', 'tenant', async (req, _ctx) => {
 
   try {
     const supabase = createClient(
@@ -22,12 +71,17 @@ serve(async (req) => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error("User not authenticated.");
 
-    const body = await req.json();
+    const rawBody: unknown = await req.json();
+    if (!isJournalEntryRequestBody(rawBody)) {
+      throw new Error("Invalid request payload.");
+    }
+    const body = rawBody;
     const { method, company_id } = body;
 
     if (!company_id) {
       throw new Error("Company ID is required.");
     }
+    _ctx.companyId = company_id;
 
     // Security Check: Verify user membership
     const { data: companyMember, error: memberError } = await supabase
@@ -46,10 +100,11 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    let data, error;
+    let data: unknown = null;
+    let error: Error | null = null;
 
     switch (method) {
-      case 'GET':
+      case 'GET': {
         let entryIdsFromAccountFilter = null;
         if (body.filters?.account_id && body.filters.account_id !== 'all') {
           const { data: items, error: itemsError } = await supabaseAdmin
@@ -57,7 +112,7 @@ serve(async (req) => {
             .select('journal_entry_id')
             .eq('account_id', body.filters.account_id);
           if (itemsError) throw itemsError;
-          entryIdsFromAccountFilter = items.map(item => item.journal_entry_id);
+          entryIdsFromAccountFilter = ((items ?? []) as JournalEntryItemRow[]).map(item => item.journal_entry_id);
           if (entryIdsFromAccountFilter.length === 0) {
              return new Response(JSON.stringify([]), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 });
           }
@@ -85,13 +140,23 @@ serve(async (req) => {
           query = query.eq('customer_id', body.filters.customer_id);
         }
         if (body.filters?.id) {
-          query = query.eq('id', body.filters.id).single();
+          const { data: entry, error: entryError } = await supabaseAdmin
+            .from('journal_entries')
+            .select(body.select || '*')
+            .eq('company_id', company_id)
+            .eq('id', body.filters.id)
+            .maybeSingle();
+
+          if (entryError) throw entryError;
+          data = entry;
+          break;
         }
 
         ({ data, error } = await query);
         break;
+      }
       
-      case 'GET_RELATED_TO_INVOICE':
+      case 'GET_RELATED_TO_INVOICE': {
         ({ data, error } = await supabaseAdmin
           .from('journal_entries')
           .select('id, entry_date, description')
@@ -99,29 +164,42 @@ serve(async (req) => {
           .eq('invoice_id', body.invoiceId)
           .order('entry_date', { ascending: true }));
         break;
+      }
 
-      case 'POST':
-        const { items: postItems, ...postEntryData } = body.entryData;
-        const { data: newEntry, error: postError } = await supabaseAdmin
-          .from('journal_entries')
-          .insert({ ...postEntryData, company_id })
-          .select('id')
-          .single();
+      case 'POST': {
+        if (!body.entryData) throw new Error("Entry data is required.");
+        const { items: postItems, entry_date, description, vendor_id, customer_id, attachment_url } = body.entryData;
+
+        // Single gateway into the GL (ERP V2.0 Phase 2 Posting Engine) — no
+        // more direct journal_entries/journal_entry_items inserts here.
+        const { data: postingResult, error: postError } = await supabaseAdmin.rpc('posting_engine_submit', {
+          p_request: {
+            company_id,
+            posting_date: entry_date,
+            module: 'manual_journal',
+            document_type: 'manual_journal',
+            description: description || null,
+            vendor_id: vendor_id || null,
+            customer_id: customer_id || null,
+            attachment_url: attachment_url || null,
+            created_by: user.id,
+            lines: postItems.map((item: JournalEntryItemInput) => ({
+              account_id: item.account_id,
+              debit: item.type === 'debit' ? item.amount : 0,
+              credit: item.type === 'credit' ? item.amount : 0,
+              project_id: item.project_id || null,
+            })),
+          },
+          p_mode: 'commit',
+        });
         if (postError) throw postError;
-        
-        // Add project_id to the items being inserted
-        const itemsToInsert = postItems.map(item => ({ 
-          ...item, 
-          journal_entry_id: newEntry.id,
-          project_id: item.project_id || null // Ensure project_id is handled
-        }));
-        
-        const { error: postItemsError } = await supabaseAdmin.from('journal_entry_items').insert(itemsToInsert);
-        if (postItemsError) throw postItemsError;
-        data = newEntry;
+        data = { id: postingResult.journal_id };
         break;
+      }
 
-      case 'PUT':
+      case 'PUT': {
+        if (!body.entryData) throw new Error("Entry data is required.");
+        if (!body.entryId) throw new Error("Entry ID is required.");
         const { items: putItems, ...putEntryData } = body.entryData;
         
         // Update Header
@@ -153,14 +231,17 @@ serve(async (req) => {
         
         data = { id: body.entryId };
         break;
+      }
 
-      case 'DELETE':
+      case 'DELETE': {
+        if (!body.entryId) throw new Error("Entry ID is required.");
         ({ data, error } = await supabaseAdmin
           .from('journal_entries')
           .delete()
           .eq('id', body.entryId)
           .eq('company_id', company_id));
         break;
+      }
 
       default:
         throw new Error(`Unsupported method: ${method}`);
@@ -173,10 +254,7 @@ serve(async (req) => {
       status: 200,
     });
 
-  } catch (error) {
-    return new Response(JSON.stringify({ error: error.message }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      status: 500,
-    });
+  } catch (error: unknown) {
+    return edgeFailure(_ctx, error);
   }
-})
+}))

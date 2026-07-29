@@ -1,48 +1,36 @@
 // @ts-nocheck
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0'
+import {
+  ENTERPRISE_CORS_HEADERS,
+  withEnterprisePlatform,
+  edgeFailure,
+  bootstrapTenantRequest,
+} from '../_shared/enterpriseEdgePlatform.ts'
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-}
 
-serve(async (req) => {
-  if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders })
-  }
+const corsHeaders = ENTERPRISE_CORS_HEADERS
+
+serve(withEnterprisePlatform('invoices', 'tenant', async (req, _ctx) => {
 
   try {
-    const supabase = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
-      { global: { headers: { Authorization: req.headers.get('Authorization')! } } }
-    )
+    // ERP Context (V10 Foundation): auth + company membership + financial
+    // year/period resolved centrally instead of reimplemented per function.
+    const { user, admin: supabaseAdmin, body, company_id } = await bootstrapTenantRequest(req, _ctx);
+    const { method } = body;
 
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) throw new Error("User not authenticated.");
-
-    const body = await req.json();
-    const { method, company_id } = body;
-
-    if (!company_id) {
-      throw new Error("Company ID is required.");
+    const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+    if (!serviceRoleKey) {
+      throw new Error("Missing SUPABASE_SERVICE_ROLE_KEY edge function secret.");
     }
 
-    const { data: companyMember, error: memberError } = await supabase
-      .from('company_users')
-      .select('user_id')
-      .eq('user_id', user.id)
-      .eq('company_id', company_id)
-      .single();
-
-    if (memberError || !companyMember) {
-      throw new Error("Permission denied: User is not a member of this company.");
-    }
-
-    const supabaseAdmin = createClient(
+    // get_next_invoice_number_for_user needs auth.uid() from the caller's own
+    // JWT (not the service role) even while using the service-role key for
+    // elevated access — kept as its own client, unrelated to ERP Context.
+    const userSupabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+      serviceRoleKey,
+      { auth: { autoRefreshToken: false, persistSession: false }, global: { headers: { Authorization: req.headers.get('Authorization')! } } }
     );
 
     let data, error;
@@ -58,8 +46,8 @@ serve(async (req) => {
             due_date,
             status,
             notes,
-            customers!inner ( name ),
-            journal_entries (
+            customers ( name ),
+            journal_entries!journal_entry_id (
               journal_entry_items (
                 type,
                 amount
@@ -103,7 +91,7 @@ serve(async (req) => {
             status,
             notes,
             customers ( id, name, address, email, payment_terms ),
-            journal_entries (
+            journal_entries!journal_entry_id (
               id,
               journal_entry_items (
                 id,
@@ -111,7 +99,7 @@ serve(async (req) => {
                 type,
                 project_id,
                 account_id, 
-                chart_of_accounts ( name ),
+                chart_of_accounts ( name, account_role, tax_treatment ),
                 journal_entry_item_tax_rates (
                   tax_rates ( id, rate )
                 )
@@ -127,8 +115,9 @@ serve(async (req) => {
         const { invoiceData, timesheetIds } = body;
         const { p_items, notes, ...rpcParams } = invoiceData;
 
-        // 1. Create Invoice using RPC
-        const { data: newInvoiceId, error: rpcError } = await supabaseAdmin.rpc('create_invoice_with_taxes', {
+        // Single-transaction posting: AR/Revenue/Tax + Inventory/COGS, balanced
+        // journal, project tagging all happen inside post_sales_invoice_atomic.
+        const { data: newInvoiceId, error: rpcError } = await supabaseAdmin.rpc('post_sales_invoice_atomic', {
             p_company_id: company_id,
             p_customer_id: rpcParams.customer_id,
             p_invoice_date: rpcParams.invoice_date,
@@ -139,47 +128,17 @@ serve(async (req) => {
             p_tax_payable_account_id: rpcParams.tax_payable_account_id || null,
             p_description: rpcParams.description || `Invoice ${rpcParams.invoice_number}`,
             p_items: p_items,
+            p_notes: notes || null,
             p_quote_id: null,
+            p_actor_user_id: user.id,
         });
 
         if (rpcError) throw rpcError;
 
-        // Update notes and post-process projects
-        if (newInvoiceId) {
-            await supabaseAdmin.from('invoices').update({ notes: notes }).eq('id', newInvoiceId);
-
-            const { data: invoice } = await supabaseAdmin.from('invoices').select('journal_entry_id').eq('id', newInvoiceId).single();
-            if (invoice && invoice.journal_entry_id) {
-                const { data: createdItems } = await supabaseAdmin
-                    .from('journal_entry_items')
-                    .select('id, account_id, amount')
-                    .eq('journal_entry_id', invoice.journal_entry_id)
-                    .eq('type', 'credit'); 
-                
-                const updatedItemIds = new Set();
-                
-                for (const inputItem of p_items) {
-                    if (inputItem.project_id) {
-                        const targetAmount = inputItem.quantity * inputItem.unit_price;
-                        const match = createdItems?.find(ci => 
-                            ci.account_id === inputItem.income_account_id && 
-                            Math.abs(ci.amount - targetAmount) < 0.01 &&
-                            !updatedItemIds.has(ci.id)
-                        );
-                        
-                        if (match) {
-                            await supabaseAdmin.from('journal_entry_items').update({ project_id: inputItem.project_id }).eq('id', match.id);
-                            updatedItemIds.add(match.id);
-                        }
-                    }
-                }
-            }
-
-            if (timesheetIds && timesheetIds.length > 0) {
-                await supabaseAdmin.from('timesheets').update({ is_billed: true, invoice_id: newInvoiceId }).in('id', timesheetIds);
-            }
+        if (newInvoiceId && timesheetIds && timesheetIds.length > 0) {
+            await supabaseAdmin.from('timesheets').update({ is_billed: true, invoice_id: newInvoiceId }).in('id', timesheetIds);
         }
-        
+
         data = { id: newInvoiceId };
         break;
 
@@ -249,9 +208,35 @@ serve(async (req) => {
         data = { message: 'Invoice voided successfully' };
         break;
 
-      case 'GET_NEXT_INVOICE_NUMBER':
-        ({ data, error } = await userSupabase.rpc('get_next_invoice_number_for_user'));
+      case 'GET_NEXT_INVOICE_NUMBER': {
+        const rpcResult = await userSupabase.rpc('get_next_invoice_number_for_user');
+        if (!rpcResult.error) {
+          data = rpcResult.data;
+          break;
+        }
+        // Resilience: the DB routine casts an invoice number's numeric suffix to
+        // `integer` and fails with 22003 ("out of range for type integer") when a
+        // company has any invoice number whose numeric run exceeds 2,147,483,647
+        // (e.g. timestamp-style references). Rather than surface a 500 that blocks
+        // the invoice form, fall back to a BigInt-safe next "INV-#####".
+        const { data: existingNums, error: listErr } = await supabaseAdmin
+          .from('invoices')
+          .select('invoice_number')
+          .eq('company_id', company_id);
+        if (listErr) throw rpcResult.error; // cannot recover — surface original cause
+        let maxSeq = 0n;
+        for (const row of existingNums ?? []) {
+          const match = /^INV-(\d+)$/.exec(String(row.invoice_number ?? ''));
+          if (!match) continue;
+          try {
+            const n = BigInt(match[1]);
+            if (n > maxSeq) maxSeq = n;
+          } catch { /* ignore unparseable */ }
+        }
+        data = `INV-${(maxSeq + 1n).toString().padStart(5, '0')}`;
+        error = null;
         break;
+      }
 
       case 'CREATE_FROM_QUOTE':
         const { quoteId, invoiceData: quoteInvoiceData, percentage } = body;
@@ -274,7 +259,7 @@ serve(async (req) => {
           tax_rate_id: item.tax_rate_id || null,
         }));
 
-        ({ error } = await supabaseAdmin.rpc('create_invoice_with_taxes', {
+        const { data: quoteInvoiceId, error: quoteRpcError } = await supabaseAdmin.rpc('post_sales_invoice_atomic', {
           p_company_id: company_id,
           p_customer_id: quote.customer_id,
           p_invoice_date: quoteInvoiceData.invoice_date,
@@ -285,30 +270,14 @@ serve(async (req) => {
           p_tax_payable_account_id: quoteInvoiceData.tax_payable_account_id || null,
           p_description: quoteInvoiceData.description || `Invoice for Quote #${quote.quote_number} (${percentage}%)`,
           p_items: quote_p_items,
+          p_notes: quoteInvoiceData.notes || null,
           p_quote_id: quoteId,
-        }));
-        
-        // Update notes if provided (e.g. from default)
-        if (quoteInvoiceData.notes) {
-            // Need the ID of the invoice just created... RPC returns it!
-            // WAIT: The RPC 'create_invoice_with_taxes' returns VOID in the earlier definition I pasted in 'App Preview'.
-            // BUT in the 'Schema' section of context, there are TWO definitions. One returns uuid, one returns void.
-            // Postgres function overloading. The one used depends on signature.
-            // I should check which one I'm calling.
-            // To be safe, I'll fetch the invoice by number to update notes.
-            const { data: createdInv } = await supabaseAdmin
-                .from('invoices')
-                .select('id')
-                .eq('invoice_number', quoteInvoiceData.invoice_number)
-                .eq('company_id', company_id)
-                .single();
-            
-            if (createdInv) {
-                await supabaseAdmin.from('invoices').update({ notes: quoteInvoiceData.notes }).eq('id', createdInv.id);
-            }
-        }
+          p_actor_user_id: user.id,
+        });
 
-        data = { message: 'Invoice created from quote successfully.' };
+        if (quoteRpcError) throw quoteRpcError;
+
+        data = { id: quoteInvoiceId, message: 'Invoice created from quote successfully.' };
         break;
 
       default:
@@ -323,9 +292,6 @@ serve(async (req) => {
     });
 
   } catch (error) {
-    return new Response(JSON.stringify({ error: error.message }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      status: 500,
-    });
+    return edgeFailure(_ctx, error);
   }
-})
+}))

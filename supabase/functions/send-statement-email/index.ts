@@ -1,11 +1,15 @@
 // @ts-nocheck
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0'
+import {
+  ENTERPRISE_CORS_HEADERS,
+  withEnterprisePlatform,
+  edgeFailure,
+  requireServiceRole,
+} from '../_shared/enterpriseEdgePlatform.ts'
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-}
+
+const corsHeaders = ENTERPRISE_CORS_HEADERS
 
 const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY');
 const RESEND_DOMAIN = Deno.env.get('RESEND_DOMAIN');
@@ -17,12 +21,10 @@ const formatCurrency = (amount: number) => {
   }).format(amount);
 };
 
-serve(async (req) => {
-  if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders })
-  }
+serve(withEnterprisePlatform('send-statement-email', 'service', async (req, _ctx) => {
 
   try {
+    requireServiceRole(req, _ctx);
     if (!RESEND_API_KEY || !RESEND_DOMAIN) {
       throw new Error("Email service is not configured.");
     }
@@ -61,10 +63,10 @@ serve(async (req) => {
     // No, email generation should be server-side authoritative.
     // I'll reuse the logic pattern from above.
     
-    // FETCH ACCOUNT IDS
+    // FETCH CONTROL ACCOUNT IDS BY ROLE (never display name)
     const accType = type === 'customer' ? 'Asset' : 'Liability';
-    const accName = type === 'customer' ? '%receivable%' : '%payable%';
-    const { data: accounts } = await supabaseAdmin.from('chart_of_accounts').select('id').eq('company_id', company_id).eq('type', accType).ilike('name', accName);
+    const accRole = type === 'customer' ? 'trade_receivable' : 'trade_payable';
+    const { data: accounts } = await supabaseAdmin.from('chart_of_accounts').select('id').eq('company_id', company_id).eq('type', accType).eq('account_role', accRole);
     const accIds = new Set(accounts?.map(a => a.id) || []);
 
     // OPENING BALANCE
@@ -211,10 +213,6 @@ serve(async (req) => {
     });
 
   } catch (error) {
-    console.error(error);
-    return new Response(JSON.stringify({ error: error.message }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      status: 500,
-    });
+    return edgeFailure(_ctx, error);
   }
-})
+}))

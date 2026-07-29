@@ -1,16 +1,16 @@
 // @ts-nocheck
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0'
+import {
+  ENTERPRISE_CORS_HEADERS,
+  withEnterprisePlatform,
+  edgeFailure,
+} from '../_shared/enterpriseEdgePlatform.ts'
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-}
 
-serve(async (req) => {
-  if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders })
-  }
+const corsHeaders = ENTERPRISE_CORS_HEADERS
+
+serve(withEnterprisePlatform('ai-copilot', 'tenant', async (req, _ctx) => {
 
   try {
     const OPENAI_API_KEY = Deno.env.get('OPENAI_API_KEY');
@@ -32,7 +32,8 @@ serve(async (req) => {
 
     if (!company_id) throw new Error("Company ID is required.");
 
-    // Security Check
+    
+    _ctx.companyId = company_id;// Security Check
     const { data: member, error: memberError } = await supabase
       .from('company_users')
       .select('role')
@@ -131,10 +132,6 @@ Respond ONLY with a JSON object in this format: { "mappings": [ { "index": numbe
     });
 
   } catch (error) {
-    console.error("AI Copilot Error:", error);
-    return new Response(JSON.stringify({ error: error.message }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      status: 500,
-    });
+    return edgeFailure(_ctx, error);
   }
-})
+}))

@@ -1,4 +1,4 @@
-// @ts-nocheck
+﻿// @ts-nocheck
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0'
 import { addDays, addWeeks, addMonths, addYears, format } from "https://esm.sh/date-fns@3.6.0";
@@ -106,10 +106,11 @@ serve(async (req) => {
         
         if (fetchError) throw fetchError;
 
-        // Pre-fetch default accounts to avoid errors during invoice creation
-        const arAccountId = await getAccountId(supabaseAdmin, company_id, 'Asset', 'accounts receivable');
-        const taxAccountId = await getAccountId(supabaseAdmin, company_id, 'Liability', 'tax payable');
-        const invAccountId = await getAccountId(supabaseAdmin, company_id, 'Asset', 'inventory asset');
+        // Pre-fetch default control accounts by account_role
+        const arAccountId = await getAccountIdByRole(supabaseAdmin, company_id, 'trade_receivable');
+        const taxAccountId = await getAccountIdByRole(supabaseAdmin, company_id, 'output_vat')
+          ?? await getAccountIdByRole(supabaseAdmin, company_id, 'vat_control');
+        const invAccountId = await getAccountIdByRole(supabaseAdmin, company_id, 'inventory_asset');
 
         let processedCount = 0;
 
@@ -217,30 +218,15 @@ serve(async (req) => {
   }
 })
 
-// Helper to find accounts by loose name matching
-async function getAccountId(supabase, company_id, type, namePart) {
-  // Try exact match first
+// Resolve control accounts by canonical account_role (never display name).
+async function getAccountIdByRole(supabase, company_id, role) {
   const { data } = await supabase
     .from('chart_of_accounts')
     .select('id')
     .eq('company_id', company_id)
-    .eq('type', type)
-    .ilike('name', `%${namePart}%`)
+    .eq('account_role', role)
     .limit(1)
-    .single();
-  
-  if (data) return data.id;
-  
-  // Fallback: just return the first account of that type (risky but better than crashing in demo env)
-  if (type === 'Asset' || type === 'Liability') {
-      const { data: fallback } = await supabase
-        .from('chart_of_accounts')
-        .select('id')
-        .eq('company_id', company_id)
-        .eq('type', type)
-        .limit(1)
-        .single();
-      return fallback?.id;
-  }
-  return null;
+    .maybeSingle();
+  return data?.id ?? null;
 }
+

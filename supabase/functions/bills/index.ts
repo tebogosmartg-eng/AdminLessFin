@@ -1,16 +1,16 @@
 // @ts-nocheck
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0'
+import {
+  ENTERPRISE_CORS_HEADERS,
+  withEnterprisePlatform,
+  edgeFailure,
+} from '../_shared/enterpriseEdgePlatform.ts'
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-}
 
-serve(async (req) => {
-  if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders })
-  }
+const corsHeaders = ENTERPRISE_CORS_HEADERS
+
+serve(withEnterprisePlatform('bills', 'tenant', async (req, _ctx) => {
 
   try {
     const supabase = createClient(
@@ -28,6 +28,7 @@ serve(async (req) => {
     if (!company_id) {
       throw new Error("Company ID is required.");
     }
+    _ctx.companyId = company_id;
 
     // Security Check: Verify user membership
     const { data: companyMember, error: memberError } = await supabase
@@ -41,9 +42,14 @@ serve(async (req) => {
       throw new Error("Permission denied.");
     }
 
+    const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+    if (!serviceRoleKey) {
+      throw new Error("Missing SUPABASE_SERVICE_ROLE_KEY edge function secret.");
+    }
+
     const supabaseAdmin = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+      serviceRoleKey
     );
 
     let data, error;
@@ -57,13 +63,14 @@ serve(async (req) => {
             bill_date,
             due_date,
             status,
-            description:journal_entries(description),
             bill_number,
             attachment_url,
+            vendor_id,
             vendors ( name ),
-            journal_entries (
+            journal_entries!journal_entry_id (
               id,
               entry_date,
+              description,
               journal_entry_items ( type, amount, project_id )
             )
           `)
@@ -94,17 +101,22 @@ serve(async (req) => {
         
         // Data transformation for frontend consistency
         if (data) {
-          data = data.map(bill => ({
-            id: bill.id,
-            entry_date: bill.bill_date,
-            description: bill.description?.description || `Bill from ${bill.vendors?.name || 'Unknown Vendor'}`,
-            status: bill.status,
-            vendor_id: bill.vendor_id,
-            vendors: bill.vendors ? [bill.vendors] : [], 
-            bill_number: bill.bill_number,
-            attachment_url: bill.attachment_url,
-            journal_entry_items: bill.journal_entries?.journal_entry_items || []
-          }));
+          data = data.map(bill => {
+            const journalEntry = bill.journal_entries;
+            return {
+              id: bill.id,
+              journal_entry_id: journalEntry?.id ?? null,
+              entry_date: bill.bill_date,
+              due_date: bill.due_date,
+              description: journalEntry?.description || `Bill from ${bill.vendors?.name || 'Unknown Vendor'}`,
+              status: bill.status,
+              vendor_id: bill.vendor_id,
+              vendors: bill.vendors ? [bill.vendors] : [],
+              bill_number: bill.bill_number,
+              attachment_url: bill.attachment_url,
+              journal_entry_items: journalEntry?.journal_entry_items || [],
+            };
+          });
         }
         break;
       
@@ -119,10 +131,10 @@ serve(async (req) => {
             bill_number,
             vendor_id,
             attachment_url,
-            description:journal_entries(description),
             vendors ( name ),
-            journal_entries (
+            journal_entries!journal_entry_id (
               id,
+              description,
               journal_entry_items (
                 id,
                 amount,
@@ -190,27 +202,43 @@ serve(async (req) => {
           .eq('company_id', company_id));
         break;
 
-      case 'VOID':
+      case 'VOID': {
         const { data: billToVoid } = await supabaseAdmin.from('bills').select('journal_entry_id, bill_number').eq('id', body.billId).single();
         if (!billToVoid) throw new Error("Bill not found");
-        const { data: jeData } = await supabaseAdmin.from('journal_entries').select('*').eq('id', billToVoid.journal_entry_id).single();
-        const { data: reversalJe } = await supabaseAdmin.from('journal_entries').insert({
-          company_id,
-          entry_date: new Date().toISOString().split('T')[0],
-          description: `Void Reversal for Bill ${billToVoid.bill_number}`,
-          vendor_id: jeData.vendor_id
-        }).select('id').single();
-        const { data: originalItems } = await supabaseAdmin.from('journal_entry_items').select('*').eq('journal_entry_id', billToVoid.journal_entry_id);
-        const reversalItems = originalItems.map(item => ({
-          journal_entry_id: reversalJe.id,
-          account_id: item.account_id,
-          type: item.type === 'debit' ? 'credit' : 'debit',
-          amount: item.amount,
-          project_id: item.project_id
-        }));
-        await supabaseAdmin.from('journal_entry_items').insert(reversalItems);
+
+        // Standardized reversal (ERP V3.0 Posting Engine) — preferred path.
+        const { error: rollbackErr } = await supabaseAdmin.rpc('posting_engine_rollback', {
+          p_idempotency_key: `accounts_payable:bill:${body.billId}`,
+          p_company_id: company_id,
+          p_reason: 'Bill voided',
+          p_actor_user_id: user.id,
+        });
+
+        if (rollbackErr) {
+          // Legacy bill posted before the Posting Engine migration has no
+          // posting_requests row for this key — fall back to the original
+          // manual reversal so voiding still works for pre-existing data.
+          const { data: jeData } = await supabaseAdmin.from('journal_entries').select('*').eq('id', billToVoid.journal_entry_id).single();
+          const { data: reversalJe } = await supabaseAdmin.from('journal_entries').insert({
+            company_id,
+            entry_date: new Date().toISOString().split('T')[0],
+            description: `Void Reversal for Bill ${billToVoid.bill_number}`,
+            vendor_id: jeData.vendor_id
+          }).select('id').single();
+          const { data: originalItems } = await supabaseAdmin.from('journal_entry_items').select('*').eq('journal_entry_id', billToVoid.journal_entry_id);
+          const reversalItems = originalItems.map(item => ({
+            journal_entry_id: reversalJe.id,
+            account_id: item.account_id,
+            type: item.type === 'debit' ? 'credit' : 'debit',
+            amount: item.amount,
+            project_id: item.project_id
+          }));
+          await supabaseAdmin.from('journal_entry_items').insert(reversalItems);
+        }
+
         ({ data, error } = await supabaseAdmin.from('bills').update({ status: 'void' }).eq('id', body.billId));
         break;
+      }
 
       default:
         throw new Error(`Unsupported method: ${method}`);
@@ -224,9 +252,6 @@ serve(async (req) => {
     });
 
   } catch (error) {
-    return new Response(JSON.stringify({ error: error.message }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      status: 500,
-    });
+    return edgeFailure(_ctx, error);
   }
-})
+}))

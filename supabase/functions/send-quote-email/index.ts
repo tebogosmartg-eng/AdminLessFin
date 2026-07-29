@@ -1,11 +1,16 @@
 // @ts-nocheck
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0'
+import {
+  ENTERPRISE_CORS_HEADERS,
+  withEnterprisePlatform,
+  edgeFailure,
+  requireServiceRole,
+} from '../_shared/enterpriseEdgePlatform.ts'
+import { resolveEnterpriseIdentityEdge } from '../_shared/enterpriseIdentity.ts'
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-}
+
+const corsHeaders = ENTERPRISE_CORS_HEADERS
 
 const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY');
 const RESEND_DOMAIN = Deno.env.get('RESEND_DOMAIN');
@@ -17,12 +22,10 @@ const formatCurrency = (amount: number) => {
   }).format(amount);
 };
 
-serve(async (req) => {
-  if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders })
-  }
+serve(withEnterprisePlatform('send-quote-email', 'service', async (req, _ctx) => {
 
   try {
+    requireServiceRole(req, _ctx);
     if (!RESEND_API_KEY || !RESEND_DOMAIN) {
       throw new Error("Email service is not configured. Please set RESEND_API_KEY and RESEND_DOMAIN secrets.");
     }
@@ -40,11 +43,11 @@ serve(async (req) => {
     const { data: quote, error: quoteError } = await supabaseAdmin
       .from('quotes')
       .select(`
+        company_id,
         quote_number,
         quote_date,
         expiry_date,
         customers ( name, address ),
-        companies ( name, address ),
         quote_items (
           description,
           quantity,
@@ -57,6 +60,7 @@ serve(async (req) => {
     if (quoteError) throw quoteError;
     if (!quote) throw new Error("Quote not found.");
 
+    const identity = await resolveEnterpriseIdentityEdge(supabaseAdmin, quote.company_id);
     const totalAmount = quote.quote_items.reduce((sum: number, item: any) => sum + (item.quantity * item.unit_price), 0);
 
     const htmlBody = `
@@ -65,8 +69,8 @@ serve(async (req) => {
           <div style="max-width: 600px; margin: auto; padding: 20px; border: 1px solid #eee; border-radius: 5px;">
             <div style="display: flex; justify-content: space-between; align-items: start; padding-bottom: 20px; border-bottom: 1px solid #eee;">
               <div>
-                <h1 style="font-size: 24px; font-weight: bold; margin: 0;">${quote.companies?.name || 'Your Company'}</h1>
-                <p style="margin: 0; color: #666;">${quote.companies?.address || ''}</p>
+                <h1 style="font-size: 24px; font-weight: bold; margin: 0;">${identity.name}</h1>
+                <p style="margin: 0; color: #666;">${identity.address}</p>
               </div>
               <div style="text-align: right;">
                 <h2 style="font-size: 28px; font-weight: bold; margin: 0;">QUOTE</h2>
@@ -144,10 +148,6 @@ serve(async (req) => {
     });
 
   } catch (error) {
-    console.error('Error sending quote email:', error);
-    return new Response(JSON.stringify({ error: error.message }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      status: 500,
-    });
+    return edgeFailure(_ctx, error);
   }
-})
+}))

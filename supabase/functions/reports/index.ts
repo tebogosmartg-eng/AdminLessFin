@@ -2,16 +2,16 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0'
 import { format, subMonths, subYears, startOfMonth, endOfMonth } from "https://esm.sh/date-fns@3.6.0";
+import {
+  ENTERPRISE_CORS_HEADERS,
+  withEnterprisePlatform,
+  edgeFailure,
+} from '../_shared/enterpriseEdgePlatform.ts'
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-}
 
-serve(async (req) => {
-  if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders })
-  }
+const corsHeaders = ENTERPRISE_CORS_HEADERS
+
+serve(withEnterprisePlatform('reports', 'tenant', async (req, _ctx) => {
 
   try {
     const supabase = createClient(
@@ -109,7 +109,8 @@ serve(async (req) => {
         for (const month of months) {
             const { data, error } = await userSupabase.rpc('get_period_activity', {
                 p_start_date: month.start,
-                p_end_date: month.end
+                p_end_date: month.end,
+                p_company_id: company_id,
             });
             if (error) throw error;
 
@@ -129,9 +130,40 @@ serve(async (req) => {
 
     // --- (Keep existing methods...) ---
     if (method === 'GET_INVENTORY_VALUATION') {
-        const { data: products, error } = await supabaseAdmin.from('products').select('*').eq('company_id', company_id).eq('type', 'inventory').order('name');
+        const { data: products, error } = await supabaseAdmin
+          .from('products')
+          .select('*')
+          .eq('company_id', company_id)
+          .eq('type', 'inventory')
+          .order('name');
         if (error) throw error;
-        const valuation = products.map(p => ({ id: p.id, name: p.name, quantity: p.quantity_on_hand, cost: p.cost, totalValue: p.quantity_on_hand * (p.cost || 0) }));
+
+        const { data: balances } = await supabaseAdmin
+          .from('inv_balances')
+          .select('product_id, qty_on_hand, avg_unit_cost')
+          .eq('company_id', company_id);
+
+        const byProduct = {};
+        for (const b of balances || []) {
+          byProduct[b.product_id] = byProduct[b.product_id] || { qty: 0, value: 0 };
+          byProduct[b.product_id].qty += Number(b.qty_on_hand || 0);
+          byProduct[b.product_id].value += Number(b.qty_on_hand || 0) * Number(b.avg_unit_cost || 0);
+        }
+
+        const valuation = (products || []).map((p) => {
+          const agg = byProduct[p.id];
+          const quantity = agg ? agg.qty : Number(p.quantity_on_hand || 0);
+          const cost = agg && agg.qty > 0
+            ? agg.value / agg.qty
+            : Number(p.cost || p.standard_cost || 0);
+          return {
+            id: p.id,
+            name: p.name,
+            quantity,
+            cost,
+            totalValue: quantity * cost,
+          };
+        });
         return new Response(JSON.stringify(valuation), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 });
     }
 
@@ -175,14 +207,14 @@ serve(async (req) => {
     }
 
     const promises = [];
-    if (end_date) promises.push(userSupabase.rpc('get_balances_as_of_date', { p_end_date: end_date }));
+    if (end_date) promises.push(userSupabase.rpc('get_balances_as_of_date', { p_end_date: end_date, p_company_id: company_id }));
     if (start_date && end_date) {
-        promises.push(userSupabase.rpc('get_period_activity', { p_start_date: start_date, p_end_date: end_date }));
-        promises.push(userSupabase.rpc('get_cash_flow_statement', { p_start_date: start_date, p_end_date: end_date }));
+        promises.push(userSupabase.rpc('get_period_activity', { p_start_date: start_date, p_end_date: end_date, p_company_id: company_id }));
+        promises.push(userSupabase.rpc('get_cash_flow_statement', { p_start_date: start_date, p_end_date: end_date, p_company_id: company_id }));
     }
-    if (prior_date) promises.push(userSupabase.rpc('get_balances_as_of_date', { p_end_date: prior_date }));
-    promises.push(userSupabase.rpc('get_aged_receivables'));
-    promises.push(userSupabase.rpc('get_aged_payables'));
+    if (prior_date) promises.push(userSupabase.rpc('get_balances_as_of_date', { p_end_date: prior_date, p_company_id: company_id }));
+    promises.push(userSupabase.rpc('get_aged_receivables', { p_company_id: company_id }));
+    promises.push(userSupabase.rpc('get_aged_payables', { p_company_id: company_id }));
 
     const [balancesAsOfRes, periodActivityRes, cashFlowRes, openingBalancesRes, agedReceivablesRes, agedPayablesRes] = await Promise.all(promises);
     if (balancesAsOfRes?.error) throw balancesAsOfRes.error;
@@ -200,9 +232,6 @@ serve(async (req) => {
     });
 
   } catch (error) {
-    return new Response(JSON.stringify({ error: error.message }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      status: 500,
-    });
+    return edgeFailure(_ctx, error);
   }
-})
+}))

@@ -1,18 +1,18 @@
 // @ts-nocheck
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0'
+import {
+  ENTERPRISE_CORS_HEADERS,
+  withEnterprisePlatform,
+  edgeFailure,
+} from '../_shared/enterpriseEdgePlatform.ts'
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-}
+
+const corsHeaders = ENTERPRISE_CORS_HEADERS
 
 // ARCHITECTURE NOTE:
 // This function acts as a secure API gateway for all budget-related database operations.
-serve(async (req) => {
-  if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders })
-  }
+serve(withEnterprisePlatform('budgets', 'tenant', async (req, _ctx) => {
 
   try {
     // Create a Supabase client with the user's auth token to verify permissions
@@ -26,12 +26,13 @@ serve(async (req) => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error("User not authenticated.");
 
-    const { method, body } = await req.json();
-    const { company_id } = body;
+    const body = await req.json();
+    const { method, company_id, budgetData, budgetId } = body;
 
     if (!company_id) {
       throw new Error("Company ID is required.");
     }
+    _ctx.companyId = company_id;
 
     // Security Check: Verify the user is a member of the company they are trying to access.
     const { data: companyMember, error: memberError } = await supabase
@@ -47,29 +48,72 @@ serve(async (req) => {
 
     // Use the admin client for database operations to bypass RLS,
     // as we have already performed our security check.
+    const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+    if (!serviceRoleKey) {
+      throw new Error("Missing SUPABASE_SERVICE_ROLE_KEY edge function secret.");
+    }
+
     const supabaseAdmin = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+      serviceRoleKey
     );
 
     // User-impersonated client for RPC calls
     const userSupabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
+      serviceRoleKey,
       { auth: { autoRefreshToken: false, persistSession: false }, global: { headers: { Authorization: req.headers.get('Authorization')! } } }
     );
 
     let data, error;
 
     switch (method) {
-      case 'GET_ALL':
-        ({ data, error } = await userSupabase.rpc('get_budgets_with_activity'));
+      case 'GET_ALL': {
+        const rpcResult = await userSupabase.rpc('get_budgets_with_activity', { p_company_id: company_id });
+        if (!rpcResult.error) {
+          data = rpcResult.data;
+          break;
+        }
+
+        // Fallback when the RPC is missing or fails — return budgets without computed actuals
+        const { data: budgets, error: budgetsError } = await supabaseAdmin
+          .from('budgets')
+          .select('id, account_id, amount, period, start_date')
+          .eq('company_id', company_id);
+
+        if (budgetsError) throw budgetsError;
+
+        const accountIds = [...new Set((budgets || []).map((budget: { account_id: string }) => budget.account_id))];
+        let accountMap = new Map<string, string>();
+
+        if (accountIds.length > 0) {
+          const { data: accounts, error: accountsError } = await supabaseAdmin
+            .from('chart_of_accounts')
+            .select('id, name')
+            .in('id', accountIds);
+
+          if (accountsError) throw accountsError;
+          accountMap = new Map((accounts || []).map((account: { id: string; name: string }) => [account.id, account.name]));
+        }
+
+        data = (budgets || []).map((budget: { id: string; account_id: string; amount: number; period: string; start_date: string }) => ({
+          id: budget.id,
+          account_id: budget.account_id,
+          amount: budget.amount,
+          period: budget.period,
+          start_date: budget.start_date,
+          account_name: accountMap.get(budget.account_id) ?? 'Unknown',
+          actual_amount: 0,
+          period_start_date: budget.start_date,
+          period_end_date: budget.start_date,
+        }));
         break;
+      }
 
       case 'POST':
         ({ data, error } = await supabaseAdmin
           .from('budgets')
-          .insert({ ...body.budgetData, company_id })
+          .insert({ ...budgetData, company_id })
           .select()
           .single());
         break;
@@ -77,8 +121,8 @@ serve(async (req) => {
       case 'PUT':
         ({ data, error } = await supabaseAdmin
           .from('budgets')
-          .update(body.budgetData)
-          .eq('id', body.budgetId)
+          .update(budgetData)
+          .eq('id', budgetId)
           .eq('company_id', company_id) // Extra check for safety
           .select()
           .single());
@@ -88,7 +132,7 @@ serve(async (req) => {
         ({ data, error } = await supabaseAdmin
           .from('budgets')
           .delete()
-          .eq('id', body.budgetId)
+          .eq('id', budgetId)
           .eq('company_id', company_id)); // Extra check for safety
         break;
 
@@ -104,9 +148,6 @@ serve(async (req) => {
     });
 
   } catch (error) {
-    return new Response(JSON.stringify({ error: error.message }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      status: 500,
-    });
+    return edgeFailure(_ctx, error);
   }
-})
+}))

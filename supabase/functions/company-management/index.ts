@@ -1,16 +1,16 @@
 // @ts-nocheck
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0'
+import {
+  ENTERPRISE_CORS_HEADERS,
+  withEnterprisePlatform,
+  edgeFailure,
+} from '../_shared/enterpriseEdgePlatform.ts'
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-}
 
-serve(async (req) => {
-  if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders })
-  }
+const corsHeaders = ENTERPRISE_CORS_HEADERS
+
+serve(withEnterprisePlatform('company-management', 'tenant', async (req, _ctx) => {
 
   try {
     const supabase = createClient(
@@ -52,6 +52,17 @@ serve(async (req) => {
           .from('company_users')
           .insert({ company_id: newCompany.id, user_id: user.id, role: 'owner' });
         if (linkError) throw linkError;
+
+        // 3. Phase 1A — new companies enter Accounting Readiness at NOT_STARTED
+        const { error: readinessError } = await supabaseAdmin
+          .from('accounting_readiness')
+          .insert({
+            company_id: newCompany.id,
+            status: 'NOT_STARTED',
+            accounting_ready: false,
+            current_step: 'financial_calendar',
+          });
+        if (readinessError) throw readinessError;
         
         data = newCompany;
         break;
@@ -111,9 +122,6 @@ serve(async (req) => {
     });
 
   } catch (error) {
-    return new Response(JSON.stringify({ error: error.message }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      status: 500,
-    });
+    return edgeFailure(_ctx, error);
   }
-})
+}))

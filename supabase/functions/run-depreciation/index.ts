@@ -2,16 +2,16 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0'
 import { format, isBefore, endOfMonth } from "https://esm.sh/date-fns@3.6.0";
+import {
+  ENTERPRISE_CORS_HEADERS,
+  withEnterprisePlatform,
+  edgeFailure,
+} from '../_shared/enterpriseEdgePlatform.ts'
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-}
 
-serve(async (_req) => {
-  if (_req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders })
-  }
+const corsHeaders = ENTERPRISE_CORS_HEADERS
+
+serve(withEnterprisePlatform('run-depreciation', 'system', async (_req, _ctx) => {
 
   try {
     const supabaseAdmin = createClient(
@@ -89,12 +89,16 @@ serve(async (_req) => {
         continue;
       }
 
-      // 3. Update asset record
+      // 3. Update asset record (calculation unchanged; V16.2 adds YTD tracker only)
       const newAccumulatedDepreciation = asset.accumulated_depreciation + depreciationToPost;
+      const year = today.getFullYear();
+      const priorYtd = asset.depreciation_ytd_year === year ? Number(asset.depreciation_ytd || 0) : 0;
       const updatePayload = {
         accumulated_depreciation: newAccumulatedDepreciation,
         last_depreciation_date: format(today, 'yyyy-MM-dd'),
-        status: 'active'
+        status: 'active',
+        depreciation_ytd: priorYtd + depreciationToPost,
+        depreciation_ytd_year: year,
       };
 
       if (newAccumulatedDepreciation >= depreciableCost) {
@@ -116,10 +120,6 @@ serve(async (_req) => {
     });
 
   } catch (error) {
-    console.error('Error running depreciation:', error);
-    return new Response(JSON.stringify({ error: error.message }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      status: 500,
-    });
+    return edgeFailure(_ctx, error);
   }
-})
+}))

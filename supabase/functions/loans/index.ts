@@ -1,16 +1,16 @@
 // @ts-nocheck
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0'
+import {
+  ENTERPRISE_CORS_HEADERS,
+  withEnterprisePlatform,
+  edgeFailure,
+} from '../_shared/enterpriseEdgePlatform.ts'
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-}
 
-serve(async (req) => {
-  if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders })
-  }
+const corsHeaders = ENTERPRISE_CORS_HEADERS
+
+serve(withEnterprisePlatform('loans', 'tenant', async (req, _ctx) => {
 
   try {
     const supabase = createClient(
@@ -27,7 +27,8 @@ serve(async (req) => {
 
     if (!company_id) throw new Error("Company ID is required.");
 
-    // SECURITY: Strict RBAC for Loans
+    
+    _ctx.companyId = company_id;// SECURITY: Strict RBAC for Loans
     const { data: member, error: memberError } = await supabase
       .from('company_users')
       .select('role')
@@ -73,40 +74,28 @@ serve(async (req) => {
         data = { loan: loanData, schedule: scheduleData };
         break;
 
-      case 'POST':
+      case 'POST': {
         const { loanData: postLoanData, deposit_account_id, lender_name } = body;
-        
-        const { data: newLoan, error: loanInsertError } = await supabaseAdmin
-          .from('loans')
-          .insert({ ...postLoanData, company_id })
-          .select('id')
-          .single();
-        if (loanInsertError) throw loanInsertError;
 
-        const { data: entry, error: entryError } = await supabaseAdmin
-          .from('journal_entries')
-          .insert({
-            company_id: company_id,
-            entry_date: postLoanData.start_date,
-            description: `Loan received from ${lender_name}`,
-            vendor_id: postLoanData.lender_id,
-          })
-          .select('id')
-          .single();
-        if (entryError) throw entryError;
+        const { data: newLoanId, error: disburseError } = await supabaseAdmin.rpc('record_loan_disbursement_atomic', {
+          p_company_id: company_id,
+          p_lender_id: postLoanData.lender_id,
+          p_principal_amount: postLoanData.principal_amount,
+          p_interest_rate: postLoanData.interest_rate,
+          p_term_months: postLoanData.term_months,
+          p_repayment_frequency: postLoanData.repayment_frequency,
+          p_start_date: postLoanData.start_date,
+          p_loan_agreement_url: postLoanData.loan_agreement_url ?? null,
+          p_deposit_account_id: deposit_account_id,
+          p_liability_account_id: postLoanData.liability_account_id,
+          p_lender_name: lender_name,
+          p_actor_user_id: user.id,
+        });
+        if (disburseError) throw disburseError;
 
-        const journalItems = [
-          { journal_entry_id: entry.id, account_id: deposit_account_id, type: 'debit', amount: postLoanData.principal_amount },
-          { journal_entry_id: entry.id, account_id: postLoanData.liability_account_id, type: 'credit', amount: postLoanData.principal_amount },
-        ];
-        const { error: itemsError } = await supabaseAdmin.from('journal_entry_items').insert(journalItems);
-        if (itemsError) throw itemsError;
-
-        const { error: rpcError } = await supabaseAdmin.rpc('generate_amortization_schedule', { p_loan_id: newLoan.id });
-        if (rpcError) throw rpcError;
-        
-        data = newLoan;
+        data = { id: newLoanId };
         break;
+      }
 
       case 'PUT':
         const { loanData: putLoanData, loanId } = body;
@@ -154,7 +143,12 @@ serve(async (req) => {
         break;
 
       case 'RECORD_PAYMENT':
-        ({ data, error } = await supabaseAdmin.rpc('record_loan_payment', {
+        // record_loan_payment checks is_company_member() internally via
+        // auth.uid(), which only resolves when the request carries the
+        // calling user's JWT — must use the user-impersonated client, not
+        // the service-role admin client (matches the pattern already used
+        // for record_invoice_payment in payments/index.ts).
+        ({ data, error } = await supabase.rpc('record_loan_payment', {
           p_schedule_item_id: body.schedule_item_id,
           p_payment_date: body.payment_date,
           p_bank_account_id: body.bank_account_id,
@@ -174,9 +168,6 @@ serve(async (req) => {
     });
 
   } catch (error) {
-    return new Response(JSON.stringify({ error: error.message }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      status: 500,
-    });
+    return edgeFailure(_ctx, error);
   }
-})
+}))

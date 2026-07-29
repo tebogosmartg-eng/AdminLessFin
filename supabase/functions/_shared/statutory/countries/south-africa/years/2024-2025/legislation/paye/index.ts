@@ -1,0 +1,11 @@
+import { statutoryConstant, type StatutoryConstant, type TaxBracket } from '../../../../../../registry/types.ts';
+
+export const taxBrackets: StatutoryConstant<TaxBracket>[] = [
+  statutoryConstant({"from":0,"to":237100,"rate":0.18,"base":0}, { authority: 'National Treasury / SARS', sourceDocument: 'Budget Tax Guide 2024', pageNumber: 2, sectionReference: 'Tax table bracket 1', effectiveFrom: '2024-03-01', effectiveTo: '2025-02-28', legislationVersion: '2024.2.0' }),
+  statutoryConstant({"from":237100,"to":370500,"rate":0.26,"base":42678}, { authority: 'National Treasury / SARS', sourceDocument: 'Budget Tax Guide 2024', pageNumber: 2, sectionReference: 'Tax table bracket 2', effectiveFrom: '2024-03-01', effectiveTo: '2025-02-28', legislationVersion: '2024.2.0' }),
+  statutoryConstant({"from":370500,"to":512800,"rate":0.31,"base":77362}, { authority: 'National Treasury / SARS', sourceDocument: 'Budget Tax Guide 2024', pageNumber: 2, sectionReference: 'Tax table bracket 3', effectiveFrom: '2024-03-01', effectiveTo: '2025-02-28', legislationVersion: '2024.2.0' }),
+  statutoryConstant({"from":512800,"to":673000,"rate":0.36,"base":121475}, { authority: 'National Treasury / SARS', sourceDocument: 'Budget Tax Guide 2024', pageNumber: 2, sectionReference: 'Tax table bracket 4', effectiveFrom: '2024-03-01', effectiveTo: '2025-02-28', legislationVersion: '2024.2.0' }),
+  statutoryConstant({"from":673000,"to":857900,"rate":0.39,"base":179147}, { authority: 'National Treasury / SARS', sourceDocument: 'Budget Tax Guide 2024', pageNumber: 2, sectionReference: 'Tax table bracket 5', effectiveFrom: '2024-03-01', effectiveTo: '2025-02-28', legislationVersion: '2024.2.0' }),
+  statutoryConstant({"from":857900,"to":1817000,"rate":0.41,"base":251258}, { authority: 'National Treasury / SARS', sourceDocument: 'Budget Tax Guide 2024', pageNumber: 2, sectionReference: 'Tax table bracket 6', effectiveFrom: '2024-03-01', effectiveTo: '2025-02-28', legislationVersion: '2024.2.0' }),
+  statutoryConstant({"from":1817000,"to":null,"rate":0.45,"base":644489}, { authority: 'National Treasury / SARS', sourceDocument: 'Budget Tax Guide 2024', pageNumber: 2, sectionReference: 'Tax table bracket 7', effectiveFrom: '2024-03-01', effectiveTo: '2025-02-28', legislationVersion: '2024.2.0' }),
+];

@@ -1,14 +1,44 @@
 // @ts-nocheck
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0'
+import {
+  ENTERPRISE_CORS_HEADERS,
+  withEnterprisePlatform,
+  edgeFailure,
+} from '../_shared/enterpriseEdgePlatform.ts'
+import { resolveEnterpriseIdentityEdge } from '../_shared/enterpriseIdentity.ts'
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-}
+
+const corsHeaders = ENTERPRISE_CORS_HEADERS
 
 const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY');
 const RESEND_DOMAIN = Deno.env.get('RESEND_DOMAIN');
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+class HttpError extends Error {
+  status: number;
+  constructor(message: string, status = 400) {
+    super(message);
+    this.name = 'HttpError';
+    this.status = status;
+  }
+}
+
+const logAudit = (event: {
+  action: string;
+  outcome: 'attempt' | 'rejected' | 'success' | 'failed';
+  user_id?: string | null;
+  company_id?: string | null;
+  invoice_id?: string | null;
+  recipient?: string;
+  reason?: string;
+}) => {
+  console.log(JSON.stringify({
+    timestamp: new Date().toISOString(),
+    ...event,
+  }));
+};
 
 const formatCurrency = (amount: number) => {
   return new Intl.NumberFormat('en-ZA', {
@@ -17,19 +47,35 @@ const formatCurrency = (amount: number) => {
   }).format(amount);
 };
 
-serve(async (req) => {
-  if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders })
-  }
+serve(withEnterprisePlatform('send-invoice-email', 'tenant', async (req, _ctx) => {
 
   try {
-    if (!RESEND_API_KEY || !RESEND_DOMAIN) {
-      throw new Error("Email service is not configured. Please set RESEND_API_KEY and RESEND_DOMAIN secrets in your Supabase project.");
+    const supabase = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+      { global: { headers: { Authorization: req.headers.get('Authorization') ?? '' } } }
+    );
+
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    if (userError || !user) {
+      throw new HttpError("User not authenticated.", 401);
     }
 
     const { invoiceId, to, subject, body } = await req.json();
     if (!invoiceId || !to || !subject || !body) {
-      throw new Error("Missing required parameters: invoiceId, to, subject, body.");
+      throw new HttpError("Missing required parameters: invoiceId, to, subject, body.", 400);
+    }
+    if (!UUID_REGEX.test(invoiceId)) {
+      throw new HttpError("Invalid invoiceId format.", 400);
+    }
+    if (!EMAIL_REGEX.test(to)) {
+      throw new HttpError("Invalid recipient email format.", 400);
+    }
+    if (typeof subject !== 'string' || subject.trim().length === 0 || subject.length > 200) {
+      throw new HttpError("Subject is required and must be 1-200 characters.", 400);
+    }
+    if (typeof body !== 'string' || body.trim().length === 0 || body.length > 5000) {
+      throw new HttpError("Body is required and must be 1-5000 characters.", 400);
     }
 
     const supabaseAdmin = createClient(
@@ -37,14 +83,23 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
+    logAudit({
+      action: 'send_invoice_email',
+      outcome: 'attempt',
+      user_id: user.id,
+      invoice_id: invoiceId,
+      recipient: to,
+    });
+
     const { data: invoice, error: invoiceError } = await supabaseAdmin
       .from('invoices')
       .select(`
+        id,
+        company_id,
         invoice_number,
         invoice_date,
         due_date,
         customers ( name, address ),
-        companies ( name, address ),
         journal_entries (
           journal_entry_items (
             amount,
@@ -57,7 +112,26 @@ serve(async (req) => {
       .single();
 
     if (invoiceError) throw invoiceError;
-    if (!invoice) throw new Error("Invoice not found.");
+    if (!invoice) {
+      throw new HttpError("Invoice not found.", 404);
+    }
+
+    const { data: membership, error: membershipError } = await supabase
+      .from('company_users')
+      .select('role')
+      .eq('user_id', user.id)
+      .eq('company_id', invoice.company_id)
+      .single();
+
+    if (membershipError || !membership) {
+      throw new HttpError("Permission denied.", 403);
+    }
+
+    if (!RESEND_API_KEY || !RESEND_DOMAIN) {
+      throw new Error("Email service is not configured. Please set RESEND_API_KEY and RESEND_DOMAIN secrets in your Supabase project.");
+    }
+
+    const identity = await resolveEnterpriseIdentityEdge(supabaseAdmin, invoice.company_id);
 
     const lineItems = invoice.journal_entries[0].journal_entry_items.filter((item: any) => item.type === 'credit');
     const totalAmount = lineItems.reduce((sum: number, item: any) => sum + item.amount, 0);
@@ -68,8 +142,8 @@ serve(async (req) => {
           <div style="max-width: 600px; margin: auto; padding: 20px; border: 1px solid #eee; border-radius: 5px;">
             <div style="display: flex; justify-content: space-between; align-items: start; padding-bottom: 20px; border-bottom: 1px solid #eee;">
               <div>
-                <h1 style="font-size: 24px; font-weight: bold; margin: 0;">${invoice.companies?.name || 'Your Company'}</h1>
-                <p style="margin: 0; color: #666;">${invoice.companies?.address || ''}</p>
+                <h1 style="font-size: 24px; font-weight: bold; margin: 0;">${identity.name}</h1>
+                <p style="margin: 0; color: #666;">${identity.address}</p>
               </div>
               <div style="text-align: right;">
                 <h2 style="font-size: 28px; font-weight: bold; margin: 0;">INVOICE</h2>
@@ -137,6 +211,15 @@ serve(async (req) => {
       throw new Error(`Failed to send email: ${errorBody.message || 'Unknown error'}`);
     }
 
+    logAudit({
+      action: 'send_invoice_email',
+      outcome: 'success',
+      user_id: user.id,
+      company_id: invoice.company_id,
+      invoice_id: invoice.id,
+      recipient: to,
+    });
+
     return new Response(JSON.stringify({ message: "Email sent successfully." }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 200,
@@ -144,9 +227,19 @@ serve(async (req) => {
 
   } catch (error) {
     console.error('Error sending invoice email:', error);
-    return new Response(JSON.stringify({ error: error.message }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      status: 500,
-    });
+    if (error instanceof HttpError) {
+      logAudit({
+        action: 'send_invoice_email',
+        outcome: 'rejected',
+        reason: error.message,
+      });
+    } else {
+      logAudit({
+        action: 'send_invoice_email',
+        outcome: 'failed',
+        reason: error?.message ?? 'Unknown error',
+      });
+    }
+    return edgeFailure(_ctx, error, {}, error instanceof HttpError ? error.status : undefined);
   }
-})
+}))
