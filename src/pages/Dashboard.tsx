@@ -196,11 +196,13 @@ const Dashboard = () => {
         </Popover>
       </header>
       
-      {!isLoading && !setupStatus.isComplete && <SetupChecklist status={setupStatus} />}
-
       {accountingReadiness && !accountingReadiness.accountingReady && (
         <AccountingSetupProgressCard readiness={accountingReadiness} />
       )}
+
+      {!isLoading &&
+        accountingReadiness?.accountingReady &&
+        !setupStatus.isComplete && <SetupChecklist status={setupStatus} />}
 
       {accountingHealth && (
         <AccountingHealthCard health={accountingHealth} />

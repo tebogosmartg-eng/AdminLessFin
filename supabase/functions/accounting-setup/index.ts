@@ -53,13 +53,7 @@ async function ensureReadinessRow(supabaseAdmin: any, companyId: string) {
 }
 
 async function loadEvaluation(supabaseAdmin: any, companyId: string, row: any) {
-  const [
-    { data: financialYears },
-    { data: accounts },
-    { data: taxRates },
-    { data: bankAccounts },
-    { data: payrollMappings },
-  ] = await Promise.all([
+  const results = await Promise.all([
     supabaseAdmin
       .from('financial_years')
       .select('id, status')
@@ -67,7 +61,7 @@ async function loadEvaluation(supabaseAdmin: any, companyId: string, row: any) {
     supabaseAdmin
       .from('chart_of_accounts')
       .select(
-        'id, name, type, control_account, system_account, tax_treatment, financial_statement, normal_balance, account_code, account_number, is_active',
+        'id, name, type, account_role, category, subcategory, control_account, system_account, tax_treatment, financial_statement, normal_balance, account_code, account_number, is_active',
       )
       .eq('company_id', companyId),
     supabaseAdmin.from('tax_rates').select('id').eq('company_id', companyId),
@@ -81,6 +75,18 @@ async function loadEvaluation(supabaseAdmin: any, companyId: string, row: any) {
       .eq('company_id', companyId)
       .eq('is_active', true),
   ]);
+
+  for (const result of results) {
+    if (result.error) throw result.error;
+  }
+
+  const [
+    { data: financialYears },
+    { data: accounts },
+    { data: taxRates },
+    { data: bankAccounts },
+    { data: payrollMappings },
+  ] = results;
 
   return evaluateAccountingReadiness({
     flags: {

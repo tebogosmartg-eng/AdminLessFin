@@ -1,5 +1,5 @@
 {
-  "runAt": "2026-07-28T16:57:24.429Z",
+  "runAt": "2026-07-29T14:12:35.476Z",
   "decision": "PASS",
   "steps": [
     {
@@ -17,7 +17,7 @@
       "evidence": {
         "customer": "Itumeleng",
         "vendor": "kudzanai",
-        "product": "E2E QA Service 1785245497252 EDITED",
+        "product": "Zurman",
         "ar": "AR",
         "ap": "AP",
         "revenue": "zuru",
@@ -31,8 +31,8 @@
       "step": "Post sales invoice with balanced journal",
       "status": "PASS",
       "evidence": {
-        "invoiceId": "da26d91d-010b-4a1f-90bd-e4588a7f26db",
-        "journalEntryId": "296b2fc4-22e8-4123-b12b-96a52b5bf47c",
+        "invoiceId": "d851168d-de4d-4d02-916f-456465ffc157",
+        "journalEntryId": "c4d6ac54-7fad-4f4b-bd14-06756d2f25a2",
         "balance": {
           "pass": true,
           "debit": 1322.5,
@@ -46,7 +46,7 @@
       "status": "PASS",
       "evidence": {
         "billId": null,
-        "journalEntryId": "20db985b-6390-46e2-b3b4-a0899b751e16",
+        "journalEntryId": "c8e4bc50-026d-4f7c-bbe5-0156c167c0dd",
         "balance": {
           "pass": true,
           "debit": 661.25,
@@ -59,7 +59,7 @@
       "step": "Receive stock movement",
       "status": "PASS",
       "evidence": {
-        "journal_entry_id": "2ca3085d-7cb9-48e0-9a67-58ea7cc1c9df",
+        "journal_entry_id": "165ef01b-dc18-4977-adf8-ab4b6c4bb4e4",
         "amount": 200,
         "unit_cost": 100
       }
@@ -72,11 +72,11 @@
         "response": {
           "rule_id": null,
           "warnings": [],
-          "timestamp": "2026-07-28T16:57:23.372195+00:00",
-          "journal_id": "99559ed6-7886-4c38-9ffc-331dfcc2b58d",
+          "timestamp": "2026-07-29T14:12:33.467905+00:00",
+          "journal_id": "5ae37fa6-66fe-4774-a8ce-758590b21c5e",
           "rule_version": null,
           "business_event": null,
-          "journal_number": "JE-000055",
+          "journal_number": "JE-000095",
           "policy_results": {
             "passed": [
               {
@@ -143,15 +143,15 @@
             "blocking": false,
             "warnings": [],
             "violations": [],
-            "evaluated_at": "2026-07-28T16:57:23.372195+00:00"
+            "evaluated_at": "2026-07-29T14:12:33.467905+00:00"
           },
           "posting_status": "committed",
           "financial_year_id": "5cc2035d-d408-4ca0-b505-a045a1102395",
-          "posting_request_id": "9d881302-0d25-4498-a778-190c3a2df21d",
-          "bank_transaction_id": "243e8de8-c02f-4bd3-a5cf-c4cdf1c931d8",
+          "posting_request_id": "8faf8a8e-a06b-42a0-bbf5-9ad28c55307b",
+          "bank_transaction_id": "c227e099-2312-4850-bfdc-672c06e387b3",
           "accounting_period_id": "13a5a35c-cad1-4c75-90a8-56767886430d"
         },
-        "journalEntryId": "99559ed6-7886-4c38-9ffc-331dfcc2b58d",
+        "journalEntryId": "5ae37fa6-66fe-4774-a8ce-758590b21c5e",
         "balance": {
           "pass": true,
           "debit": 250,
@@ -166,7 +166,7 @@
       "evidence": {
         "vatItems": [
           {
-            "id": "93224b5d-c5a0-4a6d-a6fc-0001de43209c",
+            "id": "a87994d1-6a6e-41f2-8504-fb8aed253ff7",
             "amount": 1150,
             "chart_of_accounts": {
               "name": "zuru",
@@ -174,7 +174,7 @@
             }
           },
           {
-            "id": "8e47a540-845a-44c6-98fb-5fc8876a3c11",
+            "id": "f71e8651-787f-4ae2-8695-1ccc1b2419fe",
             "amount": 172.5,
             "chart_of_accounts": {
               "name": "VAT Output",
@@ -182,7 +182,7 @@
             }
           },
           {
-            "id": "a8a173b7-71ba-4702-a75a-77f171e82b6c",
+            "id": "0e38dd85-761a-439a-a95a-decf78f55430",
             "amount": 1322.5,
             "chart_of_accounts": {
               "name": "AR",

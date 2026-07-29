@@ -60,3 +60,5 @@ eng.traineddata
 *.njsproj
 *.sln
 *.sw?
+.vercel
+.env*

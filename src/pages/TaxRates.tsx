@@ -11,9 +11,12 @@ import {
   TableRow,
 } from '../components/ui/table';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/card';
-import { PlusCircle, MoreHorizontal } from 'lucide-react';
+import { PlusCircle, MoreHorizontal, Receipt } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { showError, showSuccess } from '../utils/toast';
 import TaxRateForm from '../components/TaxRateForm';
+import { EmptyState } from '../components/EmptyState';
+import { Alert, AlertDescription, AlertTitle } from '../components/ui/alert';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -79,12 +82,25 @@ const TaxRates = () => {
 
   return (
     <>
+      <Alert className="mb-4 border-amber-200/70 bg-amber-50/20 dark:border-amber-900/40">
+        <AlertTitle>Required for Accounting Setup</AlertTitle>
+        <AlertDescription>
+          At least one tax rate is needed before Accounting Ready is granted. Add VAT or other
+          rates used on invoices and bills, then return to{' '}
+          <Link to="/accounting-setup" className="font-medium underline underline-offset-2">
+            Accounting Setup
+          </Link>{' '}
+          to continue.
+        </AlertDescription>
+      </Alert>
       <Card>
         <CardHeader>
           <div className="flex flex-row items-center justify-between">
             <div>
               <CardTitle>Tax Rates</CardTitle>
-              <CardDescription>Manage tax rates for your invoices and bills.</CardDescription>
+              <CardDescription>
+                Define tax rates applied to invoice and bill line items when posting to the ledger.
+              </CardDescription>
             </div>
             <Button onClick={handleAddNew}>
               <PlusCircle className="mr-2 h-4 w-4" />
@@ -129,7 +145,19 @@ const TaxRates = () => {
                 ))
               ) : (
                 <TableRow>
-                  <TableCell colSpan={3} className="text-center">No tax rates found. Add one to get started.</TableCell>
+                  <TableCell colSpan={3} className="p-0">
+                    <EmptyState
+                      icon={Receipt}
+                      title="No tax rates yet"
+                      description="Add at least one rate — for example, VAT at 15%. This step is required to complete Accounting Setup."
+                      action={
+                        <Button onClick={handleAddNew}>
+                          <PlusCircle className="mr-2 h-4 w-4" />
+                          Add your first tax rate
+                        </Button>
+                      }
+                    />
+                  </TableCell>
                 </TableRow>
               )}
             </TableBody>

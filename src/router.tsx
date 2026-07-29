@@ -2,6 +2,7 @@ import { lazy } from "react";
 import { Navigate, Routes, Route } from "react-router-dom";
 import ProtectedRoute from "./components/ProtectedRoute";
 import AdminRoute from "./components/AdminRoute";
+import BetaAnalyticsRoute from "./components/BetaAnalyticsRoute";
 import ErrorBoundary from "./components/ErrorBoundary";
 import FinancialStatementsGate from "./components/financialStatements/FinancialStatementsGate";
 import FinancialCloseGate from "./components/financialClose/FinancialCloseGate";
@@ -28,6 +29,7 @@ const CreateCompany = lazy(() => import("./pages/CreateCompany"));
 const FinancialCalendar = lazy(() => import("./pages/FinancialCalendar"));
 const Chat = lazy(() => import("./pages/Chat"));
 const UserManual = lazy(() => import("./pages/UserManual"));
+const OnboardingGuide = lazy(() => import("./pages/OnboardingGuide"));
 
 const RevenueWorkspace = lazy(() => import("./pages/RevenueWorkspace"));
 const Quotes = lazy(() => import("./pages/Quotes"));
@@ -134,6 +136,7 @@ const AssetMaintenanceDashboard = lazy(() => import("./pages/AssetMaintenanceDas
 const AssetReports = lazy(() => import("./pages/AssetReports"));
 const TaxRates = lazy(() => import("./pages/TaxRates"));
 const Import = lazy(() => import("./pages/Import"));
+const BetaAnalyticsDashboard = lazy(() => import("./pages/admin/BetaAnalyticsDashboard"));
 
 export const AppRouter = () => {
   return (
@@ -148,6 +151,7 @@ export const AppRouter = () => {
         <Route path="/calendar" element={<FinancialCalendar />} />
         <Route path="/chat" element={<Chat />} />
         <Route path="/manual" element={<UserManual />} />
+        <Route path="/onboarding-guide" element={<OnboardingGuide />} />
 
         <Route path="/sales" element={<RevenueWorkspace />} />
         <Route path="/quotes" element={<Quotes />} />
@@ -256,6 +260,11 @@ export const AppRouter = () => {
         <Route path="/comparative-pl" element={<ComparativePL />} />
         <Route path="/comparative-bs" element={<ComparativeBalanceSheet />} />
         <Route path="/budgets" element={<Budgets />} />
+
+        {/* Platform beta analytics — email allowlist, not company RBAC */}
+        <Route element={<BetaAnalyticsRoute />}>
+          <Route path="/admin/beta-analytics" element={<BetaAnalyticsDashboard />} />
+        </Route>
 
         {/* Admin Only Routes - Protected by AdminRoute */}
         <Route element={<AdminRoute />}>

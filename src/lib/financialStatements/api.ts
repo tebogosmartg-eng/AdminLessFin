@@ -115,30 +115,34 @@ export async function invokeFinancialStatements<T = unknown>(
   const session = await ensureSessionForInvoke();
   const authHeaders = authorizationHeaderFromSession(session);
 
-  console.info('[efs] invoke request', {
-    httpMethod: 'POST',
-    function: 'financial-statements',
-    queryParams: null,
-    headers: {
-      authorization: 'Bearer <present>',
-      apikey: 'anon',
-      'content-type': 'application/json',
-    },
-    body,
-    authenticatedUser: session.user?.id ?? null,
-    company_id: companyId,
-    snapshot_version_id: (payload.snapshot_version_id as string | undefined) ?? null,
-    snapshot_id: (payload.snapshot_id as string | undefined) ?? null,
-    workspace_id: (payload.workspace_id as string | undefined) ?? null,
-    financial_year_id: (payload.financial_year_id as string | undefined) ?? null,
-    period_id:
-      (payload.reporting_period_id as string | undefined) ??
-      (payload.period_id as string | undefined) ??
-      null,
-    expires_at: session.expires_at ?? null,
-    access_token: true,
-    refresh_token: Boolean(session.refresh_token),
-  });
+  // Opt-in request trace. Default off in DEV and production so the browser
+  // console stays clean; enable with VITE_DEBUG_EFS=true when diagnosing invokes.
+  if (import.meta.env.VITE_DEBUG_EFS === 'true') {
+    console.info('[efs] invoke request', {
+      httpMethod: 'POST',
+      function: 'financial-statements',
+      queryParams: null,
+      headers: {
+        authorization: 'Bearer <present>',
+        apikey: 'anon',
+        'content-type': 'application/json',
+      },
+      body,
+      authenticatedUser: session.user?.id ?? null,
+      company_id: companyId,
+      snapshot_version_id: (payload.snapshot_version_id as string | undefined) ?? null,
+      snapshot_id: (payload.snapshot_id as string | undefined) ?? null,
+      workspace_id: (payload.workspace_id as string | undefined) ?? null,
+      financial_year_id: (payload.financial_year_id as string | undefined) ?? null,
+      period_id:
+        (payload.reporting_period_id as string | undefined) ??
+        (payload.period_id as string | undefined) ??
+        null,
+      expires_at: session.expires_at ?? null,
+      access_token: true,
+      refresh_token: Boolean(session.refresh_token),
+    });
+  }
 
   if (method === 'EXTRACT_FACT_SNAPSHOT' && !payload.snapshot_version_id) {
     throw new Error(
@@ -171,7 +175,9 @@ export async function invokeFinancialStatements<T = unknown>(
       response?.status ?? (error as { context?: Response }).context?.status ?? null;
 
     if (httpStatus === 401 || isAuthFailure(envelope, error.message)) {
-      console.warn('[efs] auth rejected by edge — refreshing session and retrying once');
+      if (import.meta.env.DEV) {
+        console.warn('[efs] auth rejected by edge — refreshing session and retrying once');
+      }
       const { data: refreshed, error: refreshError } = await supabase.auth.refreshSession();
       if (!refreshError && refreshed.session?.access_token) {
         invokeResult = await supabase.functions.invoke('financial-statements', {
@@ -194,16 +200,18 @@ export async function invokeFinancialStatements<T = unknown>(
         envelope = null;
       }
     }
-    console.error('[efs] invoke failure', {
-      method,
-      company_id: companyId,
-      workspace_id: payload.workspace_id ?? null,
-      financial_year_id: payload.financial_year_id ?? null,
-      httpStatus: response?.status ?? (error as { context?: Response }).context?.status ?? null,
-      envelope,
-      fallback: error.message,
-      access_token_attached: true,
-    });
+    if (import.meta.env.DEV) {
+      console.error('[efs] invoke failure', {
+        method,
+        company_id: companyId,
+        workspace_id: payload.workspace_id ?? null,
+        financial_year_id: payload.financial_year_id ?? null,
+        httpStatus: response?.status ?? (error as { context?: Response }).context?.status ?? null,
+        envelope,
+        fallback: error.message,
+        access_token_attached: true,
+      });
+    }
     throw toReadableError(envelope ?? error, error.message || 'Financial Statements request failed');
   }
 

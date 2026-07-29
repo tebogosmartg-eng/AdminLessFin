@@ -28,7 +28,9 @@ export default function DocumentPreview({
     try {
       return generateWorkspaceAfsPdf(model, overrides, materialityOptions);
     } catch (e) {
-      console.error('[efs] workspace preview build failed', e);
+      if (import.meta.env.DEV) {
+        console.error('[efs] workspace preview build failed', e);
+      }
       return null;
     }
   }, [model, overrides, materialityOptions]);

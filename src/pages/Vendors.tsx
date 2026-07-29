@@ -42,7 +42,7 @@ export type Vendor = {
 };
 
 const Vendors = () => {
-  useDocumentTitle('Vendors');
+  useDocumentTitle('Suppliers');
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [selectedVendor, setSelectedVendor] = useState<Vendor | undefined>(undefined);
   const { activeCompany } = useAuth();
@@ -113,8 +113,8 @@ const Vendors = () => {
         <CardHeader>
           <div className="flex flex-row items-center justify-between">
             <div>
-              <CardTitle>Vendors</CardTitle>
-              <CardDescription>Manage your list of suppliers and service providers.</CardDescription>
+              <CardTitle>Suppliers</CardTitle>
+              <CardDescription>Manage the suppliers you buy goods and services from.</CardDescription>
             </div>
             <div className="flex gap-2">
                 <Button variant="outline" onClick={handleExport} disabled={!vendors || vendors.length === 0}>
@@ -122,7 +122,7 @@ const Vendors = () => {
                 </Button>
                 <Button onClick={handleAddNew}>
                     <PlusCircle className="mr-2 h-4 w-4" />
-                    New Vendor
+                    New Supplier
                 </Button>
             </div>
           </div>
@@ -174,9 +174,9 @@ const Vendors = () => {
                   <TableCell colSpan={5} className="p-0">
                     <EmptyState
                       icon={Store}
-                      title="No vendors yet"
-                      description="Add the suppliers you buy from to record bills, track what you owe and manage purchases."
-                      action={<Button onClick={handleAddNew}><PlusCircle className="mr-2 h-4 w-4" /> New Vendor</Button>}
+                      title="No suppliers yet"
+                      description="Add the suppliers you buy from to record bills, track what you owe, and manage purchases."
+                      action={<Button onClick={handleAddNew}><PlusCircle className="mr-2 h-4 w-4" /> New Supplier</Button>}
                     />
                   </TableCell>
                 </TableRow>

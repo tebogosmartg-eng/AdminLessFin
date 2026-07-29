@@ -35,10 +35,10 @@ export type Quote = {
   expiry_date: string | null;
   status: 'draft' | 'sent' | 'accepted' | 'declined';
   customers: { name: string } | null;
-  quote_items: {
+  quote_items?: {
     quantity: number;
     unit_price: number;
-  }[];
+  }[] | null;
 };
 
 const Quotes = () => {
@@ -91,7 +91,7 @@ const Quotes = () => {
   };
 
   const getTotal = (quote: Quote) => {
-    return quote.quote_items.reduce((sum, item) => sum + (item.quantity * item.unit_price), 0);
+    return (quote.quote_items ?? []).reduce((sum, item) => sum + (item.quantity * item.unit_price), 0);
   };
 
   const { items: sortedQuotes, sort, requestSort } = useSortableData(quotes ?? [], (q, key) => {

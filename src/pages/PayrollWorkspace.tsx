@@ -133,12 +133,12 @@ const PayrollWorkspace = () => {
             <Briefcase className="h-7 w-7 text-primary" />
             Payroll Command Centre
           </h1>
-          <p className="text-sm text-muted-foreground">
+          <div className="text-sm text-muted-foreground">
             Operational intelligence for people, payroll and compliance.
             {yearCode && (
               <> · Calendar <Badge variant="outline" className="ml-1 align-middle">{yearCode}</Badge></>
             )}
-          </p>
+          </div>
         </div>
         <div className="flex flex-wrap gap-2">
           <Button size="sm" onClick={() => navigate('/payroll-runs')}>

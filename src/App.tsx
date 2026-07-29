@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter } from "react-router-dom";
 import { AuthProvider } from "./contexts/AuthContext";
 import ErrorBoundary from "./components/ErrorBoundary";
+import { AnalyticsBootstrap } from "./lib/analytics/AnalyticsBootstrap";
 import { AppRouter } from "./router";
 
 // Configure global caching to prevent redundant loading states
@@ -26,6 +27,7 @@ const App = () => (
       <Sonner />
       <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
         <AuthProvider>
+          <AnalyticsBootstrap />
           <ErrorBoundary>
             <AppRouter />
           </ErrorBoundary>

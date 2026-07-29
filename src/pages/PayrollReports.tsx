@@ -354,8 +354,8 @@ const PayrollReports = () => {
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {reports!.register.map((r) => (
-                          <TableRow key={`${r.employee_number ?? ''}-${r.employee}`}>
+                        {reports!.register.map((r, idx) => (
+                          <TableRow key={`${r.employee_number ?? 'emp'}-${r.employee}-${r.status}-${idx}`}>
                             <TableCell className="font-mono text-xs text-muted-foreground">{r.employee_number ?? '—'}</TableCell>
                             <TableCell>{r.employee}</TableCell>
                             <TableCell>{r.department}</TableCell>
@@ -400,8 +400,8 @@ const PayrollReports = () => {
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {reports!.employee_cost.map((r) => (
-                          <TableRow key={r.employee}>
+                        {reports!.employee_cost.map((r, idx) => (
+                          <TableRow key={`${r.employee}-${r.department}-${idx}`}>
                             <TableCell>{r.employee}</TableCell>
                             <TableCell>{r.department}</TableCell>
                             <TableCell className="text-right font-mono">{formatCurrency(r.amount)}</TableCell>

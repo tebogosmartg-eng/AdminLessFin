@@ -10,6 +10,7 @@ const NotFound = () => {
   useDocumentTitle("Page not found");
 
   useEffect(() => {
+    if (!import.meta.env.DEV) return;
     console.error(
       "404 Error: User attempted to access non-existent route:",
       location.pathname,

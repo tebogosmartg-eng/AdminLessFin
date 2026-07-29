@@ -14,6 +14,8 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table';
 import { Skeleton } from './ui/skeleton';
 import { financialCalendarService } from '@/governance/domains/financialCalendar/service';
+import { AnalyticsEvents } from '@/lib/analytics/events';
+import { trackEvent } from '@/lib/analytics/productAnalytics';
 
 const months = Array.from({ length: 12 }, (_, i) => ({ value: i + 1, name: new Date(0, i).toLocaleString('default', { month: 'long' }) }));
 const days = Array.from({ length: 31 }, (_, i) => i + 1);
@@ -98,6 +100,16 @@ const FinancialYearSettings = () => {
     onSuccess: async () => {
       await refreshProfile();
       queryClient.invalidateQueries({ queryKey: ['financial_years'] });
+      if (activeCompany) {
+        trackEvent({
+          eventName: AnalyticsEvents.SETUP_FINANCIAL_YEAR_CONFIGURED,
+          companyId: activeCompany.id,
+          properties: {
+            month: form.getValues('financial_year_end_month'),
+            day: form.getValues('financial_year_end_day'),
+          },
+        });
+      }
       showSuccess('Financial year settings updated.');
     },
     onError: (error: unknown) =>

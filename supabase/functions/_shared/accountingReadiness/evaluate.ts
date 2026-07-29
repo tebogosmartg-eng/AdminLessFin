@@ -77,6 +77,21 @@ const STEP_ORDER: SetupStepKey[] = [
   'validation',
 ];
 
+// Step labels. Mirrors SETUP_STEP_LABELS in the frontend twin
+// (src/governance/domains/accountingReadiness/model.ts). Redefined locally because
+// this edge module intentionally has no cross-file imports. Absence of this
+// definition caused evaluateAccountingReadiness to throw "STEP_LABELS is not defined".
+const STEP_LABELS: Record<SetupStepKey, string> = {
+  financial_calendar: 'Financial Calendar',
+  chart_of_accounts: 'Chart of Accounts',
+  tax_configuration: 'Tax',
+  bank_accounts: 'Banking',
+  opening_balances: 'Opening Balances',
+  validation: 'Validation',
+};
+
+type AccountType = 'Asset' | 'Liability' | 'Equity' | 'Income' | 'Expense';
+
 const FOUNDATIONAL_TYPES: AccountType[] = ['Asset', 'Liability', 'Equity', 'Income', 'Expense'];
 
 const ROLE_TO_ACCOUNT_ROLE: Record<string, string | string[]> = {
@@ -140,6 +155,15 @@ function hasRole(accounts: CoaRow[], role: ControlAccountRole): boolean {
     return active.some((a) => a.type === 'Income') && active.some((a) => a.type === 'Expense');
   }
   return active.some((a) => matchesRole(a, role));
+}
+
+// Normal balance by account type. Mirrors the (module-private) helper in
+// _shared/chartOfAccounts/templates.ts; redefined locally because this module
+// intentionally has no cross-file imports and edge functions bundle per-function.
+// Absence of this definition caused accounting-setup GET_STATUS/EVALUATE to 500
+// with "ReferenceError: normalBalanceFor is not defined".
+function normalBalanceFor(type: string): 'debit' | 'credit' {
+  return type === 'Asset' || type === 'Expense' ? 'debit' : 'credit';
 }
 
 export function evaluateCoaIntegrity(accounts: CoaRow[]): { pass: boolean; errors: string[] } {

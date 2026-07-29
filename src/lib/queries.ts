@@ -767,6 +767,8 @@ export const taxRatesQuery = (companyId: string) => ({
 export const accountingReadinessQuery = (companyId: string) => ({
   queryKey: ['accountingReadiness', companyId],
   queryFn: async () => accountingReadinessService.getStatus(companyId),
+  // Setup endpoint failures are environment/deploy issues — avoid retry storms in the console.
+  retry: 1,
 });
 
 export const accountingHealthQuery = (companyId: string) => ({

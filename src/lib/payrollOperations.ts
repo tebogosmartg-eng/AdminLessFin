@@ -33,13 +33,13 @@ export async function invokePayroll<T>(body: Record<string, unknown>): Promise<T
   const { data, error } = await supabase.functions.invoke('payroll', { body });
   if (error) {
     const payload = await readFunctionErrorBody(error);
-    // Diagnostic: toasts auto-dismiss, so log the full structured edge-function
-    // error (stage/code/recovery) to the console for the failing method.
-    console.error('[payroll] edge function error', {
-      method: body?.method,
-      payload,
-      fallback: error.message,
-    });
+    if (import.meta.env.DEV) {
+      console.error('[payroll] edge function error', {
+        method: body?.method,
+        payload,
+        fallback: error.message,
+      });
+    }
     throw new Error(parsePayrollFunctionError(payload, error.message));
   }
   if (data && typeof data === 'object' && 'error' in data && (data as { error?: string }).error) {
@@ -78,7 +78,7 @@ export async function executePayrollCommand<T>(input: PayrollCommandInput<T>) {
     resolveEntityId: input.resolveEntityId,
   });
 
-  if (result.subscriberWarnings.length > 0) {
+  if (result.subscriberWarnings.length > 0 && import.meta.env.DEV) {
     console.warn('[payroll] subscriber warnings', result.subscriberWarnings);
   }
 

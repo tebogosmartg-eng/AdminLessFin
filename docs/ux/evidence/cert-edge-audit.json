@@ -1,0 +1,74 @@
+{
+  "section": "EDGE_AUDIT",
+  "at": "2026-07-29T14:44:12.323Z",
+  "functions": {
+    "product-analytics": {
+      "preflight": {
+        "status": 404,
+        "acao": "*",
+        "acam": null,
+        "acah": "authorization, x-client-info, apikey"
+      },
+      "track": {
+        "status": 404,
+        "ok": false,
+        "acao": "*",
+        "body": {
+          "code": "NOT_FOUND",
+          "message": "Requested function was not found"
+        }
+      }
+    },
+    "accounting-setup": {
+      "preflight": {
+        "status": 200,
+        "acao": "*",
+        "acam": "POST, OPTIONS, GET",
+        "acah": "authorization, x-client-info, apikey, content-type, x-correlation-id, x-request-id"
+      },
+      "getStatus": {
+        "status": 500,
+        "ok": false,
+        "acao": "*",
+        "body": {
+          "version": "1.0",
+          "code": "UNKNOWNPLATFORM_FAILED",
+          "category": "UnknownPlatformError",
+          "severity": "error",
+          "businessMessage": "An unexpected platform error occurred.",
+          "technicalMessage": "normalBalanceFor is not defined",
+          "recoverySuggestion": "Contact support with the correlation ID shown below.",
+          "correlationId": "edge:ef0c5e22-25e4-4b18-b843-fef591a921c4",
+          "timestamp": "2026-07-29T14:44:16.018Z",
+          "retryable": false,
+          "originalCause": "ReferenceError: normalBalanceFor is not defined\n    at evaluateCoaIntegrity (file:///var/tmp/sb-compile-edge-runtime/functions/_shared/accountingReadiness/evaluate.ts:98:24)\n    at evaluateAccountingReadiness (file:///var/tmp/sb-compile-edge-runtime/functions/_shared/accountingReadiness/evaluate.ts:127:21)\n    at loadEvaluation (file:///var/tmp/sb-compile-edge-runtime/functions/accounting-setup/index.ts:40:10)\n    at eventLoopTick (ext:core/01_core.js:175:7)\n    at async file:///var/tmp/sb-compile-edge-runtime/functions/accounting-setup/index.ts:134:30\n    at async Server.<anonymous> (file:///var/tmp/sb-compile-edge-runtime/functions/_shared/enterpriseEdgePlatform.ts:273:19)\n    at async Server.#respond (https://deno.land/std@0.190.0/http/server.ts:220:18)",
+          "error": "An unexpected platform error occurred."
+        }
+      }
+    },
+    "vendors": {
+      "preflight": {
+        "status": 200,
+        "acao": "*",
+        "acam": "POST, OPTIONS, GET",
+        "acah": "authorization, x-client-info, apikey, content-type, x-correlation-id, x-request-id"
+      }
+    },
+    "reports": {
+      "preflight": {
+        "status": 200,
+        "acao": "*",
+        "acam": "POST, OPTIONS, GET",
+        "acah": "authorization, x-client-info, apikey, content-type, x-correlation-id, x-request-id"
+      }
+    },
+    "nonexistent-fn-xyz": {
+      "preflight": {
+        "status": 404,
+        "acao": "*",
+        "acam": null,
+        "acah": "authorization, x-client-info, apikey"
+      }
+    }
+  }
+}

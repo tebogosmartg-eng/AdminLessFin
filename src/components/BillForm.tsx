@@ -12,6 +12,8 @@ import { Input } from './ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Textarea } from './ui/textarea';
 import { showError, showSuccess } from '../utils/toast';
+import { AnalyticsEvents } from '@/lib/analytics/events';
+import { trackFirstUsageEvent } from '@/lib/analytics/productAnalytics';
 import { Vendor } from '../pages/Vendors';
 import { Product } from '../pages/Products';
 import { Project } from '../pages/Projects';
@@ -304,6 +306,9 @@ const BillForm = ({ isOpen, setIsOpen, billId, duplicateFromId, initialData, onS
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['bills', activeCompany?.id] });
       queryClient.invalidateQueries({ queryKey: ['journal_entries', activeCompany?.id] });
+      if (!billId && !duplicateFromId && activeCompany) {
+        trackFirstUsageEvent(activeCompany.id, AnalyticsEvents.USAGE_FIRST_BILL, 'bill');
+      }
       showSuccess(`Bill recorded successfully.`);
       if (onSuccess) onSuccess();
       setIsOpen(false);

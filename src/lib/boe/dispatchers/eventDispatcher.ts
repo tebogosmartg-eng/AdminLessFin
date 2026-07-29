@@ -48,7 +48,9 @@ export async function dispatchBusinessEvent(event: BusinessEvent): Promise<Event
     } catch (cause) {
       const correlationId = createCorrelationId('sub');
       const message = cause instanceof Error ? cause.message : String(cause);
-      console.error(`[BOE:subscriber-failed] ${subscriber.subscriberId}`, { correlationId, message, cause });
+      if (import.meta.env.DEV) {
+        console.error(`[BOE:subscriber-failed] ${subscriber.subscriberId}`, { correlationId, message, cause });
+      }
 
       subscriberResults.push({
         subscriberId: subscriber.subscriberId,

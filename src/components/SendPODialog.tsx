@@ -59,7 +59,7 @@ const SendPODialog = ({ isOpen, setIsOpen, po }: SendPODialogProps) => {
     onSuccess: async () => {
       // Mark as Sent if draft
       const { error } = await supabase.from('purchase_orders').update({ status: 'sent' }).eq('id', po.id).eq('status', 'draft');
-      if (error) console.error("Error updating status", error); // Non-blocking
+      if (error && import.meta.env.DEV) console.error("Error updating status", error); // Non-blocking
       
       queryClient.invalidateQueries({ queryKey: ['po_detail', po.id] });
       queryClient.invalidateQueries({ queryKey: ['purchase_orders'] });

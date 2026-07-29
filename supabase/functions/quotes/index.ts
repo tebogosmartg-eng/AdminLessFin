@@ -58,7 +58,7 @@ serve(withEnterprisePlatform('quotes', 'tenant', async (req, _ctx) => {
       case 'GET_ALL':
         ({ data, error } = await supabaseAdmin
           .from('quotes')
-          .select('*, customers ( name )')
+          .select('*, customers ( name ), quote_items(quantity, unit_price)')
           .eq('company_id', company_id)
           .order('quote_date', { ascending: false }));
         break;

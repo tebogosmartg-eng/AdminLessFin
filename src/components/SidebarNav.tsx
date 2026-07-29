@@ -5,7 +5,7 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible"
-import { Book, LayoutDashboard, BookText, Library, Target, Repeat, Building2, Users, TrendingUp, Receipt, Banknote, HandCoins, ChevronRight, Package, Scale, Upload, FileSignature, Briefcase, Landmark, MessageSquare, Clock, ShoppingBag, Calendar, TicketMinus, PieChart, Coins, FileText, HelpCircle, Quote, ReceiptText, CalendarClock, Store, ArrowLeftRight, Percent, Tags, Wallet, FileCheck2, ShieldCheck, Layers, Timer, Wrench, FileBarChart, Gauge, HeartPulse, BarChart3, ClipboardList, Warehouse, Truck, ClipboardCheck, Calculator, PiggyBank, AlertTriangle, Shield, CalendarRange, Activity, ClipboardCheck as CloseCheck } from 'lucide-react';
+import { Book, BookOpen, LayoutDashboard, BookText, Library, Target, Repeat, Building2, Users, TrendingUp, Receipt, Banknote, HandCoins, ChevronRight, Package, Scale, Upload, FileSignature, Briefcase, Landmark, MessageSquare, Clock, ShoppingBag, Calendar, TicketMinus, PieChart, Coins, FileText, HelpCircle, Quote, ReceiptText, CalendarClock, Store, ArrowLeftRight, Percent, Tags, Wallet, FileCheck2, ShieldCheck, Layers, Timer, Wrench, FileBarChart, Gauge, HeartPulse, BarChart3, ClipboardList, Warehouse, Truck, ClipboardCheck, Calculator, PiggyBank, AlertTriangle, Shield, CalendarRange, Activity, ClipboardCheck as CloseCheck } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { Button } from './ui/button';
 import { useAuth } from '../contexts/AuthContext';
@@ -25,6 +25,7 @@ import {
   taxRatesQuery, vendorBalancesQuery, vendorCreditsQuery, vendorsQuery,
 } from '../lib/queries';
 import { shouldShowFinancialStatementsNav } from '../lib/financialStatements/flags';
+import { isBetaAnalyticsAdmin } from '../lib/analytics/betaAllowlist';
 import { shouldShowFinancialCloseNav } from '../lib/financialClose/flags';
 
 const queries = {
@@ -81,7 +82,7 @@ export const SidebarNav = ({ className, onNavigate }: SidebarNavProps) => {
   const location = useLocation();
   const pathname = location.pathname;
   const queryClient = useQueryClient();
-  const { activeCompany, role, session, profile } = useAuth();
+  const { activeCompany, role, session, profile, user } = useAuth();
   const isAdmin = role === 'owner' || role === 'admin';
   const showFinancialStatementsNav = shouldShowFinancialStatementsNav({
     role,
@@ -123,7 +124,7 @@ export const SidebarNav = ({ className, onNavigate }: SidebarNavProps) => {
     { to: '/vendor-credits', label: 'Vendor Credits', icon: TicketMinus, prefetch: () => prefetch(queries.vendorCreditsQuery) },
     { to: '/recurring-bills', label: 'Recurring Bills', icon: Repeat, prefetch: () => prefetch(queries.recurringBillsQuery) },
     { to: '/pay-bills', label: 'Pay Bills', icon: Banknote, prefetch: () => prefetch(queries.vendorBalancesQuery) },
-    { to: '/vendors', label: 'Vendors', icon: Store, prefetch: () => prefetch(queries.vendorsQuery) },
+    { to: '/vendors', label: 'Suppliers', icon: Store, prefetch: () => prefetch(queries.vendorsQuery) },
   ];
 
   const payrollLinks = [
@@ -383,7 +384,17 @@ export const SidebarNav = ({ className, onNavigate }: SidebarNavProps) => {
         Import Data
       </NavLink>
       
-      <div className="pt-4 mt-auto">
+      <div className="pt-4 mt-auto space-y-1">
+        {isBetaAnalyticsAdmin(user?.email) && (
+          <NavLink to="/admin/beta-analytics" className={navLinkClasses} onClick={onNavigate}>
+            <BarChart3 className="mr-3 h-5 w-5" />
+            Beta Analytics
+          </NavLink>
+        )}
+        <NavLink to="/onboarding-guide" className={navLinkClasses} onClick={onNavigate}>
+          <BookOpen className="mr-3 h-5 w-5" />
+          Onboarding Guide
+        </NavLink>
         <NavLink to="/manual" className={navLinkClasses} onClick={onNavigate}>
           <HelpCircle className="mr-3 h-5 w-5" />
           User Guide

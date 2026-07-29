@@ -26,6 +26,8 @@ import { Input } from './ui/input';
 import { Textarea } from './ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { showError, showSuccess } from '../utils/toast';
+import { AnalyticsEvents } from '@/lib/analytics/events';
+import { trackFirstUsageEvent } from '@/lib/analytics/productAnalytics';
 import { Customer } from '../pages/Customers';
 
 const customerSchema = z.object({
@@ -104,6 +106,13 @@ const CustomerForm = ({ isOpen, setIsOpen, customer }: CustomerFormProps) => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['customers', activeCompany?.id] });
+      if (!customer && activeCompany) {
+        trackFirstUsageEvent(
+          activeCompany.id,
+          AnalyticsEvents.USAGE_FIRST_CUSTOMER,
+          'customer',
+        );
+      }
       showSuccess(`Customer ${customer ? 'updated' : 'created'} successfully.`);
       setIsOpen(false);
     },

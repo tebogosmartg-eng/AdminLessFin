@@ -11,8 +11,10 @@ import {
   TableRow,
 } from '../components/ui/table';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
-import { PlusCircle, MoreHorizontal, Paperclip, Calendar as CalendarIcon, Download } from 'lucide-react';
+import { PlusCircle, MoreHorizontal, Paperclip, Calendar as CalendarIcon, Download, BookOpen } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import JournalEntryForm from '../components/JournalEntryForm';
+import { EmptyState } from '../components/EmptyState';
 import JournalEntryDetail from '../components/JournalEntryDetail';
 import {
   DropdownMenu,
@@ -252,10 +254,10 @@ const JournalEntries = () => {
             </Select>
             <Select value={filterVendor} onValueChange={setFilterVendor}>
               <SelectTrigger className="w-[180px]">
-                <SelectValue placeholder="Filter by vendor" />
+                <SelectValue placeholder="Filter by supplier" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Vendors</SelectItem>
+                <SelectItem value="all">All Suppliers</SelectItem>
                 {vendors?.map(v => <SelectItem key={v.id} value={v.id}>{v.name}</SelectItem>)}
               </SelectContent>
             </Select>
@@ -337,7 +339,24 @@ const JournalEntries = () => {
                 })
               ) : (
                 <TableRow>
-                  <TableCell colSpan={11} className="text-center">No journal entries found for the selected period.</TableCell>
+                  <TableCell colSpan={11} className="p-0">
+                    <EmptyState
+                      icon={BookOpen}
+                      title="No journal entries yet"
+                      description="Journal entries appear here once you post invoices, bills, or manual adjustments. Most activity starts with an invoice or supplier bill."
+                      action={
+                        <div className="flex flex-wrap justify-center gap-2">
+                          <Button onClick={() => setIsFormOpen(true)}>
+                            <PlusCircle className="mr-2 h-4 w-4" />
+                            New journal entry
+                          </Button>
+                          <Button asChild variant="outline">
+                            <Link to="/onboarding-guide">Journal walkthrough</Link>
+                          </Button>
+                        </div>
+                      }
+                    />
+                  </TableCell>
                 </TableRow>
               )}
             </TableBody>

@@ -511,12 +511,16 @@ async function runFinancialStatementsCert(
   const activity = res.data?.periodActivity ?? [];
   const balances = res.data?.balancesAsOf ?? [];
 
-  const income = activity.filter((a) => a.type === 'Income').reduce((s, a) => s + (a.net_movement ?? 0), 0);
-  const expenses = activity.filter((a) => a.type === 'Expense' || a.type === 'Cost of Goods Sold').reduce((s, a) => s + Math.abs(a.net_movement ?? 0), 0);
+  const periodMovement = (a: { activity?: number; net_movement?: number }) => a.activity ?? a.net_movement ?? 0;
+  const income = activity.filter((a) => a.type === 'Income').reduce((s, a) => s + periodMovement(a), 0);
+  const expenses = activity
+    .filter((a) => a.type === 'Expense' || a.type === 'Cost of Goods Sold')
+    .reduce((s, a) => s + Math.abs(periodMovement(a)), 0);
   const netIncome = Math.round((income - expenses) * 100) / 100;
 
   const assets = balances.filter((a) => a.type === 'Asset').reduce((s, a) => s + (a.balance ?? 0), 0);
-  const liabilities = balances.filter((a) => a.type === 'Liability').reduce((s, a) => s + Math.abs(a.balance ?? 0), 0);
+  // Credit-normal liabilities: signed balance sum (debit balance on liability reduces net obligations).
+  const liabilities = balances.filter((a) => a.type === 'Liability').reduce((s, a) => s + (a.balance ?? 0), 0);
   const equity = balances.filter((a) => a.type === 'Equity').reduce((s, a) => s + (a.balance ?? 0), 0);
   const equationDiff = Math.round((assets - (liabilities + equity + netIncome)) * 100) / 100;
 
@@ -532,9 +536,9 @@ async function runFinancialStatementsCert(
   });
 
   if (payroll?.wage && payroll.wageDelta) {
-    const wageActivity = activity.find((a) => a.account_id === payroll.wage!.id);
+    const wageActivity = activity.find((a) => (a as { id?: string; account_id?: string }).id === payroll.wage!.id || (a as { account_id?: string }).account_id === payroll.wage!.id);
     record(area, 'Payroll wage expense in P&L activity', wageActivity ? 'PASS' : 'UNKNOWN', {
-      evidence: { wageAccount: payroll.wage.name, movement: wageActivity?.net_movement, expectedDelta: payroll.wageDelta },
+      evidence: { wageAccount: payroll.wage.name, movement: wageActivity ? periodMovement(wageActivity as { activity?: number; net_movement?: number }) : undefined, expectedDelta: payroll.wageDelta },
     });
   }
   if (payroll?.payLiab) {
@@ -556,17 +560,29 @@ async function runSecurityCert(supabase: SupabaseClient, companyId: string, auth
     evidence: { blocked: !!unauth.error },
   });
 
+  const { data: memberships } = await authedClient.from('company_users').select('company_id').eq('user_id', (await authedClient.auth.getUser()).data.user!.id);
+  const allowedCompanyIds = new Set((memberships ?? []).map((m) => m.company_id));
+
   const tables = ['chart_of_accounts', 'journal_entries', 'customers', 'invoices', 'employees', 'bank_accounts'] as const;
-  let foreign = 0;
+  let unauthorized = 0;
   let total = 0;
   for (const t of tables) {
     const { data } = await authedClient.from(t).select('company_id').limit(500);
     total += data?.length ?? 0;
-    foreign += (data ?? []).filter((r) => (r as { company_id: string }).company_id !== companyId).length;
+    unauthorized += (data ?? []).filter((r) => !allowedCompanyIds.has((r as { company_id: string }).company_id)).length;
   }
-  record(area, 'RLS tenant scoping (read)', foreign === 0 ? 'PASS' : 'FAIL', {
-    evidence: { rowsScanned: total, foreignRows: foreign },
+  record(area, 'RLS tenant scoping (read)', unauthorized === 0 ? 'PASS' : 'FAIL', {
+    evidence: { rowsScanned: total, unauthorizedRows: unauthorized, membershipCount: allowedCompanyIds.size },
   });
+
+  // Cross-tenant probe: company the user is not a member of must return zero rows.
+  const foreignCompanyId = '377d1d8c-7479-41a3-9b1c-e72975185868';
+  if (!allowedCompanyIds.has(foreignCompanyId)) {
+    const { data: foreignCoa } = await authedClient.from('chart_of_accounts').select('id').eq('company_id', foreignCompanyId).limit(5);
+    record(area, 'Cross-tenant read denied', (foreignCoa?.length ?? 0) === 0 ? 'PASS' : 'FAIL', {
+      evidence: { foreignCompanyId, rowsReturned: foreignCoa?.length ?? 0 },
+    });
+  }
 
   for (const t of ['chart_of_accounts', 'invoices', 'employees']) {
     const { data, error } = await anon.from(t).select('id').limit(1);

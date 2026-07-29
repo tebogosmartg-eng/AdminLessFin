@@ -280,11 +280,11 @@ export default function WorkClocking() {
           </div>
 
           {openSession && (
-            <p className="text-sm text-muted-foreground">
+            <div className="text-sm text-muted-foreground">
               Open session {openSession.id.slice(0, 8)}… · status{' '}
               <Badge variant={statusBadgeVariant(openSession.status)}>{openSession.status}</Badge> ·
               project {projectName(openSession.ewm_project_id)}
-            </p>
+            </div>
           )}
         </CardContent>
       </Card>

@@ -1,0 +1,535 @@
+{
+  "at": "2026-07-29T14:09:36.662Z",
+  "e2eUser": {
+    "email": "efs.certification.v6102@adminless.local",
+    "memberships": [
+      {
+        "company_id": "063d0ae0-394a-4b22-b140-087d5979633b",
+        "role": "owner",
+        "companies": {
+          "name": "CERT TX 1785231635647"
+        }
+      },
+      {
+        "company_id": "0837027f-347a-455e-914b-995b96b34397",
+        "role": "owner",
+        "companies": {
+          "name": "CERT TX 1785230285930"
+        }
+      },
+      {
+        "company_id": "0a2ff5bb-3796-4467-b227-a6dd4306bcdb",
+        "role": "owner",
+        "companies": {
+          "name": "CERT COA 1785230945189"
+        }
+      },
+      {
+        "company_id": "0b07df94-1868-4ed9-aaa2-6ac8b847234b",
+        "role": "owner",
+        "companies": {
+          "name": "CERT TX 1785231040107"
+        }
+      },
+      {
+        "company_id": "14712eb7-01e0-4664-ae34-2cd52b2c795a",
+        "role": "owner",
+        "companies": {
+          "name": "CERT TX 1785230740094"
+        }
+      },
+      {
+        "company_id": "26014bd5-f03f-44ae-93bd-64b5add2e09f",
+        "role": "owner",
+        "companies": {
+          "name": "My's Company"
+        }
+      },
+      {
+        "company_id": "2f1aaf89-f52f-4f85-b13a-9b54594df26f",
+        "role": "owner",
+        "companies": {
+          "name": "CERT TX 1785231821168"
+        }
+      },
+      {
+        "company_id": "3cbfd4eb-a095-43f3-837a-0b4f1e2c1752",
+        "role": "owner",
+        "companies": {
+          "name": "Spaceman"
+        }
+      },
+      {
+        "company_id": "62de66bf-f962-481e-8236-a8d0777b056a",
+        "role": "owner",
+        "companies": {
+          "name": "CERT TX 1785230470207"
+        }
+      },
+      {
+        "company_id": "a9988c29-9766-4de8-84bb-8823a9d868d0",
+        "role": "owner",
+        "companies": {
+          "name": "CERT FY Fix 1785226265825"
+        }
+      },
+      {
+        "company_id": "b46f3ec6-82d5-4538-b000-4e192d54e7d1",
+        "role": "owner",
+        "companies": {
+          "name": "CERT COA 1785230862080"
+        }
+      },
+      {
+        "company_id": "bae80005-212f-4fdd-8d39-758177845d2e",
+        "role": "owner",
+        "companies": {
+          "name": "CERT New Customer 2026-07-28T08:08:07.174Z"
+        }
+      },
+      {
+        "company_id": "be3855e9-d11c-48a8-8c39-10e12a0ff2df",
+        "role": "owner",
+        "companies": {
+          "name": "CERT TX 1785230675937"
+        }
+      },
+      {
+        "company_id": "ed2f2a92-a8f4-4496-a6fe-51d68bf9ba03",
+        "role": "owner",
+        "companies": {
+          "name": "CERT TX 1785230987178"
+        }
+      }
+    ],
+    "membershipCount": 14
+  },
+  "rls": {
+    "legacyCertHarnessInterpretation": {
+      "companies": {
+        "error": "column companies.company_id does not exist",
+        "leaked": 0,
+        "total": 0
+      },
+      "chart_of_accounts": {
+        "total": 496,
+        "leaked": 483,
+        "leakedCompanyIds": [
+          "063d0ae0-394a-4b22-b140-087d5979633b",
+          "0837027f-347a-455e-914b-995b96b34397",
+          "0a2ff5bb-3796-4467-b227-a6dd4306bcdb",
+          "0b07df94-1868-4ed9-aaa2-6ac8b847234b",
+          "14712eb7-01e0-4664-ae34-2cd52b2c795a",
+          "26014bd5-f03f-44ae-93bd-64b5add2e09f",
+          "2f1aaf89-f52f-4f85-b13a-9b54594df26f",
+          "3cbfd4eb-a095-43f3-837a-0b4f1e2c1752",
+          "62de66bf-f962-481e-8236-a8d0777b056a",
+          "a9988c29-9766-4de8-84bb-8823a9d868d0",
+          "b46f3ec6-82d5-4538-b000-4e192d54e7d1",
+          "bae80005-212f-4fdd-8d39-758177845d2e",
+          "ed2f2a92-a8f4-4496-a6fe-51d68bf9ba03"
+        ]
+      },
+      "journal_entries": {
+        "total": 152,
+        "leaked": 137,
+        "leakedCompanyIds": [
+          "0837027f-347a-455e-914b-995b96b34397",
+          "ed2f2a92-a8f4-4496-a6fe-51d68bf9ba03",
+          "3cbfd4eb-a095-43f3-837a-0b4f1e2c1752",
+          "063d0ae0-394a-4b22-b140-087d5979633b",
+          "26014bd5-f03f-44ae-93bd-64b5add2e09f",
+          "62de66bf-f962-481e-8236-a8d0777b056a",
+          "14712eb7-01e0-4664-ae34-2cd52b2c795a",
+          "0b07df94-1868-4ed9-aaa2-6ac8b847234b",
+          "2f1aaf89-f52f-4f85-b13a-9b54594df26f",
+          "a9988c29-9766-4de8-84bb-8823a9d868d0"
+        ]
+      },
+      "journal_entry_items": {
+        "error": "column journal_entry_items.company_id does not exist",
+        "leaked": 0,
+        "total": 0
+      },
+      "customers": {
+        "total": 15,
+        "leaked": 10,
+        "leakedCompanyIds": [
+          "3cbfd4eb-a095-43f3-837a-0b4f1e2c1752",
+          "0837027f-347a-455e-914b-995b96b34397",
+          "62de66bf-f962-481e-8236-a8d0777b056a",
+          "14712eb7-01e0-4664-ae34-2cd52b2c795a",
+          "ed2f2a92-a8f4-4496-a6fe-51d68bf9ba03",
+          "0b07df94-1868-4ed9-aaa2-6ac8b847234b",
+          "063d0ae0-394a-4b22-b140-087d5979633b",
+          "2f1aaf89-f52f-4f85-b13a-9b54594df26f"
+        ]
+      },
+      "vendors": {
+        "total": 8,
+        "leaked": 4,
+        "leakedCompanyIds": [
+          "3cbfd4eb-a095-43f3-837a-0b4f1e2c1752"
+        ]
+      },
+      "invoices": {
+        "total": 38,
+        "leaked": 33,
+        "leakedCompanyIds": [
+          "3cbfd4eb-a095-43f3-837a-0b4f1e2c1752",
+          "0837027f-347a-455e-914b-995b96b34397",
+          "62de66bf-f962-481e-8236-a8d0777b056a",
+          "14712eb7-01e0-4664-ae34-2cd52b2c795a",
+          "ed2f2a92-a8f4-4496-a6fe-51d68bf9ba03",
+          "0b07df94-1868-4ed9-aaa2-6ac8b847234b",
+          "063d0ae0-394a-4b22-b140-087d5979633b",
+          "2f1aaf89-f52f-4f85-b13a-9b54594df26f"
+        ]
+      },
+      "invoice_items": {
+        "error": "Could not find the table 'public.invoice_items' in the schema cache",
+        "leaked": 0,
+        "total": 0
+      },
+      "bills": {
+        "total": 13,
+        "leaked": 11,
+        "leakedCompanyIds": [
+          "3cbfd4eb-a095-43f3-837a-0b4f1e2c1752"
+        ]
+      },
+      "bill_items": {
+        "error": "Could not find the table 'public.bill_items' in the schema cache",
+        "leaked": 0,
+        "total": 0
+      },
+      "employees": {
+        "total": 10,
+        "leaked": 9,
+        "leakedCompanyIds": [
+          "3cbfd4eb-a095-43f3-837a-0b4f1e2c1752",
+          "62de66bf-f962-481e-8236-a8d0777b056a",
+          "14712eb7-01e0-4664-ae34-2cd52b2c795a",
+          "ed2f2a92-a8f4-4496-a6fe-51d68bf9ba03",
+          "0b07df94-1868-4ed9-aaa2-6ac8b847234b",
+          "063d0ae0-394a-4b22-b140-087d5979633b",
+          "2f1aaf89-f52f-4f85-b13a-9b54594df26f"
+        ]
+      },
+      "bank_accounts": {
+        "total": 12,
+        "leaked": 11,
+        "leakedCompanyIds": [
+          "3cbfd4eb-a095-43f3-837a-0b4f1e2c1752"
+        ]
+      },
+      "payroll_runs": {
+        "total": 32,
+        "leaked": 29,
+        "leakedCompanyIds": [
+          "3cbfd4eb-a095-43f3-837a-0b4f1e2c1752",
+          "14712eb7-01e0-4664-ae34-2cd52b2c795a",
+          "ed2f2a92-a8f4-4496-a6fe-51d68bf9ba03",
+          "0b07df94-1868-4ed9-aaa2-6ac8b847234b",
+          "063d0ae0-394a-4b22-b140-087d5979633b",
+          "2f1aaf89-f52f-4f85-b13a-9b54594df26f"
+        ]
+      }
+    },
+    "authorizedMembershipInterpretation": {
+      "companies": {
+        "error": "column companies.company_id does not exist",
+        "leaked": 0,
+        "total": 0
+      },
+      "chart_of_accounts": {
+        "total": 496,
+        "leaked": 0,
+        "leakedCompanyIds": []
+      },
+      "journal_entries": {
+        "total": 152,
+        "leaked": 0,
+        "leakedCompanyIds": []
+      },
+      "journal_entry_items": {
+        "error": "column journal_entry_items.company_id does not exist",
+        "leaked": 0,
+        "total": 0
+      },
+      "customers": {
+        "total": 15,
+        "leaked": 0,
+        "leakedCompanyIds": []
+      },
+      "vendors": {
+        "total": 8,
+        "leaked": 0,
+        "leakedCompanyIds": []
+      },
+      "invoices": {
+        "total": 38,
+        "leaked": 0,
+        "leakedCompanyIds": []
+      },
+      "invoice_items": {
+        "error": "Could not find the table 'public.invoice_items' in the schema cache",
+        "leaked": 0,
+        "total": 0
+      },
+      "bills": {
+        "total": 13,
+        "leaked": 0,
+        "leakedCompanyIds": []
+      },
+      "bill_items": {
+        "error": "Could not find the table 'public.bill_items' in the schema cache",
+        "leaked": 0,
+        "total": 0
+      },
+      "employees": {
+        "total": 10,
+        "leaked": 0,
+        "leakedCompanyIds": []
+      },
+      "bank_accounts": {
+        "total": 12,
+        "leaked": 0,
+        "leakedCompanyIds": []
+      },
+      "payroll_runs": {
+        "total": 32,
+        "leaked": 0,
+        "leakedCompanyIds": []
+      }
+    },
+    "trueCrossTenantLeaks": {
+      "companies": 0,
+      "chart_of_accounts": 0,
+      "journal_entries": 0,
+      "journal_entry_items": 0,
+      "customers": 0,
+      "vendors": 0,
+      "invoices": 0,
+      "invoice_items": 0,
+      "bills": 0,
+      "bill_items": 0,
+      "employees": 0,
+      "bank_accounts": 0,
+      "payroll_runs": 0
+    }
+  },
+  "accounting": {
+    "companyId": "be3855e9-d11c-48a8-8c39-10e12a0ff2df",
+    "income": 0,
+    "expenses": 0,
+    "netIncome": 0,
+    "assets": 50600,
+    "liabilities": 2200,
+    "equity": 0,
+    "equationDiff": 48400,
+    "equityAccounts": [
+      {
+        "id": "05791788-672c-45b1-a820-e50d98c58981",
+        "account_number": 5010,
+        "name": "Retained Earnings",
+        "type": "Equity",
+        "balance": 0
+      }
+    ],
+    "assetAccounts": [
+      {
+        "id": "d89ea05c-1916-4b73-ae88-1ca29d3e9252",
+        "account_number": 3010,
+        "name": "Accounts Receivable",
+        "type": "Asset",
+        "balance": 21150
+      },
+      {
+        "id": "65b4705d-2196-4c4e-aa9d-278988e057e0",
+        "account_number": 1300,
+        "name": "CERT Inventory Asset",
+        "type": "Asset",
+        "balance": 600
+      },
+      {
+        "id": "7bcb0bac-76c8-40f2-bf07-217cefed6d28",
+        "account_number": 1100,
+        "name": "CERT Bank Account",
+        "type": "Asset",
+        "balance": 28850
+      }
+    ],
+    "liabilityAccounts": [
+      {
+        "id": "6cce2961-9a90-4a26-81a8-a227d8bee84a",
+        "account_number": 4001,
+        "name": "VAT Control",
+        "type": "Liability",
+        "balance": -300
+      },
+      {
+        "id": "e0eb3208-9259-41e1-b9d8-16b3f384fbcc",
+        "account_number": 4100,
+        "name": "CERT Payroll Liabilities",
+        "type": "Liability",
+        "balance": 0
+      },
+      {
+        "id": "9c851628-379f-44e6-9aff-b1128bb211ac",
+        "account_number": 4000,
+        "name": "Accounts Payable",
+        "type": "Liability",
+        "balance": 1900
+      },
+      {
+        "id": "f71a465e-2588-4014-992b-9dece70d7f69",
+        "account_number": 2200,
+        "name": "CERT VAT Payable",
+        "type": "Liability",
+        "balance": 0
+      }
+    ],
+    "trialBalance": {
+      "rows": [
+        {
+          "account_id": "03d1da8e-7838-4aba-b7e1-b59021beeb84",
+          "account_number": 1000,
+          "account_name": "Sales Revenue",
+          "account_type": "Income",
+          "category": "Income",
+          "hierarchy": "Income",
+          "normal_balance": "credit",
+          "opening_debit": 0,
+          "opening_credit": 0,
+          "period_debit": 0,
+          "period_credit": 51000,
+          "closing_debit": 0,
+          "closing_credit": 51000,
+          "net_movement": 51000,
+          "control_account": false,
+          "is_active": true
+        },
+        {
+          "account_id": "7bcb0bac-76c8-40f2-bf07-217cefed6d28",
+          "account_number": 1100,
+          "account_name": "CERT Bank Account",
+          "account_type": "Asset",
+          "category": "Asset",
+          "hierarchy": "Asset",
+          "normal_balance": "debit",
+          "opening_debit": 0,
+          "opening_credit": 0,
+          "period_debit": 30000,
+          "period_credit": 1150,
+          "closing_debit": 28850,
+          "closing_credit": 0,
+          "net_movement": 28850,
+          "control_account": false,
+          "is_active": true
+        },
+        {
+          "account_id": "65b4705d-2196-4c4e-aa9d-278988e057e0",
+          "account_number": 1300,
+          "account_name": "CERT Inventory Asset",
+          "account_type": "Asset",
+          "category": "Asset",
+          "hierarchy": "Asset",
+          "normal_balance": "debit",
+          "opening_debit": 0,
+          "opening_credit": 0,
+          "period_debit": 600,
+          "period_credit": 0,
+          "closing_debit": 600,
+          "closing_credit": 0,
+          "net_movement": 600,
+          "control_account": false,
+          "is_active": true
+        },
+        {
+          "account_id": "d89ea05c-1916-4b73-ae88-1ca29d3e9252",
+          "account_number": 3010,
+          "account_name": "Accounts Receivable",
+          "account_type": "Asset",
+          "category": "Asset",
+          "hierarchy": "Asset",
+          "normal_balance": "debit",
+          "opening_debit": 0,
+          "opening_credit": 0,
+          "period_debit": 51150,
+          "period_credit": 30000,
+          "closing_debit": 21150,
+          "closing_credit": 0,
+          "net_movement": 21150,
+          "control_account": false,
+          "is_active": true
+        },
+        {
+          "account_id": "9c851628-379f-44e6-9aff-b1128bb211ac",
+          "account_number": 4000,
+          "account_name": "Accounts Payable",
+          "account_type": "Liability",
+          "category": "Liability",
+          "hierarchy": "Liability",
+          "normal_balance": "credit",
+          "opening_debit": 0,
+          "opening_credit": 0,
+          "period_debit": 1150,
+          "period_credit": 3050,
+          "closing_debit": 0,
+          "closing_credit": 1900,
+          "net_movement": 1900,
+          "control_account": false,
+          "is_active": true
+        },
+        {
+          "account_id": "6cce2961-9a90-4a26-81a8-a227d8bee84a",
+          "account_number": 4001,
+          "account_name": "VAT Control",
+          "account_type": "Liability",
+          "category": "Liability",
+          "hierarchy": "Liability",
+          "normal_balance": "credit",
+          "opening_debit": 0,
+          "opening_credit": 0,
+          "period_debit": 300,
+          "period_credit": 0,
+          "closing_debit": 300,
+          "closing_credit": 0,
+          "net_movement": -300,
+          "control_account": true,
+          "is_active": true
+        },
+        {
+          "account_id": "367fc107-172f-4f3f-b383-ff3e79c922c8",
+          "account_number": 6000,
+          "account_name": "CERT Operating Expenses",
+          "account_type": "Expense",
+          "category": "Expense",
+          "hierarchy": "Expense",
+          "normal_balance": "debit",
+          "opening_debit": 0,
+          "opening_credit": 0,
+          "period_debit": 2000,
+          "period_credit": 0,
+          "closing_debit": 2000,
+          "closing_credit": 0,
+          "net_movement": 2000,
+          "control_account": false,
+          "is_active": true
+        }
+      ],
+      "totals": {
+        "opening_debit": 0,
+        "opening_credit": 0,
+        "period_debit": 85200,
+        "period_credit": 85200,
+        "closing_debit": 52900,
+        "closing_credit": 52900
+      },
+      "balanced": true,
+      "start_date": "2026-07-01",
+      "end_date": "2026-07-29"
+    }
+  }
+}

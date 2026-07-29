@@ -8,8 +8,12 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../co
 import { Button } from '../components/ui/button';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '../components/ui/form';
 import { Input } from '../components/ui/input';
+import { Progress } from '../components/ui/progress';
 import { showError, showSuccess } from '../utils/toast';
 import { useNavigate } from 'react-router-dom';
+import { Building2, ArrowRight } from 'lucide-react';
+import { AnalyticsEvents } from '@/lib/analytics/events';
+import { trackEvent } from '@/lib/analytics/productAnalytics';
 
 const companySchema = z.object({
   name: z.string().min(1, 'Company name is required.'),
@@ -24,8 +28,6 @@ const CreateCompany = () => {
   });
 
   const mutation = useMutation({
-    // Phase G3.5 — company CREATE resolves through Governance Company Service.
-    // Underlying company-management CREATE call is unchanged.
     mutationFn: async (values: CompanyFormValues) => {
       if (!user) throw new Error('User not authenticated');
       const data = await companyService.createCompany(values.name);
@@ -33,7 +35,12 @@ const CreateCompany = () => {
     },
     onSuccess: async (newCompanyId) => {
       await switchCompany(newCompanyId);
-      showSuccess('Company created successfully!');
+      trackEvent({
+        eventName: AnalyticsEvents.COMPANY_CREATED,
+        companyId: newCompanyId,
+        properties: { company_name: form.getValues('name') },
+      });
+      showSuccess('Company created — next, set up your accounting foundation.');
       navigate('/accounting-setup');
     },
     onError: (error: unknown) =>
@@ -41,35 +48,60 @@ const CreateCompany = () => {
   });
 
   return (
-    <div className="flex items-center justify-center min-h-full">
-      <Card className="w-full max-w-md">
-        <CardHeader>
-          <CardTitle>Create a New Company</CardTitle>
-          <CardDescription>Set up a new workspace for your business.</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Form {...form}>
-            <form onSubmit={form.handleSubmit((v) => mutation.mutate(v))} className="space-y-4">
-              <FormField
-                control={form.control}
-                name="name"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Company Name</FormLabel>
-                    <FormControl>
-                      <Input placeholder="e.g., ACME Inc." {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <Button type="submit" className="w-full" disabled={mutation.isPending}>
-                {mutation.isPending ? 'Creating...' : 'Create Company'}
-              </Button>
-            </form>
-          </Form>
-        </CardContent>
-      </Card>
+    <div className="flex min-h-full items-center justify-center p-6">
+      <div className="w-full max-w-md space-y-6">
+        <div className="space-y-2 text-center">
+          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+            Step 2 of 5 · Company setup
+          </p>
+          <Progress value={40} className="h-1.5" />
+        </div>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Building2 className="h-5 w-5 text-primary" />
+              Create your company
+            </CardTitle>
+            <CardDescription>
+              This creates your private workspace. You will configure your chart of accounts,
+              tax rates, and financial calendar in the next step.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Form {...form}>
+              <form onSubmit={form.handleSubmit((v) => mutation.mutate(v))} className="space-y-4">
+                <FormField
+                  control={form.control}
+                  name="name"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Company name</FormLabel>
+                      <FormControl>
+                        <Input placeholder="e.g., ACME Inc." {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <Button type="submit" className="w-full" disabled={mutation.isPending}>
+                  {mutation.isPending ? (
+                    'Creating…'
+                  ) : (
+                    <>
+                      Create company & continue
+                      <ArrowRight className="ml-2 h-4 w-4" />
+                    </>
+                  )}
+                </Button>
+              </form>
+            </Form>
+            <p className="mt-4 text-center text-xs text-muted-foreground">
+              What happens next: Accounting Setup wizard — financial year, chart of accounts, and tax.
+            </p>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 };

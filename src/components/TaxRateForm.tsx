@@ -25,6 +25,8 @@ import {
 import { Input } from './ui/input';
 import { showError, showSuccess } from '../utils/toast';
 import { TaxRate } from '../pages/TaxRates';
+import { AnalyticsEvents } from '@/lib/analytics/events';
+import { trackEvent } from '@/lib/analytics/productAnalytics';
 
 const taxRateSchema = z.object({
   name: z.string().min(1, 'Tax rate name is required.'),
@@ -78,6 +80,13 @@ const TaxRateForm = ({ isOpen, setIsOpen, taxRate }: TaxRateFormProps) => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['tax_rates', activeCompany?.id] });
+      if (!taxRate && activeCompany) {
+        trackEvent({
+          eventName: AnalyticsEvents.SETUP_TAX_CONFIGURED,
+          companyId: activeCompany.id,
+          properties: { name: form.getValues('name'), rate: form.getValues('rate') },
+        });
+      }
       showSuccess(`Tax rate ${taxRate ? 'updated' : 'created'} successfully.`);
       setIsOpen(false);
     },

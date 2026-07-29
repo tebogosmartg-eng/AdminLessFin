@@ -32,6 +32,8 @@ import {
 } from './ui/select';
 import { Textarea } from './ui/textarea';
 import { showError, showSuccess } from '../utils/toast';
+import { AnalyticsEvents } from '@/lib/analytics/events';
+import { trackFirstUsageEvent } from '@/lib/analytics/productAnalytics';
 import { Account } from '../pages/ChartOfAccounts';
 import { Vendor } from '../pages/Vendors';
 import { Customer } from '../pages/Customers';
@@ -220,6 +222,9 @@ const JournalEntryForm = ({ isOpen, setIsOpen, entryId }: JournalEntryFormProps)
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['journal_entries'] });
       queryClient.invalidateQueries({ queryKey: ['journal_entry_detail', entryId] });
+      if (!isEditing && activeCompany) {
+        trackFirstUsageEvent(activeCompany.id, AnalyticsEvents.USAGE_FIRST_JOURNAL, 'journal');
+      }
       showSuccess(`Journal entry ${isEditing ? 'updated' : 'created'} successfully.`);
       setIsOpen(false);
     },

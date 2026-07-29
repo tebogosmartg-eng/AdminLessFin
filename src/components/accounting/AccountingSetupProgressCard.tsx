@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { CheckCircle2, Circle, Clock3, ArrowRight } from 'lucide-react';
+import { CheckCircle2, Circle, Clock3, ArrowRight, BookOpen } from 'lucide-react';
 import type { AccountingReadinessSnapshot, SetupStepKey } from '@/governance/domains/accountingReadiness/model';
 import { SETUP_STEP_ORDER } from '@/governance/domains/accountingReadiness/model';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
@@ -29,7 +29,8 @@ const AccountingSetupProgressCard = ({ readiness }: AccountingSetupProgressCardP
           <div>
             <CardTitle className="text-lg">Accounting Setup</CardTitle>
             <CardDescription>
-              Progress is derived automatically from your accounting foundation. Complete setup before posting journals, invoicing, payroll, or banking.
+              Complete these steps before you can invoice, post journals, or generate financial
+              statements. Progress updates automatically as you configure each area.
             </CardDescription>
           </div>
           <div className="text-right text-sm font-medium">{readiness.progressPercent}%</div>
@@ -66,16 +67,24 @@ const AccountingSetupProgressCard = ({ readiness }: AccountingSetupProgressCardP
           })}
         </div>
 
-        <div className="flex items-center justify-between gap-3 pt-1">
+        <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
           <p className="text-xs text-muted-foreground">
             {completedCount} of {steps.length} steps complete
           </p>
-          <Button asChild size="sm">
-            <Link to="/accounting-setup">
-              Continue setup
-              <ArrowRight className="ml-2 h-4 w-4" />
-            </Link>
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button asChild variant="outline" size="sm">
+              <Link to="/onboarding-guide">
+                <BookOpen className="mr-2 h-4 w-4" />
+                Guide
+              </Link>
+            </Button>
+            <Button asChild size="sm">
+              <Link to="/accounting-setup">
+                Continue setup
+                <ArrowRight className="ml-2 h-4 w-4" />
+              </Link>
+            </Button>
+          </div>
         </div>
       </CardContent>
     </Card>

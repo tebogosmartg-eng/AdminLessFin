@@ -116,7 +116,9 @@ const Chat = () => {
           .single();
 
         if (error) {
-          console.error('Error fetching profile for new message:', error);
+          if (import.meta.env.DEV) {
+            console.error('Error fetching profile for new message:', error);
+          }
           return;
         }
 

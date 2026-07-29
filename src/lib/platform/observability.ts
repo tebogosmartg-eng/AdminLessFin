@@ -35,15 +35,19 @@ export function emitCommandLog(entry: CommandExecutionLog): void {
   if (executionLogs.length > MAX_LOGS) executionLogs.length = MAX_LOGS;
 
   const label = `[BOE:${entry.phase}] ${entry.commandName}`;
-  if (entry.phase === 'failed') {
-    console.error(label, entry);
-  } else {
-    console.info(label, {
-      correlationId: entry.correlationId,
-      commandId: entry.commandId,
-      durationMs: entry.durationMs,
-      subscribersFailed: entry.subscribersFailed,
-    });
+  if (import.meta.env.DEV) {
+    if (entry.phase === 'failed') {
+      console.error(label, entry);
+    } else {
+      // Success-path lifecycle logs are dev-only diagnostics. The in-memory ring
+      // buffer (getRecentCommandLogs) retains them for the diagnostics UI regardless.
+      console.info(label, {
+        correlationId: entry.correlationId,
+        commandId: entry.commandId,
+        durationMs: entry.durationMs,
+        subscribersFailed: entry.subscribersFailed,
+      });
+    }
   }
 }
 

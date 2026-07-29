@@ -72,8 +72,15 @@ const AuthPage = () => {
           </Link>
 
           <AppBrand variant="full" size="lg" className="mb-1" />
-          <h2 className="mt-6 text-2xl font-semibold tracking-tight text-foreground">Welcome back</h2>
-          <p className="mt-1 text-sm text-muted-foreground">Sign in to your {BRAND.product} workspace.</p>
+          <h2 className="mt-6 text-2xl font-semibold tracking-tight text-foreground">
+            Sign in or create an account
+          </h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            New here? Use the sign-up tab below. Returning? Sign in to your {BRAND.product} workspace.
+          </p>
+          <p className="mt-2 text-xs text-muted-foreground">
+            Step 1 of 5 — After sign-up you will create your company and complete Accounting Setup.
+          </p>
 
           <div className="mt-8">
             <Auth

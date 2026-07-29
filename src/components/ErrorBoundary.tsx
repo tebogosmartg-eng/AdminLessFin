@@ -3,6 +3,8 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from './ui/
 import { AlertCircle } from 'lucide-react';
 import { AppIcon } from './brand';
 import { BRAND } from '../config/brand';
+import { AnalyticsEvents } from '../lib/analytics/events';
+import { trackError } from '../lib/analytics/productAnalytics';
 
 interface ErrorBoundaryState {
   hasError: boolean;
@@ -21,8 +23,19 @@ class ErrorBoundary extends React.Component<React.PropsWithChildren, ErrorBounda
   }
 
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
-    // You can also log the error to an error reporting service
-    console.error("Uncaught error:", error, errorInfo);
+    if (import.meta.env.DEV) {
+      console.error("Uncaught error:", error, errorInfo);
+    }
+    trackError({
+      eventName: 'error.frontend_exception',
+      module: typeof window !== 'undefined' ? window.location.pathname.split('/')[1] || 'app' : 'app',
+      route: typeof window !== 'undefined' ? window.location.pathname : undefined,
+      properties: {
+        message: error.message,
+        stack: error.stack?.slice(0, 500),
+        component_stack: errorInfo.componentStack?.slice(0, 500),
+      },
+    });
   }
 
   render() {

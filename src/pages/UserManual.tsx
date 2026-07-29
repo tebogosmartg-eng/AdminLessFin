@@ -48,7 +48,29 @@ const UserManual = () => {
             </section>
 
             <section className="space-y-4 mb-8">
-              <h2 className="text-2xl font-bold">2. Roles & Security</h2>
+              <h2 className="text-2xl font-bold">2. Getting Started — Accounting Setup</h2>
+              <p>
+                Before you can invoice, post journals, or generate financial statements, you must
+                complete <strong>Accounting Setup</strong>. Open it from the dashboard or navigate
+                to Accounting Setup in the sidebar.
+              </p>
+              <h3 className="text-lg font-semibold">Setup steps (in order)</h3>
+              <ol className="list-decimal pl-6 space-y-2">
+                <li><strong>Financial Calendar</strong> — set your financial year end and save.</li>
+                <li><strong>Chart of Accounts</strong> — generate the standard chart (recommended).</li>
+                <li><strong>Tax</strong> — add at least one tax rate (e.g. VAT 15%).</li>
+                <li><strong>Banking</strong> — add a bank account or skip for now.</li>
+                <li><strong>Opening Balances</strong> — confirm zero balances for a new company.</li>
+                <li><strong>Validation</strong> — all checks must pass for Accounting Ready.</li>
+              </ol>
+              <p>
+                For a step-by-step private beta guide, see the{' '}
+                <a href="/onboarding-guide" className="font-medium underline">Onboarding Guide</a>.
+              </p>
+            </section>
+
+            <section className="space-y-4 mb-8">
+              <h2 className="text-2xl font-bold">3. Roles & Security</h2>
               <p>{BRAND.product} uses a strict Role-Based Access Control (RBAC) system to protect your data.</p>
               
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 my-4 print:grid-cols-3">
@@ -68,7 +90,7 @@ const UserManual = () => {
             </section>
 
             <section className="space-y-4 mb-8">
-              <h2 className="text-2xl font-bold">3. Sales & Revenue</h2>
+              <h2 className="text-2xl font-bold">4. Sales & Revenue</h2>
               <p>Manage the entire Order-to-Cash cycle.</p>
               <ul className="list-disc pl-6 space-y-2">
                 <li><strong>Quotes:</strong> Create estimates for clients. Once accepted, convert them directly into Invoices.</li>
@@ -80,18 +102,18 @@ const UserManual = () => {
             </section>
 
             <section className="space-y-4 mb-8">
-              <h2 className="text-2xl font-bold">4. Purchasing & Expenses</h2>
-              <p>Control your spending and manage vendor relationships.</p>
+              <h2 className="text-2xl font-bold">5. Purchasing & Expenses</h2>
+              <p>Control your spending and manage supplier relationships.</p>
               <ul className="list-disc pl-6 space-y-2">
                 <li><strong>Purchase Orders (PO):</strong> Send formal orders to suppliers. Convert POs to Bills upon delivery.</li>
-                <li><strong>Bills:</strong> Record incoming invoices from vendors to track Accounts Payable.</li>
+                <li><strong>Bills:</strong> Record incoming invoices from suppliers to track Accounts Payable.</li>
                 <li><strong>Expense Claims:</strong> Employees can submit out-of-pocket expenses. Admins approve and reimburse them.</li>
                 <li><strong>Vendor Credits:</strong> Track refunds from suppliers and allocate them to reduce future bill payments.</li>
               </ul>
             </section>
 
             <section className="space-y-4 mb-8">
-              <h2 className="text-2xl font-bold">5. Inventory & Projects</h2>
+              <h2 className="text-2xl font-bold">6. Inventory & Projects</h2>
               <div className="space-y-2">
                 <h4 className="font-bold">Inventory Management</h4>
                 <p>Track stock levels automatically. Selling items reduces stock; buying items increases it. Use <strong>Stock Adjustments</strong> for shrinkage or corrections.</p>
@@ -105,7 +127,7 @@ const UserManual = () => {
             </section>
 
             <section className="space-y-4 mb-8">
-              <h2 className="text-2xl font-bold">6. Accounting & Finance (Admin Only)</h2>
+              <h2 className="text-2xl font-bold">7. Accounting & Finance (Admin Only)</h2>
               <ul className="list-disc pl-6 space-y-2">
                 <li><strong>Chart of Accounts:</strong> Customize your ledger accounts.</li>
                 <li><strong>Journal Entries:</strong> Record manual adjustments, depreciation, or complex transactions.</li>
@@ -116,7 +138,7 @@ const UserManual = () => {
             </section>
 
             <section className="space-y-4 mb-8">
-              <h2 className="text-2xl font-bold">7. Reporting</h2>
+              <h2 className="text-2xl font-bold">8. Reporting</h2>
               <p>Gain actionable insights with real-time reports.</p>
               <ul className="list-disc pl-6 space-y-2">
                 <li><strong>Financial Statements:</strong> Balance Sheet, Income Statement (P&L), Cash Flow.</li>
@@ -127,7 +149,7 @@ const UserManual = () => {
             </section>
 
              <section className="space-y-4 mb-8">
-              <h2 className="text-2xl font-bold">8. Getting Support</h2>
+              <h2 className="text-2xl font-bold">9. Getting Support</h2>
               <p>
                 If you encounter issues or need to update company settings, navigate to the <strong>Settings</strong> page. 
                 Use the <strong>Audit Log</strong> (Admin only) to trace data changes.

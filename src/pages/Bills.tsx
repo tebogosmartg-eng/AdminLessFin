@@ -28,6 +28,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { formatCurrency, statusBadgeVariant } from '../lib/utils';
 import { billsQuery, vendorsQuery } from '../lib/queries';
 import { Badge } from '../components/ui/badge';
+import AccountingSetupBanner from '../components/accounting/AccountingSetupBanner';
 import { Input } from '../components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { Vendor } from './Vendors';
@@ -191,6 +192,7 @@ const Bills = () => {
 
   return (
     <>
+      <AccountingSetupBanner actionLabel="Recording a supplier bill" />
       <Card>
         <CardHeader>
           <div className="flex flex-row items-center justify-between">

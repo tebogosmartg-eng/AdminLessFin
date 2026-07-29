@@ -20,6 +20,7 @@ import { Badge } from '../components/ui/badge';
 import { isCurrentAssetAccount, isCurrentLiabilityAccount } from '../lib/accounting/accountRoles';
 import { accountsQuery } from '../lib/queries';
 import type { Account } from './ChartOfAccounts';
+import { AnalyticsEvents, useFirstUsagePageView } from '../lib/analytics';
 
 type AccountBalance = {
   id: string;
@@ -49,6 +50,7 @@ type CashFlowItem = {
 
 const FinancialStatements = () => {
   const { activeCompany } = useAuth();
+  useFirstUsagePageView(AnalyticsEvents.USAGE_FIRST_FINANCIAL_STATEMENTS, 'financial_statements');
   const { startDate, endDate, yearCode } = useEnterpriseCalendar(activeCompany?.id);
   const [date, setDate] = useState<DateRange | undefined>();
   

@@ -1,20 +1,18 @@
 {
   "certification": "ADMINLESS_FIN_FINAL_PRODUCTION",
-  "at": "2026-07-29T12:41:12.826Z",
+  "at": "2026-07-29T14:11:39.577Z",
   "company": "be3855e9-d11c-48a8-8c39-10e12a0ff2df",
   "decision": "NO-GO",
-  "score": 85,
+  "score": 89,
   "matrix": {
-    "pass": 44,
-    "fail": 4,
+    "pass": 47,
+    "fail": 2,
     "unknown": 4,
-    "total": 52
+    "total": 53
   },
   "failures": [
     "PAYROLL: Payroll control account deltas",
-    "CUSTOMER_PAYMENTS: AR reduced by payment",
-    "FINANCIAL_STATEMENTS: Accounting equation (Equation diff 43400)",
-    "SECURITY: RLS tenant scoping (read)"
+    "CUSTOMER_PAYMENTS: AR reduced by payment"
   ],
   "steps": [
     {
@@ -69,7 +67,7 @@
       "step": "Create payroll run",
       "status": "PASS",
       "evidence": {
-        "runId": "ad0fa0b7-593f-4709-b5d4-2660387e5380",
+        "runId": "aa5316ae-0734-4681-8a2a-69e3478b8468",
         "period": {
           "pay_period_start": "2026-09-01",
           "pay_period_end": "2026-09-30",
@@ -123,7 +121,7 @@
       "step": "Payslip generated",
       "status": "PASS",
       "evidence": {
-        "payslipId": "63e23c19-e89f-4cb1-8743-5968ab1e9a21"
+        "payslipId": "dd27d880-ea61-40ba-bc44-846da88e33ce"
       }
     },
     {
@@ -136,7 +134,7 @@
       "step": "Finalize / post payroll journal",
       "status": "PASS",
       "evidence": {
-        "journalEntryId": "174a4d43-cf95-408a-8abe-28c3146507dc",
+        "journalEntryId": "ea7b0d30-4da1-4ea9-bd44-0360c2d03e2e",
         "status": "finalized"
       }
     },
@@ -219,7 +217,7 @@
       "step": "Create invoice",
       "status": "PASS",
       "evidence": {
-        "invoiceId": "efee3bb2-4d1f-4d03-8dfc-2976e9de76a7",
+        "invoiceId": "0065815a-5e21-4b86-86a5-4145d1d2c0ed",
         "amount": 5000
       }
     },
@@ -267,7 +265,7 @@
       "step": "Statement import",
       "status": "PASS",
       "evidence": {
-        "import_id": "bdafdf78-0b2e-47a5-951b-e6deb92cd92c",
+        "import_id": "2c5a64de-aa1b-4785-8e4f-95505458946c",
         "inserted_count": 1,
         "duplicate_count": 0
       }
@@ -307,6 +305,34 @@
           "matched_journal_entry_item_id": null,
           "matched_bank_transaction_id": null,
           "created_at": "2026-07-29T12:40:55.228828+00:00"
+        },
+        {
+          "id": "e0c53d3e-2477-4372-adf7-87b826032c02",
+          "company_id": "be3855e9-d11c-48a8-8c39-10e12a0ff2df",
+          "statement_import_id": "7e3d414b-0553-4499-8e02-6cf06533bd7c",
+          "bank_account_id": "6e9bd8c0-dce4-4ad3-aa71-ff9443abca19",
+          "line_date": "2026-07-29",
+          "description": "Cert unmatched deposit",
+          "amount": 1500,
+          "external_reference": "CERT-STMT-1785333734122",
+          "match_status": "unmatched",
+          "matched_journal_entry_item_id": null,
+          "matched_bank_transaction_id": null,
+          "created_at": "2026-07-29T14:02:13.827459+00:00"
+        },
+        {
+          "id": "add36eaf-90de-4124-944e-6aa3ca705327",
+          "company_id": "be3855e9-d11c-48a8-8c39-10e12a0ff2df",
+          "statement_import_id": "2c5a64de-aa1b-4785-8e4f-95505458946c",
+          "bank_account_id": "6e9bd8c0-dce4-4ad3-aa71-ff9443abca19",
+          "line_date": "2026-07-29",
+          "description": "Cert unmatched deposit",
+          "amount": 1500,
+          "external_reference": "CERT-STMT-1785334280294",
+          "match_status": "unmatched",
+          "matched_journal_entry_item_id": null,
+          "matched_bank_transaction_id": null,
+          "created_at": "2026-07-29T14:11:19.501912+00:00"
         }
       ]
     },
@@ -324,9 +350,9 @@
       "step": "Statement of Profit or Loss computable",
       "status": "PASS",
       "evidence": {
-        "totalIncome": 0,
-        "totalExpenses": 0,
-        "netIncome": 0
+        "totalIncome": 56000,
+        "totalExpenses": 2000,
+        "netIncome": 54000
       }
     },
     {
@@ -334,24 +360,23 @@
       "step": "Statement of Financial Position computable",
       "status": "PASS",
       "evidence": {
-        "totalAssets": 45600,
-        "totalLiabilities": 2200,
+        "totalAssets": 55600,
+        "totalLiabilities": 1600,
         "totalEquity": 0,
-        "netIncome": 0
+        "netIncome": 54000
       }
     },
     {
       "area": "FINANCIAL_STATEMENTS",
       "step": "Accounting equation",
-      "status": "FAIL",
+      "status": "PASS",
       "evidence": {
-        "assets": 45600,
-        "liabilities": 2200,
+        "assets": 55600,
+        "liabilities": 1600,
         "equity": 0,
-        "netIncome": 0,
-        "diff": 43400
-      },
-      "error": "Equation diff 43400"
+        "netIncome": 54000,
+        "diff": 0
+      }
     },
     {
       "area": "FINANCIAL_STATEMENTS",
@@ -372,10 +397,20 @@
     {
       "area": "SECURITY",
       "step": "RLS tenant scoping (read)",
-      "status": "FAIL",
+      "status": "PASS",
       "evidence": {
-        "rowsScanned": 714,
-        "foreignRows": 678
+        "rowsScanned": 727,
+        "unauthorizedRows": 0,
+        "membershipCount": 14
+      }
+    },
+    {
+      "area": "SECURITY",
+      "step": "Cross-tenant read denied",
+      "status": "PASS",
+      "evidence": {
+        "foreignCompanyId": "377d1d8c-7479-41a3-9b1c-e72975185868",
+        "rowsReturned": 0
       }
     },
     {
@@ -448,9 +483,9 @@
       "step": "Dashboard data (parallel RPCs)",
       "status": "PASS",
       "evidence": {
-        "ms_min": 702,
-        "ms_median": 1128,
-        "ms_max": 1314,
+        "ms_min": 663,
+        "ms_median": 724,
+        "ms_max": 729,
         "thresholdMs": 3000
       }
     },
@@ -459,9 +494,9 @@
       "step": "Invoice list",
       "status": "PASS",
       "evidence": {
-        "ms_min": 480,
-        "ms_median": 508,
-        "ms_max": 521,
+        "ms_min": 472,
+        "ms_median": 484,
+        "ms_max": 507,
         "thresholdMs": 3000
       }
     },
@@ -470,9 +505,9 @@
       "step": "Financial statements bundle",
       "status": "PASS",
       "evidence": {
-        "ms_min": 577,
-        "ms_median": 579,
-        "ms_max": 589,
+        "ms_min": 487,
+        "ms_median": 491,
+        "ms_max": 551,
         "thresholdMs": 3000
       }
     },
@@ -481,9 +516,9 @@
       "step": "Payroll workspace summary",
       "status": "PASS",
       "evidence": {
-        "ms_min": 549,
-        "ms_median": 555,
-        "ms_max": 710,
+        "ms_min": 588,
+        "ms_median": 653,
+        "ms_max": 1064,
         "thresholdMs": 3000
       }
     },
@@ -492,9 +527,9 @@
       "step": "Journal list",
       "status": "PASS",
       "evidence": {
-        "ms_min": 456,
-        "ms_median": 469,
-        "ms_max": 471,
+        "ms_min": 473,
+        "ms_median": 516,
+        "ms_max": 575,
         "thresholdMs": 3000
       }
     },
@@ -503,9 +538,9 @@
       "step": "Global search",
       "status": "PASS",
       "evidence": {
-        "ms_min": 505,
-        "ms_median": 540,
-        "ms_max": 633,
+        "ms_min": 600,
+        "ms_median": 1177,
+        "ms_max": 1282,
         "thresholdMs": 3000
       }
     },

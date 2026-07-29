@@ -1,0 +1,415 @@
+{
+  "at": "2026-07-29T14:03:45.037Z",
+  "companyId": "063d0ae0-394a-4b22-b140-087d5979633b",
+  "results": [
+    {
+      "name": "Bucket list includes attachments",
+      "ok": true,
+      "evidence": {
+        "buckets": [
+          "attachments"
+        ]
+      }
+    },
+    {
+      "name": "Upload attachment",
+      "ok": true,
+      "evidence": {
+        "path": "063d0ae0-394a-4b22-b140-087d5979633b/hardening-sprint1-1785333820462.pdf"
+      }
+    },
+    {
+      "name": "Download attachment",
+      "ok": true,
+      "evidence": {
+        "bytes": 27
+      }
+    },
+    {
+      "name": "Public URL resolves",
+      "ok": true,
+      "evidence": {
+        "url": "https://zaulhnpohrgqqodvzhxp.supabase.co/storage/v1/object/public/attachments/063d0ae0-394a-4b22-b140-087d5979633b/hardening-sprint1-1785333820462.pdf",
+        "status": 200
+      }
+    },
+    {
+      "name": "Signed URL works",
+      "ok": true,
+      "evidence": {
+        "signed": true,
+        "status": 200
+      }
+    },
+    {
+      "name": "RLS blocks foreign company path upload",
+      "ok": true,
+      "evidence": {
+        "blocked": "new row violates row-level security policy"
+      }
+    },
+    {
+      "name": "Delete attachment",
+      "ok": true,
+      "evidence": {
+        "removed": "063d0ae0-394a-4b22-b140-087d5979633b/hardening-sprint1-1785333820462.pdf"
+      }
+    },
+    {
+      "name": "New edge functions HEALTH",
+      "ok": true,
+      "evidence": {
+        "accounting-health": {
+          "overallScore": 89,
+          "status": "Critical",
+          "domains": {
+            "chart_of_accounts": {
+              "domain": "chart_of_accounts",
+              "label": "Chart of Accounts",
+              "score": 72,
+              "maxScore": 100,
+              "percent": 72,
+              "findings": [
+                {
+                  "id": "chart_of_accounts:MISSING_BANK_GL:global",
+                  "domain": "chart_of_accounts",
+                  "severity": "critical",
+                  "code": "MISSING_BANK_GL",
+                  "message": "Missing mandatory account: Bank / Cash.",
+                  "recommendation": "Add a Bank / Cash account to the Chart of Accounts."
+                },
+                {
+                  "id": "chart_of_accounts:UNUSED_CONTROL_ACCOUNT:b4bc8a83-a372-4a89-bffa-e2c40ab88e8a",
+                  "domain": "chart_of_accounts",
+                  "severity": "info",
+                  "code": "UNUSED_CONTROL_ACCOUNT",
+                  "message": "Control account \"UIF Payable\" has never been posted to.",
+                  "recommendation": "Confirm the control account is required, or deactivate if obsolete.",
+                  "accountId": "b4bc8a83-a372-4a89-bffa-e2c40ab88e8a",
+                  "accountName": "UIF Payable"
+                },
+                {
+                  "id": "chart_of_accounts:UNUSED_CONTROL_ACCOUNT:e746852e-e7cb-4002-a034-cd538315068e",
+                  "domain": "chart_of_accounts",
+                  "severity": "info",
+                  "code": "UNUSED_CONTROL_ACCOUNT",
+                  "message": "Control account \"SDL Payable\" has never been posted to.",
+                  "recommendation": "Confirm the control account is required, or deactivate if obsolete.",
+                  "accountId": "e746852e-e7cb-4002-a034-cd538315068e",
+                  "accountName": "SDL Payable"
+                },
+                {
+                  "id": "chart_of_accounts:UNUSED_CONTROL_ACCOUNT:82cc3f8c-808f-4439-b78a-49fd996d501a",
+                  "domain": "chart_of_accounts",
+                  "severity": "info",
+                  "code": "UNUSED_CONTROL_ACCOUNT",
+                  "message": "Control account \"Accumulated Depreciation\" has never been posted to.",
+                  "recommendation": "Confirm the control account is required, or deactivate if obsolete.",
+                  "accountId": "82cc3f8c-808f-4439-b78a-49fd996d501a",
+                  "accountName": "Accumulated Depreciation"
+                },
+                {
+                  "id": "chart_of_accounts:UNUSED_CONTROL_ACCOUNT:e568a35a-6757-4aa3-846f-45060529226d",
+                  "domain": "chart_of_accounts",
+                  "severity": "info",
+                  "code": "UNUSED_CONTROL_ACCOUNT",
+                  "message": "Control account \"VAT Input (Receivable)\" has never been posted to.",
+                  "recommendation": "Confirm the control account is required, or deactivate if obsolete.",
+                  "accountId": "e568a35a-6757-4aa3-846f-45060529226d",
+                  "accountName": "VAT Input (Receivable)"
+                },
+                {
+                  "id": "chart_of_accounts:UNUSED_CONTROL_ACCOUNT:e16a4dc7-5350-4cf8-90b1-72960481b5bb",
+                  "domain": "chart_of_accounts",
+                  "severity": "info",
+                  "code": "UNUSED_CONTROL_ACCOUNT",
+                  "message": "Control account \"VAT Control\" has never been posted to.",
+                  "recommendation": "Confirm the control account is required, or deactivate if obsolete.",
+                  "accountId": "e16a4dc7-5350-4cf8-90b1-72960481b5bb",
+                  "accountName": "VAT Control"
+                }
+              ],
+              "applicable": true
+            },
+            "general_ledger": {
+              "domain": "general_ledger",
+              "label": "General Ledger",
+              "score": 68,
+              "maxScore": 100,
+              "percent": 68,
+              "findings": [
+                {
+                  "id": "general_ledger:ACCOUNT_NEVER_POSTED:99836555-e714-4857-8b4c-9218310120b6",
+                  "domain": "general_ledger",
+                  "severity": "info",
+                  "code": "ACCOUNT_NEVER_POSTED",
+                  "message": "\"Intangible Assets\" has never been posted to.",
+                  "recommendation": "Deactivate unused accounts or leave them for future use.",
+                  "accountId": "99836555-e714-4857-8b4c-9218310120b6",
+                  "accountName": "Intangible Assets"
+                },
+                {
+                  "id": "general_ledger:ACCOUNT_NEVER_POSTED:ec099649-1e45-4e5c-9794-8b0463811cd1",
+                  "domain": "general_ledger",
+                  "severity": "info",
+                  "code": "ACCOUNT_NEVER_POSTED",
+                  "message": "\"Provision for Doubtful Debts\" has never been posted to.",
+                  "recommendation": "Deactivate unused accounts or leave them for future use.",
+                  "accountId": "ec099649-1e45-4e5c-9794-8b0463811cd1",
+                  "accountName": "Provision for Doubtful Debts"
+                },
+                {
+                  "id": "general_ledger:ACCOUNT_NEVER_POSTED:4f1bda24-2af8-468a-9729-af29ba9fde18",
+                  "domain": "general_ledger",
+                  "severity": "info",
+                  "code": "ACCOUNT_NEVER_POSTED",
+                  "message": "\"Prepaid Expenses\" has never been posted to.",
+                  "recommendation": "Deactivate unused accounts or leave them for future use.",
+                  "accountId": "4f1bda24-2af8-468a-9729-af29ba9fde18",
+                  "accountName": "Prepaid Expenses"
+                },
+                {
+                  "id": "general_ledger:ACCOUNT_NEVER_POSTED:ea442de6-2078-49eb-8b0c-231440715c03",
+                  "domain": "general_ledger",
+                  "severity": "info",
+                  "code": "ACCOUNT_NEVER_POSTED",
+                  "message": "\"Petty Cash / Cash on Hand\" has never been posted to.",
+                  "recommendation": "Deactivate unused accounts or leave them for future use.",
+                  "accountId": "ea442de6-2078-49eb-8b0c-231440715c03",
+                  "accountName": "Petty Cash / Cash on Hand"
+                },
+                {
+                  "id": "general_ledger:ACCOUNT_NEVER_POSTED:6f742ebe-92d6-48a7-bffa-6ce7956c36cf",
+                  "domain": "general_ledger",
+                  "severity": "info",
+                  "code": "ACCOUNT_NEVER_POSTED",
+                  "message": "\"Long-term Loans\" has never been posted to.",
+                  "recommendation": "Deactivate unused accounts or leave them for future use.",
+                  "accountId": "6f742ebe-92d6-48a7-bffa-6ce7956c36cf",
+                  "accountName": "Long-term Loans"
+                },
+                {
+                  "id": "general_ledger:ACCOUNT_NEVER_POSTED:f06830d0-3636-4355-aa21-a89f3c2376e4",
+                  "domain": "general_ledger",
+                  "severity": "info",
+                  "code": "ACCOUNT_NEVER_POSTED",
+                  "message": "\"Instalment Sale Liabilities\" has never been posted to.",
+                  "recommendation": "Deactivate unused accounts or leave them for future use.",
+                  "accountId": "f06830d0-3636-4355-aa21-a89f3c2376e4",
+                  "accountName": "Instalment Sale Liabilities"
+                },
+                {
+                  "id": "general_ledger:ACCOUNT_NEVER_POSTED:b4bc8a83-a372-4a89-bffa-e2c40ab88e8a",
+                  "domain": "general_ledger",
+                  "severity": "info",
+                  "code": "ACCOUNT_NEVER_POSTED",
+                  "message": "\"UIF Payable\" has never been posted to.",
+                  "recommendation": "Deactivate unused accounts or leave them for future use.",
+                  "accountId": "b4bc8a83-a372-4a89-bffa-e2c40ab88e8a",
+                  "accountName": "UIF Payable"
+                },
+                {
+                  "id": "general_ledger:ACCOUNT_NEVER_POSTED:e746852e-e7cb-4002-a034-cd538315068e",
+                  "domain": "general_ledger",
+                  "severity": "info",
+                  "code": "ACCOUNT_NEVER_POSTED",
+                  "message": "\"SDL Payable\" has never been posted to.",
+                  "recommendation": "Deactivate unused accounts or leave them for future use.",
+                  "accountId": "e746852e-e7cb-4002-a034-cd538315068e",
+                  "accountName": "SDL Payable"
+                },
+                {
+                  "id": "general_ledger:ACCOUNT_NEVER_POSTED:251bb4a0-75a7-448a-850e-937d39e794ca",
+                  "domain": "general_ledger",
+                  "severity": "info",
+                  "code": "ACCOUNT_NEVER_POSTED",
+                  "message": "\"Accrued Expenses\" has never been posted to.",
+                  "recommendation": "Deactivate unused accounts or leave them for future use.",
+                  "accountId": "251bb4a0-75a7-448a-850e-937d39e794ca",
+                  "accountName": "Accrued Expenses"
+                },
+                {
+                  "id": "general_ledger:ACCOUNT_NEVER_POSTED:92d92489-dc70-4d42-aae3-e0a2d7b27e86",
+                  "domain": "general_ledger",
+                  "severity": "info",
+                  "code": "ACCOUNT_NEVER_POSTED",
+                  "message": "\"Provisions\" has never been posted to.",
+                  "recommendation": "Deactivate unused accounts or leave them for future use.",
+                  "accountId": "92d92489-dc70-4d42-aae3-e0a2d7b27e86",
+                  "accountName": "Provisions"
+                },
+                {
+                  "id": "general_ledger:ACCOUNT_NEVER_POSTED:2007f0b7-0afd-4a7e-a0b8-bd585a92325e",
+                  "domain": "general_ledger",
+                  "severity": "info",
+                  "code": "ACCOUNT_NEVER_POSTED",
+                  "message": "\"Printing and Stationery\" has never been posted to.",
+                  "recommendation": "Deactivate unused accounts or leave them for future use.",
+                  "accountId": "2007f0b7-0afd-4a7e-a0b8-bd585a92325e",
+                  "accountName": "Printing and Stationery"
+                },
+                {
+                  "id": "general_ledger:ACCOUNT_NEVER_POSTED:03d67f6d-bdfe-4ef4-8a7a-484b9668a1da",
+                  "domain": "general_ledger",
+                  "severity": "info",
+                  "code": "ACCOUNT_NEVER_POSTED",
+                  "message": "\"Rates and Taxes\" has never been posted to.",
+                  "recommendation": "Deactivate unused accounts or leave them for future use.",
+                  "accountId": "03d67f6d-bdfe-4ef4-8a7a-484b9668a1da",
+                  "accountName": "Rates and Taxes"
+                },
+                {
+                  "id": "general_ledger:ACCOUNT_NEVER_POSTED:9bc94da9-decf-4e37-ac50-773e04f2f330",
+                  "domain": "general_ledger",
+                  "severity": "info",
+                  "code": "ACCOUNT_NEVER_POSTED",
+                  "message": "\"Repairs and Maintenance\" has never been posted to.",
+                  "recommendation": "Deactivate unused accounts or leave them for future use.",
+                  "accountId": "9bc94da9-decf-4e37-ac50-773e04f2f330",
+                  "accountName": "Repairs and Maintenance"
+                },
+                {
+                  "id": "general_ledger:ACCOUNT_NEVER_POSTED:1819bd70-1db7-4e75-97a7-36d29bb4e8a7",
+                  "domain": "general_ledger",
+                  "severity": "info",
+                  "code": "ACCOUNT_NEVER_POSTED",
+                  "message": "\"Subscriptions\" has never been posted to.",
+                  "recommendation": "Deactivate unused accounts or leave them for future use.",
+                  "accountId": "1819bd70-1db7-4e75-97a7-36d29bb4e8a7",
+                  "accountName": "Subscriptions"
+                },
+                {
+                  "id": "general_ledger:ACCOUNT_NEVER_POSTED:7d5237f1-028f-42f0-a9f0-493787ebe8dc",
+                  "domain": "general_ledger",
+                  "severity": "info",
+                  "code": "ACCOUNT_NEVER_POSTED",
+                  "message": "\"Current Portion of Long-term Loans\" has never been posted to.",
+                  "recommendation": "Deactivate unused accounts or leave them for future use.",
+                  "accountId": "7d5237f1-028f-42f0-a9f0-493787ebe8dc",
+                  "accountName": "Current Portion of Long-term Loans"
+                },
+                {
+                  "id": "general_ledger:ACCOUNT_NEVER_POSTED_SUMMARY:global",
+                  "domain": "general_ledger",
+                  "severity": "info",
+                  "code": "ACCOUNT_NEVER_POSTED_SUMMARY",
+                  "message": "47 additional unused accounts omitted from detail.",
+                  "recommendation": "Review unused accounts in Chart of Accounts maintenance."
+                }
+              ],
+              "applicable": true
+            },
+            "financial_statements": {
+              "domain": "financial_statements",
+              "label": "Financial Statements",
+              "score": 100,
+              "maxScore": 100,
+              "percent": 100,
+              "findings": [],
+              "applicable": true
+            },
+            "tax": {
+              "domain": "tax",
+              "label": "Tax",
+              "score": 100,
+              "maxScore": 100,
+              "percent": 100,
+              "findings": [],
+              "applicable": true
+            },
+            "banking": {
+              "domain": "banking",
+              "label": "Banking",
+              "score": 92,
+              "maxScore": 100,
+              "percent": 92,
+              "findings": [
+                {
+                  "id": "banking:MISSING_CASH_ACCOUNTS:global",
+                  "domain": "banking",
+                  "severity": "warning",
+                  "code": "MISSING_CASH_ACCOUNTS",
+                  "message": "No cash or bank GL accounts were found.",
+                  "recommendation": "Create Bank / Cash GL accounts or link bank accounts to the chart."
+                }
+              ],
+              "applicable": true
+            },
+            "payroll": {
+              "domain": "payroll",
+              "label": "Payroll",
+              "score": 100,
+              "maxScore": 100,
+              "percent": 100,
+              "findings": [],
+              "applicable": false
+            },
+            "assets": {
+              "domain": "assets",
+              "label": "Assets",
+              "score": 100,
+              "maxScore": 100,
+              "percent": 100,
+              "findings": [],
+              "applicable": false
+            },
+            "double_entry": {
+              "domain": "double_entry",
+              "label": "Double Entry",
+              "score": 100,
+              "maxScore": 100,
+              "percent": 100,
+              "findings": [],
+              "applicable": true
+            }
+          },
+          "warnings": [
+            {
+              "id": "chart_of_accounts:MISSING_BANK_GL:global",
+              "domain": "chart_of_accounts",
+              "severity": "critical",
+              "code": "MISSING_BANK_GL",
+              "message": "Missing mandatory account: Bank / Cash.",
+              "recommendation": "Add a Bank / Cash account to the Chart of Accounts."
+            },
+            {
+              "id": "banking:MISSING_CASH_ACCOUNTS:global",
+              "domain": "banking",
+              "severity": "warning",
+              "code": "MISSING_CASH_ACCOUNTS",
+              "message": "No cash or bank GL accounts were found.",
+              "recommendation": "Create Bank / Cash GL accounts or link bank accounts to the chart."
+            }
+          ],
+          "recommendations": [
+            "Add a Bank / Cash account to the Chart of Accounts.",
+            "Create Bank / Cash GL accounts or link bank accounts to the chart.",
+            "Confirm the control account is required, or deactivate if obsolete.",
+            "Deactivate unused accounts or leave them for future use.",
+            "Review unused accounts in Chart of Accounts maintenance."
+          ],
+          "findingCount": {
+            "critical": 1,
+            "warning": 1,
+            "info": 21
+          },
+          "assessedAt": "2026-07-29T14:03:42.785Z"
+        },
+        "seed-data": {
+          "status": "ok",
+          "slug": "seed-data",
+          "importPath": "data-import",
+          "note": "Use data-import for tenant imports; certified CLI scripts for enterprise seed."
+        },
+        "year-end-close": {
+          "status": "ok",
+          "slug": "year-end-close",
+          "methods": [
+            "CLOSE",
+            "REOPEN"
+          ]
+        }
+      }
+    }
+  ]
+}

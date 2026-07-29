@@ -8,8 +8,8 @@ import type {
   HealthDomainScore,
   HealthFinding,
   HealthStatus,
-} from './model';
-import { HEALTH_DOMAIN_LABELS, HEALTH_DOMAIN_ORDER } from './model';
+} from './model.ts';
+import { HEALTH_DOMAIN_LABELS, HEALTH_DOMAIN_ORDER } from './model.ts';
 
 export type HealthAccount = {
   id: string;

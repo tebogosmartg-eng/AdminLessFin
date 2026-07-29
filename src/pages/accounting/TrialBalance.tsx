@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { format, startOfMonth, endOfMonth } from 'date-fns';
 import { DateRange } from 'react-day-picker';
-import { Download, Scale, Calendar as CalendarIcon, ChevronRight, ChevronDown } from 'lucide-react';
+import { Download, Scale, Calendar as CalendarIcon, ChevronRight, ChevronDown, FileText } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { hierarchicalTrialBalanceQuery } from '../../lib/accountingQueries';
@@ -10,6 +10,7 @@ import { accountingApi } from '../../lib/accountingWorkspace';
 import { accountantPrefs } from '../../lib/accountantProductivity';
 import { formatCurrency, downloadCSV, cn } from '../../lib/utils';
 import { useDocumentTitle } from '../../hooks/useDocumentTitle';
+import { AnalyticsEvents, useFirstUsagePageView } from '../../lib/analytics';
 import AccountingSearch from '../../components/accounting/AccountingSearch';
 import EnterpriseAccountCard from '../../components/accounting/EnterpriseAccountCard';
 import TraceabilityDrawer from '../../components/accounting/TraceabilityDrawer';
@@ -17,6 +18,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../..
 import { Button } from '../../components/ui/button';
 import { Badge } from '../../components/ui/badge';
 import { Skeleton } from '../../components/ui/skeleton';
+import { EmptyState } from '../../components/EmptyState';
 import { Popover, PopoverContent, PopoverTrigger } from '../../components/ui/popover';
 import { Calendar } from '../../components/ui/calendar';
 
@@ -43,6 +45,7 @@ type TbRow = {
 const TrialBalance = () => {
   useDocumentTitle('Trial Balance');
   const { activeCompany } = useAuth();
+  useFirstUsagePageView(AnalyticsEvents.USAGE_FIRST_TRIAL_BALANCE, 'trial_balance');
   const companyId = activeCompany?.id;
   const [date, setDate] = useState<DateRange | undefined>({
     from: startOfMonth(new Date()),
@@ -155,7 +158,25 @@ const TrialBalance = () => {
           </div>
         </CardHeader>
         <CardContent>
-          {isLoading ? <Skeleton className="h-96 w-full" /> : (
+          {isLoading ? (
+            <Skeleton className="h-96 w-full" />
+          ) : rows.length === 0 ? (
+            <EmptyState
+              icon={FileText}
+              title="No balances to show yet"
+              description="The trial balance populates once you post invoices, bills, or journal entries. Complete Accounting Setup first, then record your first transaction."
+              action={
+                <div className="flex flex-wrap justify-center gap-2">
+                  <Button asChild variant="outline">
+                    <Link to="/accounting-setup">Accounting Setup</Link>
+                  </Button>
+                  <Button asChild>
+                    <Link to="/invoices">Create an invoice</Link>
+                  </Button>
+                </div>
+              }
+            />
+          ) : (
             <div className="space-y-1">
               <div className="grid grid-cols-[1fr_repeat(6,minmax(80px,100px))] gap-2 text-xs font-medium text-muted-foreground px-2 py-2 border-b sticky top-0 bg-background z-10">
                 <div>Account / Hierarchy</div>

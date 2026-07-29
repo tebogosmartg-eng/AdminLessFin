@@ -5,6 +5,12 @@ import {
   authorizationHeaderFromSession,
   ensureSessionForInvoke,
 } from '../lib/auth/ensureSessionForInvoke';
+import { AnalyticsEvents } from '../lib/analytics/events';
+import { trackEvent, flushEvents } from '../lib/analytics/productAnalytics';
+import {
+  markRegistrationTracked,
+  wasRegistrationTracked,
+} from '../lib/analytics/session';
 
 type Profile = {
   id: string;
@@ -104,7 +110,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         setRole(data.role);
         lastFetchUserId.current = currentUser.id;
       } catch (error) {
-        console.error('[AuthContext] Error fetching user data:', error);
+        if (import.meta.env.DEV) {
+          console.error('[AuthContext] Error fetching user data:', error);
+        }
         const message = error instanceof Error ? error.message : String(error);
         const authExpired = /session has expired|not authenticated/i.test(message);
 
@@ -171,16 +179,38 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         setUser(currentSession?.user ?? null);
         try {
           if (event === 'SIGNED_OUT' || !currentSession?.user) {
+            if (event === 'SIGNED_OUT') {
+              trackEvent({ eventName: AnalyticsEvents.AUTH_LOGOUT });
+              void flushEvents();
+            }
             await fetchUserAndCompanyData(null);
           } else if (
             event === 'INITIAL_SESSION' ||
             event === 'SIGNED_IN' ||
             event === 'TOKEN_REFRESHED'
           ) {
+            if (event === 'SIGNED_IN' && currentSession.user) {
+              const createdAt = new Date(currentSession.user.created_at).getTime();
+              const isRecentRegistration = Date.now() - createdAt < 5 * 60 * 1000;
+              if (isRecentRegistration && !wasRegistrationTracked(currentSession.user.id)) {
+                markRegistrationTracked(currentSession.user.id);
+                trackEvent({
+                  eventName: AnalyticsEvents.AUTH_REGISTRATION,
+                  userId: currentSession.user.id,
+                });
+              }
+              trackEvent({
+                eventName: AnalyticsEvents.AUTH_LOGIN,
+                userId: currentSession.user.id,
+                properties: { auth_event: event },
+              });
+            }
             await fetchUserAndCompanyData(currentSession.user);
           }
         } catch (error) {
-          console.error('[AuthContext] Auth state change handling failed:', error);
+          if (import.meta.env.DEV) {
+            console.error('[AuthContext] Auth state change handling failed:', error);
+          }
         } finally {
           setLoading(false);
         }
@@ -190,7 +220,11 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     return () => authListener.subscription.unsubscribe();
   }, []);
 
-  const signOut = async () => await supabase.auth.signOut();
+  const signOut = async () => {
+    trackEvent({ eventName: AnalyticsEvents.AUTH_LOGOUT });
+    await flushEvents();
+    await supabase.auth.signOut();
+  };
   const refreshProfile = async () => await fetchUserAndCompanyData(user, true);
   const switchCompany = async (companyId: string) => {
     if (user) {
@@ -198,6 +232,12 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         body: { method: 'SWITCH_COMPANY', company_id: companyId, target_company_id: companyId },
       });
       if (error) throw error;
+      trackEvent({
+        eventName: AnalyticsEvents.COMPANY_SWITCHED,
+        companyId,
+        userId: user.id,
+        properties: { target_company_id: companyId },
+      });
       await refreshProfile();
     }
   };

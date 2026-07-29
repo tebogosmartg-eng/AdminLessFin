@@ -13,6 +13,8 @@ import { Input } from './ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Textarea } from './ui/textarea';
 import { showError, showPlatformError, showSuccess } from '../utils/toast';
+import { AnalyticsEvents } from '@/lib/analytics/events';
+import { trackFirstUsageEvent } from '@/lib/analytics/productAnalytics';
 import { PlatformError, isPlatformErrorEnvelope } from '../lib/platform/platformError';
 import { Account } from '../pages/ChartOfAccounts';
 import { Customer } from '../pages/Customers';
@@ -397,6 +399,9 @@ const InvoiceForm = ({ isOpen, setIsOpen, invoiceId, duplicateFromId, initialCus
         queryClient.invalidateQueries({ queryKey: ['invoices', activeCompany?.id] });
         queryClient.invalidateQueries({ queryKey: ['journal_entries', activeCompany?.id] });
         if (invoiceId) queryClient.invalidateQueries({ queryKey: ['invoice_detail', invoiceId] });
+      }
+      if (!isEditing && activeCompany) {
+        trackFirstUsageEvent(activeCompany.id, AnalyticsEvents.USAGE_FIRST_INVOICE, 'invoice');
       }
       showSuccess(`Invoice ${isEditing ? 'updated' : 'created'} successfully.`);
       setIsOpen(false);

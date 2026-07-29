@@ -26,6 +26,8 @@ import { Input } from './ui/input';
 import { Textarea } from './ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { showError, showSuccess } from '../utils/toast';
+import { AnalyticsEvents } from '@/lib/analytics/events';
+import { trackFirstUsageEvent } from '@/lib/analytics/productAnalytics';
 import { Vendor } from '../pages/Vendors';
 
 const vendorSchema = z.object({
@@ -104,6 +106,13 @@ const VendorForm = ({ isOpen, setIsOpen, vendor }: VendorFormProps) => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['vendors', activeCompany?.id] });
+      if (!vendor && activeCompany) {
+        trackFirstUsageEvent(
+          activeCompany.id,
+          AnalyticsEvents.USAGE_FIRST_SUPPLIER,
+          'supplier',
+        );
+      }
       showSuccess(`Vendor ${vendor ? 'updated' : 'created'} successfully.`);
       setIsOpen(false);
     },

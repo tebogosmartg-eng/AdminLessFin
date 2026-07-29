@@ -14,6 +14,9 @@ function isExpiredOrMissing(session: Session | null | undefined): boolean {
 }
 
 function logSessionPresence(phase: string, session: Session | null | undefined): void {
+  // Opt-in diagnostic only. Default off in DEV and production so the browser
+  // console stays clean; enable with VITE_DEBUG_AUTH_SESSION=true when needed.
+  if (import.meta.env.VITE_DEBUG_AUTH_SESSION !== 'true') return;
   console.info('[auth] session probe', {
     phase,
     userId: session?.user?.id ?? null,
@@ -45,7 +48,7 @@ export async function ensureSessionForInvoke(options?: {
   const redirectOnFailure = options?.redirectOnFailure !== false;
 
   const { data: initial, error: sessionError } = await supabase.auth.getSession();
-  if (sessionError) {
+  if (sessionError && import.meta.env.DEV) {
     console.error('[auth] getSession failed', { message: sessionError.message });
   }
 
@@ -61,10 +64,12 @@ export async function ensureSessionForInvoke(options?: {
   logSessionPresence('refreshSession', session);
 
   if (refreshError || isExpiredOrMissing(session)) {
-    console.error('[auth] session recovery failed', {
-      refreshError: refreshError?.message ?? null,
-      access_token: Boolean(session?.access_token),
-    });
+    if (import.meta.env.DEV) {
+      console.error('[auth] session recovery failed', {
+        refreshError: refreshError?.message ?? null,
+        access_token: Boolean(session?.access_token),
+      });
+    }
     if (redirectOnFailure) redirectToLogin();
     throw new Error(SESSION_EXPIRED_MESSAGE);
   }

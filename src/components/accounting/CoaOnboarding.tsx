@@ -5,6 +5,8 @@ import { supabase } from '../../integrations/supabase/client';
 import { useAuth } from '../../contexts/AuthContext';
 import { coaTemplatesQuery } from '../../lib/queries';
 import { showError, showSuccess } from '../../utils/toast';
+import { AnalyticsEvents } from '../../lib/analytics/events';
+import { trackEvent } from '../../lib/analytics/productAnalytics';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
 import { Button } from '../ui/button';
 
@@ -52,6 +54,13 @@ const CoaOnboarding = ({ onCreateManually }: CoaOnboardingProps) => {
     },
     onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ['accounts', activeCompany?.id] });
+      if (activeCompany) {
+        trackEvent({
+          eventName: AnalyticsEvents.SETUP_COA_GENERATED,
+          companyId: activeCompany.id,
+          properties: { generated_count: result?.generated, template: standard?.key },
+        });
+      }
       showSuccess(`Generated ${result?.generated ?? ''} accounts. Your Chart of Accounts is ready.`);
     },
     onError: (error) => showError(`Could not generate the Chart of Accounts: ${error.message}`),
@@ -113,7 +122,7 @@ const CoaOnboarding = ({ onCreateManually }: CoaOnboardingProps) => {
           <h3 className="mb-1 font-semibold">Import Existing</h3>
           <p className="flex-1 text-sm text-muted-foreground">
             Bring your chart in from a spreadsheet or another accounting system
-            (CSV, Excel, Sage, Pastel, Xero, QuickBooks).
+            (CSV, Excel, Sage, Pastel, Xero, QuickBooks). Requires admin access.
           </p>
           <Button variant="outline" className="mt-4" onClick={() => navigate('/import')}>
             <Upload className="mr-2 h-4 w-4" /> Import
