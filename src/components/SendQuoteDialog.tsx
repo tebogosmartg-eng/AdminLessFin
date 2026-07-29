@@ -15,6 +15,7 @@ import { Textarea } from './ui/textarea';
 import { Label } from './ui/label';
 import { showError, showSuccess } from '../utils/toast';
 import { useAuth } from '../contexts/AuthContext';
+import { useEnterpriseIdentity } from '../hooks/useEnterpriseIdentity';
 
 interface SendQuoteDialogProps {
   isOpen: boolean;
@@ -28,6 +29,7 @@ interface SendQuoteDialogProps {
 
 const SendQuoteDialog = ({ isOpen, setIsOpen, quote }: SendQuoteDialogProps) => {
   const { activeCompany } = useAuth();
+  const { identity } = useEnterpriseIdentity(activeCompany?.id);
   const queryClient = useQueryClient();
   const [to, setTo] = useState('');
   const [subject, setSubject] = useState('');
@@ -35,11 +37,12 @@ const SendQuoteDialog = ({ isOpen, setIsOpen, quote }: SendQuoteDialogProps) => 
 
   useEffect(() => {
     if (quote) {
+      const companyName = identity?.name || 'Your Company';
       setTo(quote.customer_email || '');
-      setSubject(`Quote ${quote.quote_number} from ${activeCompany?.name || 'Your Company'}`);
-      setBody(`Hi,\n\nPlease find the quote details below.\n\nLet us know if you have any questions.\n\nBest regards,\n${activeCompany?.name || 'Your Company'}`);
+      setSubject(`Quote ${quote.quote_number} from ${companyName}`);
+      setBody(`Hi,\n\nPlease find the quote details below.\n\nLet us know if you have any questions.\n\nBest regards,\n${companyName}`);
     }
-  }, [quote, activeCompany, isOpen]);
+  }, [quote, identity?.name, isOpen]);
 
   const sendEmailMutation = useMutation({
     mutationFn: async () => {

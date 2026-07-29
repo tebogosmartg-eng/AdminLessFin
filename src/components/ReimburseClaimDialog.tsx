@@ -13,6 +13,8 @@ import { showError, showSuccess } from '../utils/toast';
 import { Account } from '../pages/ChartOfAccounts';
 import { format } from 'date-fns';
 import { formatCurrency } from '../lib/utils';
+import { formatEmployeeAiContext } from '../lib/employeeIdentity';
+import { accountsQuery } from '../lib/queries';
 
 const reimburseSchema = z.object({
   payment_date: z.string().min(1, "Date is required."),
@@ -29,7 +31,7 @@ interface Props {
     id: string;
     claim_number: string;
     total_amount: number;
-    employees?: { first_name: string; last_name: string };
+    employees?: { employee_number: string; first_name: string; last_name: string; department?: string | null };
   };
 }
 
@@ -47,7 +49,7 @@ const ReimburseClaimDialog = ({ isOpen, setIsOpen, claim }: Props) => {
   });
 
   const { data: accounts } = useQuery<Account[]>({ 
-    queryKey: ['accounts', activeCompany?.id],
+    ...accountsQuery(activeCompany!.id),
     enabled: !!activeCompany
   });
 
@@ -86,7 +88,7 @@ const ReimburseClaimDialog = ({ isOpen, setIsOpen, claim }: Props) => {
         <DialogHeader>
           <DialogTitle>Reimburse Claim {claim.claim_number}</DialogTitle>
           <DialogDescription>
-            Record payment of {formatCurrency(claim.total_amount)} to {claim.employees?.first_name} {claim.employees?.last_name}.
+            Record payment of {formatCurrency(claim.total_amount)} to {claim.employees ? formatEmployeeAiContext(claim.employees) : 'employee'}.
           </DialogDescription>
         </DialogHeader>
         <Form {...form}>

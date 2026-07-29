@@ -1,23 +1,30 @@
 import { useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from '../components/ui/table';
 import { Skeleton } from '../components/ui/skeleton';
 import { Button } from '../components/ui/button';
-import { Printer, FileCheck, Send, Paperclip } from 'lucide-react';
+import { Printer, FileCheck, Send, Paperclip, MessageSquare } from 'lucide-react';
 import { Badge } from '../components/ui/badge';
 import { showError, showSuccess } from '../utils/toast';
 import { useAuth } from '../contexts/AuthContext';
+import { useEnterpriseIdentity } from '../hooks/useEnterpriseIdentity';
 import { formatCurrency } from '../lib/utils';
 import { format } from 'date-fns';
 import BillForm from '../components/BillForm';
 import SendPODialog from '../components/SendPODialog';
+import BusinessLifecycleStepper from '../components/BusinessLifecycleStepper';
+import LifecycleNextAction from '../components/LifecycleNextAction';
+import LifecycleContextBadge from '../components/boe/LifecycleContextBadge';
+import { buildChatUrl } from '../lib/boe/contextualChat';
+import { resolvePurchaseOrderLifecycleStage, purchaseOrderNextAction } from '../lib/procurementWorkflow';
 
 const PurchaseOrderDetail = () => {
   const { id } = useParams();
   const { activeCompany } = useAuth();
+  const { identity } = useEnterpriseIdentity(activeCompany?.id);
   const queryClient = useQueryClient();
   const [isBillFormOpen, setIsBillFormOpen] = useState(false);
   const [isSendDialogOpen, setIsSendDialogOpen] = useState(false);
@@ -60,9 +67,37 @@ const PurchaseOrderDetail = () => {
     return <div>Purchase Order not found.</div>;
   }
 
+  const lifecycleStage = resolvePurchaseOrderLifecycleStage(po);
+  const nextAction = purchaseOrderNextAction(po);
+
   return (
     <>
       <div className="max-w-4xl mx-auto p-4 sm:p-6 lg:p-8 bg-background print:max-w-none print:p-8 print:mx-0 print:bg-white">
+        <div className="mb-6 print:hidden space-y-4">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <LifecycleContextBadge lifecycleId="procurement" stageId={lifecycleStage} />
+            <Button variant="ghost" size="sm" asChild>
+              <Link to={buildChatUrl({ type: 'purchase_order', id: po.id, label: po.po_number })}>
+                <MessageSquare className="mr-1 h-3.5 w-3.5" /> Discuss
+              </Link>
+            </Button>
+          </div>
+          <BusinessLifecycleStepper lifecycleId="procurement" currentStageId={lifecycleStage} compact />
+          {nextAction && (
+            <LifecycleNextAction
+              label={nextAction.label}
+              description={nextAction.description}
+              route={nextAction.route}
+              onAction={
+                nextAction.action === 'send'
+                  ? () => setIsSendDialogOpen(true)
+                  : nextAction.action === 'bill'
+                    ? () => setIsBillFormOpen(true)
+                    : undefined
+              }
+            />
+          )}
+        </div>
         <div className="flex justify-between items-start mb-6 print:hidden">
           <div>
             <h1 className="text-3xl font-bold">Purchase Order {po.po_number}</h1>
@@ -93,8 +128,8 @@ const PurchaseOrderDetail = () => {
         <Card className="print:shadow-none print:border-none">
           <CardHeader className="grid grid-cols-2 gap-4">
             <div>
-              <h2 className="text-2xl font-bold tracking-tight mb-1">{activeCompany?.name}</h2>
-              <p className="text-sm text-muted-foreground whitespace-pre-wrap">{activeCompany?.address}</p>
+              <h2 className="text-2xl font-bold tracking-tight mb-1">{identity?.name || 'Your Company'}</h2>
+              <p className="text-sm text-muted-foreground whitespace-pre-wrap">{identity?.address}</p>
             </div>
             <div className="text-right">
               <p className="text-xl font-bold tracking-tight text-muted-foreground">PURCHASE ORDER</p>

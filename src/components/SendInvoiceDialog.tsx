@@ -15,6 +15,7 @@ import { Textarea } from './ui/textarea';
 import { Label } from './ui/label';
 import { showError, showSuccess } from '../utils/toast';
 import { useAuth } from '../contexts/AuthContext';
+import { useEnterpriseIdentity } from '../hooks/useEnterpriseIdentity';
 
 interface SendInvoiceDialogProps {
   isOpen: boolean;
@@ -28,6 +29,7 @@ interface SendInvoiceDialogProps {
 
 const SendInvoiceDialog = ({ isOpen, setIsOpen, invoice }: SendInvoiceDialogProps) => {
   const { activeCompany } = useAuth();
+  const { identity } = useEnterpriseIdentity(activeCompany?.id);
   const queryClient = useQueryClient();
   const [to, setTo] = useState('');
   const [subject, setSubject] = useState('');
@@ -35,11 +37,12 @@ const SendInvoiceDialog = ({ isOpen, setIsOpen, invoice }: SendInvoiceDialogProp
 
   useEffect(() => {
     if (invoice) {
+      const companyName = identity?.name || 'Your Company';
       setTo(invoice.customer_email || '');
-      setSubject(`Invoice ${invoice.invoice_number} from ${activeCompany?.name || 'Your Company'}`);
-      setBody(`Hi,\n\nPlease find your invoice details below.\n\nThank you for your business!\n\nBest regards,\n${activeCompany?.name || 'Your Company'}`);
+      setSubject(`Invoice ${invoice.invoice_number} from ${companyName}`);
+      setBody(`Hi,\n\nPlease find your invoice details below.\n\nThank you for your business!\n\nBest regards,\n${companyName}`);
     }
-  }, [invoice, activeCompany, isOpen]);
+  }, [invoice, identity?.name, isOpen]);
 
   const sendEmailMutation = useMutation({
     mutationFn: async () => {

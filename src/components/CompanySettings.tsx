@@ -2,8 +2,10 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useMutation } from '@tanstack/react-query';
+import { Link } from 'react-router-dom';
 import { supabase } from '../integrations/supabase/client';
 import { useAuth } from '../contexts/AuthContext';
+import { useEnterpriseIdentity } from '../hooks/useEnterpriseIdentity';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from './ui/card';
 import { Button } from './ui/button';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from './ui/form';
@@ -12,32 +14,33 @@ import { Textarea } from './ui/textarea';
 import { showError, showSuccess } from '../utils/toast';
 import { useEffect, useState } from 'react';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from './ui/alert-dialog';
-import { AlertCircle, Upload, X } from 'lucide-react';
+import { AlertCircle, Upload, X, Database } from 'lucide-react';
+import { companyService } from '@/governance/domains/company/service';
 
-const companySchema = z.object({
-  name: z.string().min(1, 'Company name is required.'),
-  address: z.string().optional(),
-  tax_id: z.string().optional(),
+/**
+ * G3.6C — Company tab no longer edits enterprise identity (name/address/tax).
+ * Those live exclusively in Settings → Master Data. This surface keeps only
+ * operational branding (logo) and invoice notes.
+ */
+const companyOpsSchema = z.object({
   default_invoice_notes: z.string().optional(),
 });
-type CompanyFormValues = z.infer<typeof companySchema>;
+type CompanyOpsValues = z.infer<typeof companyOpsSchema>;
 
 const CompanySettings = () => {
   const { user, activeCompany, refreshProfile } = useAuth();
+  const { identity } = useEnterpriseIdentity(activeCompany?.id);
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
 
-  const form = useForm<CompanyFormValues>({
-    resolver: zodResolver(companySchema),
-    defaultValues: { name: '', address: '', tax_id: '', default_invoice_notes: '' },
+  const form = useForm<CompanyOpsValues>({
+    resolver: zodResolver(companyOpsSchema),
+    defaultValues: { default_invoice_notes: '' },
   });
 
   useEffect(() => {
     if (activeCompany) {
       form.reset({
-        name: activeCompany.name || '',
-        address: activeCompany.address || '',
-        tax_id: activeCompany.tax_id || '',
         default_invoice_notes: activeCompany.default_invoice_notes || '',
       });
       setPreviewUrl(activeCompany.logo_url || null);
@@ -53,44 +56,36 @@ const CompanySettings = () => {
   };
 
   const updateMutation = useMutation({
-    mutationFn: async (values: CompanyFormValues) => {
+    mutationFn: async (values: CompanyOpsValues) => {
       if (!user || !activeCompany) throw new Error('User not authenticated or no active company');
-      
+
       let logoUrl = activeCompany.logo_url;
 
       if (logoFile) {
         const fileExt = logoFile.name.split('.').pop();
         const fileName = `logo-${Date.now()}.${fileExt}`;
         const filePath = `${activeCompany.id}/${fileName}`;
-        
+
         const { error: uploadError } = await supabase.storage
-          .from('attachments') 
+          .from('attachments')
           .upload(filePath, logoFile, { upsert: true });
-          
+
         if (uploadError) throw new Error(`Logo Upload Error: ${uploadError.message}`);
-        
+
         const { data: urlData } = supabase.storage.from('attachments').getPublicUrl(filePath);
         logoUrl = urlData.publicUrl;
       }
 
-      const { error } = await supabase.functions.invoke('settings', {
-        body: {
-          method: 'UPDATE_COMPANY',
-          company_id: activeCompany.id,
-          companyData: { 
-            name: values.name, 
-            address: values.address || null,
-            tax_id: values.tax_id || null,
-            default_invoice_notes: values.default_invoice_notes || null,
-            logo_url: logoUrl 
-          },
-        },
+      // Identity fields are NOT written here — Enterprise Master Data owns them.
+      const result = await companyService.updateCompanyProfile(activeCompany.id, {
+        defaultInvoiceNotes: values.default_invoice_notes || null,
+        logoUrl,
       });
-      if (error) throw error;
+      if (!result.success) throw new Error(result.error || 'Failed to update company information.');
     },
     onSuccess: async () => {
       await refreshProfile();
-      showSuccess('Company information updated successfully.');
+      showSuccess('Company branding updated successfully.');
       setLogoFile(null);
     },
     onError: (error: any) => {
@@ -101,13 +96,8 @@ const CompanySettings = () => {
   const deleteMutation = useMutation({
     mutationFn: async () => {
       if (!activeCompany) throw new Error('No active company');
-      const { error } = await supabase.functions.invoke('company-management', {
-        body: {
-          method: 'DELETE',
-          company_id: activeCompany.id,
-        },
-      });
-      if (error) throw error;
+      const result = await companyService.deleteCompany(activeCompany.id);
+      if (!result.success) throw new Error(result.error || 'Failed to delete company.');
     },
     onSuccess: async () => {
       await refreshProfile();
@@ -118,15 +108,52 @@ const CompanySettings = () => {
     },
   });
 
-  const onSubmit = (values: CompanyFormValues) => updateMutation.mutate(values);
+  const onSubmit = (values: CompanyOpsValues) => updateMutation.mutate(values);
   const isOwner = user?.id === activeCompany?.owner_id;
+  const displayName = identity?.name || 'Company';
 
   return (
     <div className="space-y-6">
       <Card>
         <CardHeader>
-          <CardTitle>Company Information</CardTitle>
-          <CardDescription>This information and logo will appear on your invoices.</CardDescription>
+          <CardTitle>Enterprise Identity</CardTitle>
+          <CardDescription>
+            Legal name, addresses, and tax registrations are maintained once in Master Data and
+            consumed across invoices, quotes, financial statements, emails, and reports.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <dl className="grid gap-2 text-sm sm:grid-cols-2">
+            <div>
+              <dt className="text-muted-foreground">Registered name</dt>
+              <dd className="font-medium">{identity?.name || 'Not configured'}</dd>
+            </div>
+            <div>
+              <dt className="text-muted-foreground">Address</dt>
+              <dd className="font-medium whitespace-pre-wrap">{identity?.address || 'Not configured'}</dd>
+            </div>
+            <div>
+              <dt className="text-muted-foreground">Tax ID</dt>
+              <dd className="font-medium">{identity?.taxId || 'Not configured'}</dd>
+            </div>
+            <div>
+              <dt className="text-muted-foreground">Registration number</dt>
+              <dd className="font-medium">{identity?.registrationNumber || 'Not configured'}</dd>
+            </div>
+          </dl>
+          <Button asChild variant="outline" size="sm">
+            <Link to="/settings?tab=master-data&module=company_profile">
+              <Database className="mr-2 h-4 w-4" />
+              Manage in Master Data
+            </Link>
+          </Button>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Branding &amp; Invoice Defaults</CardTitle>
+          <CardDescription>Logo and default invoice notes (operational, not legal identity).</CardDescription>
         </CardHeader>
         <CardContent>
           <Form {...form}>
@@ -137,10 +164,10 @@ const CompanySettings = () => {
                   {previewUrl ? (
                     <div className="relative border rounded-md p-1 h-20 w-20 flex items-center justify-center bg-gray-50">
                       <img src={previewUrl} alt="Logo Preview" className="max-h-full max-w-full object-contain" />
-                      <Button 
-                        type="button" 
-                        variant="destructive" 
-                        size="icon" 
+                      <Button
+                        type="button"
+                        variant="destructive"
+                        size="icon"
                         className="absolute -top-2 -right-2 h-6 w-6 rounded-full"
                         onClick={() => { setLogoFile(null); setPreviewUrl(null); }}
                       >
@@ -153,9 +180,9 @@ const CompanySettings = () => {
                     </div>
                   )}
                   <div className="flex-1">
-                    <Input 
-                      type="file" 
-                      accept="image/*" 
+                    <Input
+                      type="file"
+                      accept="image/*"
                       onChange={handleLogoChange}
                       className="cursor-pointer"
                     />
@@ -164,45 +191,6 @@ const CompanySettings = () => {
                 </div>
               </div>
 
-              <FormField
-                control={form.control}
-                name="name"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Company Name</FormLabel>
-                    <FormControl>
-                      <Input placeholder="Your Company Inc." {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="address"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Company Address</FormLabel>
-                    <FormControl>
-                      <Textarea placeholder="123 Main St, Anytown, USA" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="tax_id"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Tax ID / VAT Number</FormLabel>
-                    <FormControl>
-                      <Input placeholder="e.g., VAT123456789" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
               <FormField
                 control={form.control}
                 name="default_invoice_notes"
@@ -217,7 +205,7 @@ const CompanySettings = () => {
                 )}
               />
               <Button type="submit" disabled={updateMutation.isPending}>
-                {updateMutation.isPending ? 'Saving...' : 'Save Company Info'}
+                {updateMutation.isPending ? 'Saving...' : 'Save Branding'}
               </Button>
             </form>
           </Form>
@@ -243,7 +231,7 @@ const CompanySettings = () => {
                   </AlertDialogTitle>
                   <AlertDialogDescription>
                     This action cannot be undone. This will permanently delete the company
-                    <strong> "{activeCompany?.name}"</strong> and all of its associated data, including accounts, transactions, invoices, and bills.
+                    <strong> "{displayName}"</strong> and all of its associated data, including accounts, transactions, invoices, and bills.
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>

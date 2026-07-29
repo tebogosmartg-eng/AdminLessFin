@@ -9,13 +9,17 @@ import { Calendar as CalendarIcon, Download, Printer } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '../components/ui/popover';
 import { Calendar } from '../components/ui/calendar';
 import { DateRange } from 'react-day-picker';
-import { format, startOfYear, endOfYear, subDays, getYear, set, isBefore } from 'date-fns';
-import { cn, downloadCSV } from '../lib/utils';
-import { formatCurrency } from '../lib/utils';
+import { format, subDays, parseISO } from 'date-fns';
+import { cn, downloadCSV, formatCurrency } from '../lib/utils';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
 import FinancialRatios from '../components/FinancialRatios';
 import { useAuth } from '../contexts/AuthContext';
 import ReportDrilldownDialog from '../components/ReportDrilldownDialog';
+import { useEnterpriseCalendar } from '../hooks/useEnterpriseCalendar';
+import { Badge } from '../components/ui/badge';
+import { isCurrentAssetAccount, isCurrentLiabilityAccount } from '../lib/accounting/accountRoles';
+import { accountsQuery } from '../lib/queries';
+import type { Account } from './ChartOfAccounts';
 
 type AccountBalance = {
   id: string;
@@ -23,6 +27,11 @@ type AccountBalance = {
   name: string;
   type: 'Asset' | 'Liability' | 'Equity' | 'Income' | 'Expense';
   balance: number;
+  category?: string | null;
+  subcategory?: string | null;
+  account_role?: string | null;
+  tax_treatment?: string | null;
+  control_account?: boolean | null;
 };
 
 type AccountActivity = {
@@ -39,25 +48,19 @@ type CashFlowItem = {
 };
 
 const FinancialStatements = () => {
-  const { profile, activeCompany } = useAuth();
+  const { activeCompany } = useAuth();
+  const { startDate, endDate, yearCode } = useEnterpriseCalendar(activeCompany?.id);
   const [date, setDate] = useState<DateRange | undefined>();
   
   // Drilldown state
   const [drilldownAccount, setDrilldownAccount] = useState<{ id: string; name: string } | null>(null);
 
+  // G3.6C — period defaults from Enterprise Financial Calendar (not profile copy).
   useEffect(() => {
-    if (profile?.current_financial_year_start && !date) {
-      const start = new Date(profile.current_financial_year_start);
-      const startYear = getYear(start);
-      const endMonth = (profile.financial_year_end_month || 12) - 1;
-      const endDay = profile.financial_year_end_day || 31;
-      const tempStartDate = set(new Date(0), { month: start.getMonth(), date: start.getDate() });
-      const tempEndDate = set(new Date(0), { month: endMonth, date: endDay });
-      const endYear = isBefore(tempEndDate, tempStartDate) ? startYear + 1 : startYear;
-      const end = set(new Date(0), { year: endYear, month: endMonth, date: endDay });
-      setDate({ from: start, to: end });
+    if (startDate && endDate && !date) {
+      setDate({ from: parseISO(startDate), to: parseISO(endDate) });
     }
-  }, [profile, date]);
+  }, [startDate, endDate, date]);
 
   const fromDate = date?.from;
   const toDate = date?.to;
@@ -81,8 +84,27 @@ const FinancialStatements = () => {
     enabled: !!activeCompany && !!fromDate && !!toDate && !!priorDate,
   });
 
-  const balancesAsOf: AccountBalance[] = reportData?.balancesAsOf || [];
-  const openingBalances: AccountBalance[] = reportData?.openingBalances || [];
+  const { data: coaMeta } = useQuery<Account[]>({
+    ...accountsQuery(activeCompany?.id ?? ''),
+    enabled: !!activeCompany,
+  });
+  const coaById = useMemo(() => new Map((coaMeta ?? []).map((a) => [a.id, a])), [coaMeta]);
+
+  const enrichBalance = (acc: AccountBalance): AccountBalance => {
+    const meta = coaById.get(acc.id);
+    if (!meta) return acc;
+    return {
+      ...acc,
+      category: meta.category ?? acc.category,
+      subcategory: meta.subcategory ?? acc.subcategory,
+      account_role: meta.account_role ?? acc.account_role,
+      tax_treatment: meta.tax_treatment ?? acc.tax_treatment,
+      control_account: meta.control_account ?? acc.control_account,
+    };
+  };
+
+  const balancesAsOf: AccountBalance[] = (reportData?.balancesAsOf || []).map(enrichBalance);
+  const openingBalances: AccountBalance[] = (reportData?.openingBalances || []).map(enrichBalance);
   const periodActivity: AccountActivity[] = reportData?.periodActivity || [];
   const cashFlowData: CashFlowItem[] = reportData?.cashFlowData || [];
 
@@ -112,9 +134,11 @@ const FinancialStatements = () => {
   let totalCredits = 0;
   balancesAsOf?.forEach(acc => {
     if (['Asset', 'Expense'].includes(acc.type)) {
-      acc.balance >= 0 ? (totalDebits += acc.balance) : (totalCredits += -acc.balance);
+      if (acc.balance >= 0) totalDebits += acc.balance;
+      else totalCredits += -acc.balance;
     } else {
-      acc.balance >= 0 ? (totalCredits += acc.balance) : (totalDebits += -acc.balance);
+      if (acc.balance >= 0) totalCredits += acc.balance;
+      else totalDebits += -acc.balance;
     }
   });
 
@@ -126,10 +150,8 @@ const FinancialStatements = () => {
   const totalFinancing = financingActivities.reduce((sum, i) => sum + i.amount, 0);
   const netCashFlow = totalOperating + totalInvesting + totalFinancing;
 
-  const currentAssetKeywords = ['cash', 'bank', 'checking', 'receivable', 'inventory'];
-  const currentLiabilityKeywords = ['payable', 'credit card'];
-  const currentAssets = assetAccounts.filter(a => currentAssetKeywords.some(k => a.name.toLowerCase().includes(k))).reduce((sum, a) => sum + a.balance, 0);
-  const currentLiabilities = liabilityAccounts.filter(l => currentLiabilityKeywords.some(k => l.name.toLowerCase().includes(k))).reduce((sum, l) => sum + l.balance, 0);
+  const currentAssets = assetAccounts.filter((a) => isCurrentAssetAccount(a)).reduce((sum, a) => sum + a.balance, 0);
+  const currentLiabilities = liabilityAccounts.filter((l) => isCurrentLiabilityAccount(l)).reduce((sum, l) => sum + l.balance, 0);
   
   const ratios = {
     currentRatio: currentLiabilities > 0 ? currentAssets / currentLiabilities : null,
@@ -187,6 +209,11 @@ const FinancialStatements = () => {
     <div className="space-y-6">
       <div className="flex justify-between items-center print:hidden">
         <h1 className="text-3xl font-bold">Financial Statements</h1>
+        {yearCode && (
+          <Badge variant="outline" className="ml-2 align-middle">
+            Calendar {yearCode}
+          </Badge>
+        )}
         <div className="flex items-center gap-2">
           <Popover>
             <PopoverTrigger asChild>

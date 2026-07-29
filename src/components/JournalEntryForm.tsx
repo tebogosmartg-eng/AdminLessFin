@@ -37,6 +37,7 @@ import { Vendor } from '../pages/Vendors';
 import { Customer } from '../pages/Customers';
 import { Trash2, X, Sparkles, Loader2 } from 'lucide-react';
 import { formatCurrency } from '../lib/utils';
+import { accountsQuery, customersQuery, vendorsQuery } from '../lib/queries';
 
 const journalEntryItemSchema = z.object({
   account_id: z.string().min(1, "Account is required."),
@@ -143,9 +144,9 @@ const JournalEntryForm = ({ isOpen, setIsOpen, entryId }: JournalEntryFormProps)
     name: "items",
   });
 
-  const { data: accounts } = useQuery<Account[]>({ queryKey: ['accounts', activeCompany?.id], enabled: !!activeCompany });
-  const { data: vendors } = useQuery<Vendor[]>({ queryKey: ['vendors', activeCompany?.id], enabled: !!activeCompany });
-  const { data: customers } = useQuery<Customer[]>({ queryKey: ['customers', activeCompany?.id], enabled: !!activeCompany });
+  const { data: accounts } = useQuery<Account[]>({ ...accountsQuery(activeCompany!.id), enabled: !!activeCompany });
+  const { data: vendors } = useQuery<Vendor[]>({ ...vendorsQuery(activeCompany!.id), enabled: !!activeCompany });
+  const { data: customers } = useQuery<Customer[]>({ ...customersQuery(activeCompany!.id), enabled: !!activeCompany });
 
   const handleMagicFill = async () => {
     if (!aiPrompt.trim()) return;
@@ -168,8 +169,9 @@ const JournalEntryForm = ({ isOpen, setIsOpen, entryId }: JournalEntryFormProps)
         }
         showSuccess("Magic Fill applied!");
       }
-    } catch (err: any) {
-      showError(err.message.includes('OPENAI') ? 'AI is not configured yet. Set OPENAI_API_KEY.' : err.message);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Failed to generate journal suggestion';
+      showError(message.includes('OPENAI') ? 'AI is not configured yet. Set OPENAI_API_KEY.' : message);
     } finally {
       setIsMagicLoading(false);
     }

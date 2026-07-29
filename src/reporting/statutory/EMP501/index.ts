@@ -1,0 +1,1 @@
+export { statutoryRunsFromFacts } from '../index';

@@ -41,6 +41,7 @@ const employeeSchema = z.object({
   id_number: z.string().optional(),
   tax_number: z.string().optional(),
   bank_name: z.string().optional(),
+  bank_branch_code: z.string().optional(),
   bank_account_number: z.string().optional(),
   employment_type: z.enum(['permanent', 'contract', 'intern', 'casual']),
   department: z.string().optional(),
@@ -75,6 +76,7 @@ const EmployeeForm = ({ isOpen, setIsOpen, employee }: EmployeeFormProps) => {
         id_number: employee.id_number || '',
         tax_number: employee.tax_number || '',
         bank_name: employee.bank_name || '',
+        bank_branch_code: employee.bank_branch_code || '',
         bank_account_number: employee.bank_account_number || '',
         department: employee.department || '',
         position: employee.position || '',
@@ -91,6 +93,7 @@ const EmployeeForm = ({ isOpen, setIsOpen, employee }: EmployeeFormProps) => {
         id_number: '',
         tax_number: '',
         bank_name: '',
+        bank_branch_code: '',
         bank_account_number: '',
         employment_type: 'permanent',
         department: '',
@@ -145,8 +148,18 @@ const EmployeeForm = ({ isOpen, setIsOpen, employee }: EmployeeFormProps) => {
       <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
         <DialogHeader>
           <DialogTitle>{employee ? 'Edit Employee' : 'Add New Employee'}</DialogTitle>
-          <DialogDescription>Enter the employee's details below.</DialogDescription>
+          <DialogDescription>
+            {employee
+              ? `Employee number ${employee.employee_number} is permanent and cannot be changed.`
+              : 'Enter the employee\'s details below. An employee number will be assigned automatically.'}
+          </DialogDescription>
         </DialogHeader>
+        {employee && (
+          <div className="rounded-md border bg-muted/40 px-3 py-2 text-sm">
+            <span className="text-muted-foreground">Employee Number: </span>
+            <span className="font-mono font-medium">{employee.employee_number}</span>
+          </div>
+        )}
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 overflow-y-auto pr-6 flex-1">
             <fieldset className="grid grid-cols-1 md:grid-cols-2 gap-4 border p-4 rounded-md">
@@ -224,6 +237,9 @@ const EmployeeForm = ({ isOpen, setIsOpen, employee }: EmployeeFormProps) => {
               <legend className="text-sm font-medium px-1">Bank Details</legend>
               <FormField control={form.control} name="bank_name" render={({ field }) => (
                 <FormItem><FormLabel>Bank Name</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
+              )} />
+              <FormField control={form.control} name="bank_branch_code" render={({ field }) => (
+                <FormItem><FormLabel>Branch Code</FormLabel><FormControl><Input {...field} placeholder="e.g. 250655" /></FormControl><FormMessage /></FormItem>
               )} />
               <FormField control={form.control} name="bank_account_number" render={({ field }) => (
                 <FormItem><FormLabel>Account Number</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>

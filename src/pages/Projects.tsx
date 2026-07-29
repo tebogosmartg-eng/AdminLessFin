@@ -11,7 +11,11 @@ import {
   TableRow,
 } from '../components/ui/table';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/card';
-import { PlusCircle, MoreHorizontal } from 'lucide-react';
+import { PlusCircle, MoreHorizontal, Briefcase } from 'lucide-react';
+import { EmptyState } from '../components/EmptyState';
+import { Skeleton } from '../components/ui/skeleton';
+import { statusBadgeVariant } from '../lib/utils';
+import { useDocumentTitle } from '../hooks/useDocumentTitle';
 import { showError, showSuccess } from '../utils/toast';
 import ProjectForm from '../components/ProjectForm';
 import {
@@ -36,6 +40,7 @@ export type Project = {
 };
 
 const Projects = () => {
+  useDocumentTitle('Engagements');
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [selectedProject, setSelectedProject] = useState<Project | undefined>(undefined);
   const { activeCompany } = useAuth();
@@ -98,8 +103,10 @@ const Projects = () => {
         <CardHeader>
           <div className="flex flex-row items-center justify-between">
             <div>
-              <CardTitle>Projects</CardTitle>
-              <CardDescription>Manage your projects and track time against them.</CardDescription>
+              <CardTitle>Engagements</CardTitle>
+              <CardDescription>
+                Billable customer engagements (invoicing, rates, GL profitability). Operational delivery projects live under Work Management → Projects.
+              </CardDescription>
             </div>
             <Button onClick={handleAddNew}>
               <PlusCircle className="mr-2 h-4 w-4" />
@@ -119,16 +126,18 @@ const Projects = () => {
             </TableHeader>
             <TableBody>
               {isLoading ? (
-                <TableRow>
-                  <TableCell colSpan={4} className="text-center">Loading projects...</TableCell>
-                </TableRow>
+                Array.from({ length: 5 }).map((_, i) => (
+                  <TableRow key={`skeleton-${i}`}>
+                    <TableCell colSpan={4}><Skeleton className="h-6 w-full" /></TableCell>
+                  </TableRow>
+                ))
               ) : projects && projects.length > 0 ? (
                 projects.map((project) => (
                   <TableRow key={project.id} className="cursor-pointer" onClick={() => navigate(`/projects/${project.id}`)}>
                     <TableCell className="font-medium">{project.name}</TableCell>
                     <TableCell>{project.customers?.name || 'N/A'}</TableCell>
-                    <TableCell><Badge variant="outline" className="capitalize">{project.status}</Badge></TableCell>
-                    <TableCell>
+                    <TableCell><Badge variant={statusBadgeVariant(project.status)} className="capitalize">{project.status}</Badge></TableCell>
+                    <TableCell onClick={(e) => e.stopPropagation()}>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                           <Button variant="ghost" className="h-8 w-8 p-0" onClick={(e) => e.stopPropagation()}>
@@ -147,7 +156,14 @@ const Projects = () => {
                 ))
               ) : (
                 <TableRow>
-                  <TableCell colSpan={4} className="text-center">No projects found. Add one to get started.</TableCell>
+                  <TableCell colSpan={4} className="p-0">
+                    <EmptyState
+                      icon={Briefcase}
+                      title="No projects yet"
+                      description="Create a project to track time, costs and profitability against a customer."
+                      action={<Button onClick={handleAddNew}><PlusCircle className="mr-2 h-4 w-4" /> New Project</Button>}
+                    />
+                  </TableCell>
                 </TableRow>
               )}
             </TableBody>

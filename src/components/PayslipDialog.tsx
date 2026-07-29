@@ -3,7 +3,7 @@ import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { supabase } from '../integrations/supabase/client';
+import { invokePayroll } from '../lib/payrollOperations';
 import { Button } from './ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from './ui/dialog';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from './ui/form';
@@ -27,6 +27,12 @@ const payslipSchema = z.object({
 
 type PayslipFormValues = z.infer<typeof payslipSchema>;
 
+type PayslipEditData = {
+  payroll_run_id: string;
+  payslip_items: { description: string; type: 'earning' | 'deduction'; amount: number }[];
+  employees: { first_name: string; last_name: string };
+};
+
 interface PayslipDialogProps {
   isOpen: boolean;
   setIsOpen: (isOpen: boolean) => void;
@@ -45,15 +51,11 @@ const PayslipDialog = ({ isOpen, setIsOpen, payslipId }: PayslipDialogProps) => 
     queryKey: ['payslip_detail', payslipId],
     queryFn: async () => {
       if (!activeCompany) return null;
-      const { data, error } = await supabase.functions.invoke('payroll', {
-        body: {
-          method: 'GET_PAYSLIP_DETAIL',
-          company_id: activeCompany.id,
-          payslipId: payslipId,
-        },
+      return invokePayroll<PayslipEditData>({
+        method: 'GET_PAYSLIP_DETAIL',
+        company_id: activeCompany.id,
+        payslipId: payslipId,
       });
-      if (error) throw error;
-      return data;
     },
     enabled: isOpen && !!activeCompany,
   });
@@ -71,15 +73,12 @@ const PayslipDialog = ({ isOpen, setIsOpen, payslipId }: PayslipDialogProps) => 
   const mutation = useMutation({
     mutationFn: async (values: PayslipFormValues) => {
       if (!activeCompany) throw new Error('No active company');
-      const { error } = await supabase.functions.invoke('payroll', {
-        body: {
-          method: 'UPDATE_PAYSLIP',
-          company_id: activeCompany.id,
-          payslipId: payslipId,
-          items: values.items,
-        },
+      await invokePayroll({
+        method: 'UPDATE_PAYSLIP',
+        company_id: activeCompany.id,
+        payslipId: payslipId,
+        items: values.items,
       });
-      if (error) throw error;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['payroll_run_detail', payslipData.payroll_run_id] });

@@ -9,9 +9,11 @@ import { Input } from './ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Skeleton } from './ui/skeleton';
 import { formatCurrency } from '../lib/utils';
+import { accountsQuery } from '../lib/queries';
 import { showError, showSuccess } from '../utils/toast';
 import { Account } from '../pages/ChartOfAccounts';
 import { format } from 'date-fns';
+import { findAccountsByRole } from '../lib/accounting/accountRoles';
 
 interface AllocateVendorCreditDialogProps {
   isOpen: boolean;
@@ -66,11 +68,11 @@ const AllocateVendorCreditDialog = ({ isOpen, setIsOpen, vendorCredit }: Allocat
   });
 
   const { data: accounts } = useQuery<Account[]>({ 
-    queryKey: ['accounts', activeCompany?.id],
+    ...accountsQuery(activeCompany!.id),
     enabled: !!activeCompany
   });
   
-  const apAccounts = accounts?.filter(a => a.type === 'Liability' && a.name.toLowerCase().includes('payable'));
+  const apAccounts = findAccountsByRole(accounts?.filter((a) => a.type === 'Liability'), 'trade_payable');
 
   const mutation = useMutation({
     mutationFn: async () => {

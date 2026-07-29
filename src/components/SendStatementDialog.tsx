@@ -15,6 +15,7 @@ import { Textarea } from './ui/textarea';
 import { Label } from './ui/label';
 import { showError, showSuccess } from '../utils/toast';
 import { useAuth } from '../contexts/AuthContext';
+import { useEnterpriseIdentity } from '../hooks/useEnterpriseIdentity';
 import { format } from 'date-fns';
 
 interface SendStatementDialogProps {
@@ -32,17 +33,19 @@ interface SendStatementDialogProps {
 
 const SendStatementDialog = ({ isOpen, setIsOpen, entity, type, dateFrom, dateTo }: SendStatementDialogProps) => {
   const { activeCompany } = useAuth();
+  const { identity } = useEnterpriseIdentity(activeCompany?.id);
   const [to, setTo] = useState('');
   const [subject, setSubject] = useState('');
   const [body, setBody] = useState('');
 
   useEffect(() => {
     if (entity && activeCompany) {
+      const companyName = identity?.name || 'Your Company';
       setTo(entity.email || '');
-      setSubject(`Statement of Account: ${activeCompany.name}`);
-      setBody(`Dear ${entity.name},\n\nPlease find attached your statement of account for the period ${format(new Date(dateFrom), 'PP')} to ${format(new Date(dateTo), 'PP')}.\n\nIf you have any questions, please don't hesitate to contact us.\n\nBest regards,\n${activeCompany.name}`);
+      setSubject(`Statement of Account: ${companyName}`);
+      setBody(`Dear ${entity.name},\n\nPlease find attached your statement of account for the period ${format(new Date(dateFrom), 'PP')} to ${format(new Date(dateTo), 'PP')}.\n\nIf you have any questions, please don't hesitate to contact us.\n\nBest regards,\n${companyName}`);
     }
-  }, [entity, activeCompany, dateFrom, dateTo, isOpen]);
+  }, [entity, activeCompany, identity?.name, dateFrom, dateTo, isOpen]);
 
   const sendEmailMutation = useMutation({
     mutationFn: async () => {

@@ -16,6 +16,11 @@ import { Alert, AlertDescription } from './ui/alert';
 import { Textarea } from './ui/textarea';
 import { formatCurrency } from '../lib/utils';
 import { ChevronDown, ChevronUp } from 'lucide-react';
+import {
+  findAccountByRole,
+  findCashEquivalentAccounts,
+  resolveControlAccounts,
+} from '../lib/accounting/accountRoles';
 
 const paymentSchema = z.object({
   payment_date: z.string().min(1, "Date is required."),
@@ -83,21 +88,21 @@ const BillPaymentForm = ({ isOpen, setIsOpen, vendorId, vendorName, amountDue, b
     }
   }, [isOpen, amountDue, vendorName, form]);
 
-  // Smart Defaults: Auto-select bank and AP accounts
+  // Smart Defaults: resolve bank + AP via account_role / cash-equivalent subcategory
   useEffect(() => {
     if (isOpen && accounts) {
-      const bankAcc = assetAccounts?.find(a => a.name.toLowerCase().includes('bank') || a.name.toLowerCase().includes('checking') || a.name.toLowerCase().includes('cash')) 
-        || assetAccounts?.[0];
-      const apAcc = apAccounts?.find(a => a.name.toLowerCase().includes('payable'));
+      const cashAccounts = findCashEquivalentAccounts(assetAccounts);
+      const bankAcc = cashAccounts[0] || assetAccounts?.[0];
+      const controls = resolveControlAccounts(accounts);
       
       if (bankAcc && !form.getValues('payment_account_id')) {
           form.setValue('payment_account_id', bankAcc.id);
       }
-      if (apAcc && !form.getValues('accounts_payable_id')) {
-          form.setValue('accounts_payable_id', apAcc.id);
+      if (controls.ap && !form.getValues('accounts_payable_id')) {
+          form.setValue('accounts_payable_id', controls.ap.id);
       }
     }
-  }, [isOpen, accounts, assetAccounts, apAccounts, form]);
+  }, [isOpen, accounts, assetAccounts, form]);
 
   const mutation = useMutation({
     mutationFn: async (values: PaymentFormValues) => {
@@ -127,7 +132,7 @@ const BillPaymentForm = ({ isOpen, setIsOpen, vendorId, vendorName, amountDue, b
 
   const onSubmit = (values: PaymentFormValues) => mutation.mutate(values);
 
-  const apAccountsList = apAccounts?.filter(a => a.name.toLowerCase().includes('payable'));
+  const apAccountsList = apAccounts?.filter((a) => !!findAccountByRole([a], 'trade_payable'));
 
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>

@@ -4,7 +4,11 @@ import { supabase } from '../integrations/supabase/client';
 import { Button } from '../components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/table';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/card';
-import { PlusCircle, MoreHorizontal } from 'lucide-react';
+import { PlusCircle, MoreHorizontal, ShoppingBag } from 'lucide-react';
+import { EmptyState } from '../components/EmptyState';
+import { useDocumentTitle } from '../hooks/useDocumentTitle';
+import { Skeleton } from '../components/ui/skeleton';
+import { statusBadgeVariant } from '../lib/utils';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "../components/ui/dropdown-menu";
 import { Badge } from '../components/ui/badge';
 import { useAuth } from '../contexts/AuthContext';
@@ -15,6 +19,7 @@ import { showSuccess, showError } from '../utils/toast';
 import { useNavigate } from 'react-router-dom';
 
 const PurchaseOrders = () => {
+  useDocumentTitle('Purchase Orders');
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [selectedId, setSelectedId] = useState<string | undefined>(undefined);
   const { activeCompany } = useAuth();
@@ -22,7 +27,7 @@ const PurchaseOrders = () => {
   const navigate = useNavigate();
 
   const { data: pos, isLoading } = useQuery<any[]>({
-    ...purchaseOrdersQuery(activeCompany?.id!),
+    ...purchaseOrdersQuery(activeCompany!.id),
     enabled: !!activeCompany,
   });
 
@@ -79,7 +84,11 @@ const PurchaseOrders = () => {
             </TableHeader>
             <TableBody>
               {isLoading ? (
-                <TableRow><TableCell colSpan={6} className="text-center">Loading...</TableCell></TableRow>
+                Array.from({ length: 5 }).map((_, i) => (
+                  <TableRow key={`skeleton-${i}`}>
+                    <TableCell colSpan={6}><Skeleton className="h-6 w-full" /></TableCell>
+                  </TableRow>
+                ))
               ) : pos && pos.length > 0 ? (
                 pos.map((po) => (
                   <TableRow key={po.id} className="cursor-pointer" onClick={() => navigate(`/purchase-orders/${po.id}`)}>
@@ -87,7 +96,7 @@ const PurchaseOrders = () => {
                     <TableCell>{po.vendors?.name}</TableCell>
                     <TableCell>{format(new Date(po.po_date), 'PPP')}</TableCell>
                     <TableCell>{po.delivery_date ? format(new Date(po.delivery_date), 'PPP') : '-'}</TableCell>
-                    <TableCell><Badge variant={po.status === 'billed' ? 'default' : (po.status === 'draft' ? 'outline' : 'secondary')}>{po.status}</Badge></TableCell>
+                    <TableCell><Badge variant={statusBadgeVariant(po.status)} className="capitalize">{po.status}</Badge></TableCell>
                     <TableCell>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
@@ -103,7 +112,16 @@ const PurchaseOrders = () => {
                   </TableRow>
                 ))
               ) : (
-                <TableRow><TableCell colSpan={6} className="text-center">No purchase orders found.</TableCell></TableRow>
+                <TableRow>
+                  <TableCell colSpan={6} className="p-0">
+                    <EmptyState
+                      icon={ShoppingBag}
+                      title="No purchase orders yet"
+                      description="Create a purchase order to formalise what you're buying and convert it to a bill on delivery."
+                      action={<Button onClick={handleAddNew}><PlusCircle className="mr-2 h-4 w-4" /> New Purchase Order</Button>}
+                    />
+                  </TableCell>
+                </TableRow>
               )}
             </TableBody>
           </Table>

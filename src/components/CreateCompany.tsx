@@ -2,12 +2,12 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useMutation } from '@tanstack/react-query';
-import { supabase } from '../integrations/supabase/client';
 import { useAuth } from '../contexts/AuthContext';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/card';
-import { Button } from '../components/ui/button';
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '../components/ui/form';
-import { Input } from '../components/ui/input';
+import { companyService } from '@/governance/domains/company/service';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from './ui/card';
+import { Button } from './ui/button';
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from './ui/form';
+import { Input } from './ui/input';
 import { showError, showSuccess } from '../utils/toast';
 import { useNavigate } from 'react-router-dom';
 
@@ -16,6 +16,7 @@ const companySchema = z.object({
 });
 type CompanyFormValues = z.infer<typeof companySchema>;
 
+/** Orphan duplicate of pages/CreateCompany — kept in sync for G3.5 (router uses pages/). */
 const CreateCompany = () => {
   const { user, switchCompany } = useAuth();
   const navigate = useNavigate();
@@ -24,17 +25,10 @@ const CreateCompany = () => {
   });
 
   const mutation = useMutation({
+    // Phase G3.5 — company CREATE resolves through Governance Company Service.
     mutationFn: async (values: CompanyFormValues) => {
       if (!user) throw new Error('User not authenticated');
-
-      const { data, error } = await supabase.functions.invoke('company-management', {
-        body: {
-          method: 'CREATE',
-          companyData: { name: values.name },
-        },
-      });
-
-      if (error) throw error;
+      const data = await companyService.createCompany(values.name);
       return data.id;
     },
     onSuccess: async (newCompanyId) => {
@@ -42,7 +36,8 @@ const CreateCompany = () => {
       showSuccess('Company created successfully!');
       navigate('/');
     },
-    onError: (error: any) => showError(error.message),
+    onError: (error: unknown) =>
+      showError(error instanceof Error ? error.message : String(error)),
   });
 
   return (

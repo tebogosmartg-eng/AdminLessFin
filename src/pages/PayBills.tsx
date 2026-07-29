@@ -32,10 +32,11 @@ const PayBills = () => {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [selectedPayment, setSelectedPayment] = useState<SelectedPayment | null>(null);
   const { activeCompany } = useAuth();
+  const companyId = activeCompany?.id;
 
   const { data: vendors, isLoading } = useQuery<VendorBalance[]>({
-    ...vendorBalancesQuery(activeCompany?.id!),
-    enabled: !!activeCompany,
+    ...vendorBalancesQuery(companyId ?? ''),
+    enabled: !!companyId,
   });
 
   const handleRecordPayment = (vendor: VendorBalance) => {

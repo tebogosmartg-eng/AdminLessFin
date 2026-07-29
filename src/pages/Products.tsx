@@ -12,6 +12,11 @@ import {
 } from '../components/ui/table';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/card';
 import { PlusCircle, MoreHorizontal, Download, PackageOpen, History } from 'lucide-react';
+import { EmptyState } from '../components/EmptyState';
+import { useDocumentTitle } from '../hooks/useDocumentTitle';
+import { useSortableData } from '../hooks/useSortableData';
+import { SortableHeader } from '../components/SortableHeader';
+import { Skeleton } from '../components/ui/skeleton';
 import { showError, showSuccess } from '../utils/toast';
 import ProductForm from '../components/ProductForm';
 import InventoryAdjustmentDialog from '../components/InventoryAdjustmentDialog';
@@ -43,6 +48,7 @@ export type Product = {
 };
 
 const Products = () => {
+  useDocumentTitle('Products & Services');
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [isAdjustmentOpen, setIsAdjustmentOpen] = useState(false);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
@@ -51,8 +57,19 @@ const Products = () => {
   const queryClient = useQueryClient();
 
   const { data: products, isLoading } = useQuery<Product[]>({
-    ...productsQuery(activeCompany?.id!),
+    ...productsQuery(activeCompany!.id),
     enabled: !!activeCompany,
+  });
+
+  const { items: sortedProducts, sort, requestSort } = useSortableData(products ?? [], (p, key) => {
+    switch (key) {
+      case 'quantity_on_hand': return p.type === 'inventory' ? p.quantity_on_hand : null;
+      case 'price': return p.price ?? null;
+      case 'cost': return p.cost ?? null;
+      case 'income_account': return p.income_account?.name ?? '';
+      case 'cogs_account': return p.cogs_account?.name ?? '';
+      default: return (p as unknown as Record<string, string>)[key];
+    }
   });
 
   const deleteMutation = useMutation({
@@ -139,21 +156,25 @@ const Products = () => {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Name</TableHead>
-                <TableHead>Type</TableHead>
-                <TableHead>Qty on Hand</TableHead>
-                <TableHead className="text-right">Sale Price</TableHead>
-                <TableHead className="text-right">Cost</TableHead>
-                <TableHead>Income Account</TableHead>
-                <TableHead>COGS Account</TableHead>
+                <SortableHeader sortKey="name" sort={sort} onSort={requestSort}>Name</SortableHeader>
+                <SortableHeader sortKey="type" sort={sort} onSort={requestSort}>Type</SortableHeader>
+                <SortableHeader sortKey="quantity_on_hand" sort={sort} onSort={requestSort}>Qty on Hand</SortableHeader>
+                <SortableHeader sortKey="price" sort={sort} onSort={requestSort} align="right">Sale Price</SortableHeader>
+                <SortableHeader sortKey="cost" sort={sort} onSort={requestSort} align="right">Cost</SortableHeader>
+                <SortableHeader sortKey="income_account" sort={sort} onSort={requestSort}>Income Account</SortableHeader>
+                <SortableHeader sortKey="cogs_account" sort={sort} onSort={requestSort}>COGS Account</SortableHeader>
                 <TableHead className="w-[50px]"></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {isLoading ? (
-                <TableRow><TableCell colSpan={8} className="text-center">Loading items...</TableCell></TableRow>
+                Array.from({ length: 5 }).map((_, i) => (
+                  <TableRow key={`skeleton-${i}`}>
+                    <TableCell colSpan={8}><Skeleton className="h-6 w-full" /></TableCell>
+                  </TableRow>
+                ))
               ) : products && products.length > 0 ? (
-                products.map((product) => (
+                sortedProducts.map((product) => (
                   <TableRow key={product.id}>
                     <TableCell className="font-medium">{product.name}</TableCell>
                     <TableCell className="capitalize">{product.type}</TableCell>
@@ -186,7 +207,16 @@ const Products = () => {
                   </TableRow>
                 ))
               ) : (
-                <TableRow><TableCell colSpan={8} className="text-center">No items found. Add one to get started.</TableCell></TableRow>
+                <TableRow>
+                  <TableCell colSpan={8} className="p-0">
+                    <EmptyState
+                      icon={PackageOpen}
+                      title="No products or services yet"
+                      description="Add the items you sell to speed up invoicing and keep inventory and valuations accurate."
+                      action={<Button onClick={handleAddNew}><PlusCircle className="mr-2 h-4 w-4" /> New Item</Button>}
+                    />
+                  </TableCell>
+                </TableRow>
               )}
             </TableBody>
           </Table>

@@ -50,6 +50,7 @@ interface AccountFormProps {
 const AccountForm = ({ isOpen, setIsOpen, account }: AccountFormProps) => {
   const { activeCompany } = useAuth();
   const queryClient = useQueryClient();
+  const isSystemAccount = !!account?.system_account;
   const form = useForm<AccountFormValues>({
     resolver: zodResolver(accountSchema),
     defaultValues: {
@@ -133,7 +134,11 @@ const AccountForm = ({ isOpen, setIsOpen, account }: AccountFormProps) => {
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Account Type</FormLabel>
-                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                  <Select
+                    onValueChange={field.onChange}
+                    defaultValue={field.value}
+                    disabled={isSystemAccount}
+                  >
                     <FormControl>
                       <SelectTrigger>
                         <SelectValue placeholder="Select an account type" />
@@ -147,6 +152,11 @@ const AccountForm = ({ isOpen, setIsOpen, account }: AccountFormProps) => {
                       <SelectItem value="Expense">Expense</SelectItem>
                     </SelectContent>
                   </Select>
+                  {isSystemAccount ? (
+                    <p className="text-xs text-muted-foreground">
+                      System account type is locked. You can still rename or update the description.
+                    </p>
+                  ) : null}
                   <FormMessage />
                 </FormItem>
               )}

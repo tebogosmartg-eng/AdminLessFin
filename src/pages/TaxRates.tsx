@@ -36,7 +36,7 @@ const TaxRates = () => {
   const queryClient = useQueryClient();
 
   const { data: taxRates, isLoading } = useQuery<TaxRate[]>({
-    ...taxRatesQuery(activeCompany?.id!),
+    ...taxRatesQuery(activeCompany!.id),
     enabled: !!activeCompany,
   });
 

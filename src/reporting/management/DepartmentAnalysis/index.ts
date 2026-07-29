@@ -1,0 +1,1 @@
+export { buildManagementReportsFromFacts } from '../index';

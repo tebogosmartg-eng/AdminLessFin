@@ -16,6 +16,11 @@ import { Alert, AlertDescription } from './ui/alert';
 import { Textarea } from './ui/textarea';
 import { formatCurrency } from '../lib/utils';
 import { ChevronDown, ChevronUp } from 'lucide-react';
+import {
+  findAccountByRole,
+  findCashEquivalentAccounts,
+  resolveControlAccounts,
+} from '../lib/accounting/accountRoles';
 
 const paymentSchema = z.object({
   payment_date: z.string().min(1, "Date is required."),
@@ -57,7 +62,7 @@ const ReceivePaymentForm = ({ isOpen, setIsOpen, customerId, customerName, amoun
       if (!activeCompany) return [];
       const { data, error } = await supabase.from('chart_of_accounts').select('*').eq('type', 'Asset').eq('company_id', activeCompany.id);
       if (error) throw error;
-      return data;
+      return (data ?? []).map((row) => ({ ...row, balance: 0 })) as Account[];
     },
     enabled: !!activeCompany,
   });
@@ -75,16 +80,15 @@ const ReceivePaymentForm = ({ isOpen, setIsOpen, customerId, customerName, amoun
     }
   }, [isOpen, amountDue, customerName, form]);
 
-  // Smart Defaults: Auto-select bank and AR accounts
+  // Smart Defaults: resolve deposit + AR via account_role / cash-equivalent subcategory
   useEffect(() => {
     if (isOpen && assetAccounts) {
-      const arAcc = assetAccounts.find(a => a.name.toLowerCase().includes('receivable'));
-      // Prefer checking/bank account over generic assets
-      const bankAcc = assetAccounts.find(a => a.name.toLowerCase().includes('bank') || a.name.toLowerCase().includes('checking') || a.name.toLowerCase().includes('cash')) 
-        || assetAccounts.find(a => !a.name.toLowerCase().includes('receivable'));
+      const controls = resolveControlAccounts(assetAccounts);
+      const cashAccounts = findCashEquivalentAccounts(assetAccounts);
+      const bankAcc = cashAccounts[0] || assetAccounts.find((a) => a.account_role !== 'trade_receivable');
 
-      if (arAcc && !form.getValues('accounts_receivable_id')) {
-          form.setValue('accounts_receivable_id', arAcc.id);
+      if (controls.ar && !form.getValues('accounts_receivable_id')) {
+          form.setValue('accounts_receivable_id', controls.ar.id);
       }
       if (bankAcc && !form.getValues('deposit_account_id')) {
           form.setValue('deposit_account_id', bankAcc.id);
@@ -118,8 +122,8 @@ const ReceivePaymentForm = ({ isOpen, setIsOpen, customerId, customerName, amoun
 
   const onSubmit = (values: PaymentFormValues) => mutation.mutate(values);
 
-  const bankAccountsList = assetAccounts?.filter(a => !a.name.toLowerCase().includes('receivable'));
-  const arAccountsList = assetAccounts?.filter(a => a.name.toLowerCase().includes('receivable'));
+  const arAccountsList = assetAccounts?.filter((a) => a.account_role === 'trade_receivable' || findAccountByRole([a], 'trade_receivable'));
+  const bankAccountsList = assetAccounts?.filter((a) => !arAccountsList?.some((ar) => ar.id === a.id));
 
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>

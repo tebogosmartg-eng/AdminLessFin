@@ -20,7 +20,7 @@ const RecurringInvoices = () => {
   const queryClient = useQueryClient();
 
   const { data: profiles, isLoading } = useQuery<any[]>({
-    ...recurringInvoicesQuery(activeCompany?.id!),
+    ...recurringInvoicesQuery(activeCompany!.id),
     enabled: !!activeCompany,
   });
 

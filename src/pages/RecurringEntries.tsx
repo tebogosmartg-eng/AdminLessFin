@@ -27,7 +27,7 @@ const RecurringEntries = () => {
   const { activeCompany } = useAuth();
 
   const { data: entries, isLoading } = useQuery<RecurringEntry[]>({
-    ...recurringEntriesQuery(activeCompany?.id!),
+    ...recurringEntriesQuery(activeCompany!.id),
     enabled: !!activeCompany,
   });
 

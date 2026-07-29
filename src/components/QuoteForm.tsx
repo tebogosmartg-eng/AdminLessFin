@@ -5,6 +5,7 @@ import { z } from 'zod';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../integrations/supabase/client';
 import { useAuth } from '../contexts/AuthContext';
+import { useEnterpriseIdentity } from '../hooks/useEnterpriseIdentity';
 import { Button } from './ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from './ui/dialog';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from './ui/form';
@@ -21,7 +22,7 @@ import { addDays, format } from 'date-fns';
 import { formatCurrency } from '../lib/utils';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from './ui/sheet';
 import QuotePreview from './QuotePreview';
-import { taxRatesQuery } from '../lib/queries';
+import { taxRatesQuery, accountsQuery, customersQuery, productsQuery } from '../lib/queries';
 
 const quoteItemSchema = z.object({
   product_id: z.string().optional(),
@@ -52,6 +53,7 @@ interface QuoteFormProps {
 
 const QuoteForm = ({ isOpen, setIsOpen, quoteId, duplicateFromId }: QuoteFormProps) => {
   const { activeCompany } = useAuth();
+  const { companyProp: enterpriseIdentity } = useEnterpriseIdentity(activeCompany?.id);
   const queryClient = useQueryClient();
   const isEditing = !!quoteId;
   const isDuplicating = !!duplicateFromId;
@@ -122,10 +124,10 @@ const QuoteForm = ({ isOpen, setIsOpen, quoteId, duplicateFromId }: QuoteFormPro
 
   const { fields, append, remove } = useFieldArray({ control: form.control, name: "items" });
 
-  const { data: customers } = useQuery<Customer[]>({ queryKey: ['customers', activeCompany?.id] });
-  const { data: products } = useQuery<Product[]>({ queryKey: ['products', activeCompany?.id] });
-  const { data: accounts } = useQuery<Account[]>({ queryKey: ['accounts', activeCompany?.id] });
-  const { data: taxRates } = useQuery<TaxRate[]>({ ...taxRatesQuery(activeCompany?.id!), enabled: !!activeCompany });
+  const { data: customers } = useQuery<Customer[]>({ ...customersQuery(activeCompany!.id), enabled: !!activeCompany });
+  const { data: products } = useQuery<Product[]>({ ...productsQuery(activeCompany!.id), enabled: !!activeCompany });
+  const { data: accounts } = useQuery<Account[]>({ ...accountsQuery(activeCompany!.id), enabled: !!activeCompany });
+  const { data: taxRates } = useQuery<TaxRate[]>({ ...taxRatesQuery(activeCompany!.id), enabled: !!activeCompany });
   const incomeAccounts = accounts?.filter(a => a.type === 'Income');
 
   const handleProductSelect = (productId: string, index: number) => {
@@ -247,7 +249,7 @@ const QuoteForm = ({ isOpen, setIsOpen, quoteId, duplicateFromId }: QuoteFormPro
             <QuotePreview
                 formData={watchedValues}
                 customers={customers}
-                company={activeCompany}
+                company={enterpriseIdentity ? { ...enterpriseIdentity, logo_url: activeCompany?.logo_url } : null}
                 taxRates={taxRates}
             />
         </SheetContent>

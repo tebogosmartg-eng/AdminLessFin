@@ -4,7 +4,10 @@ import { supabase } from '../integrations/supabase/client';
 import { Button } from '../components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/table';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/card';
-import { PlusCircle, MoreHorizontal, CheckCircle, DollarSign, Paperclip } from 'lucide-react';
+import { PlusCircle, MoreHorizontal, CheckCircle, DollarSign, Paperclip, Coins } from 'lucide-react';
+import { EmptyState } from '../components/EmptyState';
+import { useDocumentTitle } from '../hooks/useDocumentTitle';
+import { Skeleton } from '../components/ui/skeleton';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "../components/ui/dropdown-menu";
 import { Badge } from '../components/ui/badge';
 import { useAuth } from '../contexts/AuthContext';
@@ -12,13 +15,16 @@ import { format } from 'date-fns';
 import { showError, showSuccess } from '../utils/toast';
 import ExpenseClaimForm from '../components/ExpenseClaimForm';
 import ReimburseClaimDialog from '../components/ReimburseClaimDialog';
+import { EmployeeIdentity } from '../components/hr/EmployeeIdentity';
 import { formatCurrency } from '../lib/utils';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '../components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { Label } from '../components/ui/label';
 import { Account } from './ChartOfAccounts';
+import { expenseClaimsQuery } from '../lib/queries';
 
 const ExpenseClaims = () => {
+  useDocumentTitle('Expense Claims');
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [selectedClaimId, setSelectedClaimId] = useState<string | undefined>(undefined);
   const [isApproveOpen, setIsApproveOpen] = useState(false);
@@ -30,15 +36,7 @@ const ExpenseClaims = () => {
   const queryClient = useQueryClient();
 
   const { data: claims, isLoading } = useQuery({
-    queryKey: ['expense_claims', activeCompany?.id],
-    queryFn: async () => {
-      if (!activeCompany) return [];
-      const { data, error } = await supabase.functions.invoke('expense-claims', {
-        body: { method: 'GET_ALL', company_id: activeCompany.id },
-      });
-      if (error) throw error;
-      return data;
-    },
+    ...expenseClaimsQuery(activeCompany!.id),
     enabled: !!activeCompany,
   });
 
@@ -144,13 +142,21 @@ const ExpenseClaims = () => {
             </TableHeader>
             <TableBody>
               {isLoading ? (
-                <TableRow><TableCell colSpan={7} className="text-center">Loading...</TableCell></TableRow>
+                Array.from({ length: 5 }).map((_, i) => (
+                  <TableRow key={`skeleton-${i}`}>
+                    <TableCell colSpan={7}><Skeleton className="h-6 w-full" /></TableCell>
+                  </TableRow>
+                ))
               ) : claims && claims.length > 0 ? (
                 claims.map((claim: any) => (
                   <TableRow key={claim.id}>
                     <TableCell className="font-medium">{claim.claim_number}</TableCell>
                     <TableCell>{format(new Date(claim.submission_date), 'PPP')}</TableCell>
-                    <TableCell>{claim.employees?.first_name} {claim.employees?.last_name}</TableCell>
+                    <TableCell>
+                      {claim.employees ? (
+                        <EmployeeIdentity employee={claim.employees} layout="stacked" showDepartment />
+                      ) : '—'}
+                    </TableCell>
                     <TableCell className="flex items-center gap-2">
                         {claim.description}
                         {claim.attachment_url && <Paperclip className="h-3 w-3 text-muted-foreground" />}
@@ -173,14 +179,23 @@ const ExpenseClaims = () => {
                           {claim.status === 'approved' && (
                              <DropdownMenuItem onClick={() => handleReimburseClick(claim)}><DollarSign className="mr-2 h-4 w-4 text-green-600" /> Reimburse</DropdownMenuItem>
                           )}
-                          <DropdownMenuItem onClick={() => deleteMutation.mutate(claim.id)} className="text-red-600">Delete</DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => deleteMutation.mutate(claim.id)} className="text-red-600" disabled={claim.status !== 'draft'}>Delete</DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </TableCell>
                   </TableRow>
                 ))
               ) : (
-                <TableRow><TableCell colSpan={7} className="text-center">No claims found.</TableCell></TableRow>
+                <TableRow>
+                  <TableCell colSpan={7} className="p-0">
+                    <EmptyState
+                      icon={Coins}
+                      title="No expense claims yet"
+                      description="Submit an expense claim to get reimbursed. Approved claims post to your books automatically."
+                      action={<Button onClick={handleAddNew}><PlusCircle className="mr-2 h-4 w-4" /> New Claim</Button>}
+                    />
+                  </TableCell>
+                </TableRow>
               )}
             </TableBody>
           </Table>

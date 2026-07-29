@@ -15,6 +15,7 @@ import { showError, showSuccess } from '../utils/toast';
 import { formatCurrency } from '../lib/utils';
 import { useAuth } from '../contexts/AuthContext';
 import { Sparkles, Wand2 } from 'lucide-react';
+import { isCashEquivalentAccount } from '../lib/accounting/accountRoles';
 
 type Transaction = {
   id: string;
@@ -45,11 +46,7 @@ const Reconciliation = () => {
         },
       });
       if (error) throw new Error(error.message);
-      return data.filter((acc: Account) => 
-        acc.name.toLowerCase().includes('bank') || 
-        acc.name.toLowerCase().includes('checking') || 
-        acc.name.toLowerCase().includes('cash')
-      );
+      return data.filter((acc: Account) => isCashEquivalentAccount(acc));
     },
     enabled: !!activeCompany,
   });

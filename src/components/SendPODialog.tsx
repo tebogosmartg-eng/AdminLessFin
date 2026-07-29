@@ -15,6 +15,7 @@ import { Textarea } from './ui/textarea';
 import { Label } from './ui/label';
 import { showError, showSuccess } from '../utils/toast';
 import { useAuth } from '../contexts/AuthContext';
+import { useEnterpriseIdentity } from '../hooks/useEnterpriseIdentity';
 
 interface SendPODialogProps {
   isOpen: boolean;
@@ -28,6 +29,7 @@ interface SendPODialogProps {
 
 const SendPODialog = ({ isOpen, setIsOpen, po }: SendPODialogProps) => {
   const { activeCompany } = useAuth();
+  const { identity } = useEnterpriseIdentity(activeCompany?.id);
   const queryClient = useQueryClient();
   const [to, setTo] = useState('');
   const [subject, setSubject] = useState('');
@@ -35,11 +37,12 @@ const SendPODialog = ({ isOpen, setIsOpen, po }: SendPODialogProps) => {
 
   useEffect(() => {
     if (po) {
+      const companyName = identity?.name || 'Your Company';
       setTo(po.vendor_email || '');
-      setSubject(`Purchase Order ${po.po_number} from ${activeCompany?.name || 'Your Company'}`);
-      setBody(`Hi,\n\nPlease find the attached purchase order.\n\nPlease confirm receipt and expected delivery date.\n\nBest regards,\n${activeCompany?.name || 'Your Company'}`);
+      setSubject(`Purchase Order ${po.po_number} from ${companyName}`);
+      setBody(`Hi,\n\nPlease find the attached purchase order.\n\nPlease confirm receipt and expected delivery date.\n\nBest regards,\n${companyName}`);
     }
-  }, [po, activeCompany, isOpen]);
+  }, [po, identity?.name, isOpen]);
 
   const sendEmailMutation = useMutation({
     mutationFn: async () => {

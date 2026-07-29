@@ -11,8 +11,10 @@ import {
   TableRow,
 } from '../components/ui/table';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/card';
-import { PlusCircle } from 'lucide-react';
+import { PlusCircle, CalendarClock } from 'lucide-react';
 import NewPayrollRunDialog from '../components/NewPayrollRunDialog';
+import { EmptyState } from '../components/EmptyState';
+import { Skeleton } from '../components/ui/skeleton';
 import { Badge } from '../components/ui/badge';
 import { format } from 'date-fns';
 import { useNavigate } from 'react-router-dom';
@@ -33,7 +35,7 @@ const PayrollRuns = () => {
   const { activeCompany } = useAuth();
 
   const { data: payrollRuns, isLoading } = useQuery<PayrollRun[]>({
-    ...payrollRunsQuery(activeCompany?.id!),
+    ...payrollRunsQuery(activeCompany!.id),
     enabled: !!activeCompany,
   });
 
@@ -64,9 +66,11 @@ const PayrollRuns = () => {
             </TableHeader>
             <TableBody>
               {isLoading ? (
-                <TableRow>
-                  <TableCell colSpan={4} className="text-center">Loading payroll runs...</TableCell>
-                </TableRow>
+                Array.from({ length: 5 }).map((_, i) => (
+                  <TableRow key={`skeleton-${i}`}>
+                    <TableCell colSpan={4}><Skeleton className="h-6 w-full" /></TableCell>
+                  </TableRow>
+                ))
               ) : payrollRuns && payrollRuns.length > 0 ? (
                 payrollRuns.map((run) => (
                   <TableRow key={run.id}>
@@ -84,7 +88,14 @@ const PayrollRuns = () => {
                 ))
               ) : (
                 <TableRow>
-                  <TableCell colSpan={4} className="text-center">No payroll runs found. Create one to get started.</TableCell>
+                  <TableCell colSpan={4} className="p-0">
+                    <EmptyState
+                      icon={CalendarClock}
+                      title="No payroll runs yet"
+                      description="Create a payroll run to generate payslips, post to the general ledger, and pay your team."
+                      action={<Button onClick={() => setIsFormOpen(true)}><PlusCircle className="mr-2 h-4 w-4" /> New Payroll Run</Button>}
+                    />
+                  </TableCell>
                 </TableRow>
               )}
             </TableBody>

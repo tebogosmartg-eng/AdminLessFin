@@ -1,20 +1,29 @@
 import { useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from '../components/ui/table';
 import { Skeleton } from '../components/ui/skeleton';
 import { Button } from '../components/ui/button';
-import { Printer, Send, HandCoins, Ban } from 'lucide-react';
+import { Printer, Send, HandCoins, Ban, MessageSquare } from 'lucide-react';
 import { Badge } from '../components/ui/badge';
 import { showError, showSuccess } from '../utils/toast';
 import InvoicePaymentForm from '../components/InvoicePaymentForm';
 import { useAuth } from '../contexts/AuthContext';
+import { useEnterpriseIdentity } from '../hooks/useEnterpriseIdentity';
 import SendInvoiceDialog from '../components/SendInvoiceDialog';
 import { formatCurrency } from '../lib/utils';
 import JournalEntryDetail from '../components/JournalEntryDetail';
 import { Alert, AlertDescription, AlertTitle } from '../components/ui/alert';
+import { CompanyLogo } from '../components/brand';
+import BusinessLifecycleStepper from '../components/BusinessLifecycleStepper';
+import LifecycleNextAction from '../components/LifecycleNextAction';
+import LifecycleContextBadge from '../components/boe/LifecycleContextBadge';
+import { buildChatUrl } from '../lib/boe/contextualChat';
+import { resolveInvoiceLifecycleStage, invoiceNextAction } from '../lib/revenueWorkflow';
+import { isTaxLedgerAccount } from '../lib/accounting/accountRoles';
+import { invoiceJournalItems } from '../lib/invoiceJournal';
 
 type InvoiceDetailData = {
   id: string;
@@ -47,6 +56,7 @@ type InvoiceDetailData = {
 const InvoiceDetail = () => {
   const { id } = useParams();
   const { activeCompany } = useAuth();
+  const { identity } = useEnterpriseIdentity(activeCompany?.id);
   const queryClient = useQueryClient();
   const [isPaymentFormOpen, setIsPaymentFormOpen] = useState(false);
   const [isSendDialogOpen, setIsSendDialogOpen] = useState(false);
@@ -108,9 +118,10 @@ const InvoiceDetail = () => {
     onError: (error: any) => showError(error.message),
   });
 
-  const lineItems = invoice?.journal_entries?.[0]?.journal_entry_items.filter(item => item.type === 'credit' && !item.chart_of_accounts?.name.toLowerCase().includes('tax')) || [];
-  const taxItems = invoice?.journal_entries?.[0]?.journal_entry_items.filter(item => item.type === 'credit' && item.chart_of_accounts?.name.toLowerCase().includes('tax')) || [];
-  const totalAmount = invoice?.journal_entries?.[0]?.journal_entry_items.filter(item => item.type === 'debit').reduce((sum, item) => sum + item.amount, 0) || 0;
+  const jeItems = invoiceJournalItems<any>(invoice?.journal_entries);
+  const lineItems = jeItems.filter(item => item.type === 'credit' && !isTaxLedgerAccount(item.chart_of_accounts));
+  const taxItems = jeItems.filter(item => item.type === 'credit' && isTaxLedgerAccount(item.chart_of_accounts));
+  const totalAmount = jeItems.filter(item => item.type === 'debit').reduce((sum, item) => sum + item.amount, 0);
   const subtotal = lineItems.reduce((sum, item) => sum + item.amount, 0);
   const totalTax = taxItems.reduce((sum, item) => sum + item.amount, 0);
 
@@ -122,9 +133,39 @@ const InvoiceDetail = () => {
     return <div>Invoice not found.</div>;
   }
 
+  const lifecycleStage = resolveInvoiceLifecycleStage(invoice);
+  const nextAction = invoiceNextAction(invoice);
+
   return (
     <>
       <div className="max-w-4xl mx-auto p-4 sm:p-6 lg:p-8 bg-background print:max-w-none print:p-8 print:mx-0 print:bg-white">
+        {invoice.status !== 'void' && (
+          <div className="mb-6 print:hidden space-y-4">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <LifecycleContextBadge lifecycleId="revenue" stageId={lifecycleStage} />
+              <Button variant="ghost" size="sm" asChild>
+                <Link to={buildChatUrl({ type: 'invoice', id: invoice.id, label: invoice.invoice_number })}>
+                  <MessageSquare className="mr-1 h-3.5 w-3.5" /> Discuss
+                </Link>
+              </Button>
+            </div>
+            <BusinessLifecycleStepper lifecycleId="revenue" currentStageId={lifecycleStage} compact />
+            {nextAction && (
+              <LifecycleNextAction
+                label={nextAction.label}
+                description={nextAction.description}
+                route={nextAction.route}
+                onAction={
+                  nextAction.action === 'send'
+                    ? () => setIsSendDialogOpen(true)
+                    : nextAction.action === 'payment'
+                      ? () => setIsPaymentFormOpen(true)
+                      : undefined
+                }
+              />
+            )}
+          </div>
+        )}
         {invoice.status === 'void' && (
           <Alert variant="destructive" className="mb-6 print:hidden">
             <Ban className="h-4 w-4" />
@@ -161,9 +202,9 @@ const InvoiceDetail = () => {
         <Card className={`print:shadow-none print:border-none ${invoice.status === 'void' ? 'opacity-50' : ''}`}>
           <CardHeader className="grid grid-cols-2 gap-4">
             <div>
-              <img src={activeCompany?.logo_url || "/logo.png"} alt="Company Logo" className="h-12 w-auto mb-2 object-contain" />
-              <CardTitle className="text-base">{activeCompany?.name || 'Your Company'}</CardTitle>
-              <p className="text-sm text-muted-foreground whitespace-pre-wrap">{activeCompany?.address || 'Your Company Address'}</p>
+              <CompanyLogo src={activeCompany?.logo_url} className="mb-2" />
+              <CardTitle className="text-base">{identity?.name || 'Your Company'}</CardTitle>
+              <p className="text-sm text-muted-foreground whitespace-pre-wrap">{identity?.address || 'Your Company Address'}</p>
             </div>
             <div className="text-right">
               <p className="text-3xl font-bold tracking-tight">INVOICE</p>

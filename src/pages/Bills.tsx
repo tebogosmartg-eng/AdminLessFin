@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useState, useEffect, useMemo } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../integrations/supabase/client';
 import { Button } from '../components/ui/button';
@@ -11,7 +12,12 @@ import {
   TableRow,
 } from '../components/ui/table';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/card';
-import { PlusCircle, MoreHorizontal, Search, X, Paperclip } from 'lucide-react';
+import { PlusCircle, MoreHorizontal, Search, X, Paperclip, Receipt } from 'lucide-react';
+import { EmptyState } from '../components/EmptyState';
+import { useDocumentTitle } from '../hooks/useDocumentTitle';
+import { useSortableData } from '../hooks/useSortableData';
+import { SortableHeader } from '../components/SortableHeader';
+import { Skeleton } from '../components/ui/skeleton';
 import BillForm from '../components/BillForm';
 import JournalEntryDetail from '../components/JournalEntryDetail';
 import JournalEntryForm from '../components/JournalEntryForm';
@@ -19,7 +25,7 @@ import BillPaymentForm from '../components/BillPaymentForm';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '../components/ui/dropdown-menu';
 import { showError, showSuccess } from '../utils/toast';
 import { useAuth } from '../contexts/AuthContext';
-import { formatCurrency } from '../lib/utils';
+import { formatCurrency, statusBadgeVariant } from '../lib/utils';
 import { billsQuery, vendorsQuery } from '../lib/queries';
 import { Badge } from '../components/ui/badge';
 import { Input } from '../components/ui/input';
@@ -28,7 +34,9 @@ import { Vendor } from './Vendors';
 
 type BillEntry = {
   id: string;
+  journal_entry_id?: string | null;
   entry_date: string;
+  due_date?: string;
   description: string | null;
   status: string;
   vendor_id: string;
@@ -39,6 +47,8 @@ type BillEntry = {
 };
 
 const Bills = () => {
+  useDocumentTitle('Bills');
+  const [searchParams] = useSearchParams();
   const [isBillFormOpen, setIsBillFormOpen] = useState(false);
   const [isEditFormOpen, setIsEditFormOpen] = useState(false);
   const [selectedEntryIdForDetail, setSelectedEntryIdForDetail] = useState<string | null>(null);
@@ -55,12 +65,25 @@ const Bills = () => {
   const [vendorFilter, setVendorFilter] = useState('all');
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
+  const [overdueOnly, setOverdueOnly] = useState(false);
 
   const { activeCompany } = useAuth();
   const queryClient = useQueryClient();
 
+  useEffect(() => {
+    const vendorId = searchParams.get('vendor_id');
+    const status = searchParams.get('status');
+    const overdue = searchParams.get('overdue');
+    if (vendorId) setVendorFilter(vendorId);
+    if (status) setStatusFilter(status);
+    if (overdue === 'true') {
+      setOverdueOnly(true);
+      setStatusFilter('open');
+    }
+  }, [searchParams]);
+
   const { data: bills, isLoading } = useQuery<BillEntry[]>({
-    ...billsQuery(activeCompany?.id!, {
+    ...billsQuery(activeCompany!.id, {
       search: searchTerm,
       status: statusFilter,
       vendor_id: vendorFilter,
@@ -70,8 +93,27 @@ const Bills = () => {
     enabled: !!activeCompany,
   });
 
+  const { items: sortedBills, sort, requestSort } = useSortableData(bills ?? [], (b, key) => {
+    switch (key) {
+      case 'entry_date': return new Date(b.entry_date).getTime();
+      case 'due_date': return b.due_date ? new Date(b.due_date).getTime() : 0;
+      case 'vendor': return b.vendors?.[0]?.name ?? '';
+      case 'total': return b.total ?? 0;
+      default: return (b as unknown as Record<string, string>)[key];
+    }
+  });
+
+  const displayedBills = useMemo(() => {
+    if (!overdueOnly) return sortedBills;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return sortedBills.filter(
+      (bill) => bill.due_date && new Date(bill.due_date) < today && bill.status === 'open'
+    );
+  }, [sortedBills, overdueOnly]);
+
   const { data: vendors } = useQuery<Vendor[]>({
-    ...vendorsQuery(activeCompany?.id!),
+    ...vendorsQuery(activeCompany!.id),
     enabled: !!activeCompany,
   });
 
@@ -146,14 +188,6 @@ const Bills = () => {
     setDateTo('');
   };
 
-  const getStatusVariant = (status: string) => {
-    switch (status) {
-      case 'paid': return 'default';
-      case 'open': return 'outline';
-      case 'void': return 'destructive';
-      default: return 'secondary';
-    }
-  };
 
   return (
     <>
@@ -228,22 +262,24 @@ const Bills = () => {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Date</TableHead>
-                <TableHead>Vendor</TableHead>
-                <TableHead>Bill #</TableHead>
-                <TableHead>Description</TableHead>
-                <TableHead className="text-right">Amount</TableHead>
-                <TableHead>Status</TableHead>
+                <SortableHeader sortKey="entry_date" sort={sort} onSort={requestSort}>Date</SortableHeader>
+                <SortableHeader sortKey="vendor" sort={sort} onSort={requestSort}>Vendor</SortableHeader>
+                <SortableHeader sortKey="bill_number" sort={sort} onSort={requestSort}>Bill #</SortableHeader>
+                <SortableHeader sortKey="description" sort={sort} onSort={requestSort}>Description</SortableHeader>
+                <SortableHeader sortKey="total" sort={sort} onSort={requestSort} align="right">Amount</SortableHeader>
+                <SortableHeader sortKey="status" sort={sort} onSort={requestSort}>Status</SortableHeader>
                 <TableHead className="w-[50px]"></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {isLoading ? (
-                <TableRow>
-                  <TableCell colSpan={7} className="text-center">Loading bills...</TableCell>
-                </TableRow>
-              ) : bills && bills.length > 0 ? (
-                bills.map((bill) => (
+                Array.from({ length: 5 }).map((_, i) => (
+                  <TableRow key={`skeleton-${i}`}>
+                    <TableCell colSpan={7}><Skeleton className="h-6 w-full" /></TableCell>
+                  </TableRow>
+                ))
+              ) : displayedBills.length > 0 ? (
+                displayedBills.map((bill) => (
                   <TableRow key={bill.id}>
                     <TableCell>{new Date(bill.entry_date).toLocaleDateString()}</TableCell>
                     <TableCell>{bill.vendors?.[0]?.name || 'N/A'}</TableCell>
@@ -256,7 +292,7 @@ const Bills = () => {
                     </TableCell>
                     <TableCell className="text-right font-mono">{formatCurrency(bill.total)}</TableCell>
                     <TableCell>
-                      <Badge variant={getStatusVariant(bill.status)} className="capitalize">{bill.status}</Badge>
+                      <Badge variant={statusBadgeVariant(bill.status)} className="capitalize">{bill.status}</Badge>
                     </TableCell>
                     <TableCell>
                       <DropdownMenu>
@@ -267,7 +303,12 @@ const Bills = () => {
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => setSelectedEntryIdForDetail(bill.id)}>View Details</DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={() => bill.journal_entry_id && setSelectedEntryIdForDetail(bill.journal_entry_id)}
+                            disabled={!bill.journal_entry_id}
+                          >
+                            View Details
+                          </DropdownMenuItem>
                           <DropdownMenuItem onClick={() => handleDuplicate(bill.id)}>Duplicate</DropdownMenuItem>
                           {bill.attachment_url && (
                              <DropdownMenuItem asChild>
@@ -288,7 +329,23 @@ const Bills = () => {
                 ))
               ) : (
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center">No bills found matching your filters.</TableCell>
+                  <TableCell colSpan={7} className="p-0">
+                    {(searchTerm || statusFilter !== 'all' || vendorFilter !== 'all' || dateFrom || dateTo) ? (
+                      <EmptyState
+                        icon={Search}
+                        title="No bills match your filters"
+                        description="Try adjusting or clearing your filters to see more results."
+                        action={<Button variant="outline" onClick={clearFilters}><X className="mr-2 h-4 w-4" /> Clear filters</Button>}
+                      />
+                    ) : (
+                      <EmptyState
+                        icon={Receipt}
+                        title="No bills yet"
+                        description="Record a bill to track what you owe your vendors and stay on top of due dates."
+                        action={<Button onClick={() => { setDuplicateFromId(undefined); setIsBillFormOpen(true); }}><PlusCircle className="mr-2 h-4 w-4" /> Record New Bill</Button>}
+                      />
+                    )}
+                  </TableCell>
                 </TableRow>
               )}
             </TableBody>

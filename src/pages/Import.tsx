@@ -12,6 +12,7 @@ import { showError, showSuccess, showLoading, dismissToast } from '../utils/toas
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
 import { ScrollArea } from '../components/ui/scroll-area';
 import { Skeleton } from '../components/ui/skeleton';
+import { BRAND } from '../config/brand';
 
 type CsvRow = {
   Date: string;
@@ -222,7 +223,7 @@ const Import = () => {
           <CardContent className="space-y-4">
             <p>1. Download the CSV template file. This ensures your data is in the correct format.</p>
             <p>2. Fill out the template with your transaction data. Each line represents a debit or a credit. All lines for a single journal entry must have the exact same <strong>Date</strong> and <strong>Description</strong>.</p>
-            <p>3. The <strong>Account</strong>, <strong>Vendor</strong>, and <strong>Customer</strong> names must exactly match the names in your SmaAcc account.</p>
+            <p>3. The <strong>Account</strong>, <strong>Vendor</strong>, and <strong>Customer</strong> names must exactly match the names in your {BRAND.product} account.</p>
             <p>4. Upload the completed file below. The system will validate it before importing.</p>
             <Button onClick={handleDownloadTemplate} variant="outline">
               <Download className="mr-2 h-4 w-4" />

@@ -13,7 +13,13 @@ import { showError, showSuccess } from '../utils/toast';
 import { Account } from '../pages/ChartOfAccounts';
 import { format } from 'date-fns';
 import { formatCurrency } from '../lib/utils';
+import { accountsQuery } from '../lib/queries';
 import { useAuth } from '../contexts/AuthContext';
+import {
+  findAccountByRole,
+  findCashEquivalentAccounts,
+  resolveControlAccounts,
+} from '../lib/accounting/accountRoles';
 
 const paymentSchema = z.object({
   payment_date: z.string().min(1, "Date is required."),
@@ -43,19 +49,22 @@ const InvoicePaymentForm = ({ isOpen, setIsOpen, invoice }: InvoicePaymentFormPr
     },
   });
 
-  const { data: accounts } = useQuery<Account[]>({ queryKey: ['accounts', activeCompany?.id] });
+  const { data: accounts } = useQuery<Account[]>({ ...accountsQuery(activeCompany!.id), enabled: !!activeCompany });
   const assetAccounts = accounts?.filter(a => a.type === 'Asset');
-  const arAccounts = assetAccounts?.filter(a => a.name.toLowerCase().includes('receivable'));
-  const cashAccounts = assetAccounts?.filter(a => !a.name.toLowerCase().includes('receivable'));
+  const arAccounts = assetAccounts?.filter((a) => !!findAccountByRole([a], 'trade_receivable'));
+  const cashAccounts = findCashEquivalentAccounts(assetAccounts).length
+    ? findCashEquivalentAccounts(assetAccounts)
+    : assetAccounts?.filter((a) => !findAccountByRole([a], 'trade_receivable'));
 
   useEffect(() => {
     if (isOpen) {
       form.setValue('amount', invoice.totalAmount);
-      if (arAccounts && arAccounts.length > 0) {
-        form.setValue('ar_account_id', arAccounts[0].id);
+      const controls = resolveControlAccounts(accounts);
+      if (controls.ar) {
+        form.setValue('ar_account_id', controls.ar.id);
       }
     }
-  }, [isOpen, invoice, arAccounts, form]);
+  }, [isOpen, invoice, accounts, form]);
 
   const mutation = useMutation({
     mutationFn: async (values: PaymentFormValues) => {
@@ -80,8 +89,9 @@ const InvoicePaymentForm = ({ isOpen, setIsOpen, invoice }: InvoicePaymentFormPr
       showSuccess('Payment recorded successfully.');
       setIsOpen(false);
     },
-    onError: (error: any) => {
-      showError(`Error: ${error.message}`);
+    onError: (error: unknown) => {
+      const message = error instanceof Error ? error.message : 'Failed to record payment';
+      showError(`Error: ${message}`);
     },
   });
 

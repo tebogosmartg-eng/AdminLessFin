@@ -89,7 +89,8 @@ const ProjectDetail = () => {
       const { data: accounts } = await supabase.functions.invoke('chart-of-accounts', {
         body: { method: 'GET', company_id: activeCompany.id }
       });
-      const arAcc = accounts?.find((a: any) => a.name.toLowerCase().includes('receivable'));
+      const arAcc = accounts?.find((a: any) => a.account_role === 'trade_receivable')
+        ?? accounts?.find((a: any) => a.type === 'Asset' && a.control_account && a.subcategory === 'Trade and Other Receivables' && !a.tax_treatment);
       const incomeAcc = accounts?.find((a: any) => a.type === 'Income');
       
       if (!arAcc || !incomeAcc) throw new Error("Missing default A/R or Income account. Please check Chart of Accounts.");
@@ -181,7 +182,7 @@ const ProjectDetail = () => {
           <p className="mt-2 text-gray-600 dark:text-gray-400">{project.description}</p>
         </div>
         <div className="flex gap-2">
-          <Button onClick={() => navigate('/time-tracking')} variant="outline">
+          <Button onClick={() => navigate('/work/time?view=billing')} variant="outline">
             <Clock className="mr-2 h-4 w-4" /> Log Time
           </Button>
           {stats?.unbilledAmount > 0 && (

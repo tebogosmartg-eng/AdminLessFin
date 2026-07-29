@@ -11,6 +11,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { Input } from './ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { showError, showSuccess } from '../utils/toast';
+import { accountsQuery, vendorsQuery } from '../lib/queries';
 import { Vendor } from '../pages/Vendors';
 import { Account } from '../pages/ChartOfAccounts';
 
@@ -57,8 +58,8 @@ const LoanForm = ({ isOpen, setIsOpen, loanId }: LoanFormProps) => {
     }
   }, [isOpen, form]);
 
-  const { data: vendors } = useQuery<Vendor[]>({ queryKey: ['vendors', activeCompany?.id], enabled: !!activeCompany });
-  const { data: accounts } = useQuery<Account[]>({ queryKey: ['accounts', activeCompany?.id], enabled: !!activeCompany });
+  const { data: vendors } = useQuery<Vendor[]>({ ...vendorsQuery(activeCompany!.id), enabled: !!activeCompany });
+  const { data: accounts } = useQuery<Account[]>({ ...accountsQuery(activeCompany!.id), enabled: !!activeCompany });
   const assetAccounts = accounts?.filter(a => a.type === 'Asset');
   const liabilityAccounts = accounts?.filter(a => a.type === 'Liability');
 

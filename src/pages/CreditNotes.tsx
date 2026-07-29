@@ -4,7 +4,7 @@ import { supabase } from '../integrations/supabase/client';
 import { Button } from '../components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/table';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/card';
-import { PlusCircle, MoreHorizontal, ArrowRightLeft } from 'lucide-react';
+import { PlusCircle, MoreHorizontal, ArrowRightLeft, ReceiptText } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "../components/ui/dropdown-menu";
 import { Badge } from '../components/ui/badge';
 import { useAuth } from '../contexts/AuthContext';
@@ -12,8 +12,13 @@ import { format } from 'date-fns';
 import { showError, showSuccess } from '../utils/toast';
 import CreditNoteForm from '../components/CreditNoteForm';
 import AllocateCreditDialog from '../components/AllocateCreditDialog';
+import { creditNotesQuery } from '../lib/queries';
+import { EmptyState } from '../components/EmptyState';
+import { Skeleton } from '../components/ui/skeleton';
+import { useDocumentTitle } from '../hooks/useDocumentTitle';
 
 const CreditNotes = () => {
+  useDocumentTitle('Credit Notes');
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [selectedCN, setSelectedCN] = useState<any>(null);
   const [isAllocateOpen, setIsAllocateOpen] = useState(false);
@@ -22,15 +27,7 @@ const CreditNotes = () => {
   const queryClient = useQueryClient();
 
   const { data: creditNotes, isLoading } = useQuery({
-    queryKey: ['credit_notes', activeCompany?.id],
-    queryFn: async () => {
-      if (!activeCompany) return [];
-      const { data, error } = await supabase.functions.invoke('credit-notes', {
-        body: { method: 'GET_ALL', company_id: activeCompany.id },
-      });
-      if (error) throw error;
-      return data;
-    },
+    ...creditNotesQuery(activeCompany!.id),
     enabled: !!activeCompany,
   });
 
@@ -82,7 +79,11 @@ const CreditNotes = () => {
             </TableHeader>
             <TableBody>
               {isLoading ? (
-                <TableRow><TableCell colSpan={6} className="text-center">Loading...</TableCell></TableRow>
+                Array.from({ length: 5 }).map((_, i) => (
+                  <TableRow key={i}>
+                    <TableCell colSpan={6}><Skeleton className="h-8 w-full" /></TableCell>
+                  </TableRow>
+                ))
               ) : creditNotes && creditNotes.length > 0 ? (
                 creditNotes.map((cn: any) => (
                   <TableRow key={cn.id}>
@@ -105,7 +106,21 @@ const CreditNotes = () => {
                   </TableRow>
                 ))
               ) : (
-                <TableRow><TableCell colSpan={6} className="text-center">No credit notes found.</TableCell></TableRow>
+                <TableRow>
+                  <TableCell colSpan={6}>
+                    <EmptyState
+                      icon={ReceiptText}
+                      title="No credit notes yet"
+                      description="Issue a credit note when you need to refund or adjust a customer invoice."
+                      action={
+                        <Button onClick={() => setIsFormOpen(true)}>
+                          <PlusCircle className="mr-2 h-4 w-4" />
+                          New Credit Note
+                        </Button>
+                      }
+                    />
+                  </TableCell>
+                </TableRow>
               )}
             </TableBody>
           </Table>

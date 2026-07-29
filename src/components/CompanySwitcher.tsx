@@ -1,4 +1,5 @@
 import { useAuth } from '../contexts/AuthContext';
+import { useEnterpriseIdentity } from '../hooks/useEnterpriseIdentity';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -13,6 +14,7 @@ import { useNavigate } from 'react-router-dom';
 
 const CompanySwitcher = () => {
   const { activeCompany, companies, switchCompany } = useAuth();
+  const { identity } = useEnterpriseIdentity(activeCompany?.id);
   const navigate = useNavigate();
 
   if (!activeCompany) {
@@ -30,7 +32,7 @@ const CompanySwitcher = () => {
         <Button variant="outline" className="w-56 justify-between">
           <div className="flex items-center truncate">
             <Building className="mr-2 h-4 w-4" />
-            <span className="truncate">{activeCompany.name}</span>
+            <span className="truncate">{identity?.name || 'Company'}</span>
           </div>
           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
         </Button>

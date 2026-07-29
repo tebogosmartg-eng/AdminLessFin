@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/card';
@@ -9,10 +9,11 @@ import { Calendar as CalendarIcon, Download } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '../components/ui/popover';
 import { Calendar } from '../components/ui/calendar';
 import { DateRange } from 'react-day-picker';
-import { format, startOfMonth, endOfMonth } from 'date-fns';
-import { cn, downloadCSV } from '../lib/utils';
-import { formatCurrency } from '../lib/utils';
+import { format, startOfMonth, endOfMonth, parseISO } from 'date-fns';
+import { cn, downloadCSV, formatCurrency } from '../lib/utils';
 import { useAuth } from '../contexts/AuthContext';
+import { useEnterpriseCalendar } from '../hooks/useEnterpriseCalendar';
+import { Badge } from '../components/ui/badge';
 
 type AccountBalance = {
   id: string;
@@ -52,10 +53,19 @@ type AgedPayable = {
 
 const Reports = () => {
   const { activeCompany } = useAuth();
+  const { startDate: fyStart, endDate: fyEnd, yearCode } = useEnterpriseCalendar(activeCompany?.id);
   const [date, setDate] = useState<DateRange | undefined>({
     from: startOfMonth(new Date()),
     to: endOfMonth(new Date()),
   });
+  const [calendarApplied, setCalendarApplied] = useState(false);
+
+  useEffect(() => {
+    if (!calendarApplied && fyStart && fyEnd) {
+      setDate({ from: parseISO(fyStart), to: parseISO(fyEnd) });
+      setCalendarApplied(true);
+    }
+  }, [fyStart, fyEnd, calendarApplied]);
 
   const fromDate = date?.from ?? new Date();
   const toDate = date?.to ?? new Date();
@@ -100,9 +110,11 @@ const Reports = () => {
   let totalCredits = 0;
   pointInTimeAccounts?.forEach(acc => {
     if (['Asset', 'Expense'].includes(acc.type)) {
-      acc.balance >= 0 ? (totalDebits += acc.balance) : (totalCredits += -acc.balance);
+      if (acc.balance >= 0) totalDebits += acc.balance;
+      else totalCredits += -acc.balance;
     } else {
-      acc.balance >= 0 ? (totalCredits += acc.balance) : (totalDebits += -acc.balance);
+      if (acc.balance >= 0) totalCredits += acc.balance;
+      else totalDebits += -acc.balance;
     }
   });
 
@@ -173,7 +185,14 @@ const Reports = () => {
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
-        <h1 className="text-3xl font-bold">Reports</h1>
+        <h1 className="text-3xl font-bold">
+          Reports
+          {yearCode && (
+            <Badge variant="outline" className="ml-2 align-middle text-sm font-normal">
+              Calendar {yearCode}
+            </Badge>
+          )}
+        </h1>
         <Popover>
           <PopoverTrigger asChild>
             <Button

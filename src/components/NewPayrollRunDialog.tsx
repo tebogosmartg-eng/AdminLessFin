@@ -2,7 +2,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { supabase } from '../integrations/supabase/client';
+import { invokePayroll } from '../lib/payrollOperations';
 import { useAuth } from '../contexts/AuthContext';
 import { Button } from './ui/button';
 import {
@@ -54,15 +54,11 @@ const NewPayrollRunDialog = ({ isOpen, setIsOpen }: NewPayrollRunDialogProps) =>
     mutationFn: async (values: PayrollRunFormValues) => {
       if (!activeCompany) throw new Error('No active company selected');
 
-      const { error } = await supabase.functions.invoke('payroll', {
-        body: {
-          method: 'CREATE_RUN',
-          company_id: activeCompany.id,
-          runData: values,
-        },
+      await invokePayroll({
+        method: 'CREATE_RUN',
+        company_id: activeCompany.id,
+        runData: values,
       });
-
-      if (error) throw new Error(error.message);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['payroll_runs', activeCompany?.id] });

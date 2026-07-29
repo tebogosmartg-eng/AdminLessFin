@@ -15,9 +15,32 @@ export function formatCurrency(amount: number) {
   }).format(amount);
 }
 
+/**
+ * Maps a document status to the correct Badge variant so status colour is
+ * consistent and semantically right across the whole app:
+ *   success (emerald) = settled/agreed · warning (amber) = awaiting action
+ *   outline = draft · destructive (red) = void/declined/overdue · secondary = other
+ */
+export type StatusBadgeVariant =
+  | "default"
+  | "secondary"
+  | "destructive"
+  | "outline"
+  | "success"
+  | "warning";
+
+export function statusBadgeVariant(status?: string | null): StatusBadgeVariant {
+  const s = (status ?? "").toLowerCase().trim();
+  if (["paid", "accepted", "active", "approved", "completed", "reconciled", "received", "closed", "billed"].includes(s)) return "success";
+  if (["sent", "partial", "open", "pending", "submitted", "processing", "unpaid", "awaiting"].includes(s)) return "warning";
+  if (["draft"].includes(s)) return "outline";
+  if (["void", "voided", "declined", "rejected", "cancelled", "canceled", "overdue", "failed", "expired"].includes(s)) return "destructive";
+  return "secondary";
+}
+
 export function downloadCSV(data: any[], filename: string) {
   const csv = Papa.unparse(data);
-  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
   const link = document.createElement("a");
   const url = URL.createObjectURL(blob);
   link.setAttribute("href", url);
@@ -26,4 +49,24 @@ export function downloadCSV(data: any[], filename: string) {
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
+}
+
+export type PayrollFunctionError = {
+  error?: string;
+  stage?: string;
+  code?: string;
+  recovery?: string;
+};
+
+export function parsePayrollFunctionError(
+  data: unknown,
+  fallback: string
+): string {
+  if (!data || typeof data !== 'object') return fallback;
+  const payload = data as PayrollFunctionError;
+  if (payload.error && payload.recovery) {
+    const stage = payload.stage ? `[${payload.stage}] ` : '';
+    return `${stage}${payload.error} — ${payload.recovery}`;
+  }
+  return payload.error ?? fallback;
 }

@@ -15,6 +15,7 @@ import { showError, showSuccess } from '../utils/toast';
 import { Account } from '../pages/ChartOfAccounts';
 import { addDays, format } from 'date-fns';
 import { useNavigate } from 'react-router-dom';
+import { accountsQuery } from '../lib/queries';
 
 const invoiceFromQuoteSchema = z.object({
   invoice_number: z.string().min(1, "Invoice number is required."),
@@ -70,7 +71,7 @@ const CreateInvoiceFromQuoteDialog = ({ isOpen, setIsOpen, quote }: CreateInvoic
     }
   }, [nextInvoiceNumber, form]);
 
-  const { data: accounts } = useQuery<Account[]>({ queryKey: ['accounts', activeCompany?.id] });
+  const { data: accounts } = useQuery<Account[]>({ ...accountsQuery(activeCompany!.id), enabled: !!activeCompany });
   const assetAccounts = accounts?.filter(a => a.type === 'Asset');
   const liabilityAccounts = accounts?.filter(a => a.type === 'Liability');
 

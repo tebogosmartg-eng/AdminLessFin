@@ -15,6 +15,7 @@ import { showError, showSuccess } from '../utils/toast';
 import { Project } from '../pages/Projects';
 import { Timesheet } from '../pages/TimeTracking';
 import { format } from 'date-fns';
+import { projectsQuery } from '../lib/queries';
 
 const timesheetSchema = z.object({
   project_id: z.string().min(1, 'Project is required.'),
@@ -57,7 +58,7 @@ const TimesheetForm = ({ isOpen, setIsOpen, timesheet }: TimesheetFormProps) => 
   }, [timesheet, form, isOpen]);
 
   const { data: projects } = useQuery<Project[]>({ 
-    queryKey: ['projects', activeCompany?.id],
+    ...projectsQuery(activeCompany!.id),
     enabled: !!activeCompany
   });
 

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/card';
@@ -10,13 +10,21 @@ import { Printer, Send, Check, X, FileSignature } from 'lucide-react';
 import { Badge } from '../components/ui/badge';
 import { showError, showSuccess } from '../utils/toast';
 import { useAuth } from '../contexts/AuthContext';
+import { useEnterpriseIdentity } from '../hooks/useEnterpriseIdentity';
 import { formatCurrency } from '../lib/utils';
 import CreateInvoiceFromQuoteDialog from '../components/CreateInvoiceFromQuoteDialog';
 import SendQuoteDialog from '../components/SendQuoteDialog';
+import { CompanyLogo } from '../components/brand';
+import BusinessLifecycleStepper from '../components/BusinessLifecycleStepper';
+import LifecycleNextAction from '../components/LifecycleNextAction';
+import LifecycleContextBadge from '../components/boe/LifecycleContextBadge';
+import { buildChatUrl } from '../lib/boe/contextualChat';
+import { resolveQuoteLifecycleStage, quoteNextAction } from '../lib/revenueWorkflow';
 
 const QuoteDetail = () => {
   const { id } = useParams();
   const { activeCompany } = useAuth();
+  const { identity } = useEnterpriseIdentity(activeCompany?.id);
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const [isCreateInvoiceOpen, setIsCreateInvoiceOpen] = useState(false);
@@ -62,9 +70,36 @@ const QuoteDetail = () => {
     return <div>Quote not found.</div>;
   }
 
+  const lifecycleStage = resolveQuoteLifecycleStage(quote);
+  const nextAction = quoteNextAction(quote);
+
   return (
     <>
       <div className="max-w-4xl mx-auto p-4 sm:p-6 lg:p-8 bg-background print:max-w-none print:p-8 print:mx-0 print:bg-white">
+        <div className="mb-6 print:hidden space-y-4">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <LifecycleContextBadge lifecycleId="revenue" stageId={lifecycleStage} />
+            <Button variant="ghost" size="sm" asChild>
+              <Link to={buildChatUrl({ type: 'quote', id: quote.id, label: quote.quote_number })}>
+                Discuss
+              </Link>
+            </Button>
+          </div>
+          <BusinessLifecycleStepper lifecycleId="revenue" currentStageId={lifecycleStage} compact />
+          {nextAction && (
+            <LifecycleNextAction
+              label={nextAction.label}
+              description={nextAction.description}
+              onAction={
+                nextAction.action === 'send'
+                  ? () => setIsSendDialogOpen(true)
+                  : nextAction.action === 'invoice'
+                    ? () => setIsCreateInvoiceOpen(true)
+                    : undefined
+              }
+            />
+          )}
+        </div>
         <div className="flex justify-between items-start mb-6 print:hidden">
           <div>
             <h1 className="text-3xl font-bold">Quote {quote.quote_number}</h1>
@@ -91,9 +126,9 @@ const QuoteDetail = () => {
         <Card className="print:shadow-none print:border-none">
           <CardHeader className="grid grid-cols-2 gap-4">
             <div>
-              <img src={activeCompany?.logo_url || "/logo.png"} alt="Company Logo" className="h-12 w-auto mb-2 object-contain" />
-              <CardTitle className="text-base">{activeCompany?.name || 'Your Company'}</CardTitle>
-              <p className="text-sm text-muted-foreground">{activeCompany?.address || 'Your Company Address'}</p>
+              <CompanyLogo src={activeCompany?.logo_url} className="mb-2" />
+              <CardTitle className="text-base">{identity?.name || 'Your Company'}</CardTitle>
+              <p className="text-sm text-muted-foreground">{identity?.address || 'Your Company Address'}</p>
             </div>
             <div className="text-right">
               <p className="text-3xl font-bold tracking-tight">QUOTE</p>

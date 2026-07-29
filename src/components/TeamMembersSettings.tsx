@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { supabase } from '../integrations/supabase/client';
 import { useAuth } from '../contexts/AuthContext';
+import { securityService } from '@/governance/domains/security/service';
+import type { RawCompanyMemberRow } from '@/governance/domains/security/service';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from './ui/card';
 import { Button } from './ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table';
@@ -29,14 +30,7 @@ import {
   AlertDialogTitle,
 } from "./ui/alert-dialog";
 
-type CompanyMember = {
-  user_id: string;
-  role: 'owner' | 'admin' | 'member';
-  profiles: {
-    full_name: string;
-    email: string;
-  } | null;
-};
+type CompanyMember = RawCompanyMemberRow;
 
 const TeamMembersSettings = () => {
   const { activeCompany, user } = useAuth();
@@ -46,61 +40,46 @@ const TeamMembersSettings = () => {
 
   const { data: members, isLoading } = useQuery<CompanyMember[]>({
     queryKey: ['company_members', activeCompany?.id],
+    // Phase G3.6 — team member list resolves through Governance Security Service.
+    // Raw edge shape preserved (identical to pre-migration GET_TEAM_MEMBERS).
     queryFn: async () => {
       if (!activeCompany) return [];
-      const { data, error } = await supabase.functions.invoke('settings', {
-        body: {
-          method: 'GET_TEAM_MEMBERS',
-          company_id: activeCompany.id,
-        },
-      });
-      if (error) throw error;
-      return data as CompanyMember[];
+      return securityService.getCompanyMembersRaw(activeCompany.id);
     },
     enabled: !!activeCompany,
   });
 
   const updateRoleMutation = useMutation({
-    mutationFn: async ({ userId, newRole }: { userId: string, newRole: string }) => {
+    // Phase G3.6 — role updates resolve through Governance Security Service.
+    mutationFn: async ({ userId, newRole }: { userId: string; newRole: 'admin' | 'member' }) => {
       if (!activeCompany) throw new Error("No active company");
-      const { error } = await supabase.functions.invoke('settings', {
-        body: {
-          method: 'UPDATE_MEMBER_ROLE',
-          company_id: activeCompany.id,
-          target_user_id: userId,
-          new_role: newRole,
-        },
-      });
-      if (error) throw new Error(error.message);
+      const result = await securityService.updateMemberRole(activeCompany.id, userId, newRole);
+      if (!result.success) throw new Error(result.error || 'Failed to update member role.');
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['company_members'] });
       showSuccess("Member role updated.");
     },
-    onError: (e: any) => showError(e.message),
+    onError: (e: unknown) => showError(e instanceof Error ? e.message : String(e)),
   });
 
   const removeMemberMutation = useMutation({
+    // Phase G3.6 — member removal resolves through Governance Security Service.
     mutationFn: async (userId: string) => {
       if (!activeCompany) throw new Error("No active company");
-      const { error } = await supabase.functions.invoke('settings', {
-        body: {
-          method: 'REMOVE_MEMBER',
-          company_id: activeCompany.id,
-          user_id_to_remove: userId,
-        },
-      });
-      if (error) throw new Error(error.message);
+      const result = await securityService.removeMember(activeCompany.id, userId);
+      if (!result.success) throw new Error(result.error || 'Failed to remove member.');
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['company_members'] });
       showSuccess("Member removed from company.");
       setMemberToRemove(null);
     },
-    onError: (e: any) => showError(e.message),
+    onError: (e: unknown) => showError(e instanceof Error ? e.message : String(e)),
   });
 
-  // Check if current user is admin/owner to show actions
+  // Local UI gate — Security has no permission-evaluator API yet (documented debt).
+  // Outcome identical to pre-migration: owner/admin may manage.
   const currentUserRole = members?.find(m => m.user_id === user?.id)?.role;
   const canManage = currentUserRole === 'owner' || currentUserRole === 'admin';
 
@@ -182,7 +161,7 @@ const TeamMembersSettings = () => {
           </Table>
         </CardContent>
       </Card>
-      
+
       <InviteMemberDialog isOpen={isInviteOpen} setIsOpen={setIsInviteOpen} />
 
       <AlertDialog open={!!memberToRemove} onOpenChange={(open) => !open && setMemberToRemove(null)}>
@@ -195,7 +174,7 @@ const TeamMembersSettings = () => {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction 
+            <AlertDialogAction
               onClick={() => memberToRemove && removeMemberMutation.mutate(memberToRemove.user_id)}
               className="bg-red-600 hover:bg-red-700"
               disabled={removeMemberMutation.isPending}

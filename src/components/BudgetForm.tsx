@@ -34,6 +34,7 @@ import { showError, showSuccess } from '../utils/toast';
 import { Account } from '../pages/ChartOfAccounts';
 import { Budget } from '../pages/Budgets';
 import { format } from 'date-fns';
+import { accountsQuery } from '../lib/queries';
 
 const budgetSchema = z.object({
   account_id: z.string().min(1, 'Please select an expense account.'),
@@ -82,18 +83,7 @@ const BudgetForm = ({ isOpen, setIsOpen, budget }: BudgetFormProps) => {
   }, [budget, form, isOpen]);
 
   const { data: accounts } = useQuery<Account[]>({
-    queryKey: ['accounts', activeCompany?.id],
-    queryFn: async () => {
-      if (!activeCompany) return [];
-      const { data, error } = await supabase.functions.invoke('chart-of-accounts', {
-        body: {
-          method: 'GET',
-          company_id: activeCompany.id,
-        },
-      });
-      if (error) throw new Error(error.message);
-      return data;
-    },
+    ...accountsQuery(activeCompany!.id),
     enabled: !!activeCompany,
   });
   const expenseAccounts = accounts?.filter(acc => acc.type === 'Expense');

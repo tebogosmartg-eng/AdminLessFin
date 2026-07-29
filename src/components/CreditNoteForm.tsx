@@ -19,7 +19,7 @@ import { TaxRate } from '../pages/TaxRates';
 import { Trash2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { formatCurrency } from '../lib/utils';
-import { taxRatesQuery } from '../lib/queries';
+import { taxRatesQuery, accountsQuery, customersQuery, productsQuery } from '../lib/queries';
 
 const itemSchema = z.object({
   product_id: z.string().optional(),
@@ -82,10 +82,10 @@ const CreditNoteForm = ({ isOpen, setIsOpen }: Props) => {
 
   const { fields, append, remove } = useFieldArray({ control: form.control, name: "items" });
 
-  const { data: customers } = useQuery<Customer[]>({ queryKey: ['customers', activeCompany?.id] });
-  const { data: products } = useQuery<Product[]>({ queryKey: ['products', activeCompany?.id] });
-  const { data: accounts } = useQuery<Account[]>({ queryKey: ['accounts', activeCompany?.id] });
-  const { data: taxRates } = useQuery<TaxRate[]>({ ...taxRatesQuery(activeCompany?.id!), enabled: !!activeCompany });
+  const { data: customers } = useQuery<Customer[]>({ ...customersQuery(activeCompany!.id), enabled: !!activeCompany });
+  const { data: products } = useQuery<Product[]>({ ...productsQuery(activeCompany!.id), enabled: !!activeCompany });
+  const { data: accounts } = useQuery<Account[]>({ ...accountsQuery(activeCompany!.id), enabled: !!activeCompany });
+  const { data: taxRates } = useQuery<TaxRate[]>({ ...taxRatesQuery(activeCompany!.id), enabled: !!activeCompany });
 
   const incomeAccounts = accounts?.filter(a => a.type === 'Income');
   const assetAccounts = accounts?.filter(a => a.type === 'Asset'); // For A/R

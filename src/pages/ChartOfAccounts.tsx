@@ -19,9 +19,12 @@ import {
   TableRow,
 } from '../components/ui/table';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
+import { Link } from 'react-router-dom';
 import { PlusCircle, MoreHorizontal, Search } from 'lucide-react';
 import { showError, showSuccess } from '../utils/toast';
 import AccountForm from '../components/AccountForm';
+import AccountBalanceCard from '../components/accounting/AccountBalanceCard';
+import CoaOnboarding from '../components/accounting/CoaOnboarding';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -39,18 +42,27 @@ export type Account = {
   type: 'Asset' | 'Liability' | 'Equity' | 'Income' | 'Expense';
   description: string | null;
   balance: number;
+  account_role?: string | null;
+  tax_treatment?: string | null;
+  control_account?: boolean | null;
+  system_account?: boolean | null;
+  account_code?: string | null;
+  category?: string | null;
+  subcategory?: string | null;
+  is_active?: boolean | null;
 };
 
 const ChartOfAccounts = () => {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [selectedAccount, setSelectedAccount] = useState<Account | undefined>(undefined);
+  const [inquiryAccountId, setInquiryAccountId] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterType, setFilterType] = useState('all');
   const queryClient = useQueryClient();
   const { activeCompany } = useAuth();
 
   const { data: accounts, isLoading } = useQuery<Account[]>({
-    ...accountsQuery(activeCompany?.id!),
+    ...accountsQuery(activeCompany!.id),
     enabled: !!activeCompany,
   });
 
@@ -103,6 +115,19 @@ const ChartOfAccounts = () => {
       deleteMutation.mutate(id);
     }
   };
+
+  // Every company requires a Chart of Accounts — when none exists yet, show the
+  // guided onboarding (generate / import / manual) instead of an empty table.
+  const showOnboarding = !isLoading && (!accounts || accounts.length === 0);
+
+  if (showOnboarding) {
+    return (
+      <>
+        <CoaOnboarding onCreateManually={handleAddNew} />
+        <AccountForm isOpen={isFormOpen} setIsOpen={setIsFormOpen} account={selectedAccount} />
+      </>
+    );
+  }
 
   return (
     <>
@@ -173,8 +198,30 @@ const ChartOfAccounts = () => {
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={() => setInquiryAccountId(account.id)}>Open Activity</DropdownMenuItem>
+                          <DropdownMenuItem asChild>
+                            <Link to={`/general-ledger?account_id=${account.id}`}>Open Ledger</Link>
+                          </DropdownMenuItem>
+                          <DropdownMenuItem asChild>
+                            <Link to="/journal-entries">Open Journals</Link>
+                          </DropdownMenuItem>
+                          <DropdownMenuItem asChild>
+                            <Link to="/trial-balance">Open Trial Balance Position</Link>
+                          </DropdownMenuItem>
+                          <DropdownMenuItem asChild>
+                            <Link to="/accounting/posting-requests">Open Posting History</Link>
+                          </DropdownMenuItem>
+                          <DropdownMenuItem asChild>
+                            <Link to="/accounting/posting-requests">Open Source Documents</Link>
+                          </DropdownMenuItem>
                           <DropdownMenuItem onClick={() => handleEdit(account)}>Edit</DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => handleDelete(account.id)} className="text-red-600">Delete</DropdownMenuItem>
+                          {account.system_account ? (
+                            <DropdownMenuItem disabled className="text-muted-foreground">
+                              System account — deactivate instead of delete
+                            </DropdownMenuItem>
+                          ) : (
+                            <DropdownMenuItem onClick={() => handleDelete(account.id)} className="text-red-600">Delete</DropdownMenuItem>
+                          )}
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </TableCell>
@@ -193,6 +240,11 @@ const ChartOfAccounts = () => {
         isOpen={isFormOpen}
         setIsOpen={setIsFormOpen}
         account={selectedAccount}
+      />
+      <AccountBalanceCard
+        accountId={inquiryAccountId}
+        open={!!inquiryAccountId}
+        onOpenChange={(o) => !o && setInquiryAccountId(null)}
       />
     </>
   );

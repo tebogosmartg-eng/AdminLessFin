@@ -11,7 +11,12 @@ import {
   TableRow,
 } from '../components/ui/table';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/card';
-import { PlusCircle, MoreHorizontal, Download } from 'lucide-react';
+import { PlusCircle, MoreHorizontal, Download, Store } from 'lucide-react';
+import { EmptyState } from '../components/EmptyState';
+import { useDocumentTitle } from '../hooks/useDocumentTitle';
+import { useSortableData } from '../hooks/useSortableData';
+import { SortableHeader } from '../components/SortableHeader';
+import { Skeleton } from '../components/ui/skeleton';
 import { showError, showSuccess } from '../utils/toast';
 import VendorForm from '../components/VendorForm';
 import {
@@ -37,6 +42,7 @@ export type Vendor = {
 };
 
 const Vendors = () => {
+  useDocumentTitle('Vendors');
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [selectedVendor, setSelectedVendor] = useState<Vendor | undefined>(undefined);
   const { activeCompany } = useAuth();
@@ -44,9 +50,11 @@ const Vendors = () => {
   const navigate = useNavigate();
 
   const { data: vendors, isLoading } = useQuery<Vendor[]>({
-    ...vendorsQuery(activeCompany?.id!),
+    ...vendorsQuery(activeCompany!.id),
     enabled: !!activeCompany,
   });
+
+  const { items: sortedVendors, sort, requestSort } = useSortableData(vendors ?? []);
 
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
@@ -123,20 +131,22 @@ const Vendors = () => {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Name</TableHead>
-                <TableHead>Contact</TableHead>
-                <TableHead>Email</TableHead>
-                <TableHead>Phone</TableHead>
+                <SortableHeader sortKey="name" sort={sort} onSort={requestSort}>Name</SortableHeader>
+                <SortableHeader sortKey="contact_name" sort={sort} onSort={requestSort}>Contact</SortableHeader>
+                <SortableHeader sortKey="email" sort={sort} onSort={requestSort}>Email</SortableHeader>
+                <SortableHeader sortKey="phone" sort={sort} onSort={requestSort}>Phone</SortableHeader>
                 <TableHead className="w-[50px]"></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {isLoading ? (
-                <TableRow>
-                  <TableCell colSpan={5} className="text-center">Loading vendors...</TableCell>
-                </TableRow>
+                Array.from({ length: 5 }).map((_, i) => (
+                  <TableRow key={`skeleton-${i}`}>
+                    <TableCell colSpan={5}><Skeleton className="h-6 w-full" /></TableCell>
+                  </TableRow>
+                ))
               ) : vendors && vendors.length > 0 ? (
-                vendors.map((vendor) => (
+                sortedVendors.map((vendor) => (
                   <TableRow key={vendor.id} className="cursor-pointer" onClick={() => navigate(`/vendors/${vendor.id}`)}>
                     <TableCell className="font-medium">{vendor.name}</TableCell>
                     <TableCell>{vendor.contact_name}</TableCell>
@@ -151,9 +161,9 @@ const Vendors = () => {
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => navigate(`/vendors/${vendor.id}`)}>View Details</DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => handleEdit(vendor)}>Edit</DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => handleDelete(vendor.id)} className="text-red-600">Delete</DropdownMenuItem>
+                          <DropdownMenuItem onClick={(e) => { e.stopPropagation(); navigate(`/vendors/${vendor.id}`); }}>View Details</DropdownMenuItem>
+                          <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleEdit(vendor); }}>Edit</DropdownMenuItem>
+                          <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleDelete(vendor.id); }} className="text-red-600">Delete</DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </TableCell>
@@ -161,7 +171,14 @@ const Vendors = () => {
                 ))
               ) : (
                 <TableRow>
-                  <TableCell colSpan={5} className="text-center">No vendors found. Add one to get started.</TableCell>
+                  <TableCell colSpan={5} className="p-0">
+                    <EmptyState
+                      icon={Store}
+                      title="No vendors yet"
+                      description="Add the suppliers you buy from to record bills, track what you owe and manage purchases."
+                      action={<Button onClick={handleAddNew}><PlusCircle className="mr-2 h-4 w-4" /> New Vendor</Button>}
+                    />
+                  </TableCell>
                 </TableRow>
               )}
             </TableBody>

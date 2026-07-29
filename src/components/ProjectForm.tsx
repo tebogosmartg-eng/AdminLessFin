@@ -34,6 +34,7 @@ import { Textarea } from './ui/textarea';
 import { showError, showSuccess } from '../utils/toast';
 import { Customer } from '../pages/Customers';
 import { Project } from '../pages/Projects';
+import { customersQuery } from '../lib/queries';
 
 const projectSchema = z.object({
   name: z.string().min(1, 'Project name is required.'),
@@ -81,7 +82,7 @@ const ProjectForm = ({ isOpen, setIsOpen, project }: ProjectFormProps) => {
     }
   }, [project, form, isOpen]);
 
-  const { data: customers } = useQuery<Customer[]>({ queryKey: ['customers', activeCompany?.id] });
+  const { data: customers } = useQuery<Customer[]>({ ...customersQuery(activeCompany!.id), enabled: !!activeCompany });
 
   const mutation = useMutation({
     mutationFn: async (values: ProjectFormValues) => {

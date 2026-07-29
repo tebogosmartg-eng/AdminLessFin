@@ -1,5 +1,4 @@
 import { useQuery } from '@tanstack/react-query';
-import { supabase } from '../integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from './ui/card';
 import { Skeleton } from './ui/skeleton';
 import { Progress } from './ui/progress';
@@ -8,6 +7,7 @@ import { Link } from 'react-router-dom';
 import { formatCurrency } from '../lib/utils';
 import { cn } from '../lib/utils';
 import { useAuth } from '../contexts/AuthContext';
+import { budgetsQuery } from '../lib/queries';
 
 type Budget = {
   id: string;
@@ -20,23 +20,12 @@ const BudgetStatus = () => {
   const { activeCompany } = useAuth();
 
   const { data: budgets, isLoading } = useQuery<Budget[]>({
-    queryKey: ['budgets_with_activity', activeCompany?.id],
-    queryFn: async () => {
-      if (!activeCompany) return [];
-      const { data, error } = await supabase.functions.invoke('budgets', {
-        body: {
-          method: 'GET_ALL',
-          company_id: activeCompany.id,
-        },
-      });
-      if (error) throw new Error(error.message);
-      return data;
-    },
+    ...budgetsQuery(activeCompany!.id),
     enabled: !!activeCompany,
   });
 
   return (
-    <Card>
+    <Card className="shadow-sm">
       <CardHeader>
         <CardTitle>Budget vs. Actuals</CardTitle>
         <CardDescription>Current period spending at a glance.</CardDescription>
@@ -60,7 +49,7 @@ const BudgetStatus = () => {
                 )
               })}
               {budgets.length > 4 && (
-                <Button asChild variant="link" className="px-0 mt-2 h-auto py-0">
+                <Button asChild variant="link" className="mt-2 h-auto px-0 py-0">
                   <Link to="/budgets">View all budgets</Link>
                 </Button>
               )}

@@ -11,7 +11,12 @@ import {
   TableRow,
 } from '../components/ui/table';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/card';
-import { PlusCircle, MoreHorizontal, Download } from 'lucide-react';
+import { PlusCircle, MoreHorizontal, Download, Users } from 'lucide-react';
+import { EmptyState } from '../components/EmptyState';
+import { useDocumentTitle } from '../hooks/useDocumentTitle';
+import { useSortableData } from '../hooks/useSortableData';
+import { SortableHeader } from '../components/SortableHeader';
+import { Skeleton } from '../components/ui/skeleton';
 import { showError, showSuccess } from '../utils/toast';
 import CustomerForm from '../components/CustomerForm';
 import {
@@ -37,6 +42,7 @@ export type Customer = {
 };
 
 const Customers = () => {
+  useDocumentTitle('Customers');
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | undefined>(undefined);
   const { activeCompany } = useAuth();
@@ -44,9 +50,11 @@ const Customers = () => {
   const navigate = useNavigate();
 
   const { data: customers, isLoading } = useQuery<Customer[]>({
-    ...customersQuery(activeCompany?.id!),
+    ...customersQuery(activeCompany!.id),
     enabled: !!activeCompany,
   });
+
+  const { items: sortedCustomers, sort, requestSort } = useSortableData(customers ?? []);
 
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
@@ -123,20 +131,22 @@ const Customers = () => {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Name</TableHead>
-                <TableHead>Contact</TableHead>
-                <TableHead>Email</TableHead>
-                <TableHead>Phone</TableHead>
+                <SortableHeader sortKey="name" sort={sort} onSort={requestSort}>Name</SortableHeader>
+                <SortableHeader sortKey="contact_name" sort={sort} onSort={requestSort}>Contact</SortableHeader>
+                <SortableHeader sortKey="email" sort={sort} onSort={requestSort}>Email</SortableHeader>
+                <SortableHeader sortKey="phone" sort={sort} onSort={requestSort}>Phone</SortableHeader>
                 <TableHead className="w-[50px]"></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {isLoading ? (
-                <TableRow>
-                  <TableCell colSpan={5} className="text-center">Loading customers...</TableCell>
-                </TableRow>
+                Array.from({ length: 5 }).map((_, i) => (
+                  <TableRow key={`skeleton-${i}`}>
+                    <TableCell colSpan={5}><Skeleton className="h-6 w-full" /></TableCell>
+                  </TableRow>
+                ))
               ) : customers && customers.length > 0 ? (
-                customers.map((customer) => (
+                sortedCustomers.map((customer) => (
                   <TableRow key={customer.id} className="cursor-pointer" onClick={() => navigate(`/customers/${customer.id}`)}>
                     <TableCell className="font-medium">{customer.name}</TableCell>
                     <TableCell>{customer.contact_name}</TableCell>
@@ -161,7 +171,14 @@ const Customers = () => {
                 ))
               ) : (
                 <TableRow>
-                  <TableCell colSpan={5} className="text-center">No customers found. Add one to get started.</TableCell>
+                  <TableCell colSpan={5} className="p-0">
+                    <EmptyState
+                      icon={Users}
+                      title="No customers yet"
+                      description="Add your customers to start sending quotes and invoices and tracking what they owe."
+                      action={<Button onClick={handleAddNew}><PlusCircle className="mr-2 h-4 w-4" /> New Customer</Button>}
+                    />
+                  </TableCell>
                 </TableRow>
               )}
             </TableBody>

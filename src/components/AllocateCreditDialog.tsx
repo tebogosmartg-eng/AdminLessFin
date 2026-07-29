@@ -9,9 +9,11 @@ import { Input } from './ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Skeleton } from './ui/skeleton';
 import { formatCurrency } from '../lib/utils';
+import { accountsQuery } from '../lib/queries';
 import { showError, showSuccess } from '../utils/toast';
 import { Account } from '../pages/ChartOfAccounts';
 import { format } from 'date-fns';
+import { findAccountsByRole } from '../lib/accounting/accountRoles';
 
 interface AllocateCreditDialogProps {
   isOpen: boolean;
@@ -48,9 +50,17 @@ const AllocateCreditDialog = ({ isOpen, setIsOpen, creditNote }: AllocateCreditD
       
       // Calculate remaining amounts client-side for simplicity, though server is better
       // Filter out paid/void
+      const getJournalItems = (inv: any) => {
+        const entries = inv.journal_entries;
+        if (!entries) return [];
+        const list = Array.isArray(entries) ? entries : [entries];
+        return list.flatMap((je: any) => je.journal_entry_items || []);
+      };
+
       return data.filter((inv: any) => inv.status !== 'paid' && inv.status !== 'void').map((inv: any) => {
-         const debits = inv.journal_entries?.journal_entry_items.filter((i: any) => i.type === 'debit').reduce((sum: number, i: any) => sum + i.amount, 0) || 0;
-         const credits = inv.journal_entries?.journal_entry_items.filter((i: any) => i.type === 'credit').reduce((sum: number, i: any) => sum + i.amount, 0) || 0;
+         const items = getJournalItems(inv);
+         const debits = items.filter((i: any) => i.type === 'debit').reduce((sum: number, i: any) => sum + i.amount, 0);
+         const credits = items.filter((i: any) => i.type === 'credit').reduce((sum: number, i: any) => sum + i.amount, 0);
          // Remaining is usually Total Debits (original inv) - Total Credits (payments/allocations)
          // Note: The original invoice creates Debits in AR. Payments create Credits in AR.
          // However, the original invoice JE has Credits to Sales.
@@ -75,11 +85,11 @@ const AllocateCreditDialog = ({ isOpen, setIsOpen, creditNote }: AllocateCreditD
   });
 
   const { data: accounts } = useQuery<Account[]>({ 
-    queryKey: ['accounts', activeCompany?.id],
+    ...accountsQuery(activeCompany!.id),
     enabled: !!activeCompany
   });
   
-  const arAccounts = accounts?.filter(a => a.type === 'Asset' && a.name.toLowerCase().includes('receivable'));
+  const arAccounts = findAccountsByRole(accounts?.filter((a) => a.type === 'Asset'), 'trade_receivable');
 
   const mutation = useMutation({
     mutationFn: async () => {

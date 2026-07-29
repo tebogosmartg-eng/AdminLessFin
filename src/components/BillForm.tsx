@@ -22,6 +22,10 @@ import { Alert, AlertDescription } from './ui/alert';
 import { addDays, format, isValid } from 'date-fns';
 import { formatCurrency } from '../lib/utils';
 import { projectsQuery, taxRatesQuery } from '../lib/queries';
+import {
+  findAccountByRole,
+  resolveControlAccounts,
+} from '../lib/accounting/accountRoles';
 
 const billItemSchema = z.object({
   product_id: z.string().optional(),
@@ -123,19 +127,101 @@ const BillForm = ({ isOpen, setIsOpen, billId, duplicateFromId, initialData, onS
     enabled: !!activeCompany
   });
   
-  const { data: projects } = useQuery<Project[]>({ ...projectsQuery(activeCompany?.id!), enabled: !!activeCompany });
-  const { data: taxRates } = useQuery<TaxRate[]>({ ...taxRatesQuery(activeCompany?.id!), enabled: !!activeCompany });
+  const { data: projects } = useQuery<Project[]>({ ...projectsQuery(activeCompany!.id), enabled: !!activeCompany });
+  const { data: taxRates } = useQuery<TaxRate[]>({ ...taxRatesQuery(activeCompany!.id), enabled: !!activeCompany });
 
   const vendorId = form.watch('vendor_id');
   const billDate = form.watch('bill_date');
 
-  // Smart Defaults: Auto-select ledger routing
+  // Smart Defaults: resolve AP via account_role
   useEffect(() => {
-    if (isOpen && accounts && !isEditing) {
-      const apAcc = accounts.find(a => a.type === 'Liability' && a.name.toLowerCase().includes('payable'));
-      if (apAcc) form.setValue('accounts_payable_id', apAcc.id);
+    if (isOpen && accounts && !isEditing && !isDuplicating) {
+      const controls = resolveControlAccounts(accounts);
+      if (controls.ap) form.setValue('accounts_payable_id', controls.ap.id);
     }
-  }, [isOpen, accounts, isEditing, form]);
+  }, [isOpen, accounts, isEditing, isDuplicating, form]);
+
+  // Apply initial data (e.g. PO → Bill conversion)
+  useEffect(() => {
+    if (!isOpen || isEditing || isDuplicating || !initialData) return;
+
+    if (initialData.vendor_id) form.setValue('vendor_id', initialData.vendor_id);
+    if (initialData.description) form.setValue('description', initialData.description);
+    if (initialData.bill_date) form.setValue('bill_date', initialData.bill_date);
+    if (initialData.due_date) form.setValue('due_date', initialData.due_date);
+    if (initialData.bill_number) form.setValue('bill_number', initialData.bill_number);
+
+    if (initialData.items && initialData.items.length > 0) {
+      const defaultExpenseId = expenseAccounts?.[0]?.id || assetAccounts?.[0]?.id || '';
+      form.setValue(
+        'items',
+        initialData.items.map((item) => ({
+          product_id: item.product_id || '',
+          description: item.description || '',
+          quantity: item.quantity ?? 1,
+          unit_cost: item.unit_cost ?? 0,
+          expense_account_id: item.expense_account_id || defaultExpenseId,
+          project_id: item.project_id || '',
+          tax_rate_id: item.tax_rate_id || '',
+        }))
+      );
+    }
+  }, [isOpen, initialData, isEditing, isDuplicating, form, expenseAccounts, assetAccounts]);
+
+  const { data: sourceBill } = useQuery({
+    queryKey: ['bill_duplicate', duplicateFromId, activeCompany?.id],
+    queryFn: async () => {
+      const { data, error } = await supabase.functions.invoke('bills', {
+        body: { method: 'GET_ONE', company_id: activeCompany!.id, billId: duplicateFromId },
+      });
+      if (error) throw error;
+      return data;
+    },
+    enabled: isOpen && isDuplicating && !!duplicateFromId && !!activeCompany,
+  });
+
+  useEffect(() => {
+    if (!isOpen || !isDuplicating || !sourceBill) return;
+
+    const debitItems =
+      sourceBill.journal_entries?.journal_entry_items?.filter(
+        (item: { type: string }) => item.type === 'debit'
+      ) || [];
+
+    const defaultExpenseId = expenseAccounts?.[0]?.id || assetAccounts?.[0]?.id || '';
+
+    form.reset({
+      bill_number: '',
+      bill_date: format(new Date(), 'yyyy-MM-dd'),
+      due_date: sourceBill.due_date
+        ? format(addDays(new Date(sourceBill.due_date), 30), 'yyyy-MM-dd')
+        : format(addDays(new Date(), 30), 'yyyy-MM-dd'),
+      vendor_id: sourceBill.vendor_id,
+      accounts_payable_id: form.getValues('accounts_payable_id'),
+      tax_receivable_account_id: '',
+      description: sourceBill.journal_entries?.description
+        ? `Copy of: ${sourceBill.journal_entries.description}`
+        : '',
+      items:
+        debitItems.length > 0
+          ? debitItems.map((item: {
+              account_id: string;
+              amount: number;
+              project_id?: string;
+              chart_of_accounts?: { name?: string } | null;
+              journal_entry_item_tax_rates?: { tax_rates: { id: string } }[];
+            }) => ({
+              product_id: '',
+              description: item.chart_of_accounts?.name || 'Line item',
+              quantity: 1,
+              unit_cost: item.amount,
+              expense_account_id: item.account_id || defaultExpenseId,
+              project_id: item.project_id || '',
+              tax_rate_id: item.journal_entry_item_tax_rates?.[0]?.tax_rates?.id || '',
+            }))
+          : [{ description: '', quantity: 1, unit_cost: 0, expense_account_id: defaultExpenseId, project_id: '', tax_rate_id: '' }],
+    });
+  }, [isOpen, isDuplicating, sourceBill, form, expenseAccounts, assetAccounts]);
 
   useEffect(() => {
     if (vendorId && billDate && !isEditing && vendors) {
@@ -157,7 +243,7 @@ const BillForm = ({ isOpen, setIsOpen, billId, duplicateFromId, initialData, onS
       form.setValue(`items.${index}.description`, product.description || product.name);
       form.setValue(`items.${index}.unit_cost`, product.cost || 0);
       if (product.type === 'inventory') {
-        const inventoryAssetAccount = assetAccounts?.find(a => a.name.toLowerCase().includes('inventory'));
+        const inventoryAssetAccount = findAccountByRole(assetAccounts, 'inventory_asset');
         if (inventoryAssetAccount) {
           form.setValue(`items.${index}.expense_account_id`, inventoryAssetAccount.id);
         }
@@ -243,8 +329,8 @@ const BillForm = ({ isOpen, setIsOpen, billId, duplicateFromId, initialData, onS
           <DialogTitle>{isEditing ? 'Edit Bill' : isDuplicating ? 'Duplicate Bill' : 'Record New Bill'}</DialogTitle>
           <DialogDescription>Enter the supplier invoice details below.</DialogDescription>
         </DialogHeader>
-        {!apAccounts?.some(acc => acc.name.toLowerCase().includes('accounts payable')) && (
-            <Alert variant="destructive"><AlertDescription>Warning: You don't have an "Accounts Payable" account. Please create one in your Chart of Accounts (Type: Liability).</AlertDescription></Alert>
+        {!findAccountByRole(accounts, 'trade_payable') && (
+            <Alert variant="destructive"><AlertDescription>Warning: You don't have a Trade Payables control account. Please assign account_role trade_payable in your Chart of Accounts (Type: Liability).</AlertDescription></Alert>
         )}
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">

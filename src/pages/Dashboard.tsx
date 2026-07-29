@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../co
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../integrations/supabase/client';
 import { Account } from './ChartOfAccounts';
-import { Landmark, TrendingUp, TrendingDown, Wallet, DollarSign, Calendar as CalendarIcon, AlertTriangle, ListChecks, History, FileText, Receipt, Coins, MessageSquare } from 'lucide-react';
+import { Landmark, TrendingUp, TrendingDown, Wallet, DollarSign, Calendar as CalendarIcon, AlertTriangle, ListChecks, History, FileText, Receipt, Coins, MessageSquare, Briefcase } from 'lucide-react';
 import { Skeleton } from '../components/ui/skeleton';
 import IncomeExpenseChart from '../components/IncomeExpenseChart';
 import { Link, useNavigate } from 'react-router-dom';
@@ -23,6 +23,19 @@ import { DateRange } from 'react-day-picker';
 import { Alert, AlertTitle, AlertDescription } from '../components/ui/alert';
 import { Badge } from '../components/ui/badge';
 import SetupChecklist from '../components/SetupChecklist';
+import AccountingSetupProgressCard from '../components/accounting/AccountingSetupProgressCard';
+import AccountingHealthCard from '../components/accounting/AccountingHealthCard';
+import AccountingPolicyCard from '../components/accounting/AccountingPolicyCard';
+import AccountingRulesCard from '../components/accounting/AccountingRulesCard';
+import BusinessEventsCard from '../components/accounting/BusinessEventsCard';
+import DashboardInsights from '../components/DashboardInsights';
+import { useDocumentTitle } from '../hooks/useDocumentTitle';
+import OperationsActionPanel from '../components/boe/OperationsActionPanel';
+import ActivityFeed from '../components/boe/ActivityFeed';
+import { accountsQuery as glAccountsQuery, bankAccountsQuery, bankTransactionsQuery, bankOutstandingLinesQuery, accountingReadinessQuery, accountingHealthQuery, accountingPolicyDashboardQuery, accountingRulesDashboardQuery, businessEventsDashboardQuery } from '../lib/queries';
+import { BANK_TRANSACTION_LABELS } from '../lib/banking/types';
+import { isCashEquivalentAccount } from '../lib/accounting/accountRoles';
+import { FileCheck2 } from 'lucide-react';
 
 type OverdueInvoice = {
   id: string;
@@ -33,6 +46,7 @@ type OverdueInvoice = {
 };
 
 const Dashboard = () => {
+  useDocumentTitle('Dashboard');
   const { user, profile, activeCompany } = useAuth();
   const navigate = useNavigate();
   const [date, setDate] = useState<DateRange | undefined>({
@@ -72,20 +86,59 @@ const Dashboard = () => {
     topCustomers = [],
     cashFlowForecast = [],
     lowStockItems = [],
-    actions = { pendingClaims: 0, draftInvoices: 0, openBills: 0, expiringQuotes: 0 },
+    actions = { pendingClaims: 0, draftPayrollRuns: 0, draftInvoices: 0, openBills: 0, expiringQuotes: 0 },
     recentActivity = [],
-    setupStatus = { isComplete: true }
+    setupStatus = { isComplete: true },
+    payrollKpis = null,
   } = dashboardData || {};
 
   const isAdmin = role === 'owner' || role === 'admin';
 
+  // Banking widgets: dashboard-data is frozen this phase, so these compose
+  // from the existing `banking` edge function's own GET_* methods rather
+  // than extending that response.
+  const { data: bankAccounts, isLoading: loadingBankAccounts } = useQuery({ ...bankAccountsQuery(activeCompany?.id ?? ''), enabled: !!activeCompany && isAdmin });
+  const { data: glAccountsForBanking } = useQuery<Account[]>({ ...glAccountsQuery(activeCompany?.id ?? ''), enabled: !!activeCompany && isAdmin });
+  const { data: bankTransactions, isLoading: loadingBankTxns } = useQuery({ ...bankTransactionsQuery(activeCompany?.id ?? ''), enabled: !!activeCompany && isAdmin });
+  const { data: outstandingLines, isLoading: loadingOutstanding } = useQuery({ ...bankOutstandingLinesQuery(activeCompany?.id ?? ''), enabled: !!activeCompany && isAdmin });
+  const bankingLoading = loadingBankAccounts || loadingBankTxns || loadingOutstanding;
+
+  const { data: accountingReadiness } = useQuery({
+    ...accountingReadinessQuery(activeCompany?.id ?? ''),
+    enabled: !!activeCompany,
+  });
+
+  const { data: accountingHealth } = useQuery({
+    ...accountingHealthQuery(activeCompany?.id ?? ''),
+    enabled: !!activeCompany,
+  });
+
+  const { data: accountingPolicyDashboard } = useQuery({
+    ...accountingPolicyDashboardQuery(activeCompany?.id ?? ''),
+    enabled: !!activeCompany,
+  });
+
+  const { data: accountingRulesDashboard } = useQuery({
+    ...accountingRulesDashboardQuery(activeCompany?.id ?? ''),
+    enabled: !!activeCompany,
+  });
+
+  const { data: businessEventsDashboard } = useQuery({
+    ...businessEventsDashboardQuery(activeCompany?.id ?? ''),
+    enabled: !!activeCompany,
+  });
+
+  const bankGlBalanceByCoaId = new Map((glAccountsForBanking ?? []).map((a) => [a.id, a.balance]));
+  const cashPosition = (bankAccounts ?? []).reduce((sum, a) => sum + (bankGlBalanceByCoaId.get(a.chart_of_account_id) ?? 0), 0);
+  const recentBankingActivity = (bankTransactions ?? []).slice().sort((a, b) => (a.transaction_date < b.transaction_date ? 1 : -1)).slice(0, 5);
+  const pendingReconciliationCount = (outstandingLines ?? []).length;
+
   const calculateTotals = (accList: Account[]) => {
     if (!accList || accList.length === 0) return { assets: 0, liabilities: 0, netIncome: 0, cash: 0 };
-    const bankAccountKeywords = ['cash', 'bank', 'checking', 'savings'];
     const totals = accList.reduce((acc, account) => {
       const type = account.type.toLowerCase() as keyof typeof acc;
       acc[type] = (acc[type] || 0) + (account.balance || 0);
-      if (account.type === 'Asset' && bankAccountKeywords.some(keyword => account.name?.toLowerCase().includes(keyword))) {
+      if (account.type === 'Asset' && isCashEquivalentAccount(account)) {
           acc.cash = (acc.cash || 0) + (account.balance || 0);
       }
       return acc;
@@ -99,9 +152,9 @@ const Dashboard = () => {
 
   const summaryCards = [
     { title: 'Cash Balance', value: totals.cash, icon: DollarSign, link: '/chart-of-accounts', hidden: !isAdmin },
-    { title: 'Total Assets', value: totals.assets, icon: Wallet, link: '/financial-statements', hidden: !isAdmin },
-    { title: 'Total Liabilities', value: totals.liabilities, icon: Landmark, link: '/financial-statements', hidden: !isAdmin },
-    { title: 'Net Income (YTD)', value: totals.netIncome, icon: totals.netIncome >= 0 ? TrendingUp : TrendingDown, color: totals.netIncome >= 0 ? 'text-green-600' : 'text-red-600', link: '/reports', hidden: !isAdmin },
+    { title: 'Total Assets', value: totals.assets, icon: Wallet, link: '/reports/live-financial-statements', hidden: !isAdmin },
+    { title: 'Total Liabilities', value: totals.liabilities, icon: Landmark, link: '/reports/live-financial-statements', hidden: !isAdmin },
+    { title: 'Net Income (YTD)', value: totals.netIncome, icon: totals.netIncome >= 0 ? TrendingUp : TrendingDown, color: totals.netIncome >= 0 ? 'text-success' : 'text-destructive', link: '/reports', hidden: !isAdmin },
   ];
 
   if (queryError) {
@@ -118,18 +171,18 @@ const Dashboard = () => {
   }
 
   return (
-    <div className="space-y-6">
-      <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+    <div className="section-stack">
+      <header className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Dashboard</h1>
-          <p className="text-gray-600 dark:text-gray-400">Welcome back, {profile?.full_name || user?.email}!</p>
+          <h1 className="text-3xl font-semibold tracking-tight text-foreground">Operations Command Centre</h1>
+          <p className="text-muted-foreground">Welcome back, {profile?.full_name || user?.email}! What needs your attention today?</p>
         </div>
         <Popover>
           <PopoverTrigger asChild>
             <Button
               id="date"
               variant={"outline"}
-              className={cn("w-[260px] justify-start text-left font-normal", !date && "text-muted-foreground")}
+              className={cn("w-full justify-start text-left font-normal sm:w-[260px]", !date && "text-muted-foreground")}
             >
               <CalendarIcon className="mr-2 h-4 w-4" />
               {date?.from ? (
@@ -144,6 +197,26 @@ const Dashboard = () => {
       </header>
       
       {!isLoading && !setupStatus.isComplete && <SetupChecklist status={setupStatus} />}
+
+      {accountingReadiness && !accountingReadiness.accountingReady && (
+        <AccountingSetupProgressCard readiness={accountingReadiness} />
+      )}
+
+      {accountingHealth && (
+        <AccountingHealthCard health={accountingHealth} />
+      )}
+
+      {accountingPolicyDashboard && (
+        <AccountingPolicyCard dashboard={accountingPolicyDashboard} />
+      )}
+
+      {accountingRulesDashboard && (
+        <AccountingRulesCard dashboard={accountingRulesDashboard} />
+      )}
+
+      {businessEventsDashboard && (
+        <BusinessEventsCard dashboard={businessEventsDashboard} />
+      )}
 
       {lowStockItems && lowStockItems.length > 0 && (
         <Alert variant="destructive">
@@ -163,82 +236,128 @@ const Dashboard = () => {
         </Alert>
       )}
 
-      <QuickActions />
-      
+      <section className="space-y-3" aria-label="Quick actions">
+        <div>
+          <h2 className="text-lg font-semibold tracking-tight text-foreground">Quick actions</h2>
+          <p className="text-sm text-muted-foreground">Jump into common workflows quickly.</p>
+        </div>
+        <QuickActions />
+      </section>
+
       {isAdmin && (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <DashboardInsights
+          isLoading={isLoading}
+          overdueInvoices={overdueInvoices}
+          lowStockItems={lowStockItems}
+          actions={actions}
+          totalAr={totalAr}
+          totalAp={totalAp}
+          netIncome={totals.netIncome}
+        />
+      )}
+
+      {isAdmin && (
+        <section className="space-y-3" aria-label="Financial health KPIs">
+          <div>
+            <h2 className="text-lg font-semibold tracking-tight text-foreground">Financial health</h2>
+            <p className="text-sm text-muted-foreground">A concise overview of your current position.</p>
+          </div>
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
             {summaryCards.filter(c => !c.hidden).map((card, index) => (
-            <Card key={index} className="cursor-pointer transition-colors hover:bg-muted/50" onClick={() => navigate(card.link)}>
+            <Card key={index} className="cursor-pointer transition-all duration-base ease-smooth hover:shadow-md hover:-translate-y-0.5" onClick={() => navigate(card.link)}>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">{card.title}</CardTitle>
-                <card.icon className="h-4 w-4 text-muted-foreground" />
+                <CardTitle className="text-sm font-medium text-muted-foreground">{card.title}</CardTitle>
+                <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                  <card.icon className="h-5 w-5" />
+                </div>
                 </CardHeader>
                 <CardContent>
-                {isLoading ? <Skeleton className="h-8 w-3/4" /> : <div className={`text-2xl font-bold ${card.color || ''}`}>{formatCurrency(card.value)}</div>}
+                {isLoading ? <Skeleton className="h-9 w-3/4" /> : <div className={`text-3xl font-semibold tracking-tight tabular-nums ${card.color || ''}`}>{formatCurrency(card.value)}</div>}
                 </CardContent>
             </Card>
             ))}
-        </div>
+          </div>
+        </section>
+      )}
+
+      {isAdmin && payrollKpis && (
+        <section className="space-y-3" aria-label="Payroll KPIs">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-lg font-semibold tracking-tight text-foreground flex items-center gap-2">
+                <Briefcase className="h-5 w-5 text-primary" /> Payroll
+              </h2>
+              <p className="text-sm text-muted-foreground">Upcoming run status, statutory totals and output lifecycle.</p>
+            </div>
+            <Button variant="outline" size="sm" asChild>
+              <Link to="/payroll">Payroll Command Centre</Link>
+            </Button>
+          </div>
+          <div className="grid gap-3 grid-cols-2 md:grid-cols-4 lg:grid-cols-6">
+            <Card>
+              <CardHeader className="p-3 pb-1">
+                <CardDescription className="text-xs">Upcoming Payroll</CardDescription>
+                <CardTitle className="text-sm">
+                  {payrollKpis.upcomingPayDate ? format(new Date(payrollKpis.upcomingPayDate), 'dd MMM yyyy') : '—'}
+                </CardTitle>
+              </CardHeader>
+            </Card>
+            <Card>
+              <CardHeader className="p-3 pb-1">
+                <CardDescription className="text-xs">Run Status</CardDescription>
+                <CardTitle className="text-sm capitalize">{payrollKpis.runStatus}</CardTitle>
+              </CardHeader>
+            </Card>
+            <Card>
+              <CardHeader className="p-3 pb-1">
+                <CardDescription className="text-xs">Draft Runs</CardDescription>
+                <CardTitle className="text-sm">{payrollKpis.draftRunCount}</CardTitle>
+              </CardHeader>
+            </Card>
+            <Card>
+              <CardHeader className="p-3 pb-1">
+                <CardDescription className="text-xs">Bank Batch</CardDescription>
+                <CardTitle className="text-sm capitalize">{(payrollKpis.bankBatchStatus ?? 'none').replace(/_/g, ' ')}</CardTitle>
+              </CardHeader>
+            </Card>
+            <Card>
+              <CardHeader className="p-3 pb-1">
+                <CardDescription className="text-xs">Payslips</CardDescription>
+                <CardTitle className="text-sm">{payrollKpis.payslipStatus}</CardTitle>
+              </CardHeader>
+            </Card>
+            <Card className="cursor-pointer hover:bg-muted/50" onClick={() => navigate('/payroll-reports')}>
+              <CardHeader className="p-3 pb-1">
+                <CardDescription className="text-xs">Reports</CardDescription>
+                <CardTitle className="text-sm flex items-center gap-1">View <FileText className="h-3 w-3" /></CardTitle>
+              </CardHeader>
+            </Card>
+          </div>
+        </section>
       )}
 
       <div className="grid gap-6 md:grid-cols-3">
         <Card className="md:col-span-1">
           <CardHeader>
-            <CardTitle className="flex items-center gap-2"><ListChecks className="h-5 w-5 text-blue-500" /> Action Required</CardTitle>
-            <CardDescription>Items waiting for your review.</CardDescription>
+            <CardTitle className="flex items-center gap-2"><ListChecks className="h-5 w-5 text-primary" /> Action Required</CardTitle>
+            <CardDescription>Grouped by business lifecycle — items waiting for your review.</CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
-            {isLoading ? <div className="space-y-2"><Skeleton className="h-10 w-full" /><Skeleton className="h-10 w-full" /></div> : (
-              <div className="grid gap-2">
-                {actions.pendingClaims > 0 && (
-                   <Button variant="outline" className="justify-between" onClick={() => navigate('/expense-claims')}>
-                       <span className="flex items-center gap-2"><Coins className="h-4 w-4" /> Expense Claims</span>
-                       <Badge variant="destructive">{actions.pendingClaims}</Badge>
-                   </Button>
-                )}
-                {actions.draftInvoices > 0 && (
-                   <Button variant="outline" className="justify-between" onClick={() => navigate('/invoices?status=draft')}>
-                       <span className="flex items-center gap-2"><FileText className="h-4 w-4" /> Draft Invoices</span>
-                       <Badge variant="secondary">{actions.draftInvoices}</Badge>
-                   </Button>
-                )}
-                {actions.openBills > 0 && (
-                   <Button variant="outline" className="justify-between" onClick={() => navigate('/bills')}>
-                       <span className="flex items-center gap-2"><Receipt className="h-4 w-4" /> Unpaid Bills</span>
-                       <Badge variant="secondary">{actions.openBills}</Badge>
-                   </Button>
-                )}
-                {actions.expiringQuotes > 0 && (
-                   <Button variant="outline" className="justify-between" onClick={() => navigate('/quotes')}>
-                       <span className="flex items-center gap-2"><MessageSquare className="h-4 w-4" /> Expiring Quotes</span>
-                       <Badge variant="destructive">{actions.expiringQuotes}</Badge>
-                   </Button>
-                )}
-                {Object.values(actions).every(v => v === 0) && <p className="text-sm text-muted-foreground text-center py-4">No pending actions. You're all caught up!</p>}
-              </div>
-            )}
+          <CardContent>
+            <OperationsActionPanel actions={actions} isLoading={isLoading} isAdmin={isAdmin} />
           </CardContent>
         </Card>
 
         <Card className="md:col-span-2">
           <CardHeader>
-            <CardTitle className="flex items-center gap-2"><History className="h-5 w-5 text-orange-500" /> Recent Activity</CardTitle>
-            <CardDescription>The latest transactions and entries across your company.</CardDescription>
+            <CardTitle className="flex items-center gap-2"><History className="h-5 w-5 text-muted-foreground" /> Business Activity</CardTitle>
+            <CardDescription>Recent events across all lifecycles — enriched from journal entries.</CardDescription>
           </CardHeader>
           <CardContent>
-            {isLoading ? <div className="space-y-2"><Skeleton className="h-12 w-full" /><Skeleton className="h-12 w-full" /></div> : (
-              <div className="space-y-4">
-                {recentActivity.length > 0 ? recentActivity.map((activity: any) => (
-                  <div key={activity.id} className="flex items-start justify-between border-b pb-2 last:border-0 last:pb-0">
-                    <div>
-                      <p className="text-sm font-medium leading-none">{activity.description || 'Journal Entry'}</p>
-                      <p className="text-xs text-muted-foreground mt-1">{format(new Date(activity.entry_date), 'MMM d, yyyy')}</p>
-                    </div>
-                    <p className="text-xs text-muted-foreground">recorded {formatDistanceToNow(new Date(activity.created_at), { addSuffix: true })}</p>
-                  </div>
-                )) : <p className="text-sm text-muted-foreground text-center py-4">No recent activity recorded.</p>}
-                {isAdmin && <Button asChild variant="ghost" className="w-full text-xs h-8"><Link to="/journal-entries">View All Transactions</Link></Button>}
-              </div>
+            <ActivityFeed entries={recentActivity} isLoading={isLoading} />
+            {isAdmin && !isLoading && (
+              <Button asChild variant="ghost" className="w-full text-xs h-8 mt-2">
+                <Link to="/journal-entries">View All Transactions</Link>
+              </Button>
             )}
           </CardContent>
         </Card>
@@ -286,9 +405,57 @@ const Dashboard = () => {
             )}
           </CardContent>
         </Card>
-        {isAdmin && <BankAccountsSummary accounts={accounts} isLoading={isLoading} />}
+        {isAdmin && <BankAccountsSummary />}
       </div>
-      
+
+      {isAdmin && (
+        <section className="space-y-3" aria-label="Banking">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-lg font-semibold tracking-tight text-foreground flex items-center gap-2">
+                <Landmark className="h-5 w-5 text-primary" /> Banking
+              </h2>
+              <p className="text-sm text-muted-foreground">Cash position and reconciliation status.</p>
+            </div>
+            <Button variant="outline" size="sm" asChild><Link to="/banking">Banking Command Centre</Link></Button>
+          </div>
+          <div className="grid gap-4 md:grid-cols-3">
+            <Card className="cursor-pointer hover:bg-muted/50 transition-colors" onClick={() => navigate('/banking/accounts')}>
+              <CardHeader><CardTitle>Cash Position</CardTitle><CardDescription>Across all bank, cash, and petty cash accounts.</CardDescription></CardHeader>
+              <CardContent>{bankingLoading ? <Skeleton className="h-9 w-2/3" /> : <div className="text-3xl font-semibold tabular-nums">{formatCurrency(cashPosition)}</div>}</CardContent>
+            </Card>
+            <Card className="cursor-pointer hover:bg-muted/50 transition-colors" onClick={() => navigate('/banking/reconciliation')}>
+              <CardHeader><CardTitle className="flex items-center gap-2"><FileCheck2 className="h-4 w-4" />Pending Reconciliation</CardTitle><CardDescription>Unmatched statement lines.</CardDescription></CardHeader>
+              <CardContent>
+                {bankingLoading ? <Skeleton className="h-9 w-1/3" /> : (
+                  <div className="flex items-center gap-2">
+                    <span className="text-3xl font-semibold tabular-nums">{pendingReconciliationCount}</span>
+                    {pendingReconciliationCount > 0 && <Badge variant="warning">Needs review</Badge>}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader><CardTitle>Recent Banking Activity</CardTitle></CardHeader>
+              <CardContent>
+                {bankingLoading ? <Skeleton className="h-24 w-full" /> : recentBankingActivity.length === 0 ? (
+                  <p className="text-sm text-muted-foreground text-center py-4">No recent banking activity.</p>
+                ) : (
+                  <ul className="space-y-2">
+                    {recentBankingActivity.map((t) => (
+                      <li key={t.id} className="flex justify-between items-center text-sm">
+                        <span className="truncate pr-2">{BANK_TRANSACTION_LABELS[t.transaction_type] ?? t.transaction_type} · {t.bank_accounts?.name}</span>
+                        <span className="font-mono flex-shrink-0">{formatCurrency(t.amount)}</span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        </section>
+      )}
+
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         <Card>
           <CardHeader><CardTitle>Overdue Invoices</CardTitle><CardDescription>Invoices past their due date.</CardDescription></CardHeader>
@@ -298,9 +465,9 @@ const Dashboard = () => {
                 <ul className="space-y-3">
                   {overdueInvoices.map((invoice: OverdueInvoice) => (
                     <li key={invoice.id}>
-                      <Link to={`/invoices/${invoice.id}`} className="block p-2 -m-2 rounded-md hover:bg-gray-100 dark:hover:bg-gray-800">
+                      <Link to={`/invoices/${invoice.id}`} className="block p-2 -m-2 rounded-md transition-colors hover:bg-muted">
                         <div className="flex justify-between items-center text-sm"><span className="font-medium">{invoice.customer_name}</span><span className="font-mono">{formatCurrency(invoice.total)}</span></div>
-                        <div className="flex justify-between items-center text-xs text-muted-foreground"><span>#{invoice.invoice_number}</span><span className="text-red-500">Due {formatDistanceToNow(new Date(invoice.due_date), { addSuffix: true })}</span></div>
+                        <div className="flex justify-between items-center text-xs text-muted-foreground"><span>#{invoice.invoice_number}</span><span className="text-destructive">Due {formatDistanceToNow(new Date(invoice.due_date), { addSuffix: true })}</span></div>
                       </Link>
                     </li>
                   ))}

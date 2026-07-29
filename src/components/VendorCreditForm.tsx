@@ -18,6 +18,7 @@ import { Account } from '../pages/ChartOfAccounts';
 import { Trash2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { formatCurrency } from '../lib/utils';
+import { accountsQuery, productsQuery, vendorsQuery } from '../lib/queries';
 
 const itemSchema = z.object({
   product_id: z.string().optional(),
@@ -78,9 +79,9 @@ const VendorCreditForm = ({ isOpen, setIsOpen }: Props) => {
 
   const { fields, append, remove } = useFieldArray({ control: form.control, name: "items" });
 
-  const { data: vendors } = useQuery<Vendor[]>({ queryKey: ['vendors', activeCompany?.id] });
-  const { data: products } = useQuery<Product[]>({ queryKey: ['products', activeCompany?.id] });
-  const { data: accounts } = useQuery<Account[]>({ queryKey: ['accounts', activeCompany?.id] });
+  const { data: vendors } = useQuery<Vendor[]>({ ...vendorsQuery(activeCompany!.id), enabled: !!activeCompany });
+  const { data: products } = useQuery<Product[]>({ ...productsQuery(activeCompany!.id), enabled: !!activeCompany });
+  const { data: accounts } = useQuery<Account[]>({ ...accountsQuery(activeCompany!.id), enabled: !!activeCompany });
 
   const expenseAccounts = accounts?.filter(a => a.type === 'Expense' || a.type === 'Asset'); // Credit Expense (refund) or Asset (return inventory)
   const apAccounts = accounts?.filter(a => a.type === 'Liability'); // For AP

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../integrations/supabase/client';
 import { Button } from '../components/ui/button';
@@ -15,14 +15,21 @@ import { PlusCircle, MoreHorizontal, Search, X } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "../components/ui/dropdown-menu";
 import { showError, showSuccess } from '../utils/toast';
 import { Badge } from '../components/ui/badge';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import InvoiceForm from '../components/InvoiceForm';
-import { formatCurrency } from '../lib/utils';
+import { formatCurrency, statusBadgeVariant } from '../lib/utils';
 import { useAuth } from '../contexts/AuthContext';
 import { invoicesQuery, customersQuery } from '../lib/queries';
+import { invoiceTotal } from '../lib/invoiceJournal';
 import { Input } from '../components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { Customer } from './Customers';
+import { EmptyState } from '../components/EmptyState';
+import { useDocumentTitle } from '../hooks/useDocumentTitle';
+import { useSortableData } from '../hooks/useSortableData';
+import { SortableHeader } from '../components/SortableHeader';
+import { FileSignature } from 'lucide-react';
+import { Skeleton } from '../components/ui/skeleton';
 
 export type Invoice = {
   id: string;
@@ -31,15 +38,16 @@ export type Invoice = {
   due_date: string;
   status: 'draft' | 'sent' | 'paid' | 'void';
   customers: { name: string } | null;
-  journal_entries: {
-    journal_entry_items: {
-      type: 'debit' | 'credit';
-      amount: number;
-    }[];
-  } | null;
+  // The invoices→journal_entries embed is a to-one FK, so PostgREST returns a
+  // single object. Array-tolerant here purely as a defensive contract.
+  journal_entries:
+    | { journal_entry_items: { type: 'debit' | 'credit'; amount: number }[] }
+    | { journal_entry_items: { type: 'debit' | 'credit'; amount: number }[] }[]
+    | null;
 };
 
 const Invoices = () => {
+  useDocumentTitle('Invoices');
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [selectedInvoiceId, setSelectedInvoiceId] = useState<string | undefined>(undefined);
   const [duplicateFromId, setDuplicateFromId] = useState<string | undefined>(undefined);
@@ -54,9 +62,17 @@ const Invoices = () => {
   const { activeCompany } = useAuth();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+
+  useEffect(() => {
+    const status = searchParams.get('status');
+    const customerId = searchParams.get('customer_id');
+    if (status) setStatusFilter(status);
+    if (customerId) setCustomerFilter(customerId);
+  }, [searchParams]);
 
   const { data: invoices, isLoading } = useQuery<Invoice[]>({
-    ...invoicesQuery(activeCompany?.id!, {
+    ...invoicesQuery(activeCompany!.id, {
       search: searchTerm,
       status: statusFilter,
       customer_id: customerFilter,
@@ -67,7 +83,7 @@ const Invoices = () => {
   });
 
   const { data: customers } = useQuery<Customer[]>({
-    ...customersQuery(activeCompany?.id!),
+    ...customersQuery(activeCompany!.id),
     enabled: !!activeCompany,
   });
 
@@ -129,21 +145,17 @@ const Invoices = () => {
     setIsFormOpen(true);
   };
 
-  const getTotal = (invoice: Invoice) => {
-    return invoice.journal_entries?.[0]?.journal_entry_items
-      .filter(item => item.type === 'debit')
-      .reduce((sum, item) => sum + item.amount, 0) || 0;
-  };
+  const getTotal = (invoice: Invoice) => invoiceTotal(invoice.journal_entries);
 
-  const getStatusVariant = (status: string) => {
-    switch (status) {
-      case 'paid': return 'default';
-      case 'sent': return 'secondary';
-      case 'draft': return 'outline';
-      case 'void': return 'destructive';
-      default: return 'outline';
+  const { items: sortedInvoices, sort, requestSort } = useSortableData(invoices ?? [], (inv, key) => {
+    switch (key) {
+      case 'customer': return inv.customers?.name ?? '';
+      case 'invoice_date': return new Date(inv.invoice_date).getTime();
+      case 'due_date': return new Date(inv.due_date).getTime();
+      case 'amount': return getTotal(inv);
+      default: return (inv as unknown as Record<string, string>)[key];
     }
-  };
+  });
 
   const clearFilters = () => {
     setSearchTerm('');
@@ -228,32 +240,36 @@ const Invoices = () => {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Number</TableHead>
-                <TableHead>Customer</TableHead>
-                <TableHead>Date</TableHead>
-                <TableHead>Due Date</TableHead>
-                <TableHead className="text-right">Amount</TableHead>
-                <TableHead>Status</TableHead>
+                <SortableHeader sortKey="invoice_number" sort={sort} onSort={requestSort}>Number</SortableHeader>
+                <SortableHeader sortKey="customer" sort={sort} onSort={requestSort}>Customer</SortableHeader>
+                <SortableHeader sortKey="invoice_date" sort={sort} onSort={requestSort}>Date</SortableHeader>
+                <SortableHeader sortKey="due_date" sort={sort} onSort={requestSort}>Due Date</SortableHeader>
+                <SortableHeader sortKey="amount" sort={sort} onSort={requestSort} align="right">Amount</SortableHeader>
+                <SortableHeader sortKey="status" sort={sort} onSort={requestSort}>Status</SortableHeader>
                 <TableHead className="w-[50px]"></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {isLoading ? (
-                <TableRow><TableCell colSpan={7} className="text-center">Loading invoices...</TableCell></TableRow>
+                Array.from({ length: 5 }).map((_, i) => (
+                  <TableRow key={`skeleton-${i}`}>
+                    <TableCell colSpan={7}><Skeleton className="h-6 w-full" /></TableCell>
+                  </TableRow>
+                ))
               ) : invoices && invoices.length > 0 ? (
-                invoices.map((invoice) => (
-                  <TableRow key={invoice.id}>
+                sortedInvoices.map((invoice) => (
+                  <TableRow key={invoice.id} className="cursor-pointer" onClick={() => navigate(`/invoices/${invoice.id}`)}>
                     <TableCell className="font-medium">{invoice.invoice_number}</TableCell>
                     <TableCell>{invoice.customers?.name || 'N/A'}</TableCell>
                     <TableCell>{new Date(invoice.invoice_date).toLocaleDateString()}</TableCell>
                     <TableCell>{new Date(invoice.due_date).toLocaleDateString()}</TableCell>
                     <TableCell className="text-right font-mono">{formatCurrency(getTotal(invoice))}</TableCell>
                     <TableCell>
-                      <Badge variant={getStatusVariant(invoice.status)} className="capitalize">{invoice.status}</Badge>
+                      <Badge variant={statusBadgeVariant(invoice.status)} className="capitalize">{invoice.status}</Badge>
                     </TableCell>
-                    <TableCell>
+                    <TableCell onClick={(e) => e.stopPropagation()}>
                       <DropdownMenu>
-                        <DropdownMenuTrigger asChild><Button variant="ghost" className="h-8 w-8 p-0"><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger>
+                        <DropdownMenuTrigger asChild><Button variant="ghost" className="h-8 w-8 p-0" onClick={(e) => e.stopPropagation()}><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
                           <DropdownMenuItem onClick={() => navigate(`/invoices/${invoice.id}`)}>View</DropdownMenuItem>
                           <DropdownMenuItem onClick={() => handleEdit(invoice.id)}>Edit</DropdownMenuItem>
@@ -267,7 +283,25 @@ const Invoices = () => {
                   </TableRow>
                 ))
               ) : (
-                <TableRow><TableCell colSpan={7} className="text-center">No invoices found matching your filters.</TableCell></TableRow>
+                <TableRow>
+                  <TableCell colSpan={7} className="p-0">
+                    {(searchTerm || statusFilter !== 'all' || customerFilter !== 'all' || dateFrom || dateTo) ? (
+                      <EmptyState
+                        icon={Search}
+                        title="No invoices match your filters"
+                        description="Try adjusting or clearing your filters to see more results."
+                        action={<Button variant="outline" onClick={clearFilters}><X className="mr-2 h-4 w-4" /> Clear filters</Button>}
+                      />
+                    ) : (
+                      <EmptyState
+                        icon={FileSignature}
+                        title="No invoices yet"
+                        description="Create your first invoice to start getting paid. It only takes a moment."
+                        action={<Button onClick={handleAddNew}><PlusCircle className="mr-2 h-4 w-4" /> New Invoice</Button>}
+                      />
+                    )}
+                  </TableCell>
+                </TableRow>
               )}
             </TableBody>
           </Table>

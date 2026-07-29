@@ -1,17 +1,19 @@
-import { useEffect, useState } from 'react';
-import { useForm, useFieldArray } from 'react-hook-form';
+import { useEffect, useMemo, useState } from 'react';
+import { useForm, useFieldArray, type FieldErrors } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../integrations/supabase/client';
 import { useAuth } from '../contexts/AuthContext';
+import { useEnterpriseIdentity } from '../hooks/useEnterpriseIdentity';
 import { Button } from './ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from './ui/dialog';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from './ui/form';
 import { Input } from './ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Textarea } from './ui/textarea';
-import { showError, showSuccess } from '../utils/toast';
+import { showError, showPlatformError, showSuccess } from '../utils/toast';
+import { PlatformError, isPlatformErrorEnvelope } from '../lib/platform/platformError';
 import { Account } from '../pages/ChartOfAccounts';
 import { Customer } from '../pages/Customers';
 import { Product } from '../pages/Products';
@@ -23,7 +25,47 @@ import { formatCurrency } from '../lib/utils';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from './ui/sheet';
 import InvoicePreview from './InvoicePreview';
 import { taxRatesQuery, projectsQuery, customersQuery } from '../lib/queries';
+import {
+  buildCreateInvoiceCommand,
+  dispatchBusinessCommandOrThrow,
+} from '../lib/boe';
 import AddUnbilledTimeDialog from './AddUnbilledTimeDialog';
+import {
+  isTaxLedgerAccount,
+  resolveControlAccounts,
+} from '../lib/accounting/accountRoles';
+import { SmartSelect, type SmartSelectOption } from './cotf/SmartSelect';
+import { invoiceJournalItems } from '../lib/invoiceJournal';
+import {
+  accountCreateConfig,
+  customerCreateConfig,
+  productCreateConfig,
+  projectCreateConfig,
+  taxRateCreateConfig,
+} from './cotf/entityCreateConfigs';
+
+/**
+ * supabase.functions.invoke() always throws a FunctionsHttpError whose .message
+ * is the fixed string "Edge Function returned a non-2xx status code" — the real
+ * platform-error envelope (category, SQLSTATE, correlation id) only exists in
+ * error.context (a Response). Unwrap it so downstream classification sees the
+ * server's actual diagnosis instead of re-deriving "UnknownPlatformError" from
+ * a message that was never informative to begin with.
+ */
+async function resolveEdgeFunctionError(error: unknown): Promise<unknown> {
+  const context = (error as { context?: unknown } | null)?.context;
+  if (context && typeof (context as Response).json === 'function') {
+    try {
+      const body = await (context as Response).json();
+      if (isPlatformErrorEnvelope(body)) {
+        return new PlatformError(body);
+      }
+    } catch {
+      // Response body wasn't JSON (or already consumed) — fall through to the raw error.
+    }
+  }
+  return error;
+}
 
 const invoiceItemSchema = z.object({
   product_id: z.string().optional(),
@@ -60,7 +102,8 @@ interface InvoiceFormProps {
 }
 
 const InvoiceForm = ({ isOpen, setIsOpen, invoiceId, duplicateFromId, initialCustomerId }: InvoiceFormProps) => {
-  const { user, activeCompany } = useAuth();
+  const { user, activeCompany, role } = useAuth();
+  const { companyProp: enterpriseIdentity } = useEnterpriseIdentity(activeCompany?.id);
   const queryClient = useQueryClient();
   const isEditing = !!invoiceId;
   const isDuplicating = !!duplicateFromId;
@@ -81,7 +124,7 @@ const InvoiceForm = ({ isOpen, setIsOpen, invoiceId, duplicateFromId, initialCus
   });
 
   const { data: customers } = useQuery<Customer[]>({ 
-    ...customersQuery(activeCompany?.id!),
+    ...customersQuery(activeCompany!.id),
     enabled: !!activeCompany 
   });
   
@@ -111,27 +154,62 @@ const InvoiceForm = ({ isOpen, setIsOpen, invoiceId, duplicateFromId, initialCus
     enabled: !!activeCompany 
   });
 
-  const { data: projects } = useQuery<Project[]>({ ...projectsQuery(activeCompany?.id!), enabled: !!activeCompany });
-  const { data: taxRates } = useQuery<TaxRate[]>({ ...taxRatesQuery(activeCompany?.id!), enabled: !!activeCompany });
+  const { data: projects } = useQuery<Project[]>({ ...projectsQuery(activeCompany!.id), enabled: !!activeCompany });
+  const { data: taxRates } = useQuery<TaxRate[]>({ ...taxRatesQuery(activeCompany!.id), enabled: !!activeCompany });
   
   const incomeAccounts = accounts?.filter(a => a.type === 'Income');
   const assetAccounts = accounts?.filter(a => a.type === 'Asset');
   const liabilityAccounts = accounts?.filter(a => a.type === 'Liability');
 
+  // Create-on-the-Fly: options + inline-create configs for every master-data
+  // dropdown on the invoice, so a first-time user never hits a dead-end select.
+  const companyId = activeCompany?.id ?? '';
+  const customerOptions = useMemo<SmartSelectOption[]>(
+    () => (customers ?? []).map(c => ({ value: c.id, label: c.name, description: c.email ?? undefined })),
+    [customers],
+  );
+  const productOptions = useMemo<SmartSelectOption[]>(
+    () => (products ?? []).map(p => ({ value: p.id, label: p.name })),
+    [products],
+  );
+  const incomeAccountOptions = useMemo<SmartSelectOption[]>(
+    () => (incomeAccounts ?? []).map(a => ({ value: a.id, label: a.name, description: a.account_number?.toString() })),
+    [incomeAccounts],
+  );
+  const taxRateOptions = useMemo<SmartSelectOption[]>(
+    () => (taxRates ?? []).map(t => ({ value: t.id, label: `${t.rate}%`, keywords: [t.name] })),
+    [taxRates],
+  );
+  const projectOptions = useMemo<SmartSelectOption[]>(
+    () => (projects ?? []).map(p => ({ value: p.id, label: p.name })),
+    [projects],
+  );
+
+  const customerCreate = useMemo(() => customerCreateConfig({ companyId }), [companyId]);
+  const productCreate = useMemo(
+    () => productCreateConfig({
+      companyId,
+      incomeAccounts: (incomeAccounts ?? []).map(a => ({ id: a.id, name: a.name })),
+      defaultIncomeAccountId: incomeAccounts?.[0]?.id,
+    }),
+    [companyId, incomeAccounts],
+  );
+  const incomeAccountCreate = useMemo(() => accountCreateConfig({ companyId }, 'Income'), [companyId]);
+  const taxRateCreate = useMemo(() => taxRateCreateConfig({ companyId }), [companyId]);
+  const projectCreate = useMemo(() => projectCreateConfig({ companyId }), [companyId]);
+
   const watchedValues = form.watch();
   const customerId = form.watch('customer_id');
   const invoiceDate = form.watch('invoice_date');
 
-  // Smart Defaults: Auto-select ledger routing so user doesn't have to
+  // Smart Defaults: resolve A/R, tax, inventory via canonical account_role metadata.
   useEffect(() => {
     if (isOpen && accounts && !isEditing) {
-      const arAcc = accounts.find(a => a.name.toLowerCase().includes('receivable'));
-      const taxAcc = accounts.find(a => a.name.toLowerCase().includes('tax payable'));
-      const invAcc = accounts.find(a => a.name.toLowerCase().includes('inventory asset'));
-
-      if (arAcc) form.setValue('accounts_receivable_id', arAcc.id);
-      if (taxAcc) form.setValue('tax_payable_account_id', taxAcc.id);
-      if (invAcc) form.setValue('inventory_asset_account_id', invAcc.id);
+      const controls = resolveControlAccounts(accounts);
+      if (controls.ar) form.setValue('accounts_receivable_id', controls.ar.id);
+      if (controls.outputVat) form.setValue('tax_payable_account_id', controls.outputVat.id);
+      else if (controls.vatControl) form.setValue('tax_payable_account_id', controls.vatControl.id);
+      if (controls.inventory) form.setValue('inventory_asset_account_id', controls.inventory.id);
     }
   }, [isOpen, accounts, isEditing, form]);
 
@@ -177,11 +255,11 @@ const InvoiceForm = ({ isOpen, setIsOpen, invoiceId, duplicateFromId, initialCus
 
   useEffect(() => {
     if (sourceInvoice && isOpen) {
-      const jeItems = sourceInvoice.journal_entries?.[0]?.journal_entry_items || [];
+      const jeItems = invoiceJournalItems<any>(sourceInvoice.journal_entries);
       const arItem = jeItems.find((item: any) => item.type === 'debit');
       
       const items = jeItems
-        .filter((item: any) => item.type === 'credit' && !item.chart_of_accounts?.name.toLowerCase().includes('tax'))
+        .filter((item: any) => item.type === 'credit' && !isTaxLedgerAccount(item.chart_of_accounts))
         .map((item: any) => ({
           product_id: item.product_id || '', 
           description: item.description || item.chart_of_accounts?.name || 'Item', 
@@ -257,8 +335,12 @@ const InvoiceForm = ({ isOpen, setIsOpen, invoiceId, duplicateFromId, initialCus
     }
   };
 
+  type InvoiceMutationOutcome =
+    | { path: 'boe'; invalidationKeys: readonly (readonly unknown[])[] }
+    | { path: 'direct' };
+
   const mutation = useMutation({
-    mutationFn: async (values: InvoiceFormValues) => {
+    mutationFn: async (values: InvoiceFormValues): Promise<InvoiceMutationOutcome> => {
       if (!user || !activeCompany) throw new Error('User not authenticated');
       
       const timesheetIds = values.items.flatMap(item => item.timesheet_ids || []);
@@ -280,23 +362,67 @@ const InvoiceForm = ({ isOpen, setIsOpen, invoiceId, duplicateFromId, initialCus
         timesheetIds: isEditing ? [] : timesheetIds,
       };
 
-      const { error } = await supabase.functions.invoke('invoices', {
-        body: payload,
+      const invokeInvoice = async () => {
+        const { error } = await supabase.functions.invoke('invoices', { body: payload });
+        if (error) throw await resolveEdgeFunctionError(error);
+      };
+
+      if (isEditing) {
+        await invokeInvoice();
+        return { path: 'direct' };
+      }
+
+      const command = buildCreateInvoiceCommand({
+        companyId: activeCompany.id,
+        userId: user.id,
+        userRole: role,
+        payload: {
+          invoiceNumber: values.invoice_number,
+          customerId: values.customer_id,
+          timesheetIds,
+        },
+        executor: invokeInvoice,
       });
 
-      if (error) throw error;
+      const result = await dispatchBusinessCommandOrThrow(command);
+
+      return { path: 'boe', invalidationKeys: result.dashboardRefreshKeys };
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['invoices', activeCompany?.id] });
-      queryClient.invalidateQueries({ queryKey: ['journal_entries', activeCompany?.id] });
-      if (invoiceId) queryClient.invalidateQueries({ queryKey: ['invoice_detail', invoiceId] });
+    onSuccess: (outcome) => {
+      if (outcome.path === 'boe') {
+        for (const queryKey of outcome.invalidationKeys) {
+          queryClient.invalidateQueries({ queryKey: [...queryKey] });
+        }
+      } else {
+        queryClient.invalidateQueries({ queryKey: ['invoices', activeCompany?.id] });
+        queryClient.invalidateQueries({ queryKey: ['journal_entries', activeCompany?.id] });
+        if (invoiceId) queryClient.invalidateQueries({ queryKey: ['invoice_detail', invoiceId] });
+      }
       showSuccess(`Invoice ${isEditing ? 'updated' : 'created'} successfully.`);
       setIsOpen(false);
     },
-    onError: (error) => showError(`Error: ${error.message}`),
+    onError: (error) => showPlatformError(error),
   });
 
   const onSubmit = (values: InvoiceFormValues) => mutation.mutate(values);
+
+  const onInvalid = (errors: FieldErrors<InvoiceFormValues>) => {
+    const advancedMissing =
+      errors.accounts_receivable_id ||
+      errors.inventory_asset_account_id ||
+      errors.tax_payable_account_id;
+    if (advancedMissing) setShowAdvanced(true);
+
+    const message =
+      errors.accounts_receivable_id?.message ||
+      errors.customer_id?.message ||
+      errors.invoice_number?.message ||
+      errors.items?.message ||
+      errors.items?.[0]?.description?.message ||
+      errors.items?.[0]?.income_account_id?.message ||
+      'Please complete the required invoice fields.';
+    showError(String(message));
+  };
   
   const productsLookup = products || [];
   const hasInventoryItem = watchedValues.items.some(item => productsLookup.find(p => p.id === item.product_id)?.type === 'inventory');
@@ -315,10 +441,24 @@ const InvoiceForm = ({ isOpen, setIsOpen, invoiceId, duplicateFromId, initialCus
             </DialogDescription>
           </DialogHeader>
           <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+            <form onSubmit={form.handleSubmit(onSubmit, onInvalid)} className="space-y-4">
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 <FormField control={form.control} name="invoice_number" render={({ field }) => (<FormItem><FormLabel>Invoice #</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>)} />
-                <FormField control={form.control} name="customer_id" render={({ field }) => (<FormItem><FormLabel>Customer</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select customer" /></SelectTrigger></FormControl><SelectContent>{customers?.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem>)} />
+                <FormField control={form.control} name="customer_id" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Customer</FormLabel>
+                    <SmartSelect
+                      entityLabel="customer"
+                      options={customerOptions}
+                      value={field.value}
+                      onChange={field.onChange}
+                      recentScope={`customer:${companyId}`}
+                      createConfig={customerCreate}
+                      invalidateKeys={[['customers', companyId]]}
+                    />
+                    <FormMessage />
+                  </FormItem>
+                )} />
                 <FormField control={form.control} name="invoice_date" render={({ field }) => (<FormItem><FormLabel>Invoice Date</FormLabel><FormControl><Input type="date" {...field} /></FormControl><FormMessage /></FormItem>)} />
                 <FormField control={form.control} name="due_date" render={({ field }) => (<FormItem><FormLabel>Due Date</FormLabel><FormControl><Input type="date" {...field} /></FormControl><FormMessage /></FormItem>)} />
               </div>
@@ -346,14 +486,67 @@ const InvoiceForm = ({ isOpen, setIsOpen, invoiceId, duplicateFromId, initialCus
                   const lineTotal = (Number(quantity) || 0) * (Number(unitPrice) || 0);
                   return (
                     <div key={field.id} className="grid grid-cols-12 gap-2 items-start border-b pb-4 md:border-none md:pb-0">
-                      <FormField control={form.control} name={`items.${index}.product_id`} render={({ field }) => (<FormItem className="col-span-12 md:col-span-2"><FormControl><Select onValueChange={(value) => { field.onChange(value); handleProductSelect(value, index); }} value={field.value || 'none'}><SelectTrigger><SelectValue placeholder="Select item" /></SelectTrigger><SelectContent><SelectItem value="none">None</SelectItem>{products?.map(p => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}</SelectContent></Select></FormControl></FormItem>)} />
+                      <FormField control={form.control} name={`items.${index}.product_id`} render={({ field }) => (
+                        <FormItem className="col-span-12 md:col-span-2">
+                          <SmartSelect
+                            entityLabel="item"
+                            placeholder="Select item"
+                            options={productOptions}
+                            value={field.value}
+                            onChange={(value) => { field.onChange(value); handleProductSelect(value, index); }}
+                            recentScope={`product:${companyId}`}
+                            createConfig={productCreate}
+                            invalidateKeys={[['products', companyId]]}
+                          />
+                        </FormItem>
+                      )} />
                       <FormField control={form.control} name={`items.${index}.description`} render={({ field }) => (<FormItem className="col-span-12 md:col-span-3"><FormControl><Textarea placeholder="Description" {...field} rows={1} className="min-h-[40px]" /></FormControl></FormItem>)} />
                       <FormField control={form.control} name={`items.${index}.quantity`} render={({ field }) => (<FormItem className="col-span-4 md:col-span-1"><FormControl><Input type="number" step="0.01" {...field} /></FormControl></FormItem>)} />
                       <FormField control={form.control} name={`items.${index}.unit_price`} render={({ field }) => (<FormItem className="col-span-4 md:col-span-1"><FormControl><Input type="number" step="0.01" {...field} /></FormControl></FormItem>)} />
-                      <FormField control={form.control} name={`items.${index}.tax_rate_id`} render={({ field }) => (<FormItem className="col-span-4 md:col-span-1"><Select onValueChange={field.onChange} value={field.value || 'none'}><FormControl><SelectTrigger><SelectValue placeholder="-" /></SelectTrigger></FormControl><SelectContent><SelectItem value="none">None</SelectItem>{taxRates?.map(t => <SelectItem key={t.id} value={t.id}>{t.rate}%</SelectItem>)}</SelectContent></Select></FormItem>)} />
+                      <FormField control={form.control} name={`items.${index}.tax_rate_id`} render={({ field }) => (
+                        <FormItem className="col-span-4 md:col-span-1">
+                          <SmartSelect
+                            entityLabel="tax code"
+                            placeholder="-"
+                            options={taxRateOptions}
+                            value={field.value}
+                            onChange={field.onChange}
+                            recentScope={`tax:${companyId}`}
+                            createConfig={taxRateCreate}
+                            invalidateKeys={[['tax_rates', companyId]]}
+                          />
+                        </FormItem>
+                      )} />
                       <div className="col-span-6 md:col-span-1 pt-2 text-right font-mono text-sm">{formatCurrency(lineTotal)}</div>
-                      <FormField control={form.control} name={`items.${index}.income_account_id`} render={({ field }) => (<FormItem className="col-span-5 md:col-span-2"><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Account" /></SelectTrigger></FormControl><SelectContent>{incomeAccounts?.map(acc => <SelectItem key={acc.id} value={acc.id}>{acc.name}</SelectItem>)}</SelectContent></Select></FormItem>)} />
-                      <FormField control={form.control} name={`items.${index}.project_id`} render={({ field }) => (<FormItem className="col-span-12 md:col-span-1"><Select onValueChange={field.onChange} value={field.value || 'none'}><FormControl><SelectTrigger><SelectValue placeholder="-" /></SelectTrigger></FormControl><SelectContent><SelectItem value="none">None</SelectItem>{projects?.map(p => <SelectItem key={p.id} value={p.id}>{p.name.substring(0,10)}...</SelectItem>)}</SelectContent></Select></FormItem>)} />
+                      <FormField control={form.control} name={`items.${index}.income_account_id`} render={({ field }) => (
+                        <FormItem className="col-span-5 md:col-span-2">
+                          <SmartSelect
+                            entityLabel="income account"
+                            placeholder="Account"
+                            options={incomeAccountOptions}
+                            value={field.value}
+                            onChange={field.onChange}
+                            allowClear={false}
+                            recentScope={`income-account:${companyId}`}
+                            createConfig={incomeAccountCreate}
+                            invalidateKeys={[['accounts', companyId]]}
+                          />
+                        </FormItem>
+                      )} />
+                      <FormField control={form.control} name={`items.${index}.project_id`} render={({ field }) => (
+                        <FormItem className="col-span-12 md:col-span-1">
+                          <SmartSelect
+                            entityLabel="project"
+                            placeholder="-"
+                            options={projectOptions}
+                            value={field.value}
+                            onChange={field.onChange}
+                            recentScope={`project:${companyId}`}
+                            createConfig={projectCreate}
+                            invalidateKeys={[['projects', companyId]]}
+                          />
+                        </FormItem>
+                      )} />
                       <div className="col-span-1 pt-2 flex justify-end"><Button type="button" variant="ghost" size="icon" onClick={() => remove(index)} disabled={fields.length <= 1}><Trash2 className="h-4 w-4" /></Button></div>
                     </div>
                   )
@@ -394,7 +587,12 @@ const InvoiceForm = ({ isOpen, setIsOpen, invoiceId, duplicateFromId, initialCus
                 <SheetDescription>Verify your invoice details before saving.</SheetDescription>
             </SheetHeader>
             <div className="mt-4">
-                <InvoicePreview formData={watchedValues} customers={customers} company={activeCompany} taxRates={taxRates} />
+                <InvoicePreview
+                  formData={watchedValues}
+                  customers={customers}
+                  company={enterpriseIdentity ? { ...enterpriseIdentity, logo_url: activeCompany?.logo_url } : null}
+                  taxRates={taxRates}
+                />
             </div>
         </SheetContent>
       </Sheet>

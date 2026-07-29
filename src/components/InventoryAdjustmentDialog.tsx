@@ -5,7 +5,6 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
-import { supabase } from '../integrations/supabase/client';
 import { useAuth } from '../contexts/AuthContext';
 import { Button } from './ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from './ui/dialog';
@@ -16,9 +15,12 @@ import { showError, showSuccess } from '../utils/toast';
 import { Product } from '../pages/Products';
 import { Account } from '../pages/ChartOfAccounts';
 import { format } from 'date-fns';
+import { accountsQuery } from '../lib/queries';
+import { invokeInventory } from '../lib/inventory/client';
+import { resolveControlAccounts } from '../lib/accounting/accountRoles';
 
 const adjustmentSchema = z.object({
-  new_quantity: z.coerce.number().int(),
+  new_quantity: z.coerce.number().min(0, 'Quantity cannot be negative.'),
   inventory_account_id: z.string().min(1, "Inventory Asset account is required."),
   adjustment_account_id: z.string().min(1, "Adjustment account is required."),
   reason: z.string().min(1, "Reason is required."),
@@ -48,23 +50,22 @@ const InventoryAdjustmentDialog = ({ isOpen, setIsOpen, product }: InventoryAdju
   });
 
   const { data: accounts } = useQuery<Account[]>({ 
-    queryKey: ['accounts', activeCompany?.id],
+    ...accountsQuery(activeCompany!.id),
     enabled: !!activeCompany
   });
 
   const assetAccounts = accounts?.filter(a => a.type === 'Asset');
   const expenseAccounts = accounts?.filter(a => a.type === 'Expense' || a.type === 'Income'); // Can be income (gain) or expense (loss)
 
-  // Try to auto-select accounts if they have obvious names
+  // Auto-select inventory + COGS/adjustment accounts via account_role
   useEffect(() => {
     if (isOpen && accounts) {
-      const invAcc = accounts.find(a => a.name.toLowerCase().includes('inventory asset'));
-      const adjAcc = accounts.find(a => a.name.toLowerCase().includes('inventory shrinkage') || a.name.toLowerCase().includes('cost of goods'));
+      const controls = resolveControlAccounts(accounts);
       
       form.reset({
         new_quantity: product.quantity_on_hand,
-        inventory_account_id: invAcc?.id || '',
-        adjustment_account_id: adjAcc?.id || (product.cogs_account_id || ''),
+        inventory_account_id: controls.inventory?.id || '',
+        adjustment_account_id: controls.cogs?.id || (product.cogs_account_id || ''),
         reason: '',
         date: format(new Date(), 'yyyy-MM-dd'),
       });
@@ -74,22 +75,21 @@ const InventoryAdjustmentDialog = ({ isOpen, setIsOpen, product }: InventoryAdju
   const mutation = useMutation({
     mutationFn: async (values: AdjustmentFormValues) => {
       if (!activeCompany) throw new Error('No active company');
-      const { error } = await supabase.functions.invoke('products', {
-        body: {
-          method: 'ADJUST_QUANTITY',
-          company_id: activeCompany.id,
-          productId: product.id,
-          newQuantity: values.new_quantity,
-          inventoryAccountId: values.inventory_account_id,
-          adjustmentAccountId: values.adjustment_account_id,
-          reason: values.reason,
-          date: values.date,
-        },
+      // V17.0: route through inventory ADJUST so inv_balances + journals stay consistent
+      await invokeInventory(activeCompany.id, {
+        method: 'ADJUST',
+        productId: product.id,
+        newQuantity: values.new_quantity,
+        inventoryAccountId: values.inventory_account_id,
+        adjustmentAccountId: values.adjustment_account_id,
+        reason: values.reason,
+        date: values.date,
       });
-      if (error) throw error;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['products', activeCompany?.id] });
+      queryClient.invalidateQueries({ queryKey: ['inventory_register', activeCompany?.id] });
+      queryClient.invalidateQueries({ queryKey: ['inventory_movements', activeCompany?.id] });
       queryClient.invalidateQueries({ queryKey: ['journal_entries', activeCompany?.id] });
       showSuccess('Inventory adjusted successfully.');
       setIsOpen(false);

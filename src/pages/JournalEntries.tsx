@@ -37,14 +37,19 @@ import { Account } from './ChartOfAccounts';
 import { Vendor } from './Vendors';
 import { Customer } from './Customers';
 import { useAuth } from '../contexts/AuthContext';
+import { accountsQuery, customersQuery, vendorsQuery } from '../lib/queries';
 
 type JournalEntry = {
   id: string;
   entry_date: string;
   description: string | null;
   attachment_url: string | null;
+  journal_number: string | null;
   vendors: { name: string }[] | null;
   customers: { name: string }[] | null;
+  invoices: { invoice_number: string }[] | null;
+  bills: { bill_number: string }[] | null;
+  posting_requests: { module: string; source: string | null; status: string; created_by: string | null }[] | null;
   journal_entry_items: {
     type: 'debit' | 'credit';
     amount: number;
@@ -63,17 +68,17 @@ const JournalEntries = () => {
   const { activeCompany } = useAuth();
 
   const { data: accounts } = useQuery<Account[]>({
-    queryKey: ['accounts', activeCompany?.id],
+    ...accountsQuery(activeCompany!.id),
     enabled: !!activeCompany,
   });
 
   const { data: vendors } = useQuery<Vendor[]>({
-    queryKey: ['vendors', activeCompany?.id],
+    ...vendorsQuery(activeCompany!.id),
     enabled: !!activeCompany,
   });
 
   const { data: customers } = useQuery<Customer[]>({
-    queryKey: ['customers', activeCompany?.id],
+    ...customersQuery(activeCompany!.id),
     enabled: !!activeCompany,
   });
 
@@ -89,8 +94,12 @@ const JournalEntries = () => {
           entry_date,
           description,
           attachment_url,
+          journal_number,
           vendors ( name ),
           customers ( name ),
+          invoices!invoice_id ( invoice_number ),
+          bills!bill_id ( bill_number ),
+          posting_requests!journal_entry_id ( module, source, status, created_by ),
           journal_entry_items (
             type,
             amount
@@ -153,20 +162,26 @@ const JournalEntries = () => {
     }
   };
 
-  const calculateTotal = (items: JournalEntry['journal_entry_items']) => {
+  const calculateTotal = (items: JournalEntry['journal_entry_items'], type: 'debit' | 'credit') => {
     return items
-      .filter(item => item.type === 'debit')
+      .filter(item => item.type === type)
       .reduce((sum, item) => sum + item.amount, 0);
+  };
+
+  const isBalanced = (items: JournalEntry['journal_entry_items']) => {
+    return Math.abs(calculateTotal(items, 'debit') - calculateTotal(items, 'credit')) < 0.005;
   };
 
   const handleExport = () => {
     if (!entries) return;
     const data = entries.map(e => ({
+      JournalNumber: e.journal_number,
       Date: new Date(e.entry_date).toLocaleDateString(),
       Description: e.description,
-      Vendor: e.vendors?.[0]?.name || '',
-      Customer: e.customers?.[0]?.name || '',
-      Amount: calculateTotal(e.journal_entry_items).toFixed(2),
+      Module: e.posting_requests?.[0]?.module || '',
+      Debit: calculateTotal(e.journal_entry_items, 'debit').toFixed(2),
+      Credit: calculateTotal(e.journal_entry_items, 'credit').toFixed(2),
+      Balanced: isBalanced(e.journal_entry_items) ? 'Yes' : 'No',
     }));
     downloadCSV(data, `journal-entries-${new Date().toISOString().split('T')[0]}.csv`);
   };
@@ -176,7 +191,10 @@ const JournalEntries = () => {
       <Card>
         <CardHeader>
           <div className="flex flex-row items-center justify-between">
-            <CardTitle>Journal Entries</CardTitle>
+            <div>
+              <CardTitle>Journal Entries</CardTitle>
+              <p className="text-sm text-muted-foreground mt-1">Enterprise journal register — double-click a row for journal lines.</p>
+            </div>
             <div className="flex gap-2">
               <Button variant="outline" onClick={handleExport} disabled={!entries || entries.length === 0}>
                 <Download className="mr-2 h-4 w-4" /> Export CSV
@@ -256,30 +274,49 @@ const JournalEntries = () => {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Date</TableHead>
-                <TableHead>Description</TableHead>
-                <TableHead>Vendor</TableHead>
-                <TableHead>Customer</TableHead>
-                <TableHead className="text-right">Amount</TableHead>
+                <TableHead>Journal #</TableHead>
+                <TableHead>Posting Date</TableHead>
+                <TableHead>Module</TableHead>
+                <TableHead>Source Document</TableHead>
+                <TableHead>Reference</TableHead>
+                <TableHead className="text-right">Debit Total</TableHead>
+                <TableHead className="text-right">Credit Total</TableHead>
+                <TableHead>Balanced</TableHead>
+                <TableHead>Posted By</TableHead>
+                <TableHead>Status</TableHead>
                 <TableHead className="w-[50px]"></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {isLoading ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center">Loading entries...</TableCell>
+                  <TableCell colSpan={11} className="text-center">Loading entries...</TableCell>
                 </TableRow>
               ) : entries && entries.length > 0 ? (
-                entries.map((entry) => (
-                  <TableRow key={entry.id}>
+                entries.map((entry) => {
+                  const pr = entry.posting_requests?.[0];
+                  const debit = calculateTotal(entry.journal_entry_items, 'debit');
+                  const credit = calculateTotal(entry.journal_entry_items, 'credit');
+                  const sourceDoc = entry.invoices?.[0]?.invoice_number || entry.bills?.[0]?.bill_number || entry.vendors?.[0]?.name || entry.customers?.[0]?.name || '—';
+                  return (
+                  <TableRow
+                    key={entry.id}
+                    className="cursor-pointer"
+                    onDoubleClick={() => setSelectedEntryIdForDetail(entry.id)}
+                  >
+                    <TableCell className="font-semibold">{entry.journal_number || entry.id.slice(0, 8)}</TableCell>
                     <TableCell>{new Date(entry.entry_date).toLocaleDateString()}</TableCell>
+                    <TableCell>{pr?.module || 'manual_journal'}</TableCell>
                     <TableCell>
-                      {entry.description}
+                      {sourceDoc}
                       {entry.attachment_url && <Paperclip className="inline-block h-4 w-4 ml-2 text-gray-400" />}
                     </TableCell>
-                    <TableCell>{entry.vendors?.[0]?.name || 'N/A'}</TableCell>
-                    <TableCell>{entry.customers?.[0]?.name || 'N/A'}</TableCell>
-                    <TableCell className="text-right font-mono">{formatCurrency(calculateTotal(entry.journal_entry_items))}</TableCell>
+                    <TableCell className="max-w-[200px] truncate">{entry.description || '—'}</TableCell>
+                    <TableCell className="text-right font-mono">{formatCurrency(debit)}</TableCell>
+                    <TableCell className="text-right font-mono">{formatCurrency(credit)}</TableCell>
+                    <TableCell>{isBalanced(entry.journal_entry_items) ? 'Yes' : 'No'}</TableCell>
+                    <TableCell className="font-mono text-xs">{pr?.created_by?.slice(0, 8) || '—'}</TableCell>
+                    <TableCell className="capitalize">{pr?.status || 'posted'}</TableCell>
                     <TableCell>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
@@ -289,17 +326,18 @@ const JournalEntries = () => {
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => setSelectedEntryIdForDetail(entry.id)}>View Details</DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => setSelectedEntryIdForDetail(entry.id)}>View Journal Lines</DropdownMenuItem>
                           <DropdownMenuItem onClick={() => handleEdit(entry.id)}>Edit</DropdownMenuItem>
                           <DropdownMenuItem onClick={() => handleDelete(entry.id)} className="text-red-600">Delete</DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </TableCell>
                   </TableRow>
-                ))
+                  );
+                })
               ) : (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center">No journal entries found for the selected period.</TableCell>
+                  <TableCell colSpan={11} className="text-center">No journal entries found for the selected period.</TableCell>
                 </TableRow>
               )}
             </TableBody>

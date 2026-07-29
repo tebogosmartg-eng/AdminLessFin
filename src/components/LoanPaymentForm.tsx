@@ -13,6 +13,7 @@ import { showError, showSuccess } from '../utils/toast';
 import { Account } from '../pages/ChartOfAccounts';
 import { format } from 'date-fns';
 import { formatCurrency } from '../lib/utils';
+import { accountsQuery } from '../lib/queries';
 import { useAuth } from '../contexts/AuthContext';
 
 const paymentSchema = z.object({
@@ -57,7 +58,7 @@ const LoanPaymentForm = ({ isOpen, setIsOpen, scheduleItem }: LoanPaymentFormPro
     }
   }, [isOpen, scheduleItem, form]);
 
-  const { data: accounts } = useQuery<Account[]>({ queryKey: ['accounts', activeCompany?.id], enabled: !!activeCompany });
+  const { data: accounts } = useQuery<Account[]>({ ...accountsQuery(activeCompany!.id), enabled: !!activeCompany });
   const assetAccounts = accounts?.filter(a => a.type === 'Asset');
   const expenseAccounts = accounts?.filter(a => a.type === 'Expense');
 

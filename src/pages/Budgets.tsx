@@ -45,7 +45,7 @@ const Budgets = () => {
   const { activeCompany } = useAuth();
 
   const { data: budgets, isLoading } = useQuery<Budget[]>({
-    ...budgetsQuery(activeCompany?.id!),
+    ...budgetsQuery(activeCompany!.id),
     enabled: !!activeCompany,
   });
 

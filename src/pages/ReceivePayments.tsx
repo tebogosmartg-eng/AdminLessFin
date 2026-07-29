@@ -32,10 +32,11 @@ const ReceivePayments = () => {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [selectedPayment, setSelectedPayment] = useState<SelectedPayment | null>(null);
   const { activeCompany } = useAuth();
+  const companyId = activeCompany?.id;
 
   const { data: customers, isLoading } = useQuery<CustomerBalance[]>({
-    ...customerBalancesQuery(activeCompany?.id!),
-    enabled: !!activeCompany,
+    ...customerBalancesQuery(companyId ?? ''),
+    enabled: !!companyId,
   });
 
   const handleReceivePayment = (customer: CustomerBalance) => {

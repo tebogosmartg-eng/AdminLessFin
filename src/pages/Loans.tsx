@@ -4,7 +4,10 @@ import { supabase } from '../integrations/supabase/client';
 import { Button } from '../components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/table';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/card';
-import { PlusCircle, MoreHorizontal, FileText } from 'lucide-react';
+import { PlusCircle, MoreHorizontal, FileText, Landmark } from 'lucide-react';
+import { EmptyState } from '../components/EmptyState';
+import { Skeleton } from '../components/ui/skeleton';
+import { useDocumentTitle } from '../hooks/useDocumentTitle';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "../components/ui/dropdown-menu";
 import { Badge } from '../components/ui/badge';
 import LoanForm from '../components/LoanForm';
@@ -23,13 +26,14 @@ type Loan = {
 };
 
 const Loans = () => {
+  useDocumentTitle('Loans');
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [selectedLoanId, setSelectedLoanId] = useState<string | undefined>(undefined);
   const navigate = useNavigate();
   const { activeCompany } = useAuth();
 
   const { data: loans, isLoading } = useQuery<Loan[]>({
-    ...loansQuery(activeCompany?.id!),
+    ...loansQuery(activeCompany!.id),
     enabled: !!activeCompany,
   });
 
@@ -66,7 +70,11 @@ const Loans = () => {
             </TableHeader>
             <TableBody>
               {isLoading ? (
-                <TableRow><TableCell colSpan={5} className="text-center">Loading loans...</TableCell></TableRow>
+                Array.from({ length: 5 }).map((_, i) => (
+                  <TableRow key={`skeleton-${i}`}>
+                    <TableCell colSpan={5}><Skeleton className="h-6 w-full" /></TableCell>
+                  </TableRow>
+                ))
               ) : loans && loans.length > 0 ? (
                 loans.map((loan) => (
                   <TableRow key={loan.id}>
@@ -94,7 +102,16 @@ const Loans = () => {
                   </TableRow>
                 ))
               ) : (
-                <TableRow><TableCell colSpan={5} className="text-center">No loans found. Add one to get started.</TableCell></TableRow>
+                <TableRow>
+                  <TableCell colSpan={5} className="p-0">
+                    <EmptyState
+                      icon={Landmark}
+                      title="No loans yet"
+                      description="Add a loan to track balances, schedule repayments and record interest automatically."
+                      action={<Button onClick={handleAddNew}><PlusCircle className="mr-2 h-4 w-4" /> New Loan</Button>}
+                    />
+                  </TableCell>
+                </TableRow>
               )}
             </TableBody>
           </Table>

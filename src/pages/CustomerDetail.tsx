@@ -18,6 +18,7 @@ type Transaction = {
   id: string;
   date: string;
   description: string;
+  invoice_id?: string;
   invoice_number?: string;
   type: 'invoice' | 'payment';
   amount: number;
@@ -144,10 +145,15 @@ const CustomerDetail = () => {
               <span className="text-sm text-muted-foreground">Paid</span>
               <span className="font-semibold text-green-600">{formatCurrency(totalPaid)}</span>
             </div>
-            <div className="pt-4 border-t flex justify-center">
+            <div className="pt-4 border-t flex flex-col gap-2">
                <Button asChild className="w-full">
                  <Link to={`/invoices?customer_id=${customer.id}`}>View All Invoices</Link>
                </Button>
+               {currentBalance > 0 && (
+                 <Button asChild variant="outline" className="w-full">
+                   <Link to="/receive-payments">Receive Payment</Link>
+                 </Button>
+               )}
             </div>
           </CardContent>
         </Card>
@@ -205,8 +211,8 @@ const CustomerDetail = () => {
                     <TableCell>{format(new Date(t.date), 'MM/dd/yyyy')}</TableCell>
                     <TableCell>{t.description}</TableCell>
                     <TableCell>
-                      {t.invoice_number ? (
-                        <Link to={`/invoices/${t.invoice_number}`} className="underline decoration-dotted print:no-underline">
+                      {t.invoice_number && t.invoice_id ? (
+                        <Link to={`/invoices/${t.invoice_id}`} className="underline decoration-dotted print:no-underline">
                           {t.invoice_number}
                         </Link>
                       ) : (

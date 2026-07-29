@@ -18,7 +18,7 @@ import { Project } from '../pages/Projects';
 import { Trash2, X } from 'lucide-react';
 import { addDays, format } from 'date-fns';
 import { formatCurrency } from '../lib/utils';
-import { projectsQuery } from '../lib/queries';
+import { projectsQuery, vendorsQuery, productsQuery } from '../lib/queries';
 
 const poItemSchema = z.object({
   product_id: z.string().optional(),
@@ -129,9 +129,9 @@ const PurchaseOrderForm = ({ isOpen, setIsOpen, poId }: Props) => {
 
   const { fields, append, remove } = useFieldArray({ control: form.control, name: "items" });
 
-  const { data: vendors } = useQuery<Vendor[]>({ queryKey: ['vendors', activeCompany?.id] });
-  const { data: products } = useQuery<Product[]>({ queryKey: ['products', activeCompany?.id] });
-  const { data: projects } = useQuery<Project[]>({ ...projectsQuery(activeCompany?.id!), enabled: !!activeCompany });
+  const { data: vendors } = useQuery<Vendor[]>({ ...vendorsQuery(activeCompany!.id), enabled: !!activeCompany });
+  const { data: products } = useQuery<Product[]>({ ...productsQuery(activeCompany!.id), enabled: !!activeCompany });
+  const { data: projects } = useQuery<Project[]>({ ...projectsQuery(activeCompany!.id), enabled: !!activeCompany });
 
   const handleProductSelect = (productId: string, index: number) => {
     const product = products?.find(p => p.id === productId);

@@ -15,6 +15,7 @@ import { format } from 'date-fns';
 import { formatCurrency } from '../lib/utils';
 import { Alert, AlertDescription } from './ui/alert';
 import { useAuth } from '../contexts/AuthContext';
+import { accountsQuery } from '../lib/queries';
 
 const disposalSchema = z.object({
   disposal_date: z.string().min(1, "Disposal date is required."),
@@ -58,7 +59,7 @@ const AssetDisposalForm = ({ isOpen, setIsOpen, asset }: AssetDisposalFormProps)
     }
   }, [isOpen, form]);
 
-  const { data: accounts } = useQuery<Account[]>({ queryKey: ['accounts'] });
+  const { data: accounts } = useQuery<Account[]>({ ...accountsQuery(activeCompany!.id), enabled: !!activeCompany });
   const assetAccounts = accounts?.filter(a => a.type === 'Asset');
   const incomeExpenseAccounts = accounts?.filter(a => ['Income', 'Expense'].includes(a.type));
 

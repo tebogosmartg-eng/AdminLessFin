@@ -12,13 +12,14 @@ import { Input } from './ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Textarea } from './ui/textarea';
 import { showError, showSuccess } from '../utils/toast';
+import { EmployeeSelector } from './hr/EmployeeSelector';
 import { Employee } from '../pages/Employees';
 import { Account } from '../pages/ChartOfAccounts';
 import { Project } from '../pages/Projects';
 import { Trash2, X, Sparkles, Loader2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { formatCurrency } from '../lib/utils';
-import { projectsQuery } from '../lib/queries';
+import { projectsQuery, accountsQuery, employeesQuery } from '../lib/queries';
 
 const itemSchema = z.object({
   expense_date: z.string().min(1, "Date is required."),
@@ -120,17 +121,12 @@ const ExpenseClaimForm = ({ isOpen, setIsOpen, claimId }: Props) => {
   const { fields, append, remove } = useFieldArray({ control: form.control, name: "items" });
 
   const { data: employees } = useQuery<Employee[]>({ 
-    queryKey: ['employees', activeCompany?.id],
-    queryFn: async () => {
-        if (!activeCompany) return [];
-        const { data, error } = await supabase.functions.invoke('employees', { body: { method: 'GET', company_id: activeCompany.id } });
-        if(error) throw error;
-        return data;
-    }
+    ...employeesQuery(activeCompany!.id),
+    enabled: !!activeCompany,
   });
   
-  const { data: accounts } = useQuery<Account[]>({ queryKey: ['accounts', activeCompany?.id] });
-  const { data: projects } = useQuery<Project[]>({ ...projectsQuery(activeCompany?.id!), enabled: !!activeCompany });
+  const { data: accounts } = useQuery<Account[]>({ ...accountsQuery(activeCompany!.id), enabled: !!activeCompany });
+  const { data: projects } = useQuery<Project[]>({ ...projectsQuery(activeCompany!.id), enabled: !!activeCompany });
 
   const expenseAccounts = accounts?.filter(a => a.type === 'Expense');
 
@@ -227,7 +223,19 @@ const ExpenseClaimForm = ({ isOpen, setIsOpen, claimId }: Props) => {
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
             <div className="grid grid-cols-3 gap-4">
-              <FormField control={form.control} name="employee_id" render={({ field }) => (<FormItem><FormLabel>Employee</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger></FormControl><SelectContent>{employees?.map(e => <SelectItem key={e.id} value={e.id}>{e.first_name} {e.last_name}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem>)} />
+              <FormField control={form.control} name="employee_id" render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Employee</FormLabel>
+                  <FormControl>
+                    <EmployeeSelector
+                      employees={employees ?? []}
+                      value={field.value}
+                      onValueChange={field.onChange}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )} />
               <FormField control={form.control} name="claim_number" render={({ field }) => (<FormItem><FormLabel>Claim #</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>)} />
               <FormField control={form.control} name="submission_date" render={({ field }) => (<FormItem><FormLabel>Date</FormLabel><FormControl><Input type="date" {...field} /></FormControl><FormMessage /></FormItem>)} />
             </div>

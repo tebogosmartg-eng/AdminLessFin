@@ -2,7 +2,6 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { supabase } from '../integrations/supabase/client';
 import { useAuth } from '../contexts/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from './ui/card';
 import { Button } from './ui/button';
@@ -14,6 +13,7 @@ import { format, getYear, set, isBefore, isAfter, addDays } from 'date-fns';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from './ui/alert-dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table';
 import { Skeleton } from './ui/skeleton';
+import { financialCalendarService } from '@/governance/domains/financialCalendar/service';
 
 const months = Array.from({ length: 12 }, (_, i) => ({ value: i + 1, name: new Date(0, i).toLocaleString('default', { month: 'long' }) }));
 const days = Array.from({ length: 31 }, (_, i) => i + 1);
@@ -49,23 +49,33 @@ const FinancialYearSettings = () => {
     }
   }, [profile, form]);
 
+  // The calendar-config writes below only persist the legacy profile signals.
+  // The posting engine binds journal entries to `financial_years`, so the
+  // first-class year for the chosen range has to be materialised alongside them
+  // or entries posted into that range stay unbound to any year and period.
+  const ensureCalendarMaterialised = async (startDate: Date) => {
+    if (!activeCompany) return;
+    const endDate = addDays(set(startDate, { year: getYear(startDate) + 1 }), -1);
+    const result = await financialCalendarService.ensureFinancialYear(
+      activeCompany.id,
+      format(startDate, 'yyyy-MM-dd'),
+      format(endDate, 'yyyy-MM-dd')
+    );
+    if (!result.success) throw new Error(result.error || 'Failed to create the financial year.');
+  };
+
   const { data: closedYears, isLoading: isLoadingClosedYears } = useQuery({
     queryKey: ['closed_financial_years', activeCompany?.id],
+    // Phase G3.5 — closed years resolve through Governance Financial Calendar Service.
     queryFn: async () => {
       if (!activeCompany) return [];
-      const { data, error } = await supabase.functions.invoke('settings', {
-        body: {
-          method: 'GET_CLOSED_YEARS',
-          company_id: activeCompany.id,
-        },
-      });
-      if (error) throw error;
-      return data;
+      return financialCalendarService.getClosedYears(activeCompany.id);
     },
     enabled: !!activeCompany,
   });
 
   const settingsMutation = useMutation({
+    // Phase G3.5 — FY end settings write through Governance (same UPDATE_PROFILE payload).
     mutationFn: async (values: FinancialYearFormValues) => {
       if (!user) throw new Error('User not authenticated');
       const newEndMonth = values.financial_year_end_month - 1;
@@ -77,62 +87,61 @@ const FinancialYearSettings = () => {
         lastYearEnd = set(lastYearEnd, { year: currentCalendarYear - 1 });
       }
       const newStartDate = addDays(lastYearEnd, 1);
-      const updatePayload = { ...values, current_financial_year_start: format(newStartDate, 'yyyy-MM-dd') };
-      
-      const { error } = await supabase.functions.invoke('settings', {
-        body: {
-          method: 'UPDATE_PROFILE',
-          profileData: updatePayload,
-        },
+      const result = await financialCalendarService.updateFinancialYearEndSettings({
+        financial_year_end_month: values.financial_year_end_month,
+        financial_year_end_day: values.financial_year_end_day,
+        current_financial_year_start: format(newStartDate, 'yyyy-MM-dd'),
       });
-      if (error) throw error;
+      if (!result.success) throw new Error(result.error || 'Failed to update financial year settings.');
+      await ensureCalendarMaterialised(newStartDate);
     },
     onSuccess: async () => {
       await refreshProfile();
+      queryClient.invalidateQueries({ queryKey: ['financial_years'] });
       showSuccess('Financial year settings updated.');
     },
-    onError: (error: any) => showError(error.message),
+    onError: (error: unknown) =>
+      showError(error instanceof Error ? error.message : String(error)),
   });
 
   const closeYearMutation = useMutation({
+    // Phase G3.2 — repointed onto Governance's FinancialCalendarService
+    // instead of invoking the `financial-year` edge function directly. The
+    // underlying CLOSE call is unchanged; this is the same network request
+    // made through the governed access point instead of inline.
     mutationFn: async (endDate: Date) => {
       if (!activeCompany) throw new Error("No active company");
-      const { error } = await supabase.functions.invoke('financial-year', {
-        body: {
-          method: 'CLOSE',
-          company_id: activeCompany.id,
-          end_date: format(endDate, 'yyyy-MM-dd'),
-        },
-      });
-      if (error) throw error;
+      const result = await financialCalendarService.closeFinancialYear(
+        activeCompany.id,
+        format(endDate, 'yyyy-MM-dd')
+      );
+      if (!result.success) throw new Error(result.error || 'Failed to close financial year.');
     },
     onSuccess: async () => {
       await refreshProfile();
       queryClient.invalidateQueries();
       showSuccess('Financial year closed successfully!');
     },
-    onError: (error: any) => showError(error.message),
+    onError: (error: unknown) =>
+      showError(error instanceof Error ? error.message : String(error)),
     onSettled: () => setIsClosing(false),
   });
 
   const reopenYearMutation = useMutation({
+    // Phase G3.2 — same migration as closeYearMutation above: repointed onto
+    // Governance's FinancialCalendarService, underlying REOPEN call unchanged.
     mutationFn: async (closedYearId: string) => {
       if (!activeCompany) throw new Error("No active company");
-      const { error } = await supabase.functions.invoke('financial-year', {
-        body: {
-          method: 'REOPEN',
-          company_id: activeCompany.id,
-          closed_year_id: closedYearId,
-        },
-      });
-      if (error) throw error;
+      const result = await financialCalendarService.reopenFinancialYear(activeCompany.id, closedYearId);
+      if (!result.success) throw new Error(result.error || 'Failed to reopen financial year.');
     },
     onSuccess: async () => {
       await refreshProfile();
       queryClient.invalidateQueries({ queryKey: ['closed_financial_years'] });
       showSuccess('Financial year has been re-opened.');
     },
-    onError: (error: any) => showError(error.message),
+    onError: (error: unknown) =>
+      showError(error instanceof Error ? error.message : String(error)),
   });
 
   const { currentYearStartDate, currentYearEndDate } = useMemo(() => {
@@ -154,6 +163,7 @@ const FinancialYearSettings = () => {
   const availableYears = Array.from({ length: 11 }, (_, i) => getYear(new Date()) - 5 + i);
 
   const setActiveYearMutation = useMutation({
+    // Phase G3.5 — active FY start write through Governance (same UPDATE_PROFILE payload).
     mutationFn: async (year: number) => {
       if (!user || !profile?.financial_year_end_month || !profile?.financial_year_end_day) {
         throw new Error("Profile settings are incomplete.");
@@ -163,20 +173,20 @@ const FinancialYearSettings = () => {
       const endDate = set(new Date(0), { year, month: endMonth, date: endDay });
       const newStartDate = addDays(endDate, 1);
       newStartDate.setFullYear(newStartDate.getFullYear() - 1);
-      
-      const { error } = await supabase.functions.invoke('settings', {
-        body: {
-          method: 'UPDATE_PROFILE',
-          profileData: { current_financial_year_start: format(newStartDate, 'yyyy-MM-dd') },
-        },
-      });
-      if (error) throw error;
+
+      const result = await financialCalendarService.setActiveFinancialYearStart(
+        format(newStartDate, 'yyyy-MM-dd'),
+      );
+      if (!result.success) throw new Error(result.error || 'Failed to update active financial year.');
+      await ensureCalendarMaterialised(newStartDate);
     },
     onSuccess: async () => {
       await refreshProfile();
+      queryClient.invalidateQueries({ queryKey: ['financial_years'] });
       showSuccess("Active financial year has been updated.");
     },
-    onError: (error: any) => showError(error.message),
+    onError: (error: unknown) =>
+      showError(error instanceof Error ? error.message : String(error)),
   });
 
   const handleYearChange = (yearString: string) => {

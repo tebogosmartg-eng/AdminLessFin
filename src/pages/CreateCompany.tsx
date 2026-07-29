@@ -2,8 +2,8 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useMutation } from '@tanstack/react-query';
-import { supabase } from '../integrations/supabase/client';
 import { useAuth } from '../contexts/AuthContext';
+import { companyService } from '@/governance/domains/company/service';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '../components/ui/form';
@@ -24,25 +24,20 @@ const CreateCompany = () => {
   });
 
   const mutation = useMutation({
+    // Phase G3.5 — company CREATE resolves through Governance Company Service.
+    // Underlying company-management CREATE call is unchanged.
     mutationFn: async (values: CompanyFormValues) => {
       if (!user) throw new Error('User not authenticated');
-
-      const { data, error } = await supabase.functions.invoke('company-management', {
-        body: {
-          method: 'CREATE',
-          companyData: { name: values.name },
-        },
-      });
-
-      if (error) throw error;
+      const data = await companyService.createCompany(values.name);
       return data.id;
     },
     onSuccess: async (newCompanyId) => {
       await switchCompany(newCompanyId);
       showSuccess('Company created successfully!');
-      navigate('/');
+      navigate('/accounting-setup');
     },
-    onError: (error: any) => showError(error.message),
+    onError: (error: unknown) =>
+      showError(error instanceof Error ? error.message : String(error)),
   });
 
   return (

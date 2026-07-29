@@ -3,90 +3,101 @@
 @tailwind utilities;
 
 @layer base {
+  /* AdminLess design tokens — emerald brand on warm-neutral grays.
+     Hue family: neutrals ~30-40 (warm), brand ~160-163 (emerald). */
   :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
+    --background: 40 20% 99%;
+    --foreground: 20 14% 10%;
 
     --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
+    --card-foreground: 20 14% 10%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
+    --popover-foreground: 20 14% 10%;
 
-    --primary: 222.2 47.4% 11.2%;
-    --primary-foreground: 210 40% 98%;
+    /* emerald-700 — passes AA (4.5:1) against white foreground */
+    --primary: 163 94% 24%;
+    --primary-foreground: 150 40% 98%;
 
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
+    --secondary: 40 12% 96%;
+    --secondary-foreground: 20 14% 12%;
 
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
+    --muted: 40 12% 96%;
+    --muted-foreground: 25 8% 45%;
 
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
+    /* emerald-500 — highlights, focus, active states (not a text bg) */
+    --accent: 160 84% 39%;
+    --accent-foreground: 150 40% 98%;
 
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
+    --success: 160 84% 30%;
+    --success-foreground: 150 40% 98%;
 
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 222.2 84% 4.9%;
+    --warning: 38 92% 50%;
+    --warning-foreground: 30 40% 12%;
 
-    --radius: 0.5rem;
+    --destructive: 0 72% 45%;
+    --destructive-foreground: 0 40% 98%;
 
-    --sidebar-background: 0 0% 98%;
+    --border: 40 10% 90%;
+    --input: 40 10% 90%;
+    --ring: 160 84% 39%;
 
-    --sidebar-foreground: 240 5.3% 26.1%;
+    --radius: 0.625rem;
 
-    --sidebar-primary: 240 5.9% 10%;
-
-    --sidebar-primary-foreground: 0 0% 98%;
-
-    --sidebar-accent: 240 4.8% 95.9%;
-
-    --sidebar-accent-foreground: 240 5.9% 10%;
-
-    --sidebar-border: 220 13% 91%;
-
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    --sidebar-background: 40 16% 98%;
+    --sidebar-foreground: 25 8% 35%;
+    --sidebar-primary: 163 94% 24%;
+    --sidebar-primary-foreground: 150 40% 98%;
+    --sidebar-accent: 160 40% 94%;
+    --sidebar-accent-foreground: 163 94% 20%;
+    --sidebar-border: 40 10% 90%;
+    --sidebar-ring: 160 84% 39%;
   }
 
   .dark {
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
+    --background: 20 14% 8%;
+    --foreground: 40 20% 96%;
 
-    --card: 222.2 84% 4.9%;
-    --card-foreground: 210 40% 98%;
+    --card: 20 12% 11%;
+    --card-foreground: 40 20% 96%;
 
-    --popover: 222.2 84% 4.9%;
-    --popover-foreground: 210 40% 98%;
+    --popover: 20 12% 11%;
+    --popover-foreground: 40 20% 96%;
 
-    --primary: 210 40% 98%;
-    --primary-foreground: 222.2 47.4% 11.2%;
+    /* brighter emerald so it glows on dark surfaces */
+    --primary: 160 84% 45%;
+    --primary-foreground: 20 30% 8%;
 
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
+    --secondary: 20 8% 18%;
+    --secondary-foreground: 40 20% 96%;
 
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
+    --muted: 20 8% 18%;
+    --muted-foreground: 30 8% 62%;
 
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 40% 98%;
+    --accent: 160 84% 45%;
+    --accent-foreground: 20 30% 8%;
 
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
+    --success: 160 84% 45%;
+    --success-foreground: 20 30% 8%;
 
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 212.7 26.8% 83.9%;
-    --sidebar-background: 240 5.9% 10%;
-    --sidebar-foreground: 240 4.8% 95.9%;
-    --sidebar-primary: 224.3 76.3% 48%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 240 3.7% 15.9%;
-    --sidebar-accent-foreground: 240 4.8% 95.9%;
-    --sidebar-border: 240 3.7% 15.9%;
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    --warning: 38 92% 55%;
+    --warning-foreground: 30 40% 10%;
+
+    --destructive: 0 62% 48%;
+    --destructive-foreground: 0 40% 98%;
+
+    --border: 20 8% 20%;
+    --input: 20 8% 20%;
+    --ring: 160 84% 45%;
+
+    --sidebar-background: 20 12% 10%;
+    --sidebar-foreground: 30 8% 70%;
+    --sidebar-primary: 160 84% 45%;
+    --sidebar-primary-foreground: 20 30% 8%;
+    --sidebar-accent: 160 40% 16%;
+    --sidebar-accent-foreground: 160 84% 70%;
+    --sidebar-border: 20 8% 18%;
+    --sidebar-ring: 160 84% 45%;
   }
 }
 
@@ -97,6 +108,35 @@
 
   body {
     @apply bg-background text-foreground;
+    font-feature-settings: "cv11", "ss01";
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4 {
+    @apply tracking-tight;
+  }
+
+  /* Currency, quantities and any figures should use tabular (monospaced) digits
+     so columns of numbers align. Apply `.tabular-nums` or font-mono at call sites;
+     this guarantees the feature is on wherever those utilities are used. */
+  .font-mono,
+  .tabular-nums {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum";
+  }
+}
+
+@layer utilities {
+  .page-shell {
+    @apply mx-auto w-full max-w-[1600px] px-4 sm:px-6 lg:px-8;
+  }
+
+  .section-stack {
+    @apply space-y-6 md:space-y-8;
   }
 }
 

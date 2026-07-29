@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { useMutation } from '@tanstack/react-query';
 import { supabase } from '../integrations/supabase/client';
 import { useAuth } from '../contexts/AuthContext';
+import { useEnterpriseIdentity } from '../hooks/useEnterpriseIdentity';
 import { Button } from './ui/button';
 import {
   Dialog,
@@ -45,6 +46,7 @@ interface InviteMemberDialogProps {
 
 const InviteMemberDialog = ({ isOpen, setIsOpen }: InviteMemberDialogProps) => {
   const { activeCompany } = useAuth();
+  const { identity } = useEnterpriseIdentity(activeCompany?.id);
   const form = useForm<InviteFormValues>({
     resolver: zodResolver(inviteSchema),
     defaultValues: { email: '', role: 'member' },
@@ -90,7 +92,7 @@ const InviteMemberDialog = ({ isOpen, setIsOpen }: InviteMemberDialogProps) => {
         <DialogHeader>
           <DialogTitle>Invite Team Member</DialogTitle>
           <DialogDescription>
-            Enter the email address of the person you want to invite to '{activeCompany?.name}'.
+            Enter the email address of the person you want to invite to '{identity?.name || 'Your Company'}'.
           </DialogDescription>
         </DialogHeader>
         <Form {...form}>

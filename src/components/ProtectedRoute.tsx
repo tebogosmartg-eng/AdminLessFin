@@ -2,6 +2,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { Navigate, useLocation } from 'react-router-dom';
 import Layout from './Layout';
 import FullScreenLoader from './FullScreenLoader';
+import Landing from '../pages/Landing';
 
 const ProtectedRoute = () => {
   const { session, activeCompany, loading } = useAuth();
@@ -12,6 +13,11 @@ const ProtectedRoute = () => {
   }
 
   if (!session) {
+    // Anonymous visitors on the root see the marketing landing page (the front
+    // door); any other protected path sends them to sign in.
+    if (location.pathname === '/') {
+      return <Landing />;
+    }
     return <Navigate to="/auth" replace />;
   }
 

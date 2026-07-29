@@ -2,6 +2,7 @@ import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from './ui/table';
 import { formatCurrency } from '../lib/utils';
 import { format } from 'date-fns';
+import { CompanyLogo } from './brand';
 
 const QuotePreview = ({ formData, customers, company, taxRates }) => {
   const customer = customers?.find(c => c.id === formData.customer_id);
@@ -27,7 +28,7 @@ const QuotePreview = ({ formData, customers, company, taxRates }) => {
       <Card className="shadow-none border-none">
         <CardHeader className="grid grid-cols-2 gap-4">
           <div>
-            <img src="/logo.png" alt="SmaAcc Logo" className="h-12 w-auto mb-2" />
+            <CompanyLogo src={company?.logo_url} className="mb-2" />
             <CardTitle className="text-base">{company?.name || 'Your Company'}</CardTitle>
             <p className="text-sm text-muted-foreground">{company?.address || 'Your Company Address'}</p>
           </div>

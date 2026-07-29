@@ -4,7 +4,9 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../co
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from '../components/ui/table';
 import { Skeleton } from '../components/ui/skeleton';
 import { Button } from '../components/ui/button';
-import { Download } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { Download, Calculator, BarChart3 } from 'lucide-react';
+import { useDocumentTitle } from '../hooks/useDocumentTitle';
 import { formatCurrency, downloadCSV } from '../lib/utils';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -17,6 +19,7 @@ type InventoryItem = {
 };
 
 const InventoryValuation = () => {
+  useDocumentTitle('Inventory Valuation');
   const { activeCompany } = useAuth();
 
   const { data: inventory, isLoading } = useQuery<InventoryItem[]>({
@@ -54,11 +57,23 @@ const InventoryValuation = () => {
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <h1 className="text-3xl font-bold">Inventory Valuation</h1>
-        <Button variant="outline" size="sm" onClick={handleDownload} disabled={!inventory || inventory.length === 0}>
-          <Download className="mr-2 h-4 w-4" /> Download CSV
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button variant="outline" size="sm" asChild>
+            <Link to="/inventory/costing">
+              <Calculator className="mr-2 h-4 w-4" /> Costing
+            </Link>
+          </Button>
+          <Button variant="outline" size="sm" asChild>
+            <Link to="/inventory/analytics">
+              <BarChart3 className="mr-2 h-4 w-4" /> Analytics
+            </Link>
+          </Button>
+          <Button variant="outline" size="sm" onClick={handleDownload} disabled={!inventory || inventory.length === 0}>
+            <Download className="mr-2 h-4 w-4" /> Download CSV
+          </Button>
+        </div>
       </div>
 
       <Card>
