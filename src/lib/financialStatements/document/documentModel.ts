@@ -442,7 +442,11 @@ export async function loadDocumentModel(params: {
     entity: generalInfo,
     period: dashboard.reportingPeriod
       ? {
-          label: dashboard.reportingPeriod.label,
+          // Prefer calendar year_code (period_key / year_code). Never keep frozen slash labels.
+          label:
+            dashboard.reportingPeriod.year_code ||
+            dashboard.reportingPeriod.period_key ||
+            dashboard.reportingPeriod.label,
           period_key: dashboard.reportingPeriod.period_key,
           start_date: dashboard.reportingPeriod.start_date,
           end_date: dashboard.reportingPeriod.end_date,

@@ -3,16 +3,17 @@ import { useParams, Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../integrations/supabase/client';
 import { useAuth } from '../contexts/AuthContext';
+import { useReportingPeriod } from '../contexts/ReportingPeriodContext';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/table';
 import { Skeleton } from '../components/ui/skeleton';
 import { Download, Printer, ArrowLeft, Mail, Phone, MapPin, Send } from 'lucide-react';
 import { formatCurrency, downloadCSV } from '../lib/utils';
-import { format, startOfYear, endOfYear } from 'date-fns';
-import { Input } from '../components/ui/input';
+import { format } from 'date-fns';
 import { Badge } from '../components/ui/badge';
 import SendStatementDialog from '../components/SendStatementDialog';
+import ReportingPeriodPicker from '../components/ReportingPeriodPicker';
 
 type Transaction = {
   id: string;
@@ -27,14 +28,13 @@ type Transaction = {
 const CustomerDetail = () => {
   const { id } = useParams();
   const { activeCompany } = useAuth();
-  const [dateFrom, setDateFrom] = useState(format(startOfYear(new Date()), 'yyyy-MM-dd'));
-  const [dateTo, setDateTo] = useState(format(endOfYear(new Date()), 'yyyy-MM-dd'));
+  const { dateFrom, dateTo, isReady } = useReportingPeriod();
   const [isEmailOpen, setIsEmailOpen] = useState(false);
 
   const { data, isLoading } = useQuery({
     queryKey: ['customer_detail', id, activeCompany?.id, dateFrom, dateTo],
     queryFn: async () => {
-      if (!activeCompany) return null;
+      if (!activeCompany || !dateFrom || !dateTo) return null;
       const { data, error } = await supabase.functions.invoke('customers', {
         body: {
           method: 'GET_DETAILS',
@@ -47,7 +47,7 @@ const CustomerDetail = () => {
       if (error) throw error;
       return data;
     },
-    enabled: !!id && !!activeCompany,
+    enabled: !!id && !!activeCompany && isReady,
   });
 
   const customer = data?.customer;
@@ -164,13 +164,11 @@ const CustomerDetail = () => {
           <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
             <div>
               <CardTitle>Statement of Account</CardTitle>
-              <CardDescription className="print:hidden">Transaction history from {format(new Date(dateFrom), 'PPP')} to {format(new Date(dateTo), 'PPP')}</CardDescription>
-              <CardDescription className="hidden print:block">Statement Period: {format(new Date(dateFrom), 'PPP')} - {format(new Date(dateTo), 'PPP')}</CardDescription>
+              <CardDescription className="print:hidden">Transaction history from {dateFrom ? format(new Date(dateFrom), 'PPP') : '—'} to {dateTo ? format(new Date(dateTo), 'PPP') : '—'}</CardDescription>
+              <CardDescription className="hidden print:block">Statement Period: {dateFrom ? format(new Date(dateFrom), 'PPP') : '—'} - {dateTo ? format(new Date(dateTo), 'PPP') : '—'}</CardDescription>
             </div>
             <div className="flex gap-2 items-center print:hidden">
-              <Input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} className="w-40" />
-              <span>to</span>
-              <Input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} className="w-40" />
+              <ReportingPeriodPicker showLabel={false} />
               <Button variant="outline" onClick={() => setIsEmailOpen(true)} title="Email Statement">
                 <Send className="mr-2 h-4 w-4" /> Email
               </Button>
@@ -208,7 +206,7 @@ const CustomerDetail = () => {
               ) : (
                 statement.map((t) => (
                   <TableRow key={t.id}>
-                    <TableCell>{format(new Date(t.date), 'MM/dd/yyyy')}</TableCell>
+                    <TableCell>{format(new Date(t.date), 'dd MMM yyyy')}</TableCell>
                     <TableCell>{t.description}</TableCell>
                     <TableCell>
                       {t.invoice_number && t.invoice_id ? (
@@ -243,8 +241,8 @@ const CustomerDetail = () => {
           setIsOpen={setIsEmailOpen}
           entity={{ id: customer.id, name: customer.name, email: customer.email }}
           type="customer"
-          dateFrom={dateFrom}
-          dateTo={dateTo}
+          dateFrom={dateFrom ?? ''}
+          dateTo={dateTo ?? ''}
         />
       )}
     </div>

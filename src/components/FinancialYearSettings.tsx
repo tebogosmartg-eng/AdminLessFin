@@ -17,6 +17,19 @@ import { financialCalendarService } from '@/governance/domains/financialCalendar
 import { AnalyticsEvents } from '@/lib/analytics/events';
 import { trackEvent } from '@/lib/analytics/productAnalytics';
 
+/**
+ * Settings → Financials — sole Financial Calendar configuration surface.
+ *
+ * Writes:
+ *   1) Legacy profile signals (compatibility for settings edge / older clients)
+ *   2) Materialises `financial_years` via financialCalendarService.ensureFinancialYear
+ *
+ * Reporting authority after save:
+ *   financial_years → ReportingPeriodContext (invalidateQueries financial_years)
+ *
+ * Profile financial_year_* fields are NEVER a reporting source of truth.
+ */
+
 const months = Array.from({ length: 12 }, (_, i) => ({ value: i + 1, name: new Date(0, i).toLocaleString('default', { month: 'long' }) }));
 const days = Array.from({ length: 31 }, (_, i) => i + 1);
 
@@ -100,6 +113,9 @@ const FinancialYearSettings = () => {
     onSuccess: async () => {
       await refreshProfile();
       queryClient.invalidateQueries({ queryKey: ['financial_years'] });
+      queryClient.invalidateQueries({ queryKey: ['efs_dashboard'] });
+      queryClient.invalidateQueries({ queryKey: ['efs_workspaces'] });
+      queryClient.invalidateQueries({ queryKey: ['efs_doc_model'] });
       if (activeCompany) {
         trackEvent({
           eventName: AnalyticsEvents.SETUP_FINANCIAL_YEAR_CONFIGURED,
@@ -195,6 +211,9 @@ const FinancialYearSettings = () => {
     onSuccess: async () => {
       await refreshProfile();
       queryClient.invalidateQueries({ queryKey: ['financial_years'] });
+      queryClient.invalidateQueries({ queryKey: ['efs_dashboard'] });
+      queryClient.invalidateQueries({ queryKey: ['efs_workspaces'] });
+      queryClient.invalidateQueries({ queryKey: ['efs_doc_model'] });
       showSuccess("Active financial year has been updated.");
     },
     onError: (error: unknown) =>

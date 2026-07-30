@@ -3,13 +3,17 @@ import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { format } from 'date-fns';
 import { useAuth } from '../../contexts/AuthContext';
+import { useReportingPeriod } from '../../contexts/ReportingPeriodContext';
 import {
   invokeFinancialStatements,
   type EfsWorkspaceListItem,
 } from '../../lib/financialStatements/api';
 import { workspaceStatusLabel } from '../../lib/financialStatements/presentation';
-import { financialCalendarService } from '@/governance/domains/financialCalendar/service';
-import { resolveCalendarYearForWorkspace } from '../../lib/financialStatements/calendarYearBinding';
+import {
+  formatCalendarYearDisplay,
+  resolveCalendarYearForWorkspace,
+  resolveEngagementReportingPeriod,
+} from '../../lib/financialStatements/calendarYearBinding';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../components/ui/card';
 import { Badge } from '../../components/ui/badge';
 import { Skeleton } from '../../components/ui/skeleton';
@@ -17,10 +21,11 @@ import { FileSignature } from 'lucide-react';
 
 /**
  * Financial Statements module landing — engagement list.
- * G3.6D — Financial Year labels come from Enterprise Financial Calendar only.
+ * Financial Year labels come from ReportingPeriodContext (Settings calendar only).
  */
 export default function FinancialStatementsWorkspaceHome() {
   const { activeCompany } = useAuth();
+  const { financialYears, activeFinancialYear } = useReportingPeriod();
   const navigate = useNavigate();
   const companyId = activeCompany?.id;
 
@@ -30,31 +35,36 @@ export default function FinancialStatementsWorkspaceHome() {
     enabled: !!companyId,
   });
 
-  const calendarYearsQuery = useQuery({
-    queryKey: ['financial_years', companyId],
-    queryFn: () => financialCalendarService.getFinancialYears(companyId!),
-    enabled: !!companyId,
-  });
-
   const rows = useMemo(() => {
-    const years = calendarYearsQuery.data || [];
+    const years = financialYears;
     const workspaces = workspacesQuery.data || [];
     return workspaces.map((ws) => {
       const calendarYear = resolveCalendarYearForWorkspace(ws, years);
+      const resolved = resolveEngagementReportingPeriod(
+        ws.efs_reporting_periods,
+        years,
+        activeFinancialYear,
+      );
       const framework =
         ws.efs_framework_bindings?.efs_framework_packs?.efs_frameworks?.name ||
         ws.efs_framework_bindings?.efs_framework_packs?.label ||
         '—';
+      // Never fall back to frozen efs_reporting_periods.label (e.g. "Financial Year 2025/26").
+      const yearLabel = calendarYear
+        ? formatCalendarYearDisplay(calendarYear)
+        : resolved.displayLabel;
       return {
         workspace: ws,
-        financialYear: calendarYear?.yearCode || ws.efs_reporting_periods?.label || '—',
+        financialYear: yearLabel,
+        isHistorical: resolved.isHistorical,
+        isLegacyUnbound: resolved.isLegacyUnbound,
         framework,
         status: workspaceStatusLabel(ws.status),
         progress: Number(ws.progress_pct || 0),
         updatedAt: ws.updated_at,
       };
     });
-  }, [workspacesQuery.data, calendarYearsQuery.data]);
+  }, [workspacesQuery.data, financialYears, activeFinancialYear]);
 
   return (
     <div className="space-y-6 p-6">
@@ -93,7 +103,9 @@ export default function FinancialStatementsWorkspaceHome() {
           )}
           {!workspacesQuery.isLoading && rows.length === 0 && (
             <p className="p-6 text-center text-sm text-muted-foreground">
-              No engagements yet.
+              No engagements yet. Open Financial Statements from the current Financial Year in
+              Settings, or create an engagement for a calendar year from the Financial Statements
+              home once a year is selected.
             </p>
           )}
           {rows.length > 0 && (
@@ -117,7 +129,28 @@ export default function FinancialStatementsWorkspaceHome() {
                         navigate(`/financial-statements-workspace/${row.workspace.id}`)
                       }
                     >
-                      <td className="px-4 py-3 font-medium">{row.financialYear}</td>
+                      <td className="px-4 py-3 font-medium">
+                        {row.isLegacyUnbound ? (
+                          <>
+                            Legacy Financial Statement Engagement
+                            <span className="mt-0.5 block text-xs font-normal text-amber-800 dark:text-amber-300">
+                              {row.financialYear.includes('·')
+                                ? row.financialYear.split('·').slice(1).join('·').trim()
+                                : 'Not linked to Enterprise Financial Calendar'}
+                              {' · open to migrate'}
+                            </span>
+                          </>
+                        ) : (
+                          <>
+                            {row.financialYear}
+                            {row.isHistorical ? (
+                              <span className="mt-0.5 block text-xs font-normal text-muted-foreground">
+                                Not current Financial Year
+                              </span>
+                            ) : null}
+                          </>
+                        )}
+                      </td>
                       <td className="px-4 py-3">{row.framework}</td>
                       <td className="px-4 py-3">
                         <Badge variant="secondary">{row.status}</Badge>

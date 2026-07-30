@@ -1,26 +1,25 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { format, startOfMonth, endOfMonth } from 'date-fns';
-import { DateRange } from 'react-day-picker';
-import { Download, Scale, Calendar as CalendarIcon, ChevronRight, ChevronDown, FileText } from 'lucide-react';
+import { format } from 'date-fns';
+import { Download, Scale, ChevronRight, ChevronDown, FileText } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
+import { useReportingPeriod } from '../../contexts/ReportingPeriodContext';
 import { hierarchicalTrialBalanceQuery } from '../../lib/accountingQueries';
 import { accountingApi } from '../../lib/accountingWorkspace';
 import { accountantPrefs } from '../../lib/accountantProductivity';
-import { formatCurrency, downloadCSV, cn } from '../../lib/utils';
+import { cn, formatCurrency, downloadCSV } from '../../lib/utils';
 import { useDocumentTitle } from '../../hooks/useDocumentTitle';
 import { AnalyticsEvents, useFirstUsagePageView } from '../../lib/analytics';
 import AccountingSearch from '../../components/accounting/AccountingSearch';
 import EnterpriseAccountCard from '../../components/accounting/EnterpriseAccountCard';
 import TraceabilityDrawer from '../../components/accounting/TraceabilityDrawer';
+import ReportingPeriodPicker from '../../components/ReportingPeriodPicker';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../../components/ui/card';
 import { Button } from '../../components/ui/button';
 import { Badge } from '../../components/ui/badge';
 import { Skeleton } from '../../components/ui/skeleton';
 import { EmptyState } from '../../components/EmptyState';
-import { Popover, PopoverContent, PopoverTrigger } from '../../components/ui/popover';
-import { Calendar } from '../../components/ui/calendar';
 
 type TbRow = {
   account_id: string;
@@ -47,10 +46,7 @@ const TrialBalance = () => {
   const { activeCompany } = useAuth();
   useFirstUsagePageView(AnalyticsEvents.USAGE_FIRST_TRIAL_BALANCE, 'trial_balance');
   const companyId = activeCompany?.id;
-  const [date, setDate] = useState<DateRange | undefined>({
-    from: startOfMonth(new Date()),
-    to: endOfMonth(new Date()),
-  });
+  const { dateFrom, dateTo, isReady } = useReportingPeriod();
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const [openAccountId, setOpenAccountId] = useState<string | null>(null);
   const [cardAccountId, setCardAccountId] = useState<string | null>(null);
@@ -66,12 +62,12 @@ const TrialBalance = () => {
     if (companyId) accountantPrefs.setTbExpansion(companyId, next);
   };
 
-  const startDate = date?.from ? format(date.from, 'yyyy-MM-dd') : format(startOfMonth(new Date()), 'yyyy-MM-dd');
-  const endDate = date?.to ? format(date.to, 'yyyy-MM-dd') : format(endOfMonth(new Date()), 'yyyy-MM-dd');
+  const startDate = dateFrom ?? '';
+  const endDate = dateTo ?? '';
 
   const { data, isLoading, isFetching, dataUpdatedAt } = useQuery({
     ...hierarchicalTrialBalanceQuery(companyId!, startDate, endDate),
-    enabled: !!companyId,
+    enabled: !!companyId && isReady,
     refetchInterval: 60_000,
   });
 
@@ -111,6 +107,8 @@ const TrialBalance = () => {
     })), `trial-balance-hierarchical-${endDate}.csv`);
   };
 
+  // Visual group subtotals only — presentation of displayed TB rows (not accounting authority).
+  // Accounting totals (balanced / closing DR/CR) come from response.totals + CFA on the edge.
   const sumClosing = (list: TbRow[]) => list.reduce((s, r) => s + r.closing_debit - r.closing_credit, 0);
 
   return (
@@ -144,17 +142,7 @@ const TrialBalance = () => {
                 )}
               </CardDescription>
             </div>
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button variant="outline" className={cn('w-[280px] justify-start', !date && 'text-muted-foreground')}>
-                  <CalendarIcon className="mr-2 h-4 w-4" />
-                  {date?.from ? (date.to ? `${format(date.from, 'LLL dd, y')} – ${format(date.to, 'LLL dd, y')}` : format(date.from, 'LLL dd, y')) : 'Pick dates'}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0" align="end">
-                <Calendar mode="range" selected={date} onSelect={setDate} numberOfMonths={2} initialFocus />
-              </PopoverContent>
-            </Popover>
+            <ReportingPeriodPicker showLabel={false} />
           </div>
         </CardHeader>
         <CardContent>

@@ -446,7 +446,8 @@ export function prepareCanonicalDocumentView(
     registrationNumber: corporateInformation.entityIdentity.registrationNumber.formatted,
     tradingName: corporateInformation.entityIdentity.tradingName.formatted,
     currencyCode: currency,
-    financialYearLabel: model.period?.label || reportingLabel,
+    financialYearLabel:
+      model.period?.period_key || model.period?.label || reportingLabel,
     coverTitle: reportingPeriodCoverTitle(model.period?.end_date),
     reportingPeriodLabel: reportingLabel,
     reportingDateLong: endLong,

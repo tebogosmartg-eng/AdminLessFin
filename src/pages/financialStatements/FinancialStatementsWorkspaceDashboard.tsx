@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useParams } from 'react-router-dom';
 import { format } from 'date-fns';
 import { useAuth } from '../../contexts/AuthContext';
+import { useReportingPeriod } from '../../contexts/ReportingPeriodContext';
 import {
   invokeFinancialStatements,
   type EfsDashboard,
@@ -16,6 +17,10 @@ import {
 } from '../../lib/financialStatements/flags';
 import { workspaceStatusLabel } from '../../lib/financialStatements/presentation';
 import { corporateDisplayFromEntity } from '../../lib/financialStatements/corporateInformation/accessors';
+import {
+  isLegacyKeepAcknowledged,
+  resolveEngagementReportingPeriod,
+} from '../../lib/financialStatements/calendarYearBinding';
 import {
   verifyV161Deployment,
   type DeploymentReadinessReport,
@@ -59,6 +64,7 @@ import EngagementValidation from './experience/EngagementValidation';
 import EngagementReview from './experience/EngagementReview';
 import EngagementPublication from './experience/EngagementPublication';
 import EngagementDocumentWorkspace from './experience/EngagementDocumentWorkspace';
+import LegacyEngagementMigrationCard from './experience/LegacyEngagementMigrationCard';
 import AccountingChangesBanner from '../../components/financialClose/AccountingChangesBanner';
 import TrialBalanceSourcePanel from './TrialBalanceSourcePanel';
 import V161DeploymentDiagnostics from './experience/V161DeploymentDiagnostics';
@@ -82,17 +88,43 @@ const ACCOUNTANT_NAV: Array<{ value: string; label: string }> = [
   { value: 'publication', label: 'Publication' },
 ];
 
+function CapabilityDisabledPanel({
+  title,
+  description,
+  onBack,
+}: {
+  title: string;
+  description: string;
+  onBack: () => void;
+}) {
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-base">{title}</CardTitle>
+        <CardDescription>{description}</CardDescription>
+      </CardHeader>
+      <CardContent>
+        <Button type="button" variant="outline" onClick={onBack}>
+          Back to Overview
+        </Button>
+      </CardContent>
+    </Card>
+  );
+}
+
 /**
- * V6.10.1 Engagement workspace — accountant generation experience.
+ * V6.10.2 Engagement workspace — accountant generation experience.
  * Reporting Snapshot / pipeline tools only when VITE_EFS_DEVELOPER_TOOLS=true.
  */
 export default function FinancialStatementsWorkspaceDashboard() {
   const { workspaceId } = useParams<{ workspaceId: string }>();
   const { activeCompany, role, session, profile } = useAuth();
+  const { financialYears, activeFinancialYear } = useReportingPeriod();
   const qc = useQueryClient();
   const companyId = activeCompany?.id;
   const [packId, setPackId] = useState('');
   const [activeNav, setActiveNav] = useState('overview');
+  const [legacyDismissed, setLegacyDismissed] = useState(false);
 
   const showAdvanced =
     efsFlags.developerTools() &&
@@ -110,6 +142,10 @@ export default function FinancialStatementsWorkspaceDashboard() {
       }),
     enabled: !!companyId && !!workspaceId,
   });
+
+  useEffect(() => {
+    setLegacyDismissed(isLegacyKeepAcknowledged(dashQuery.data?.reportingPeriod?.id));
+  }, [dashQuery.data?.reportingPeriod?.id]);
 
   const generalInfoQuery = useQuery({
     queryKey: ['efs_engagement_gi', companyId, workspaceId],
@@ -361,6 +397,12 @@ export default function FinancialStatementsWorkspaceDashboard() {
   const v161Blocked =
     deploymentQuery.isSuccess && deploymentReport?.readiness !== 'PASS';
 
+  const fy = resolveEngagementReportingPeriod(
+    d.reportingPeriod,
+    financialYears,
+    activeFinancialYear,
+  );
+
   const documentWorkspaceEnabled = efsFlags.documentWorkspace();
   const navItems = documentWorkspaceEnabled
     ? [
@@ -384,7 +426,7 @@ export default function FinancialStatementsWorkspaceDashboard() {
           <div>
             <h1 className="text-2xl font-semibold tracking-tight">{d.workspace.name}</h1>
             <p className="text-sm text-muted-foreground">
-              {d.reportingPeriod?.label || 'Annual Financial Statements'}
+              {fy.displayLabel}
               {generalInfo
                 ? (() => {
                     const name = corporateDisplayFromEntity(generalInfo).registeredName;
@@ -392,9 +434,18 @@ export default function FinancialStatementsWorkspaceDashboard() {
                   })()
                 : ''}
             </p>
+            {fy.isLegacyUnbound ? (
+              <Badge variant="outline" className="mt-2 border-amber-600/50">
+                Legacy Financial Statement Engagement
+              </Badge>
+            ) : fy.isHistorical ? (
+              <Badge variant="outline" className="mt-2">
+                Historical engagement — not the current Financial Year
+              </Badge>
+            ) : null}
           </div>
           <div className="flex items-center gap-2">
-            {deploymentQuery.isSuccess && (
+            {deploymentQuery.isSuccess && showAdvanced && (
               <Badge variant={v161Ready ? 'default' : 'destructive'}>
                 V16.1 {v161Ready ? 'READY' : 'NOT READY'}
               </Badge>
@@ -404,6 +455,22 @@ export default function FinancialStatementsWorkspaceDashboard() {
         </div>
       </div>
 
+      {fy.isLegacyUnbound && companyId && (
+        <LegacyEngagementMigrationCard
+          companyId={companyId}
+          workspaceId={d.workspace.id}
+          workspaceStatus={d.workspace.status}
+          period={d.reportingPeriod}
+          financialYears={financialYears}
+          dismissed={legacyDismissed}
+          onDismissed={() => setLegacyDismissed(true)}
+          onMigrated={() => {
+            setLegacyDismissed(false);
+            invalidate();
+          }}
+        />
+      )}
+
       {v161Blocked && deploymentReport && (
         <V161DeploymentDiagnostics report={deploymentReport} />
       )}
@@ -411,8 +478,8 @@ export default function FinancialStatementsWorkspaceDashboard() {
       {companyId && (
         <AccountingChangesBanner
           companyId={companyId}
-          startDate={d.reportingPeriod?.start_date}
-          endDate={d.reportingPeriod?.end_date}
+          startDate={fy.startDate ?? d.reportingPeriod?.start_date}
+          endDate={fy.endDate ?? d.reportingPeriod?.end_date}
           capturedAt={capturedAt}
           refreshing={refreshFromAccounting.isPending}
           onRefresh={() => refreshFromAccounting.mutate()}
@@ -487,7 +554,7 @@ export default function FinancialStatementsWorkspaceDashboard() {
                   companyId={companyId}
                   workspaceId={workspaceId}
                   generalInfo={generalInfo}
-                  periodLabel={d.reportingPeriod?.label}
+                  periodLabel={fy.displayLabel}
                   preparing={prepareStatements.isPending}
                   accountingChanged={accountingChanges.accountingChanged}
                   onGenerate={() => prepareStatements.mutate('generate')}
@@ -511,6 +578,7 @@ export default function FinancialStatementsWorkspaceDashboard() {
                       workspaceId={workspaceId}
                       dashboard={d}
                       generalInfo={generalInfo ?? null}
+                      onNavigate={setActiveNav}
                     />
                   )
                 )}
@@ -521,9 +589,11 @@ export default function FinancialStatementsWorkspaceDashboard() {
               {companyId && workspaceId && efsFlags.workingPaperPlatform() ? (
                 <EngagementWorkingPapers companyId={companyId} workspaceId={workspaceId} />
               ) : (
-                <p className="text-sm text-muted-foreground">
-                  Supporting schedules are not enabled.
-                </p>
+                <CapabilityDisabledPanel
+                  title="Supporting Schedules"
+                  description="Supporting Schedules are not enabled for this environment. Continue with Notes, Validation, and Review, or return to Overview for the next recommended action."
+                  onBack={() => setActiveNav('overview')}
+                />
               )}
             </TabsContent>
 
@@ -533,11 +603,14 @@ export default function FinancialStatementsWorkspaceDashboard() {
                   companyId={companyId}
                   workspaceId={workspaceId}
                   frameworkPackId={d.framework?.id ?? null}
+                  onGenerateStatements={() => setActiveNav('statements')}
                 />
               ) : (
-                <p className="text-sm text-muted-foreground">
-                  Notes &amp; disclosures are not enabled.
-                </p>
+                <CapabilityDisabledPanel
+                  title="Notes & Disclosures"
+                  description="Notes & Disclosures are not enabled for this environment. Generate statements first, then return to Overview for the next recommended action."
+                  onBack={() => setActiveNav('overview')}
+                />
               )}
             </TabsContent>
 
@@ -549,7 +622,11 @@ export default function FinancialStatementsWorkspaceDashboard() {
                   frameworkPackId={d.framework?.id ?? null}
                 />
               ) : (
-                <p className="text-sm text-muted-foreground">Validation is not enabled.</p>
+                <CapabilityDisabledPanel
+                  title="Validation"
+                  description="Validation is not enabled for this environment."
+                  onBack={() => setActiveNav('overview')}
+                />
               )}
             </TabsContent>
 
@@ -557,7 +634,11 @@ export default function FinancialStatementsWorkspaceDashboard() {
               {companyId && workspaceId && efsFlags.reviewWorkflow() ? (
                 <EngagementReview companyId={companyId} workspaceId={workspaceId} />
               ) : (
-                <p className="text-sm text-muted-foreground">Review is not enabled.</p>
+                <CapabilityDisabledPanel
+                  title="Review"
+                  description="Manager and Partner Review are not enabled for this environment."
+                  onBack={() => setActiveNav('overview')}
+                />
               )}
             </TabsContent>
 
@@ -573,7 +654,11 @@ export default function FinancialStatementsWorkspaceDashboard() {
                   v161DeploymentReady={v161Ready}
                 />
               ) : (
-                <p className="text-sm text-muted-foreground">Publication is not enabled.</p>
+                <CapabilityDisabledPanel
+                  title="Publication"
+                  description="Publication is not enabled for this environment."
+                  onBack={() => setActiveNav('overview')}
+                />
               )}
             </TabsContent>
           </div>

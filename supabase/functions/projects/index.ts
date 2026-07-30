@@ -6,6 +6,7 @@ import {
   withEnterprisePlatform,
   edgeFailure,
 } from '../_shared/enterpriseEdgePlatform.ts'
+import { loadCanonicalAggregation } from '../_shared/loadCanonicalAggregation.ts'
 
 
 const corsHeaders = ENTERPRISE_CORS_HEADERS
@@ -89,28 +90,12 @@ serve(withEnterprisePlatform('projects', 'tenant', async (req, _ctx) => {
         const billableAmount = totalHours * (project.billable_rate || 0);
         const unbilledAmount = unbilledHours * (project.billable_rate || 0);
 
-        // Fetch Financial Transactions
-        const { data: financialItems, error: finError } = await supabaseAdmin
-          .from('journal_entry_items')
-          .select(`
-            amount,
-            type,
-            chart_of_accounts ( name, type )
-          `)
-          .eq('project_id', body.projectId);
-
-        if (finError) throw finError;
-
-        let totalRevenue = 0;
-        let totalExpenses = 0;
-
-        financialItems.forEach(item => {
-          const accountType = item.chart_of_accounts?.type;
-          if (accountType === 'Income') {
-            totalRevenue += item.type === 'credit' ? item.amount : -item.amount;
-          } else if (accountType === 'Expense' || accountType === 'Cost of Goods Sold') {
-            totalExpenses += item.type === 'debit' ? item.amount : -item.amount;
-          }
+        // Company money = CFA only. Project JE P&L aggregation removed.
+        const cfa = await loadCanonicalAggregation({
+          admin: supabaseAdmin,
+          rpc: supabase,
+          company_id,
+          end_date: new Date().toISOString().slice(0, 10),
         });
 
         data = {
@@ -125,10 +110,15 @@ serve(withEnterprisePlatform('projects', 'tenant', async (req, _ctx) => {
           },
           timesheets,
           financials: {
-            totalRevenue,
-            totalExpenses,
-            profit: totalRevenue - totalExpenses
-          }
+            // Company CFA figures — project-level allocation is not a CFA output.
+            totalRevenue: cfa.totalIncome,
+            totalExpenses: cfa.totalExpenses,
+            profit: cfa.netIncome,
+            project_allocation: null,
+            money_source: 'canonical_financial_aggregation_company_only',
+          },
+          canonicalAggregation: cfa,
+          money_source: 'canonical_financial_aggregation',
         };
         break;
 

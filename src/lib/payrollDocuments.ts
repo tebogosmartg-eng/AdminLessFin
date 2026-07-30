@@ -117,11 +117,12 @@ function round2(n: number): number {
 type LogoImage = { dataUrl: string; format: 'PNG' | 'JPEG' | 'WEBP' };
 
 function detectLogoFormat(url: string, mime?: string | null): LogoImage['format'] | null {
-  const lower = `${mime ?? ''} ${url}`.toLowerCase();
-  if (lower.includes('svg')) return null; // jsPDF cannot embed SVG via addImage
-  if (lower.includes('jpeg') || lower.includes('jpg')) return 'JPEG';
-  if (lower.includes('webp')) return 'WEBP';
-  if (lower.includes('png') || lower.startsWith('data:image/')) return 'PNG';
+  // Only inspect the MIME / data-URL header — never the base64 payload (random bytes can contain "svg").
+  const header = `${mime ?? ''} ${url.split(',', 1)[0] ?? ''}`.toLowerCase();
+  if (header.includes('svg')) return null; // jsPDF cannot embed SVG via addImage
+  if (header.includes('jpeg') || header.includes('jpg')) return 'JPEG';
+  if (header.includes('webp')) return 'WEBP';
+  if (header.includes('png') || header.startsWith('data:image/') || header.includes('data:image/')) return 'PNG';
   return 'PNG';
 }
 
@@ -262,19 +263,6 @@ export function extractEmployeeBankFields(source: unknown): {
     bank_branch_code: pick('bank_branch_code', 'bankBranchCode', 'branch_code', 'branchCode'),
     bank_account_number: pick('bank_account_number', 'bankAccountNumber', 'account_number', 'accountNumber'),
   };
-}
-
-function drawWrappedText(
-  doc: jsPDF,
-  text: string,
-  x: number,
-  y: number,
-  maxWidth: number,
-  lineHeight: number
-): number {
-  const lines = doc.splitTextToSize(text, maxWidth);
-  doc.text(lines, x, y);
-  return y + lines.length * lineHeight;
 }
 
 /** Deterministic control hash for bank batch verification (FNV-1a 32-bit hex). */
@@ -472,17 +460,27 @@ export function buildPayslipHtml(data: PayslipDocumentData, qrDataUrl?: string):
   .net { background: #ecfdf5; padding: 12px; border-radius: 6px; font-size: 1.1rem; font-weight: bold; border-left: 4px solid #047857; }
   .statutory { background: #fafafa; padding: 12px; border-radius: 6px; margin-top: 12px; }
   .brand-bar { height: 4px; background: linear-gradient(90deg, #047857, #10b981); margin-bottom: 16px; }
+  .employer-brand { display: flex; flex-direction: row; align-items: flex-start; gap: 16px; min-width: 0; }
+  .employer-brand img { max-height: 48px; width: auto; flex-shrink: 0; display: block; }
+  .employer-details { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+  /* Place company name near the logo's vertical centre; address flows under the name. */
+  .employer-brand:has(img) .employer-details { padding-top: 12px; }
+  .employer-details h1 { margin: 0; line-height: 1.25; overflow-wrap: anywhere; }
+  .employer-details .muted { margin: 0; }
+  .employer-details .employer-tax { margin-top: 4px; }
   .generated-by { text-align:center; margin-top:36px; padding-top:12px; border-top:1px solid #e5e7eb; color:#9ca3af; font-size:10px; }
   .generated-by img { height:18px; width:18px; vertical-align:middle; margin:4px 6px; }
   @media print { body { padding: 0; } }
 </style></head><body>
   <div class="brand-bar"></div>
   <div class="grid">
-    <div>
-      ${data.companyLogoUrl ? `<img src="${data.companyLogoUrl}" alt="Company logo" style="max-height:48px;margin-bottom:8px;" />` : ''}
-      <h1>${data.companyName}</h1>
-      <p class="muted">${data.companyAddress ?? ''}</p>
-      ${data.companyTaxId ? `<p class="muted">Tax ID: ${data.companyTaxId}</p>` : ''}
+    <div class="employer-brand">
+      ${data.companyLogoUrl ? `<img src="${data.companyLogoUrl}" alt="Company logo" />` : ''}
+      <div class="employer-details">
+        <h1>${data.companyName}</h1>
+        ${data.companyAddress ? `<p class="muted">${data.companyAddress}</p>` : ''}
+        ${data.companyTaxId ? `<p class="muted employer-tax">Tax ID: ${data.companyTaxId}</p>` : ''}
+      </div>
     </div>
     <div style="text-align:right;">
       <h1>PAYSLIP</h1>
@@ -568,36 +566,66 @@ export async function generatePayslipPdf(data: PayslipDocumentData): Promise<jsP
   doc.setFillColor(...BRAND_GREEN);
   doc.rect(0, 0, pageWidth, 6, 'F');
 
-  let leftY = 14;
+  // Fixed logo column (size must not change) + company-details column beside it.
+  const LOGO_SIZE_MM = 16;
+  const LOGO_TOP_MM = 8;
+  const LOGO_TEXT_GAP_MM = 6;
+  const NAME_LINE_HEIGHT_MM = 6;
+  const ADDR_LINE_HEIGHT_MM = 4.2;
+  const NAME_TO_ADDRESS_GAP_MM = 5;
+  const ADDRESS_TO_TAX_GAP_MM = 3.5;
+
   let logoDrawn = false;
   // Company logo only — AdminLess Fin branding belongs in the footer, never as a company substitute.
   if (logo) {
     try {
-      doc.addImage(logo.dataUrl, logo.format, leftX, 8, 16, 16);
+      doc.addImage(logo.dataUrl, logo.format, leftX, LOGO_TOP_MM, LOGO_SIZE_MM, LOGO_SIZE_MM);
       logoDrawn = true;
     } catch {
       logoDrawn = false;
     }
   }
 
-  const textX = logoDrawn ? leftX + 20 : leftX;
+  const textX = logoDrawn ? leftX + LOGO_SIZE_MM + LOGO_TEXT_GAP_MM : leftX;
+  const companyTextMaxWidth = Math.max(40, LEFT_COL_MAX_WIDTH_MM - (textX - leftX));
+
+  doc.setFontSize(16);
+  const nameLines: string[] = doc.splitTextToSize(data.companyName, companyTextMaxWidth);
+  doc.setFontSize(9);
+  const addressLines: string[] = data.companyAddress
+    ? doc.splitTextToSize(data.companyAddress, companyTextMaxWidth)
+    : [];
+  const taxLabel = data.companyTaxId ? `Tax ID: ${data.companyTaxId}` : null;
+  const taxLines: string[] = taxLabel ? doc.splitTextToSize(taxLabel, companyTextMaxWidth) : [];
+
+  // Vertically centre the company-name block on the logo; address/tax flow under the name.
+  const logoCenterY = LOGO_TOP_MM + LOGO_SIZE_MM / 2;
+  const logoBottom = logoDrawn ? LOGO_TOP_MM + LOGO_SIZE_MM : LOGO_TOP_MM;
+  const nameBlockH = nameLines.length * NAME_LINE_HEIGHT_MM;
+  let cursorY = logoDrawn
+    ? logoCenterY - nameBlockH / 2 + NAME_LINE_HEIGHT_MM * 0.75
+    : 14;
 
   doc.setFontSize(16);
   doc.setTextColor(...BRAND_GREEN);
-  doc.text(data.companyName, textX, leftY);
-  leftY += 7;
+  doc.text(nameLines, textX, cursorY);
+  cursorY += nameLines.length * NAME_LINE_HEIGHT_MM;
 
-  // Only the company address uses wrapping — never table headers / labels / amounts.
+  // Only company name / address / tax wrap — never table headers / labels / amounts.
   doc.setFontSize(9);
   doc.setTextColor(100);
-  if (data.companyAddress) {
-    leftY = drawWrappedText(doc, data.companyAddress, leftX, leftY, LEFT_COL_MAX_WIDTH_MM, 4.2);
-    leftY += 2;
+  if (addressLines.length) {
+    cursorY += NAME_TO_ADDRESS_GAP_MM;
+    doc.text(addressLines, textX, cursorY);
+    cursorY += addressLines.length * ADDR_LINE_HEIGHT_MM;
   }
-  if (data.companyTaxId) {
-    doc.text(`Tax ID: ${data.companyTaxId}`, leftX, leftY);
-    leftY += 5;
+  if (taxLines.length) {
+    cursorY += addressLines.length ? ADDRESS_TO_TAX_GAP_MM : NAME_TO_ADDRESS_GAP_MM;
+    doc.text(taxLines, textX, cursorY);
+    cursorY += taxLines.length * ADDR_LINE_HEIGHT_MM;
   }
+
+  const leftY = Math.max(cursorY, logoBottom);
 
   const rightX = pageWidth - rightMargin;
   doc.setFontSize(14);
@@ -618,7 +646,7 @@ export async function generatePayslipPdf(data: PayslipDocumentData): Promise<jsP
     rightBottomY = 37 + certLines.length * 4.2;
   }
 
-  let y = Math.max(leftY, rightBottomY, logoDrawn ? 26 : 0) + 8;
+  let y = Math.max(leftY, rightBottomY) + 8;
   doc.setFontSize(10);
   doc.setTextColor(0);
   doc.text('Employee Details', leftX, y);

@@ -5,15 +5,14 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFoo
 import { Skeleton } from '../components/ui/skeleton';
 import { Button } from '../components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
-import { Calendar as CalendarIcon, Download } from 'lucide-react';
-import { Popover, PopoverContent, PopoverTrigger } from '../components/ui/popover';
-import { Calendar } from '../components/ui/calendar';
-import { DateRange } from 'react-day-picker';
-import { format, startOfMonth, endOfMonth } from 'date-fns';
-import { cn, formatCurrency } from '../lib/utils';
+import { Download } from 'lucide-react';
+import { format } from 'date-fns';
+import { formatCurrency } from '../lib/utils';
 import { useAuth } from '../contexts/AuthContext';
+import { useReportingPeriod } from '../contexts/ReportingPeriodContext';
 import { useEnterpriseIdentity } from '../hooks/useEnterpriseIdentity';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
+import ReportingPeriodPicker from '../components/ReportingPeriodPicker';
 import { loadPayrollFacts } from '../reporting/facts';
 import { buildOperationalReportsFromFacts } from '../reporting/operational/PayrollRegister';
 import { buildManagementReportsFromFacts } from '../reporting/management';
@@ -56,20 +55,17 @@ const PayrollReports = () => {
   useDocumentTitle('Payroll Reports');
   const { activeCompany, profile, user } = useAuth();
   const { identity } = useEnterpriseIdentity(activeCompany?.id);
+  const { dateFrom, dateTo, isReady, currentReportingPeriod } = useReportingPeriod();
   const [category, setCategory] = useState<ReportCategory>('operational');
   const [activeTab, setActiveTab] = useState<PayrollReportType>('register');
   const [managementTab, setManagementTab] = useState<ManagementReportId>('payroll_matrix');
   const [statutoryTab, setStatutoryTab] = useState<StatutoryReportId>('paye_summary');
   const [exportFormat, setExportFormat] = useState<PayrollExportFormat>('csv');
-  const [date, setDate] = useState<DateRange | undefined>({
-    from: startOfMonth(new Date()),
-    to: endOfMonth(new Date()),
-  });
 
-  const fromDate = date?.from ?? new Date();
-  const toDate = date?.to ?? new Date();
-  const startStr = format(fromDate, 'yyyy-MM-dd');
-  const endStr = format(toDate, 'yyyy-MM-dd');
+  const startStr = dateFrom ?? '';
+  const endStr = dateTo ?? '';
+  const fromDate = currentReportingPeriod?.from ?? new Date();
+  const toDate = currentReportingPeriod?.to ?? new Date();
 
   const companyId = activeCompany?.id;
   const companyName = identity?.name || 'Company';
@@ -84,7 +80,7 @@ const PayrollReports = () => {
         startDate: startStr,
         endDate: endStr,
       }),
-    enabled: !!companyId,
+    enabled: !!companyId && isReady,
     retry: 1,
   });
 
@@ -240,28 +236,7 @@ const PayrollReports = () => {
             Operational, management matrix, and statutory reporting — finalized payroll only
           </p>
         </div>
-        <Popover>
-          <PopoverTrigger asChild>
-            <Button
-              variant="outline"
-              className={cn('w-[300px] justify-start text-left font-normal', !date && 'text-muted-foreground')}
-            >
-              <CalendarIcon className="mr-2 h-4 w-4" />
-              {date?.from ? (
-                date.to ? (
-                  <>{format(date.from, 'LLL dd, y')} - {format(date.to, 'LLL dd, y')}</>
-                ) : (
-                  format(date.from, 'LLL dd, y')
-                )
-              ) : (
-                <span>Pick a date</span>
-              )}
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent className="w-auto p-0" align="end">
-            <Calendar initialFocus mode="range" defaultMonth={date?.from} selected={date} onSelect={setDate} numberOfMonths={2} />
-          </PopoverContent>
-        </Popover>
+        <ReportingPeriodPicker />
       </div>
 
       {reports && (

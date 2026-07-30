@@ -61,15 +61,21 @@ function buildInsights({
   const insights: Insight[] = [];
 
   if (overdueInvoices.length > 0) {
-    const total = overdueInvoices.reduce((sum, i) => sum + (i.total || 0), 0);
+    // Money figure = CFA receivables (totalAr), not invoice-row reduce.
     insights.push({
       id: 'overdue',
       icon: AlertTriangle,
       tone: 'danger',
       text: (
         <>
-          <strong>{overdueInvoices.length}</strong> overdue {overdueInvoices.length === 1 ? 'invoice' : 'invoices'} worth{' '}
-          <strong>{formatCurrency(total)}</strong> {overdueInvoices.length === 1 ? 'needs' : 'need'} following up.
+          <strong>{overdueInvoices.length}</strong> overdue {overdueInvoices.length === 1 ? 'invoice' : 'invoices'}
+          {totalAr > 0 ? (
+            <>
+              {' '}
+              (AR <strong>{formatCurrency(totalAr)}</strong>)
+            </>
+          ) : null}{' '}
+          {overdueInvoices.length === 1 ? 'needs' : 'need'} following up.
         </>
       ),
       cta: { label: 'Collect', to: '/receive-payments' },

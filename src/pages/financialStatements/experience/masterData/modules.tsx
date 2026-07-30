@@ -24,7 +24,8 @@ import { showError, showSuccess } from '../../../../utils/toast';
 import { ArrowLeft } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../../../components/ui/card';
 import { MasterDataModuleShell } from './MasterDataModuleShell';
-import { useEnterpriseCalendar } from '../../../../hooks/useEnterpriseCalendar';
+import { useReportingPeriod } from '../../../../contexts/ReportingPeriodContext';
+import { toIsoDate } from '../../../../lib/reportingPeriod/presets';
 
 function Field({
   label,
@@ -331,7 +332,8 @@ export function WorkspaceConfigurationModule({
 }) {
   const qc = useQueryClient();
   const [draft, setDraft] = useState<EfsWorkspaceGeneralInformation>(generalInfo || {});
-  const { years, activeYear, endDate: calendarEnd } = useEnterpriseCalendar(companyId);
+  const { financialYears: years, activeFinancialYear: activeYear, financialYearEnd } = useReportingPeriod();
+  const calendarEnd = financialYearEnd ? toIsoDate(financialYearEnd) : null;
 
   useEffect(() => {
     setDraft(generalInfo || {});
@@ -382,7 +384,7 @@ export function WorkspaceConfigurationModule({
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-1">
-            <Label className="text-xs">Financial Year End (from Financial Calendar)</Label>
+            <Label className="text-xs">Financial Year End (Settings → Financials)</Label>
             <select
               className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm"
               value={draft.financial_year_end || ''}
@@ -391,8 +393,8 @@ export function WorkspaceConfigurationModule({
               <option value="">Select year…</option>
               {years.map((y) => (
                 <option key={y.id} value={y.endDate}>
-                  {y.yearCode} — ends {y.endDate}
-                  {y.id === activeYear?.id ? ' (active)' : ''}
+                  {y.startDate} – {y.endDate}
+                  {y.id === activeYear?.id ? ' (Current Financial Year)' : ''}
                 </option>
               ))}
             </select>

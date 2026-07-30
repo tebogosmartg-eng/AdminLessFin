@@ -12568,7 +12568,7 @@ export type Database = {
             }[]
           }
       get_budgets_with_activity: {
-        Args: never
+        Args: { p_company_id?: string }
         Returns: {
           account_id: string
           account_name: string
@@ -12594,7 +12594,7 @@ export type Database = {
         }[]
       }
       get_customer_ar_balances: {
-        Args: never
+        Args: { p_company_id?: string }
         Returns: {
           balance: number
           customer_id: string
@@ -12602,7 +12602,7 @@ export type Database = {
         }[]
       }
       get_monthly_summary: {
-        Args: { p_months: number }
+        Args: { p_months: number; p_company_id?: string }
         Returns: {
           month_start: string
           total_expenses: number
@@ -12612,7 +12612,7 @@ export type Database = {
       get_next_invoice_number_for_user: { Args: never; Returns: string }
       get_next_quote_number_for_user: { Args: never; Returns: string }
       get_overdue_invoices: {
-        Args: never
+        Args: { p_company_id?: string }
         Returns: {
           customer_name: string
           due_date: string
@@ -12643,14 +12643,14 @@ export type Database = {
         }[]
       }
       get_top_expenses: {
-        Args: { p_end_date: string; p_start_date: string }
+        Args: { p_end_date: string; p_start_date: string; p_company_id?: string }
         Returns: {
           account_name: string
           total_amount: number
         }[]
       }
       get_vendor_ap_balances: {
-        Args: never
+        Args: { p_company_id?: string }
         Returns: {
           balance: number
           vendor_id: string

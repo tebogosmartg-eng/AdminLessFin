@@ -54,6 +54,7 @@ export function validateAfsArticulation(pack: {
     (r) => /profit|period result|loss/i.test(r.label || '') && !!r.is_total,
   ]);
   const revenue = findAmount(perf, [
+    (r) => r.line_code === 'perf.total_income',
     (r) => r.line_code === 'perf.total_revenue',
     (r) => r.line_code === 'perf.revenue',
   ]);
@@ -153,12 +154,40 @@ export function validateAfsArticulation(pack: {
       detail: `Revenue ${revenue} − Expenses ${expenses} = ${derived}`,
     });
   } else {
-    checks.push({
-      id: 'PL.RESULT',
-      label: 'Revenue and Expenses produce the reported Profit/(Loss)',
-      pass: false,
-      detail: 'Missing revenue, expenses, or profit lines',
-    });
+    // Prefer detailed canonical lines when present (Revenue − Cos − OpEx − Finance − Tax + Other = Profit)
+    const detailRevenue = findAmount(perf, [(r) => r.line_code === 'perf.revenue']);
+    const cos = findAmount(perf, [(r) => r.line_code === 'perf.cost_of_sales']);
+    const otherInc = findAmount(perf, [(r) => r.line_code === 'perf.other_income']);
+    const opex = findAmount(perf, [(r) => r.line_code === 'perf.operating_expenses']);
+    const finance = findAmount(perf, [(r) => r.line_code === 'perf.finance_costs']);
+    const tax = findAmount(perf, [(r) => r.line_code === 'perf.tax']);
+    const result = findAmount(perf, [(r) => r.line_code === 'perf.result']);
+    if (
+      detailRevenue != null &&
+      cos != null &&
+      otherInc != null &&
+      opex != null &&
+      finance != null &&
+      tax != null &&
+      result != null
+    ) {
+      const derived = round2(detailRevenue - cos + otherInc - opex - finance - tax);
+      checks.push({
+        id: 'PL.RESULT',
+        label: 'Canonical P&L lines produce the reported Profit/(Loss)',
+        pass: derived === result,
+        expected: result,
+        actual: derived,
+        detail: `Rev ${detailRevenue} − Cos ${cos} + Other ${otherInc} − OpEx ${opex} − Fin ${finance} − Tax ${tax} = ${derived}`,
+      });
+    } else {
+      checks.push({
+        id: 'PL.RESULT',
+        label: 'Revenue and Expenses produce the reported Profit/(Loss)',
+        pass: false,
+        detail: 'Missing revenue, expenses, or profit lines',
+      });
+    }
   }
 
   return { ok: checks.every((c) => c.pass), checks };

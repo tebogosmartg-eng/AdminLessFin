@@ -90,14 +90,25 @@ describe('G3.6D calendar year binding (FS consumer)', () => {
     expect(findEngagementForCalendarYear(workspaces, y2526)?.id).toBe('ws-2025/26');
   });
 
-  it('resolves list display year from Enterprise Financial Calendar', () => {
-    const ws = workspace({
+  it('resolves list display year only when explicitly linked', () => {
+    const unbound = workspace({
       period_key: '2025/26',
       label: '2025/26',
       start_date: '2025-03-01',
       end_date: '2026-02-28',
     });
-    expect(resolveCalendarYearForWorkspace(ws, [y2425, y2526, y2627])?.yearCode).toBe('2025/26');
+    expect(resolveCalendarYearForWorkspace(unbound, [y2425, y2526, y2627])).toBeNull();
+
+    const linked: EfsWorkspaceListItem = {
+      ...unbound,
+      efs_reporting_periods: {
+        ...unbound.efs_reporting_periods,
+        financial_year_id: 'fy-2526',
+      },
+    };
+    expect(resolveCalendarYearForWorkspace(linked, [y2425, y2526, y2627])?.yearCode).toBe(
+      '2025/26',
+    );
   });
 
   it('resolves prior calendar year for comparative period', () => {

@@ -182,17 +182,9 @@ export default function WorkspaceStatements({
           </Button>
         )}
         {onOpenPublication && (
-          <>
-            <Button variant="outline" size="sm" onClick={onOpenPublication}>
-              {GENERATION_COPY.downloadPdf}
-            </Button>
-            <Button variant="outline" size="sm" onClick={onOpenPublication}>
-              {GENERATION_COPY.downloadWord}
-            </Button>
-            <Button variant="outline" size="sm" onClick={onOpenPublication}>
-              {GENERATION_COPY.downloadExcel}
-            </Button>
-          </>
+          <Button variant="outline" size="sm" onClick={onOpenPublication}>
+            {GENERATION_COPY.openPublication}
+          </Button>
         )}
       </div>
 

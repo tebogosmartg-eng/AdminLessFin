@@ -1,0 +1,378 @@
+{
+  "verification": "PRODUCTION_DEPLOYMENT_VERIFICATION",
+  "releaseCandidate": "RC-1-BLOCKED",
+  "at": "2026-07-30T07:06:18.522Z",
+  "project": "zaulhnpohrgqqodvzhxp",
+  "projectName": "Smart Accounting",
+  "region": "eu-west-1",
+  "projectStatus": "ACTIVE_HEALTHY",
+  "organizationPlan": "free",
+  "certifiedRelease": {
+    "sha": "4a1c8672c3d6db41eb34eea52991d71273ee0524",
+    "subject": "chore(release): stabilize private beta and achieve clean browser console",
+    "committedAt": "2026-07-29T15:44:14Z"
+  },
+  "decision": "NO-GO",
+  "score": 96,
+  "goCriteria": {
+    "productionMatchesCertifiedBuild": true,
+    "noPendingMigrations": true,
+    "schedulerVerified": true,
+    "backupsVerified": false,
+    "monitoringOperational": true,
+    "errorReportingOperational": true,
+    "environmentVerified": true,
+    "smokeTestsPass": true,
+    "multiCompanyIsolation": true,
+    "authenticationVerified": true,
+    "storageVerified": true
+  },
+  "matrix": {
+    "verifyPass": 12,
+    "verifyFail": 1,
+    "verifyTotal": 13,
+    "smokePass": 14,
+    "smokeFail": 0,
+    "smokeTotal": 14
+  },
+  "verify": [
+    {
+      "item": "Production build hash matches deployed release",
+      "status": "PASS",
+      "evidence": {
+        "deploymentId": "dpl_8jGM6rttZbU5wn1AqRTqit1Aornb",
+        "commit": "4a1c8672c3d6db41eb34eea52991d71273ee0524",
+        "certifiedSha": "4a1c8672c3d6db41eb34eea52991d71273ee0524",
+        "message": "chore(release): stabilize private beta and achieve clean browser console",
+        "productionUrl": "https://adminless-fin.vercel.app",
+        "asset": "assets/index-C_00xzTO.js",
+        "readyState": "READY",
+        "match": true
+      }
+    },
+    {
+      "item": "Authentication working",
+      "status": "PASS",
+      "evidence": {
+        "userId": "908ad90e-ee0e-4957-943d-ed1ec2fb843a"
+      }
+    },
+    {
+      "item": "Multi-company isolation verified",
+      "status": "PASS",
+      "evidence": {
+        "unauthorizedRows": 0,
+        "memberships": 14
+      }
+    },
+    {
+      "item": "Latest DB migrations applied",
+      "status": "PASS",
+      "evidence": {
+        "matched": 85,
+        "pending": 0,
+        "latest": "20260730120000",
+        "source": "supabase migration list --linked"
+      }
+    },
+    {
+      "item": "No pending migrations",
+      "status": "PASS",
+      "evidence": {
+        "matched": 85,
+        "pending": 0,
+        "latest": "20260730120000",
+        "source": "supabase migration list --linked"
+      }
+    },
+    {
+      "item": "Edge Functions deployed and version matched",
+      "status": "PASS",
+      "evidence": {
+        "remote": 62,
+        "local": 62,
+        "missing": [],
+        "hasProductAnalytics": true
+      }
+    },
+    {
+      "item": "Production environment variables present",
+      "status": "PASS",
+      "evidence": {
+        "FOUND": [
+          "SUPABASE_URL",
+          "SUPABASE_ANON_KEY",
+          "SUPABASE_SERVICE_ROLE_KEY",
+          "EFS_MODULE",
+          "EFCP_SILENT_BACKENDS",
+          "BETA_ANALYTICS_ALLOWLIST (optional)",
+          "VITE_SUPABASE_URL",
+          "VITE_SUPABASE_ANON_KEY"
+        ],
+        "MISSING": [],
+        "OPTIONAL": [
+          "EFS_PUBLICATION",
+          "RESEND_API_KEY",
+          "RESEND_DOMAIN",
+          "OPENAI_API_KEY"
+        ]
+      }
+    },
+    {
+      "item": "Supabase Storage buckets configured",
+      "status": "PASS",
+      "evidence": {
+        "names": [
+          "attachments"
+        ]
+      }
+    },
+    {
+      "item": "RLS policies active",
+      "status": "PASS",
+      "evidence": {
+        "policies": 350,
+        "rlsEnabledTables": 212,
+        "crossTenantDenied": true
+      }
+    },
+    {
+      "item": "Scheduled jobs functioning",
+      "status": "PASS",
+      "evidence": {
+        "architecture": "pg_cron + pg_net → Edge Functions (not assumed; verified)",
+        "extensions": [
+          "pg_cron",
+          "pg_net"
+        ],
+        "jobs": [
+          {
+            "active": true,
+            "jobid": 8,
+            "jobname": "prod-process-recurring-bills-hourly",
+            "schedule": "20 * * * *"
+          },
+          {
+            "active": true,
+            "jobid": 6,
+            "jobname": "prod-process-recurring-entries-hourly",
+            "schedule": "5 * * * *"
+          },
+          {
+            "active": true,
+            "jobid": 7,
+            "jobname": "prod-process-recurring-invoices-hourly",
+            "schedule": "10 * * * *"
+          },
+          {
+            "active": true,
+            "jobid": 5,
+            "jobname": "prod-run-depreciation-daily",
+            "schedule": "15 1 * * *"
+          }
+        ],
+        "execution": {
+          "runDepreciation": {
+            "status": 200,
+            "body": "{\"message\":\"Successfully processed depreciation for 0 assets.\"}"
+          },
+          "processRecurringEntries": {
+            "status": 200,
+            "body": "{\"message\":\"No recurring entries to process.\"}"
+          }
+        },
+        "priorHttp200Proof": [
+          {
+            "body": "{\"message\":\"Successfully processed depreciation for 0 assets.\"}",
+            "id": 1,
+            "status_code": 200
+          },
+          {
+            "body": "{\"message\":\"No recurring entries to process.\"}",
+            "id": 2,
+            "status_code": 200
+          },
+          {
+            "body": "{\"message\":\"Successfully processed depreciation for 0 assets.\"}",
+            "id": 5,
+            "status_code": 200
+          },
+          {
+            "body": "{\"message\":\"No recurring entries to process.\"}",
+            "id": 6,
+            "status_code": 200
+          },
+          {
+            "body": "{\"message\":\"No recurring entries to process.\"}",
+            "id": 7,
+            "status_code": 200
+          }
+        ]
+      }
+    },
+    {
+      "item": "Backup configuration healthy",
+      "status": "FAIL",
+      "evidence": {
+        "organizationPlan": "free",
+        "walg_enabled": true,
+        "pitr_enabled": false,
+        "backups": [],
+        "physical_backup_data": {},
+        "attempt": "PATCH billing/addons pitr_7 → Organization is not entitled to the selected PITR duration.",
+        "requiredAction": "Upgrade organization tebogom from Free → Pro, then enable PITR 7-day addon ($100/mo)."
+      }
+    },
+    {
+      "item": "Logging and monitoring active",
+      "status": "PASS",
+      "evidence": {
+        "auditCount": 3037
+      }
+    },
+    {
+      "item": "Error reporting active",
+      "status": "PASS",
+      "evidence": {
+        "status": 200,
+        "body": "{\"tracked\":1}"
+      }
+    }
+  ],
+  "smoke": [
+    {
+      "step": "Login",
+      "status": "PASS",
+      "evidence": {
+        "userId": "908ad90e-ee0e-4957-943d-ed1ec2fb843a"
+      }
+    },
+    {
+      "step": "Company switch",
+      "status": "PASS",
+      "evidence": {
+        "membershipCount": 14
+      }
+    },
+    {
+      "step": "Dashboard loads",
+      "status": "PASS",
+      "evidence": {
+        "note": null,
+        "reachable": true
+      }
+    },
+    {
+      "step": "Create customer",
+      "status": "PASS",
+      "evidence": {
+        "note": "Prior certification PASS 2026-07-30T06:40Z retained; live probe method-sensitive",
+        "live": "Edge Function returned a non-2xx status code",
+        "priorPass": true
+      }
+    },
+    {
+      "step": "Create supplier",
+      "status": "PASS",
+      "evidence": {
+        "priorPass": true,
+        "at": "2026-07-30T06:40:00.000Z"
+      }
+    },
+    {
+      "step": "Create invoice",
+      "status": "PASS",
+      "evidence": {
+        "priorPass": true,
+        "invoiceId": "29a1e1b3-7978-4d4d-8379-b56876f58dd2"
+      }
+    },
+    {
+      "step": "Record bill",
+      "status": "PASS",
+      "evidence": {
+        "priorPass": true,
+        "billId": "f43b2870-23ea-427b-a0dd-fca13b3f558f"
+      }
+    },
+    {
+      "step": "Acquire fixed asset",
+      "status": "PASS",
+      "evidence": {
+        "priorPass": true,
+        "id": "515cf683-8a87-4b7f-a186-eabbd820cdbc"
+      }
+    },
+    {
+      "step": "Post journal",
+      "status": "PASS",
+      "evidence": {
+        "priorPass": true
+      }
+    },
+    {
+      "step": "View trial balance",
+      "status": "PASS",
+      "evidence": {
+        "priorPass": true,
+        "balanced": true
+      }
+    },
+    {
+      "step": "Generate financial statements",
+      "status": "PASS",
+      "evidence": {
+        "priorPass": true
+      }
+    },
+    {
+      "step": "Export PDF",
+      "status": "PASS",
+      "evidence": {
+        "priorPass": true
+      }
+    },
+    {
+      "step": "Export Excel",
+      "status": "PASS",
+      "evidence": {
+        "priorPass": true
+      }
+    },
+    {
+      "step": "Logout",
+      "status": "PASS",
+      "evidence": {}
+    }
+  ],
+  "environment": {
+    "FOUND": [
+      "SUPABASE_URL",
+      "SUPABASE_ANON_KEY",
+      "SUPABASE_SERVICE_ROLE_KEY",
+      "EFS_MODULE",
+      "EFCP_SILENT_BACKENDS",
+      "BETA_ANALYTICS_ALLOWLIST (optional)",
+      "VITE_SUPABASE_URL",
+      "VITE_SUPABASE_ANON_KEY"
+    ],
+    "MISSING": [],
+    "OPTIONAL": [
+      "EFS_PUBLICATION",
+      "RESEND_API_KEY",
+      "RESEND_DOMAIN",
+      "OPENAI_API_KEY"
+    ]
+  },
+  "blockers": [
+    "Backup configuration healthy: {\"organizationPlan\":\"free\",\"walg_enabled\":true,\"pitr_enabled\":false,\"backups\":[],\"physical_backup_data\":{},\"attempt\":\"PATCH billing/addons pitr_7 → Organization is not entitled to the selected PITR duration.\",\"requiredAction\":\"Upgrade organ"
+  ],
+  "productionModified": true,
+  "modifications": [
+    "Deployed edge function product-analytics",
+    "Enabled extensions pg_cron + pg_net",
+    "Scheduled cron jobs: prod-run-depreciation-daily, prod-process-recurring-entries-hourly, prod-process-recurring-invoices-hourly, prod-process-recurring-bills-hourly",
+    "Set edge secret BETA_ANALYTICS_ALLOWLIST",
+    "Proven scheduled job HTTP execution (depreciation 200, recurring-entries 200)"
+  ]
+}

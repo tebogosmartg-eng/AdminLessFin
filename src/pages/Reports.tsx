@@ -1,19 +1,16 @@
-import { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from '../components/ui/table';
 import { Skeleton } from '../components/ui/skeleton';
 import { Button } from '../components/ui/button';
-import { Calendar as CalendarIcon, Download } from 'lucide-react';
-import { Popover, PopoverContent, PopoverTrigger } from '../components/ui/popover';
-import { Calendar } from '../components/ui/calendar';
-import { DateRange } from 'react-day-picker';
-import { format, startOfMonth, endOfMonth, parseISO } from 'date-fns';
-import { cn, downloadCSV, formatCurrency } from '../lib/utils';
+import { Download } from 'lucide-react';
+import { format, parseISO } from 'date-fns';
+import { downloadCSV, formatCurrency } from '../lib/utils';
 import { useAuth } from '../contexts/AuthContext';
-import { useEnterpriseCalendar } from '../hooks/useEnterpriseCalendar';
+import { useReportingPeriod } from '../contexts/ReportingPeriodContext';
 import { Badge } from '../components/ui/badge';
+import ReportingPeriodPicker from '../components/ReportingPeriodPicker';
 
 type AccountBalance = {
   id: string;
@@ -53,70 +50,49 @@ type AgedPayable = {
 
 const Reports = () => {
   const { activeCompany } = useAuth();
-  const { startDate: fyStart, endDate: fyEnd, yearCode } = useEnterpriseCalendar(activeCompany?.id);
-  const [date, setDate] = useState<DateRange | undefined>({
-    from: startOfMonth(new Date()),
-    to: endOfMonth(new Date()),
-  });
-  const [calendarApplied, setCalendarApplied] = useState(false);
+  const { dateFrom, dateTo, yearCode, isReady, currentReportingPeriod } = useReportingPeriod();
 
-  useEffect(() => {
-    if (!calendarApplied && fyStart && fyEnd) {
-      setDate({ from: parseISO(fyStart), to: parseISO(fyEnd) });
-      setCalendarApplied(true);
-    }
-  }, [fyStart, fyEnd, calendarApplied]);
-
-  const fromDate = date?.from ?? new Date();
-  const toDate = date?.to ?? new Date();
+  const fromDate = currentReportingPeriod?.from ?? (dateFrom ? parseISO(dateFrom) : new Date());
+  const toDate = currentReportingPeriod?.to ?? (dateTo ? parseISO(dateTo) : new Date());
 
   const { data: reportData, isLoading } = useQuery({
-    queryKey: ['reports', fromDate, toDate, activeCompany?.id],
+    queryKey: ['reports', dateFrom, dateTo, activeCompany?.id],
     queryFn: async () => {
-      if (!activeCompany) return null;
+      if (!activeCompany || !dateFrom || !dateTo) return null;
       const { data, error } = await supabase.functions.invoke('reports', {
         body: {
           company_id: activeCompany.id,
-          start_date: format(fromDate, 'yyyy-MM-dd'),
-          end_date: format(toDate, 'yyyy-MM-dd'),
+          start_date: dateFrom,
+          end_date: dateTo,
         },
       });
       if (error) throw new Error(error.message);
       return data;
     },
-    enabled: !!activeCompany,
+    enabled: !!activeCompany && isReady,
   });
 
   const pointInTimeAccounts: AccountBalance[] = reportData?.balancesAsOf || [];
   const periodActivityAccounts: AccountActivity[] = reportData?.periodActivity || [];
   const agedReceivables: AgedReceivable[] = reportData?.agedReceivables || [];
   const agedPayables: AgedPayable[] = reportData?.agedPayables || [];
+  const t = reportData?.statementTotals;
 
   const incomeAccounts = periodActivityAccounts?.filter(acc => acc.type === 'Income') || [];
   const expenseAccounts = periodActivityAccounts?.filter(acc => acc.type === 'Expense') || [];
-  const totalIncome = incomeAccounts.reduce((sum, acc) => sum + acc.activity, 0);
-  const totalExpenses = expenseAccounts.reduce((sum, acc) => sum + acc.activity, 0);
-  const netIncome = totalIncome - totalExpenses;
-
   const assetAccounts = pointInTimeAccounts?.filter(acc => acc.type === 'Asset') || [];
   const liabilityAccounts = pointInTimeAccounts?.filter(acc => acc.type === 'Liability') || [];
   const equityAccounts = pointInTimeAccounts?.filter(acc => acc.type === 'Equity') || [];
-  const totalAssets = assetAccounts.reduce((sum, acc) => sum + acc.balance, 0);
-  const totalLiabilities = liabilityAccounts.reduce((sum, acc) => sum + acc.balance, 0);
-  const totalEquity = equityAccounts.reduce((sum, acc) => sum + acc.balance, 0);
-  const totalLiabilitiesAndEquity = totalLiabilities + totalEquity;
 
-  let totalDebits = 0;
-  let totalCredits = 0;
-  pointInTimeAccounts?.forEach(acc => {
-    if (['Asset', 'Expense'].includes(acc.type)) {
-      if (acc.balance >= 0) totalDebits += acc.balance;
-      else totalCredits += -acc.balance;
-    } else {
-      if (acc.balance >= 0) totalCredits += acc.balance;
-      else totalDebits += -acc.balance;
-    }
-  });
+  const totalIncome = Number(t?.totalIncome ?? 0);
+  const totalExpenses = Number(t?.totalExpenses ?? 0);
+  const netIncome = Number(t?.netIncome ?? 0);
+  const totalAssets = Number(t?.totalAssets ?? 0);
+  const totalLiabilities = Number(t?.totalLiabilities ?? 0);
+  const totalEquity = Number(t?.totalEquity ?? 0);
+  const totalLiabilitiesAndEquity = Number(t?.totalLiabilitiesAndEquity ?? 0);
+  const totalDebits = Number(t?.totalDebits ?? 0);
+  const totalCredits = Number(t?.totalCredits ?? 0);
 
   const handleDownloadTrialBalance = () => {
     const data = pointInTimeAccounts?.map(account => ({
@@ -151,6 +127,7 @@ const Reports = () => {
     data.push({ Section: 'Total Liabilities', Account: '', Amount: totalLiabilities.toFixed(2) });
     data.push({ Section: 'Equity', Account: '', Amount: '' });
     equityAccounts.forEach(acc => data.push({ Section: '', Account: acc.name, Amount: acc.balance.toFixed(2) }));
+    data.push({ Section: '', Account: 'Current Year Earnings', Amount: netIncome.toFixed(2) });
     data.push({ Section: 'Total Equity', Account: '', Amount: totalEquity.toFixed(2) });
     data.push({ Section: 'Total Liabilities & Equity', Account: '', Amount: totalLiabilitiesAndEquity.toFixed(2) });
     downloadCSV(data, `balance-sheet-${format(toDate, 'yyyy-MM-dd')}.csv`);
@@ -189,42 +166,11 @@ const Reports = () => {
           Reports
           {yearCode && (
             <Badge variant="outline" className="ml-2 align-middle text-sm font-normal">
-              Calendar {yearCode}
+              Current Financial Year
             </Badge>
           )}
         </h1>
-        <Popover>
-          <PopoverTrigger asChild>
-            <Button
-              id="date"
-              variant={"outline"}
-              className={cn("w-[300px] justify-start text-left font-normal", !date && "text-muted-foreground")}
-            >
-              <CalendarIcon className="mr-2 h-4 w-4" />
-              {date?.from ? (
-                date.to ? (
-                  <>
-                    {format(date.from, "LLL dd, y")} - {format(date.to, "LLL dd, y")}
-                  </>
-                ) : (
-                  format(date.from, "LLL dd, y")
-                )
-              ) : (
-                <span>Pick a date</span>
-              )}
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent className="w-auto p-0" align="end">
-            <Calendar
-              initialFocus
-              mode="range"
-              defaultMonth={date?.from}
-              selected={date}
-              onSelect={setDate}
-              numberOfMonths={2}
-            />
-          </PopoverContent>
-        </Popover>
+        <ReportingPeriodPicker />
       </div>
 
       {isLoading ? (
@@ -310,6 +256,7 @@ const Reports = () => {
                       <TableRow className="font-semibold"><TableCell>Total Liabilities</TableCell><TableCell className="text-right">{formatCurrency(totalLiabilities)}</TableCell></TableRow>
                       <TableRow className="font-semibold bg-gray-50 dark:bg-gray-800"><TableCell>Equity</TableCell><TableCell></TableCell></TableRow>
                       {equityAccounts.map(account => (<TableRow key={account.id}><TableCell className="pl-8">{account.name}</TableCell><TableCell className="text-right">{formatCurrency(account.balance)}</TableCell></TableRow>))}
+                      <TableRow><TableCell className="pl-8 italic">Current Year Earnings</TableCell><TableCell className="text-right">{formatCurrency(netIncome)}</TableCell></TableRow>
                       <TableRow className="font-semibold"><TableCell>Total Equity</TableCell><TableCell className="text-right">{formatCurrency(totalEquity)}</TableCell></TableRow>
                     </TableBody>
                     <TableFooter><TableRow className="text-lg font-bold bg-gray-100 dark:bg-gray-700"><TableCell>Total Liabilities & Equity</TableCell><TableCell className="text-right">{formatCurrency(totalLiabilitiesAndEquity)}</TableCell></TableRow></TableFooter>
@@ -356,13 +303,9 @@ const Reports = () => {
                   </TableBody>
                   <TableFooter>
                     <TableRow className="text-lg font-bold bg-gray-100 dark:bg-gray-700">
-                      <TableCell>Totals</TableCell>
-                      <TableCell className="text-right font-mono">{formatCurrency(agedReceivables?.reduce((sum, r) => sum + r.current, 0) || 0)}</TableCell>
-                      <TableCell className="text-right font-mono">{formatCurrency(agedReceivables?.reduce((sum, r) => sum + r.days_1_30, 0) || 0)}</TableCell>
-                      <TableCell className="text-right font-mono">{formatCurrency(agedReceivables?.reduce((sum, r) => sum + r.days_31_60, 0) || 0)}</TableCell>
-                      <TableCell className="text-right font-mono">{formatCurrency(agedReceivables?.reduce((sum, r) => sum + r.days_61_90, 0) || 0)}</TableCell>
-                      <TableCell className="text-right font-mono">{formatCurrency(agedReceivables?.reduce((sum, r) => sum + r.days_90_plus, 0) || 0)}</TableCell>
-                      <TableCell className="text-right font-mono">{formatCurrency(agedReceivables?.reduce((sum, r) => sum + r.total_due, 0) || 0)}</TableCell>
+                      <TableCell>Totals (CFA Receivables)</TableCell>
+                      <TableCell className="text-right font-mono" colSpan={5}>—</TableCell>
+                      <TableCell className="text-right font-mono">{formatCurrency(Number(t?.receivables ?? 0))}</TableCell>
                     </TableRow>
                   </TableFooter>
                 </Table>
@@ -409,13 +352,9 @@ const Reports = () => {
                   </TableBody>
                   <TableFooter>
                     <TableRow className="text-lg font-bold bg-gray-100 dark:bg-gray-700">
-                      <TableCell>Totals</TableCell>
-                      <TableCell className="text-right font-mono">{formatCurrency(agedPayables?.reduce((sum, r) => sum + r.current, 0) || 0)}</TableCell>
-                      <TableCell className="text-right font-mono">{formatCurrency(agedPayables?.reduce((sum, r) => sum + r.days_1_30, 0) || 0)}</TableCell>
-                      <TableCell className="text-right font-mono">{formatCurrency(agedPayables?.reduce((sum, r) => sum + r.days_31_60, 0) || 0)}</TableCell>
-                      <TableCell className="text-right font-mono">{formatCurrency(agedPayables?.reduce((sum, r) => sum + r.days_61_90, 0) || 0)}</TableCell>
-                      <TableCell className="text-right font-mono">{formatCurrency(agedPayables?.reduce((sum, r) => sum + r.days_90_plus, 0) || 0)}</TableCell>
-                      <TableCell className="text-right font-mono">{formatCurrency(agedPayables?.reduce((sum, r) => sum + r.total_due, 0) || 0)}</TableCell>
+                      <TableCell>Totals (CFA Payables)</TableCell>
+                      <TableCell className="text-right font-mono" colSpan={5}>—</TableCell>
+                      <TableCell className="text-right font-mono">{formatCurrency(Number(t?.payables ?? 0))}</TableCell>
                     </TableRow>
                   </TableFooter>
                 </Table>

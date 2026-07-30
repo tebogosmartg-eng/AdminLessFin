@@ -336,10 +336,14 @@ export function buildPayrollTimeline(
 export function computeCashImpact(
   accounts: Account[],
   workspace: WorkspaceData | null | undefined,
-  upcomingBillsTotal = 0
+  upcomingBillsTotal = 0,
+  /** CFA cash balance — sole cash authority when provided. */
+  cfaCash?: number | null,
 ): CashImpact {
   const currentCash =
-    findCashEquivalentAccounts(accounts).reduce((sum, a) => sum + (a.balance || 0), 0);
+    cfaCash != null && Number.isFinite(Number(cfaCash))
+      ? Number(cfaCash)
+      : findCashEquivalentAccounts(accounts).reduce((sum, a) => sum + (a.balance || 0), 0);
 
   const metrics = workspace?.metrics;
   const estimatedPayroll = metrics?.draftRunEstimatedCost || metrics?.estimatedMonthlyPayroll || 0;

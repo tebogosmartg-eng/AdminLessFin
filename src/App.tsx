@@ -4,6 +4,7 @@ import { TooltipProvider } from "./components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter } from "react-router-dom";
 import { AuthProvider } from "./contexts/AuthContext";
+import { ReportingPeriodProvider } from "./contexts/ReportingPeriodContext";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { AnalyticsBootstrap } from "./lib/analytics/AnalyticsBootstrap";
 import { AppRouter } from "./router";
@@ -26,12 +27,22 @@ const App = () => (
       <Toaster />
       <Sonner />
       <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
-        <AuthProvider>
-          <AnalyticsBootstrap />
-          <ErrorBoundary>
-            <AppRouter />
-          </ErrorBoundary>
-        </AuthProvider>
+        {/* RB-006: outer app-level boundary wraps the ENTIRE provider stack.
+            A render throw in AuthProvider / ReportingPeriodProvider /
+            AnalyticsBootstrap now degrades to a recoverable fallback instead of
+            an uncatchable white screen. The boundary consumes no context, so it
+            is safe to mount above the providers. The inner boundary is retained
+            to contain router-subtree failures independently. */}
+        <ErrorBoundary level="app">
+          <AuthProvider>
+            <ReportingPeriodProvider>
+              <AnalyticsBootstrap />
+              <ErrorBoundary>
+                <AppRouter />
+              </ErrorBoundary>
+            </ReportingPeriodProvider>
+          </AuthProvider>
+        </ErrorBoundary>
       </BrowserRouter>
     </TooltipProvider>
   </QueryClientProvider>

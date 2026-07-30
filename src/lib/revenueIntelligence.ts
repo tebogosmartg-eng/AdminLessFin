@@ -69,19 +69,21 @@ export type SimpleInsight = {
 export function buildRevenueMetrics(input: {
   arBalances: ArBalance[];
   overdueInvoices: OverdueInvoice[];
-  topCustomers: TopCustomer[];
+  /** Period Income from CFA — same as Income Statement Total Income. */
+  periodRevenue: number;
   cashFlowForecast: CashFlowPoint[];
+  /** CFA receivables — sole AR monetary authority when provided. */
+  receivables?: number;
+  /** CFA cash / net cash flow — expected receipts proxy (no forecast reduce). */
+  expectedReceipts?: number;
 }): RevenueMetrics {
-  const { arBalances, overdueInvoices, topCustomers, cashFlowForecast } = input;
-  const totalAr = arBalances.reduce((sum, item) => sum + item.balance, 0);
-  const overdueTotal = overdueInvoices.reduce((sum, inv) => sum + inv.total, 0);
-  const revenueThisMonth = topCustomers.reduce((sum, c) => sum + c.amount, 0);
-
-  const expectedPayments = cashFlowForecast.reduce((sum, point, index) => {
-    if (index === 0) return sum;
-    const change = point.balance - cashFlowForecast[index - 1].balance;
-    return sum + (change > 0 ? change : 0);
-  }, 0);
+  const { arBalances, overdueInvoices, periodRevenue, receivables, expectedReceipts } = input;
+  // Outstanding AR = CFA receivables only (no subledger balance reduce).
+  const totalAr = Number(receivables ?? 0);
+  // Overdue money card uses CFA receivables when present (no invoice sum).
+  const overdueTotal = Number(receivables ?? 0);
+  const revenueThisMonth = Number(periodRevenue || 0);
+  const expectedPayments = Number(expectedReceipts ?? 0);
 
   const customersAtRisk = [...arBalances]
     .filter((c) => c.balance > 0)
@@ -198,7 +200,7 @@ export function collectionExplanation(rate: number, overdueCount: number): strin
 
 export function collectionCalculationDetail(metrics: RevenueMetrics): string {
   return (
-    `We compare money you’ve already earned this month (${formatCurrency(metrics.revenueThisMonth)}) ` +
+    `We compare period revenue from the Income Statement engine (${formatCurrency(metrics.revenueThisMonth)}) ` +
     `with money customers still owe (${formatCurrency(metrics.totalAr)}). ` +
     `Collection rate = earned ÷ (earned + still owed).`
   );

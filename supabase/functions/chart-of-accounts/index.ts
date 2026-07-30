@@ -55,10 +55,15 @@ serve(withEnterprisePlatform('chart-of-accounts', 'tenant', async (req, _ctx) =>
     let data, error;
 
     switch (method) {
-      case 'GET':
-        // Use RPC with explicit company_id to avoid profile sync issues
+      case 'GET': {
+        // Optional as_of_date — Banking / KPI consumers pass reporting-period end so
+        // cash matches Dashboard. CoA management may omit it (defaults to today).
+        const asOf =
+          typeof body.as_of_date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(body.as_of_date)
+            ? body.as_of_date
+            : new Date().toISOString().split('T')[0];
         ({ data, error } = await supabaseAdmin.rpc('get_balances_as_of_date', {
-          p_end_date: new Date().toISOString().split('T')[0],
+          p_end_date: asOf,
           p_company_id: company_id
         }));
         if (!error && data) {
@@ -88,7 +93,8 @@ serve(withEnterprisePlatform('chart-of-accounts', 'tenant', async (req, _ctx) =>
           });
         }
         break;
-      
+      }
+
       case 'POST':
         if (!isAdmin) throw new Error("Access Denied: Only Admins can create accounts.");
         ({ data, error } = await supabaseAdmin

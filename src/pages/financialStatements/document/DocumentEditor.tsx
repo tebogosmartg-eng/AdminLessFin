@@ -511,7 +511,7 @@ function CoverEditor({ model }: { model: DocumentModel }) {
     ['Registered name', display.registeredName],
     ['Trading name', display.tradingName || '—'],
     ['Reporting framework', display.reportingFramework || model.frameworkLabel],
-    ['Reporting period', model.period?.label || '—'],
+    ['Reporting period', model.period?.period_key || model.period?.label || '—'],
     ['Reporting currency', display.reportingCurrency],
   ];
   return (

@@ -1,7 +1,7 @@
 import { useSearchParams } from "react-router-dom";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { User, Building, Users, ShieldAlert, Lock, Activity, Wallet, Database } from "lucide-react";
+import { User, Building, Users, ShieldAlert, Lock, Activity, Wallet, Database, Shield } from "lucide-react";
 import CompanySettings from "../components/CompanySettings";
 import TeamMembersSettings from "../components/TeamMembersSettings";
 import ProfileSettings from "../components/ProfileSettings";
@@ -12,6 +12,7 @@ import FinancialYearSettings from "../components/FinancialYearSettings";
 import PayrollSettings from "../components/PayrollSettings";
 import EmployeeNumberSettings from "../components/EmployeeNumberSettings";
 import MasterDataSettings from "../components/settings/MasterDataSettings";
+import PlatformGovernanceSettings from "../components/settings/PlatformGovernanceSettings";
 
 // Phase G3.7 — Master Data Consolidation. Settings is now the Enterprise
 // Administration Centre: the single place company/governance/financial-calendar
@@ -19,7 +20,9 @@ import MasterDataSettings from "../components/settings/MasterDataSettings";
 // are URL-controlled so other surfaces — notably the Financial Statements
 // Information Workspace — can deep-link straight to the right editor
 // (e.g. /settings?tab=master-data&module=directors).
-const VALID_TABS = ['company', 'master-data', 'team', 'accounting', 'payroll', 'profile', 'security'] as const;
+// Platform Governance hosts Accounting Engine diagnostics (health, policies,
+// rules, business events) relocated from the Operations Command Centre.
+const VALID_TABS = ['company', 'master-data', 'team', 'accounting', 'platform-governance', 'payroll', 'profile', 'security'] as const;
 type SettingsTab = typeof VALID_TABS[number];
 
 const Settings = () => {
@@ -43,16 +46,17 @@ const Settings = () => {
         <h1 className="text-3xl font-bold">Settings</h1>
         <p className="text-sm text-muted-foreground mt-1">
           Enterprise Administration Centre — the single source for company, master data, financial
-          calendar, and policy configuration consumed across every module.
+          calendar, policy configuration, and Accounting Engine governance.
         </p>
       </div>
 
       <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
-        <TabsList className="grid w-full grid-cols-2 lg:grid-cols-7 h-auto">
+        <TabsList className="grid w-full grid-cols-2 lg:grid-cols-4 xl:grid-cols-8 h-auto">
           <TabsTrigger value="company" className="py-2"><Building className="mr-2 h-4 w-4" /> Company</TabsTrigger>
           <TabsTrigger value="master-data" className="py-2"><Database className="mr-2 h-4 w-4" /> Master Data</TabsTrigger>
           <TabsTrigger value="team" className="py-2"><Users className="mr-2 h-4 w-4" /> Team</TabsTrigger>
           <TabsTrigger value="accounting" className="py-2"><Activity className="mr-2 h-4 w-4" /> Financials</TabsTrigger>
+          <TabsTrigger value="platform-governance" className="py-2"><Shield className="mr-2 h-4 w-4" /> Platform Governance</TabsTrigger>
           <TabsTrigger value="payroll" className="py-2"><Wallet className="mr-2 h-4 w-4" /> Payroll</TabsTrigger>
           <TabsTrigger value="profile" className="py-2"><User className="mr-2 h-4 w-4" /> My Profile</TabsTrigger>
           <TabsTrigger value="security" className="py-2"><Lock className="mr-2 h-4 w-4" /> Security</TabsTrigger>
@@ -72,6 +76,10 @@ const Settings = () => {
 
         <TabsContent value="accounting" className="space-y-6">
           <FinancialYearSettings />
+        </TabsContent>
+
+        <TabsContent value="platform-governance" className="space-y-6">
+          <PlatformGovernanceSettings />
         </TabsContent>
 
         <TabsContent value="payroll" className="space-y-6">

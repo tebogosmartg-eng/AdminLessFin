@@ -9,6 +9,8 @@ import {
   loadDocumentModel,
 } from '../../../lib/financialStatements/document/documentModel';
 import { useDocumentOverrides } from '../../../lib/financialStatements/document/documentStore';
+import { resolveEngagementReportingPeriod } from '../../../lib/financialStatements/calendarYearBinding';
+import { useReportingPeriod } from '../../../contexts/ReportingPeriodContext';
 import DocumentTree from '../document/DocumentTree';
 import DocumentEditor from '../document/DocumentEditor';
 import DocumentPreview from '../document/DocumentPreview';
@@ -43,13 +45,16 @@ export default function WorkspaceDocumentWorkspace({
   workspaceId,
   dashboard,
   generalInfo,
+  onNavigate,
 }: {
   companyId: string;
   workspaceId: string;
   dashboard: EfsDashboard;
   generalInfo: EfsWorkspaceGeneralInformation | null;
+  onNavigate?: (target: string) => void;
 }) {
   const qc = useQueryClient();
+  const { financialYears, activeFinancialYear } = useReportingPeriod();
   const [selection, setSelection] = useState<DocSelection>({ kind: 'cover', id: 'cover' });
   const [addDisclosureOpen, setAddDisclosureOpen] = useState(false);
   const overridesApi = useDocumentOverrides(workspaceId);
@@ -89,6 +94,11 @@ export default function WorkspaceDocumentWorkspace({
   }
 
   const model = modelQuery.data;
+  const fy = resolveEngagementReportingPeriod(
+    model.period || dashboard.reportingPeriod,
+    financialYears,
+    activeFinancialYear,
+  );
 
   return (
     <div className="space-y-4">
@@ -97,21 +107,33 @@ export default function WorkspaceDocumentWorkspace({
           <h2 className="text-lg font-semibold tracking-tight">Financial Statement Document</h2>
           <p className="text-sm text-muted-foreground">
             {model.frameworkLabel}
-            {model.period?.label ? ` · ${model.period.label}` : ''}
+            {` · ${fy.displayLabel}`}
             {model.trialBalanceCaptured
               ? ' · Populated from trial balance'
               : ' · Generic document (awaiting trial balance)'}
           </p>
         </div>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => invalidateModel()}
-          disabled={modelQuery.isFetching}
-        >
-          <RefreshCw className={`mr-2 h-4 w-4 ${modelQuery.isFetching ? 'animate-spin' : ''}`} />
-          Refresh document
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          {!model.trialBalanceCaptured && onNavigate ? (
+            <>
+              <Button variant="default" size="sm" onClick={() => onNavigate('trial-balance')}>
+                Open Trial Balance
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => onNavigate('statements')}>
+                Generate Statements
+              </Button>
+            </>
+          ) : null}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => invalidateModel()}
+            disabled={modelQuery.isFetching}
+          >
+            <RefreshCw className={`mr-2 h-4 w-4 ${modelQuery.isFetching ? 'animate-spin' : ''}`} />
+            Refresh document
+          </Button>
+        </div>
       </div>
 
       <div className="grid gap-4 lg:grid-cols-[260px_minmax(0,1fr)_320px]">

@@ -129,6 +129,10 @@ export function adaptFinancialFacts(factRow, snapshotVersionId) {
   Object.freeze(facts.period_activity);
   Object.freeze(facts.cash_flow);
   Object.freeze(facts.period);
+  // Preserve sealed canonical aggregation (presentation consumers must not recalculate).
+  if (ds.canonical_aggregation) {
+    (facts as any).canonical_aggregation = Object.freeze({ ...ds.canonical_aggregation });
+  }
   Object.freeze(facts);
 
   return facts;

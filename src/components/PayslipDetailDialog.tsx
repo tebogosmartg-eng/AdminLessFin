@@ -131,12 +131,16 @@ const PayslipDetailDialog = ({ isOpen, setIsOpen, payslipId }: PayslipDetailDial
         {isLoading ? <Skeleton className="h-96 w-full" /> : payslipData && (
           <div className="text-sm payslip-document">
             <div className="grid grid-cols-2 gap-4 mb-4">
-              <div>
+              <div className="flex items-start gap-4 min-w-0">
                 {activeCompany?.logo_url ? (
-                  <CompanyLogo src={activeCompany.logo_url} className="mb-2" />
+                  <CompanyLogo src={activeCompany.logo_url} className="shrink-0" />
                 ) : null}
-                <h3 className="font-bold text-base">{identity?.name || 'Your Company'}</h3>
-                <p className="text-muted-foreground">{identity?.address}</p>
+                <div className={`min-w-0 space-y-1.5${activeCompany?.logo_url ? ' pt-3' : ''}`}>
+                  <h3 className="font-bold text-base leading-snug break-words">{identity?.name || 'Your Company'}</h3>
+                  {identity?.address ? (
+                    <p className="text-muted-foreground whitespace-pre-line break-words">{identity.address}</p>
+                  ) : null}
+                </div>
               </div>
               <div className="text-right">
                 <p><span className="font-semibold">Pay Period:</span> {format(new Date(payslipData.payroll_runs.pay_period_start), 'PPP')} – {format(new Date(payslipData.payroll_runs.pay_period_end), 'PPP')}</p>

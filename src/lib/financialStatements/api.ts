@@ -267,6 +267,9 @@ export type EfsDashboard = {
     start_date: string;
     end_date: string;
     status: string;
+    financial_year_id?: string | null;
+    calendar_bound?: boolean;
+    year_code?: string | null;
   } | null;
   framework: {
     id: string;
@@ -472,5 +475,35 @@ export async function getWorkspaceByFinancialYear(
 ): Promise<EfsWorkspaceListItem> {
   return invokeFinancialStatements(companyId, 'GET_WORKSPACE_BY_FINANCIAL_YEAR', {
     financial_year_id: financialYearId,
+  });
+}
+
+export type MigrateLegacyReportingPeriodResult = {
+  workspace_id: string;
+  mode: 'create_and_link' | 'link_existing';
+  reporting_period: Record<string, unknown>;
+  financial_year: {
+    id: string;
+    year_code: string;
+    start_date: string;
+    end_date: string;
+    status: string;
+  };
+  note: string;
+};
+
+/** Explicit legacy → calendar migration. Never auto-invoked. */
+export async function migrateLegacyReportingPeriod(
+  companyId: string,
+  args: {
+    workspaceId: string;
+    mode: 'create_and_link' | 'link_existing';
+    financialYearId?: string;
+  },
+): Promise<MigrateLegacyReportingPeriodResult> {
+  return invokeFinancialStatements(companyId, 'MIGRATE_LEGACY_REPORTING_PERIOD', {
+    workspace_id: args.workspaceId,
+    mode: args.mode,
+    ...(args.financialYearId ? { financial_year_id: args.financialYearId } : {}),
   });
 }

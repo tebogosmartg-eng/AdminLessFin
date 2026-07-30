@@ -32,6 +32,7 @@ import {
   adaptFinancialFacts,
   runStatementEngine,
 } from "../_shared/efsStatementEngine/index.ts";
+import { buildCanonicalFinancialAggregation } from "../_shared/canonicalFinancialAggregation.ts";
 import {
   resolveStructureAttachmentPoint,
   appendReviewHistory,
@@ -273,11 +274,14 @@ async function findOrCreateReportingPeriod(admin, company_id, entity, financial_
     .eq("financial_year_id", financial_year_id)
     .maybeSingle();
   if (existingErr) throw existingErr;
-  if (existing) return existing;
+  if (existing) {
+    // Keep snapshot metadata in lockstep with financial_years (label/dates never drift).
+    return await syncReportingPeriodFromFinancialYear(admin, existing);
+  }
 
   const { data: fy, error: fyErr } = await admin
     .from("financial_years")
-    .select("id, year_code, start_date, end_date, company_id")
+    .select("id, year_code, start_date, end_date, company_id, status")
     .eq("id", financial_year_id)
     .eq("company_id", company_id)
     .maybeSingle();
@@ -313,11 +317,238 @@ async function findOrCreateReportingPeriod(admin, company_id, entity, financial_
         .eq("reporting_entity_id", entity.id)
         .eq("financial_year_id", financial_year_id)
         .maybeSingle();
-      if (retry) return retry;
+      if (retry) return await syncReportingPeriodFromFinancialYear(admin, retry);
     }
     throw error;
   }
   return data;
+}
+
+/**
+ * Display identity = financial_years.year_code + dates. Frozen slash labels are rewritten.
+ */
+async function syncReportingPeriodFromFinancialYear(admin, period, fyRow = null) {
+  if (!period) return null;
+  let fy = fyRow;
+  if (!fy && period.financial_year_id) {
+    const { data, error } = await admin
+      .from("financial_years")
+      .select("id, year_code, start_date, end_date, status")
+      .eq("id", period.financial_year_id)
+      .maybeSingle();
+    if (error) throw error;
+    fy = data;
+  }
+  if (!fy) return { ...period, calendar_bound: false };
+
+  const needsUpdate =
+    period.financial_year_id !== fy.id ||
+    period.period_key !== fy.year_code ||
+    period.label !== fy.year_code ||
+    period.start_date !== fy.start_date ||
+    period.end_date !== fy.end_date;
+
+  if (!needsUpdate) {
+    return {
+      ...period,
+      financial_year_id: fy.id,
+      period_key: fy.year_code,
+      label: fy.year_code,
+      start_date: fy.start_date,
+      end_date: fy.end_date,
+      calendar_bound: true,
+      year_code: fy.year_code,
+    };
+  }
+
+  const { data: updated, error: updErr } = await admin
+    .from("efs_reporting_periods")
+    .update({
+      financial_year_id: fy.id,
+      period_key: fy.year_code,
+      label: fy.year_code,
+      start_date: fy.start_date,
+      end_date: fy.end_date,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", period.id)
+    .select()
+    .single();
+  if (updErr) {
+    // Unique conflict: another period already owns this FY — return calendar overlay without persist.
+    if (updErr.code === "23505") {
+      return {
+        ...period,
+        financial_year_id: fy.id,
+        period_key: fy.year_code,
+        label: fy.year_code,
+        start_date: fy.start_date,
+        end_date: fy.end_date,
+        calendar_bound: true,
+        year_code: fy.year_code,
+      };
+    }
+    throw updErr;
+  }
+  return {
+    ...updated,
+    calendar_bound: true,
+    year_code: fy.year_code,
+  };
+}
+
+/**
+ * V3.6.10 / V3.6.11 — Reconcile efs_reporting_periods to Enterprise Financial Calendar.
+ * Display identity = financial_years.year_code + dates when explicitly linked.
+ * Frozen slash labels on bound periods are rewritten from the linked calendar year.
+ *
+ * Unbound legacy periods are NEVER auto-bound. Users must migrate explicitly via
+ * MIGRATE_LEGACY_REPORTING_PERIOD (create matching FY, link existing, or keep legacy).
+ */
+async function reconcileReportingPeriodWithCalendar(admin, company_id, period, workspaceStatus) {
+  if (!period) return null;
+
+  // Bound by financial_year_id → sync label/dates from that calendar year only.
+  if (period.financial_year_id) {
+    const synced = await syncReportingPeriodFromFinancialYear(admin, period);
+    if (synced?.calendar_bound) return synced;
+    // Orphaned financial_year_id — leave for explicit migration.
+    return { ...period, calendar_bound: false, legacy_unbound: true };
+  }
+
+  // Do not auto-bind unbound periods (including published/archived and drafts).
+  void company_id;
+  void workspaceStatus;
+  return { ...period, calendar_bound: false, legacy_unbound: true };
+}
+
+/**
+ * Explicit migration for legacy unbound reporting periods.
+ * Creates or links Financial Year metadata only — never mutates journals or sealed packs.
+ */
+async function migrateLegacyReportingPeriod(admin, {
+  company_id,
+  workspace_id,
+  mode,
+  financial_year_id: linkYearId,
+}) {
+  if (!workspace_id) throw new Error("workspace_id is required.");
+  if (!["create_and_link", "link_existing"].includes(mode)) {
+    throw new Error("mode must be create_and_link or link_existing.");
+  }
+
+  const { data: workspace, error: wsErr } = await admin
+    .from("efs_reporting_workspaces")
+    .select("id, status, company_id, reporting_period_id, efs_reporting_periods(*)")
+    .eq("id", workspace_id)
+    .eq("company_id", company_id)
+    .single();
+  if (wsErr) throw wsErr;
+
+  const sealed = ["published", "certified", "closed", "locked", "archived"].includes(
+    String(workspace.status || ""),
+  );
+  if (sealed) {
+    throw new Error(
+      "Published and archived engagements are immutable and cannot be migrated. Their reporting period stays historically fixed.",
+    );
+  }
+
+  const period = workspace.efs_reporting_periods;
+  if (!period?.id) throw new Error("Engagement reporting period was not found.");
+  if (period.financial_year_id) {
+    const { data: existingFy } = await admin
+      .from("financial_years")
+      .select("id")
+      .eq("id", period.financial_year_id)
+      .maybeSingle();
+    if (existingFy) {
+      throw new Error("This engagement is already linked to the Enterprise Financial Calendar.");
+    }
+  }
+
+  let fy = null;
+  if (mode === "create_and_link") {
+    if (!period.start_date || !period.end_date) {
+      throw new Error("Engagement period dates are required to create a matching Financial Year.");
+    }
+    const year_code = `FY${String(period.end_date).slice(0, 4)}`;
+    const { data: byDates } = await admin
+      .from("financial_years")
+      .select("id, year_code, start_date, end_date, status")
+      .eq("company_id", company_id)
+      .eq("start_date", period.start_date)
+      .eq("end_date", period.end_date)
+      .maybeSingle();
+    if (byDates) {
+      fy = byDates;
+    } else {
+      const { data: inserted, error: insErr } = await admin
+        .from("financial_years")
+        .insert({
+          company_id,
+          year_code,
+          start_date: period.start_date,
+          end_date: period.end_date,
+          status: "open",
+        })
+        .select("id, year_code, start_date, end_date, status")
+        .single();
+      if (insErr) {
+        if (insErr.code === "23505") {
+          const { data: retry } = await admin
+            .from("financial_years")
+            .select("id, year_code, start_date, end_date, status")
+            .eq("company_id", company_id)
+            .eq("start_date", period.start_date)
+            .eq("end_date", period.end_date)
+            .maybeSingle();
+          if (!retry) throw insErr;
+          fy = retry;
+        } else {
+          throw insErr;
+        }
+      } else {
+        fy = inserted;
+      }
+    }
+  } else {
+    if (!linkYearId) throw new Error("financial_year_id is required for link_existing.");
+    const { data: found, error: fyErr } = await admin
+      .from("financial_years")
+      .select("id, year_code, start_date, end_date, status")
+      .eq("id", linkYearId)
+      .eq("company_id", company_id)
+      .maybeSingle();
+    if (fyErr) throw fyErr;
+    if (!found) {
+      throw new Error("Financial Year not found in the Enterprise Financial Calendar for this company.");
+    }
+    fy = found;
+  }
+
+  const { data: conflict } = await admin
+    .from("efs_reporting_periods")
+    .select("id")
+    .eq("company_id", company_id)
+    .eq("reporting_entity_id", period.reporting_entity_id)
+    .eq("financial_year_id", fy.id)
+    .neq("id", period.id)
+    .maybeSingle();
+  if (conflict) {
+    throw new Error(
+      `Another engagement is already linked to Financial Year ${fy.year_code}. One workspace per Financial Year.`,
+    );
+  }
+
+  const linked = await syncReportingPeriodFromFinancialYear(admin, period, fy);
+  return {
+    workspace_id,
+    mode,
+    reporting_period: linked,
+    financial_year: fy,
+    note: "Migration linked Financial Year metadata only. Journals and sealed publication artefacts were not modified.",
+  };
 }
 
 async function resolveDefaultFrameworkPackId(admin, framework_pack_id) {
@@ -639,7 +870,18 @@ serve(withEnterprisePlatform("financial-statements", "tenant", async (req, _ctx)
           .neq("status", "archived")
           .order("updated_at", { ascending: false });
         if (error) throw error;
-        result = data;
+        // Reconcile each engagement period to financial_years (never leave frozen slash labels).
+        result = await Promise.all(
+          (data || []).map(async (ws) => {
+            const period = await reconcileReportingPeriodWithCalendar(
+              admin,
+              company_id,
+              ws.efs_reporting_periods,
+              ws.status,
+            );
+            return { ...ws, efs_reporting_periods: period };
+          }),
+        );
         break;
       }
 
@@ -740,6 +982,18 @@ serve(withEnterprisePlatform("financial-statements", "tenant", async (req, _ctx)
           after_state: data,
         });
         result = data;
+        break;
+      }
+
+      case "MIGRATE_LEGACY_REPORTING_PERIOD": {
+        // Explicit user-driven migration only — never auto-bind unbound periods.
+        // Creates/links financial_years metadata; does not touch journals or sealed packs.
+        result = await migrateLegacyReportingPeriod(admin, {
+          company_id,
+          workspace_id: body.workspace_id,
+          mode: body.mode,
+          financial_year_id: body.financial_year_id ?? null,
+        });
         break;
       }
 
@@ -977,9 +1231,18 @@ serve(withEnterprisePlatform("financial-statements", "tenant", async (req, _ctx)
           .limit(20);
 
         // Phase A: downstream widgets are reserved placeholders (no Phase B–D engines)
+        const reportingPeriod = await reconcileReportingPeriodWithCalendar(
+          admin,
+          company_id,
+          workspace.efs_reporting_periods,
+          workspace.status,
+        );
+        // Keep workspace embed in sync for any consumer reading nested period.
+        if (reportingPeriod) workspace.efs_reporting_periods = reportingPeriod;
+
         result = {
           workspace,
-          reportingPeriod: workspace.efs_reporting_periods,
+          reportingPeriod,
           framework: workspace.efs_framework_bindings?.efs_framework_packs ?? null,
           snapshot: currentSnapshot
             ? {
@@ -1667,6 +1930,35 @@ serve(withEnterprisePlatform("financial-statements", "tenant", async (req, _ctx)
           content_hash = await sha256Hex(dataset);
         }
 
+        // Seal Canonical Financial Aggregation once — Statement Engine must consume, not recalculate.
+        {
+          const { data: coaMeta } = await admin
+            .from("chart_of_accounts")
+            .select("id, account_role, category, subcategory, account_code, tax_treatment, cash_flow_classification")
+            .eq("company_id", company_id);
+          const closingAccounts =
+            dataset.balances_as_of?.accounts ?? dataset.balances_as_of ?? closingBalances ?? [];
+          const openingAccounts =
+            dataset.balances_prior_as_of?.accounts ?? dataset.balances_prior_as_of ?? openingBalances ?? [];
+          const periodRows = dataset.period_activity ?? activity ?? [];
+          dataset.canonical_aggregation = buildCanonicalFinancialAggregation({
+            balancesAsOf: closingAccounts,
+            openingBalances: openingAccounts,
+            periodActivity: (periodRows || []).map((a) => ({
+              id: a.id,
+              name: a.name,
+              type: a.type,
+              activity: Number(a.period_activity ?? a.activity ?? 0),
+            })),
+            cashFlowData: dataset.cash_flow ?? cash_flow,
+            accountMeta: coaMeta || [],
+            retainedEarningsAccountIds: (coaMeta || [])
+              .filter((r) => r.account_role === "retained_earnings")
+              .map((r) => r.id),
+          });
+          content_hash = await sha256Hex(dataset);
+        }
+
         const extract_summary = {
           account_count: (closingBalances || []).length,
           period_start: start_date,
@@ -2050,6 +2342,7 @@ serve(withEnterprisePlatform("financial-statements", "tenant", async (req, _ctx)
           taxonomyLines: taxLines || [],
           defaultTypeMaps: typeMaps || [],
           tenantMappingLines: [],
+          canonicalAggregation: facts.canonical_aggregation || null,
         });
 
         const saved = [];

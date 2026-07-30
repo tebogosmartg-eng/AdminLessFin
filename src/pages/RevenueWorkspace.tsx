@@ -1,7 +1,7 @@
 import { useCallback, useMemo, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { format, startOfMonth, endOfMonth, formatDistanceToNow } from 'date-fns';
+import { format, formatDistanceToNow } from 'date-fns';
 import {
   TrendingUp,
   FileText,
@@ -17,6 +17,7 @@ import {
   ChevronUp,
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
+import { useReportingPeriod } from '../contexts/ReportingPeriodContext';
 import { revenueWorkspaceQuery } from '../lib/queries';
 import { formatCurrency } from '../lib/utils';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
@@ -73,16 +74,14 @@ function sendReminder(opts: {
 const RevenueWorkspace = () => {
   useDocumentTitle('Revenue');
   const { activeCompany } = useAuth();
+  const { dateFrom, dateTo, isReady } = useReportingPeriod();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const [showCalc, setShowCalc] = useState(false);
 
-  const dateFrom = format(startOfMonth(new Date()), 'yyyy-MM-dd');
-  const dateTo = format(endOfMonth(new Date()), 'yyyy-MM-dd');
-
   const { data, isLoading } = useQuery({
-    ...revenueWorkspaceQuery(activeCompany!.id, dateFrom, dateTo),
-    enabled: !!activeCompany,
+    ...revenueWorkspaceQuery(activeCompany!.id, dateFrom ?? '', dateTo ?? ''),
+    enabled: !!activeCompany && isReady,
   });
 
   const drawerParam = searchParams.get('drawer') || searchParams.get('drilldown');
@@ -113,15 +112,24 @@ const RevenueWorkspace = () => {
   const actions = data?.actions || { draftInvoices: 0, expiringQuotes: 0 };
   const expectedRaw: ExpectedPaymentRaw[] = data?.expectedPayments || [];
 
+  const cfaReceivables = Number(data?.canonicalAggregation?.receivables ?? data?.statementTotals?.receivables ?? 0);
+  const cfaIncome = Number(
+    typeof data?.periodRevenue === 'number'
+      ? data.periodRevenue
+      : (data?.canonicalAggregation?.totalIncome ?? data?.statementTotals?.totalIncome ?? 0),
+  );
+  const cfaNetCash = Number(data?.canonicalAggregation?.netCashFlow ?? data?.statementTotals?.netCashFlow ?? 0);
   const metrics = useMemo(
     () =>
       buildRevenueMetrics({
         arBalances,
         overdueInvoices,
-        topCustomers,
+        periodRevenue: cfaIncome,
         cashFlowForecast,
+        receivables: cfaReceivables,
+        expectedReceipts: Math.max(0, cfaNetCash),
       }),
-    [arBalances, overdueInvoices, topCustomers, cashFlowForecast],
+    [arBalances, overdueInvoices, cfaIncome, cashFlowForecast, cfaReceivables, cfaNetCash],
   );
 
   const expectedRows = useMemo(() => buildExpectedPayments(expectedRaw), [expectedRaw]);
@@ -169,7 +177,8 @@ const RevenueWorkspace = () => {
     );
   }
 
-  const expectedTotal = expectedRows.reduce((s, r) => s + r.amount, 0) || metrics.expectedPayments;
+  // Expected receipts KPI = CFA only (no expected-row money sum).
+  const expectedTotal = metrics.expectedPayments;
 
   return (
     <div className="space-y-6">
@@ -197,9 +206,9 @@ const RevenueWorkspace = () => {
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
         <MetricCard
-          label="Revenue this month"
+          label="Revenue (period)"
           value={formatCurrency(metrics.revenueThisMonth)}
-          hint="Tap to see top customers"
+          hint="Same Income Statement total as Reports"
           onClick={() => setDrawer('revenue')}
         />
         <MetricCard
@@ -432,8 +441,8 @@ const RevenueWorkspace = () => {
       <MetricDrawer
         open={activeDrawer === 'revenue'}
         onOpenChange={(open) => !open && setDrawer(null)}
-        title="Revenue this month"
-        description="Top customers by sales this month."
+        title="Revenue (period)"
+        description="Period revenue matches the Income Statement. Top customers below are a subset for drill-down."
         footer={
           <Button variant="outline" className="w-full" onClick={() => navigate('/invoices')}>
             View all invoices
@@ -442,7 +451,7 @@ const RevenueWorkspace = () => {
         }
       >
         {topCustomers.length === 0 ? (
-          <p className="text-sm text-muted-foreground">No sales recorded this month yet.</p>
+          <p className="text-sm text-muted-foreground">No customer-tagged sales in this period yet.</p>
         ) : (
           <ul className="space-y-2">
             {topCustomers.map((c) => (

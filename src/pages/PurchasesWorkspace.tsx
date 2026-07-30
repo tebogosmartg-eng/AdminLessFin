@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { format, startOfMonth, endOfMonth, formatDistanceToNow, addDays, isBefore, isWithinInterval } from 'date-fns';
+import { format, formatDistanceToNow, addDays, isBefore, isWithinInterval } from 'date-fns';
 import {
   Wallet,
   AlertTriangle,
@@ -17,6 +17,7 @@ import {
   Camera,
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
+import { useReportingPeriod } from '../contexts/ReportingPeriodContext';
 import { purchasesWorkspaceQuery } from '../lib/queries';
 import { formatCurrency } from '../lib/utils';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
@@ -37,14 +38,12 @@ type OpenBill = {
 const PurchasesWorkspace = () => {
   useDocumentTitle('Purchases');
   const { activeCompany } = useAuth();
+  const { dateFrom, dateTo, isReady } = useReportingPeriod();
   const navigate = useNavigate();
 
-  const dateFrom = format(startOfMonth(new Date()), 'yyyy-MM-dd');
-  const dateTo = format(endOfMonth(new Date()), 'yyyy-MM-dd');
-
   const { data, isLoading } = useQuery({
-    ...purchasesWorkspaceQuery(activeCompany!.id, dateFrom, dateTo),
-    enabled: !!activeCompany,
+    ...purchasesWorkspaceQuery(activeCompany!.id, dateFrom ?? '', dateTo ?? ''),
+    enabled: !!activeCompany && isReady,
   });
 
   const apBalances: ApBalance[] = data?.apBalances || [];
@@ -53,21 +52,25 @@ const PurchasesWorkspace = () => {
     data?.purchaseOrders || [];
   const recurringBills: { id: string; profile_name: string; next_run_date: string; status: string }[] =
     data?.recurringBills || [];
-  const topExpenses = data?.topExpenses || [];
   const cashFlowForecast = data?.cashFlowForecast || [];
   const actions = data?.actions || { openBills: 0 };
 
   const today = new Date();
   const weekEnd = addDays(today, 7);
 
+  const cfaPayables = Number(data?.canonicalAggregation?.payables ?? data?.statementTotals?.payables ?? 0);
+  const cfaExpenses = Number(
+    typeof data?.periodExpenses === 'number'
+      ? data.periodExpenses
+      : (data?.canonicalAggregation?.totalExpenses ?? data?.statementTotals?.totalExpenses ?? 0),
+  );
+  const cfaNetCash = Number(data?.canonicalAggregation?.netCashFlow ?? data?.statementTotals?.netCashFlow ?? 0);
   const metrics = useMemo(() => {
-    const totalAp = apBalances.reduce((sum, item) => sum + item.balance, 0);
-
+    // AP / spend / cash outflow = CFA only (no AP-balance or bill/forecast reduces).
+    const totalAp = cfaPayables;
     const overdueBills = openBills.filter(
       (bill) => bill.due_date && isBefore(new Date(bill.due_date), today)
     );
-    const overdueTotal = overdueBills.reduce((sum, bill) => sum + bill.total, 0);
-
     const dueToday = openBills.filter(
       (bill) => bill.due_date && format(new Date(bill.due_date), 'yyyy-MM-dd') === format(today, 'yyyy-MM-dd')
     );
@@ -75,16 +78,6 @@ const PurchasesWorkspace = () => {
       (bill) =>
         bill.due_date &&
         isWithinInterval(new Date(bill.due_date), { start: today, end: weekEnd })
-    );
-    const cashRequiredWeek = dueThisWeek.reduce((sum, bill) => sum + bill.total, 0);
-
-    const cashOutflow30d = cashFlowForecast.reduce(
-      (sum: number, point: { balance: number }, index: number) => {
-        if (index === 0) return sum;
-        const change = point.balance - cashFlowForecast[index - 1].balance;
-        return sum + (change < 0 ? Math.abs(change) : 0);
-      },
-      0
     );
 
     const posAwaitingBilling = purchaseOrders.filter(
@@ -98,24 +91,24 @@ const PurchasesWorkspace = () => {
       .sort((a, b) => b.balance - a.balance)
       .slice(0, 5);
 
-    const spendThisMonth = topExpenses.reduce((sum: number, e: { amount: number }) => sum + e.amount, 0);
+    const cashOutflow30d = Math.abs(Math.min(0, cfaNetCash));
 
     return {
       totalAp,
-      overdueTotal,
+      overdueTotal: totalAp,
       overdueCount: overdueBills.length,
       overdueBills,
       dueTodayCount: dueToday.length,
       dueThisWeekCount: dueThisWeek.length,
-      cashRequiredWeek,
+      cashRequiredWeek: totalAp,
       cashOutflow30d,
       posAwaitingBilling,
       upcomingRecurring,
       topSuppliers,
-      spendThisMonth,
+      spendThisMonth: cfaExpenses,
       openBillCount: actions.openBills || openBills.length,
     };
-  }, [apBalances, openBills, purchaseOrders, recurringBills, cashFlowForecast, actions, today, weekEnd]);
+  }, [apBalances, openBills, purchaseOrders, recurringBills, actions, today, weekEnd, cfaPayables, cfaExpenses, cfaNetCash]);
 
   const workflowLinks = [
     { to: '/purchase-orders', label: 'Purchase Orders', icon: ShoppingBag, description: 'Commit spend before billing' },
@@ -194,7 +187,7 @@ const PurchasesWorkspace = () => {
         </Card>
         <Card>
           <CardHeader className="pb-2">
-            <CardDescription>Spend This Month</CardDescription>
+            <CardDescription>Expenses (period)</CardDescription>
             <CardTitle className="text-2xl">{formatCurrency(metrics.spendThisMonth)}</CardTitle>
           </CardHeader>
         </Card>

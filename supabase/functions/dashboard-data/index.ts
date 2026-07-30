@@ -7,6 +7,9 @@ import {
   withEnterprisePlatform,
   edgeFailure,
 } from '../_shared/enterpriseEdgePlatform.ts'
+import {
+  buildStatementTotals,
+} from '../_shared/accountingEngineTotals.ts'
 
 
 const corsHeaders = ENTERPRISE_CORS_HEADERS
@@ -56,10 +59,11 @@ serve(withEnterprisePlatform('dashboard-data', 'tenant', async (req, _ctx) => {
       { auth: { autoRefreshToken: false, persistSession: false }, global: { headers: { Authorization: req.headers.get('Authorization')! } } }
     );
 
-    // Promises common to all roles
+    // Promises common to all roles — every financial RPC receives explicit company_id
+    // (never rely on profiles.active_company_id when the UI company switcher is available).
     const promises = [
-      userSupabase.rpc('get_customer_ar_balances'), // AR is operational, needed for sales
-      userSupabase.rpc('get_overdue_invoices'), // Operational
+      userSupabase.rpc('get_customer_ar_balances', { p_company_id: company_id }),
+      userSupabase.rpc('get_overdue_invoices', { p_company_id: company_id }),
       supabaseAdmin.from('products').select('id, name, quantity_on_hand').eq('company_id', company_id).eq('type', 'inventory').lte('quantity_on_hand', 5).limit(5),
       
       // ACTION ITEMS
@@ -83,11 +87,24 @@ serve(withEnterprisePlatform('dashboard-data', 'tenant', async (req, _ctx) => {
 
     // Admin-only financial data promises
     if (isAdmin) {
-        promises.push(userSupabase.rpc('get_balances_as_of_date', { p_end_date: asOfDateStr }));
-        promises.push(userSupabase.rpc('get_monthly_summary', { p_months: 6 }));
-        promises.push(userSupabase.rpc('get_vendor_ap_balances'));
-        promises.push(userSupabase.rpc('get_top_expenses', { p_start_date: startDateStr, p_end_date: asOfDateStr }));
+        // Scope balances to the active company_id — the SAME engine call the
+        // Trial Balance / Balance Sheet (reports edge) makes. Without p_company_id
+        // the RPC falls back to profiles.active_company_id, which desyncs from the
+        // UI-selected company for multi-company users and returns 0/empty balances.
+        promises.push(userSupabase.rpc('get_balances_as_of_date', { p_end_date: asOfDateStr, p_company_id: company_id }));
+        // Period P&L activity — SAME engine call as Income Statement (reports edge).
+        promises.push(userSupabase.rpc('get_period_activity', { p_start_date: startDateStr, p_end_date: asOfDateStr, p_company_id: company_id }));
+        promises.push(userSupabase.rpc('get_monthly_summary', { p_months: 6, p_company_id: company_id }));
+        promises.push(userSupabase.rpc('get_vendor_ap_balances', { p_company_id: company_id }));
+        promises.push(userSupabase.rpc('get_top_expenses', { p_start_date: startDateStr, p_end_date: asOfDateStr, p_company_id: company_id }));
+        // Bank CoA links — Cash Balance / forecast open from the same bank→GL map.
+        promises.push(supabaseAdmin.from('bank_accounts').select('chart_of_account_id').eq('company_id', company_id).eq('status', 'active'));
+        // CoA metadata for canonical aggregation (roles / categories) — no money math.
+        promises.push(supabaseAdmin.from('chart_of_accounts').select('id, account_role, category, subcategory, account_code, tax_treatment, cash_flow_classification').eq('company_id', company_id));
+        // Cash flow statement — same RPC as Reports / Financial Statements.
+        promises.push(userSupabase.rpc('get_cash_flow_statement', { p_start_date: startDateStr, p_end_date: asOfDateStr, p_company_id: company_id }));
         // Forecast Data: Current Open Payables/Receivables (enriched for Expected Payments Explorer)
+        // Intentional: forecast horizon is always today → +30d (operational cash outlook), not the reporting period.
         promises.push(supabaseAdmin.from('invoices').select('id, invoice_number, due_date, status, customer_id, customers(name, payment_terms, email), journal_entries!journal_entry_id(journal_entry_items(amount, type))').eq('company_id', company_id).neq('status', 'paid').neq('status', 'void').gte('due_date', format(new Date(), 'yyyy-MM-dd')).order('due_date', { ascending: true }));
         promises.push(supabaseAdmin.from('bills').select('due_date, journal_entries!journal_entry_id(journal_entry_items(amount, type))').eq('company_id', company_id).neq('status', 'paid').neq('status', 'void').gte('due_date', format(new Date(), 'yyyy-MM-dd')).order('due_date', { ascending: true }));
         // Forecast Data: Future Recurring Payables/Receivables
@@ -115,93 +132,81 @@ serve(withEnterprisePlatform('dashboard-data', 'tenant', async (req, _ctx) => {
     const entriesCheck = results[12];
     const payrollRunsCheck = results[13];
 
-    let accountsRes = { data: [] }, monthlySummaryRes = { data: [] }, apBalancesRes = { data: [] }, topExpensesRes = { data: [] }, futureInvoicesRes = { data: [] }, futureBillsRes = { data: [] }, futureRecInvRes = { data: [] }, futureRecBillsRes = { data: [] }, revenueRes = { data: [] };
+    let accountsRes = { data: [] }, periodActivityRes = { data: [] }, monthlySummaryRes = { data: [] }, apBalancesRes = { data: [] }, topExpensesRes = { data: [] }, bankAccountsRes = { data: [] }, futureInvoicesRes = { data: [] }, futureBillsRes = { data: [] }, futureRecInvRes = { data: [] }, futureRecBillsRes = { data: [] }, revenueRes = { data: [] }, coaMetaRes = { data: [] }, cashFlowRes = { data: [] };
     let forecast = [], topCustomers = [], expectedPayments = [];
+    let periodNetIncome = 0;
+    let periodRevenue = 0;
+    let periodExpenses = 0;
+    let totalAssets = 0;
+    let totalLiabilities = 0;
+    let totalStoredEquity = 0;
+    let totalEquity = 0;
+    let cashBalance = 0;
+    let canonicalAggregation = null;
 
     if (isAdmin) {
         accountsRes = results[14];
-        monthlySummaryRes = results[15];
-        apBalancesRes = results[16];
-        topExpensesRes = results[17];
-        futureInvoicesRes = results[18];
-        futureBillsRes = results[19];
-        futureRecInvRes = results[20];
-        futureRecBillsRes = results[21];
-        revenueRes = results[22];
+        periodActivityRes = results[15];
+        monthlySummaryRes = results[16];
+        apBalancesRes = results[17];
+        topExpensesRes = results[18];
+        bankAccountsRes = results[19];
+        coaMetaRes = results[20];
+        cashFlowRes = results[21];
+        futureInvoicesRes = results[22];
+        futureBillsRes = results[23];
+        futureRecInvRes = results[24];
+        futureRecBillsRes = results[25];
+        revenueRes = results[26];
 
-        // --- Top Customers Calculation ---
-        const incomeAccountIds = new Set(accountsRes.data?.filter(a => a.type === 'Income').map(a => a.id) || []);
-        const customerRevenue = {};
-        (revenueRes.data || []).forEach(entry => {
-            const name = entry.customers?.name || 'Unknown';
-            entry.journal_entry_items.forEach(item => {
-                if (item.type === 'credit' && incomeAccountIds.has(item.account_id)) {
-                customerRevenue[name] = (customerRevenue[name] || 0) + item.amount;
-                }
-            });
+        // Canonical Financial Aggregation — ONLY money authority for Dashboard KPIs.
+        const bankCoaIds = (bankAccountsRes.data || []).map((a) => a.chart_of_account_id).filter(Boolean);
+        const accountMeta = coaMetaRes.data || [];
+        const retainedEarningsAccountIds = accountMeta
+          .filter((r) => r.account_role === 'retained_earnings')
+          .map((r) => r.id);
+        const totals = buildStatementTotals({
+          balancesAsOf: accountsRes.data,
+          periodActivity: periodActivityRes.data,
+          cashFlowData: cashFlowRes.data,
+          accountMeta,
+          retainedEarningsAccountIds,
+          bankCoaIds,
         });
-        topCustomers = Object.keys(customerRevenue).map(name => ({ name, amount: customerRevenue[name] }));
-        topCustomers.sort((a, b) => b.amount - a.amount);
+        canonicalAggregation = totals;
+        periodRevenue = totals.totalIncome;
+        periodExpenses = totals.totalExpenses;
+        periodNetIncome = totals.netIncome;
+        totalAssets = totals.totalAssets;
+        totalLiabilities = totals.totalLiabilities;
+        totalStoredEquity = totals.totalStoredEquity;
+        totalEquity = totals.totalEquity;
+        cashBalance = totals.cash;
 
-        // --- Cash Flow Forecast Calculation (cash equivalents by subcategory metadata) ---
-        const { data: cashMeta } = await supabaseAdmin
-          .from('chart_of_accounts')
-          .select('id')
-          .eq('company_id', company_id)
-          .eq('type', 'Asset')
-          .eq('subcategory', 'Cash and Cash Equivalents');
-        const cashIds = new Set((cashMeta || []).map((a) => a.id));
-        let runningBalance = accountsRes.data
-            ?.filter((a) => cashIds.has(a.id))
-            .reduce((sum, a) => sum + a.balance, 0) || 0;
-
+        // Charts: CFA partitions only — no JE / monthly-summary / top-expenses engines.
+        monthlySummaryRes = {
+          data: [
+            {
+              month: `${startDateStr}…${asOfDateStr}`,
+              income: totals.totalIncome,
+              expenses: totals.totalExpenses,
+              net: totals.netIncome,
+            },
+          ],
+        };
+        topExpensesRes = {
+          data: [
+            { name: 'Cost of Sales', amount: totals.costOfSales },
+            { name: 'Operating Expenses', amount: totals.operatingExpenses },
+            { name: 'Finance Costs', amount: totals.financeCosts },
+            { name: 'Tax', amount: totals.taxExpense },
+          ].filter((r) => Number(r.amount) !== 0),
+        };
+        topCustomers = [];
+        expectedPayments = [];
+        // Forecast opening = CFA cash only (no invoice/bill projection sums).
         const todayStr = format(new Date(), 'yyyy-MM-dd');
-        const changesByDate = {};
-
-        // 1. Current Open Invoices & Bills (+ Expected Payments Explorer rows)
-        const horizon = format(addDays(new Date(), 30), 'yyyy-MM-dd');
-        (futureInvoicesRes.data || []).forEach(inv => {
-            const amount = inv.journal_entries?.journal_entry_items?.filter(i => i.type === 'debit').reduce((s, i) => s + i.amount, 0) || 0;
-            changesByDate[inv.due_date] = (changesByDate[inv.due_date] || 0) + amount;
-            if (inv.due_date <= horizon) {
-              expectedPayments.push({
-                id: inv.id,
-                invoice_number: inv.invoice_number,
-                customer_id: inv.customer_id || null,
-                customer_name: inv.customers?.name || 'Unknown',
-                due_date: inv.due_date,
-                amount,
-                status: inv.status || 'sent',
-                payment_terms: inv.customers?.payment_terms ?? null,
-                email: inv.customers?.email ?? null,
-              });
-            }
-        });
-        (futureBillsRes.data || []).forEach(bill => {
-            const amount = bill.journal_entries?.journal_entry_items?.filter(i => i.type === 'credit').reduce((s, i) => s + i.amount, 0) || 0;
-            changesByDate[bill.due_date] = (changesByDate[bill.due_date] || 0) - amount;
-        });
-
-        // 2. Future Recurring Invoices & Bills (Predictive)
-        (futureRecInvRes.data || []).forEach(inv => {
-            // Estimate total (ignoring tax for simplicity in forecast to keep fast)
-            const amount = inv.recurring_invoice_items?.reduce((s, i) => s + (i.quantity * i.unit_price), 0) || 0;
-            // Assume Net 30 for recurring forecast cash arrival
-            const estimatedDueDate = format(addDays(new Date(inv.next_run_date), 30), 'yyyy-MM-dd');
-            changesByDate[estimatedDueDate] = (changesByDate[estimatedDueDate] || 0) + amount;
-        });
-        (futureRecBillsRes.data || []).forEach(bill => {
-            const amount = bill.recurring_bill_items?.reduce((s, i) => s + (i.quantity * i.unit_cost), 0) || 0;
-            const estimatedDueDate = format(addDays(new Date(bill.next_run_date), 30), 'yyyy-MM-dd');
-            changesByDate[estimatedDueDate] = (changesByDate[estimatedDueDate] || 0) - amount;
-        });
-
-        forecast.push({ date: todayStr, balance: runningBalance, type: 'actual' });
-        for (let i = 1; i <= 30; i++) {
-            const date = format(addDays(new Date(), i), 'yyyy-MM-dd');
-            runningBalance += (changesByDate[date] || 0);
-            forecast.push({ date, balance: runningBalance, type: 'projected' });
-        }
+        forecast = [{ date: todayStr, balance: cashBalance, type: 'actual' }];
     }
 
     // Payroll KPIs for dashboard
@@ -225,6 +230,18 @@ serve(withEnterprisePlatform('dashboard-data', 'tenant', async (req, _ctx) => {
     const responseData = {
       role: member.role, // Pass role back to UI for rendering logic
       accounts: accountsRes.data || [],
+      periodNetIncome,
+      periodRevenue,
+      periodExpenses,
+      totalAssets,
+      totalLiabilities,
+      totalStoredEquity,
+      totalEquity,
+      cashBalance,
+      // Full canonical payload — consumers must use these figures, not re-sum.
+      canonicalAggregation,
+      statementTotals: canonicalAggregation,
+      reportingPeriod: { from: startDateStr, to: asOfDateStr },
       monthlySummary: monthlySummaryRes.data || [],
       arBalances: arBalancesRes.data || [],
       apBalances: apBalancesRes.data || [],

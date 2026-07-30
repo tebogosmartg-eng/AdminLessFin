@@ -7,9 +7,30 @@ import {
   withEnterprisePlatform,
   edgeFailure,
 } from '../_shared/enterpriseEdgePlatform.ts'
+import {
+  buildStatementTotals,
+  buildComparativeBalanceSheetTotals,
+  buildComparativePlMonthTotals,
+  buildCanonicalFinancialAggregation,
+} from '../_shared/accountingEngineTotals.ts'
+import { loadCanonicalAggregation } from '../_shared/loadCanonicalAggregation.ts'
 
 
 const corsHeaders = ENTERPRISE_CORS_HEADERS
+
+async function loadCoaAggregationMeta(admin, company_id) {
+  const { data, error } = await admin
+    .from('chart_of_accounts')
+    .select('id, account_role, category, subcategory, account_code, tax_treatment, cash_flow_classification')
+    .eq('company_id', company_id);
+  if (error) throw error;
+  return data || [];
+}
+
+async function loadRetainedEarningsAccountIds(admin, company_id) {
+  const meta = await loadCoaAggregationMeta(admin, company_id);
+  return meta.filter((r) => r.account_role === 'retained_earnings').map((r) => r.id);
+}
 
 serve(withEnterprisePlatform('reports', 'tenant', async (req, _ctx) => {
 
@@ -52,6 +73,12 @@ serve(withEnterprisePlatform('reports', 'tenant', async (req, _ctx) => {
     if (method === 'GET_COMPARATIVE_BS') {
         const currentDate = end_date;
         const priorDate = format(subYears(new Date(currentDate), 1), 'yyyy-MM-dd');
+        // Optional start_date: when provided, CYE = get_period_activity for current & prior-year windows
+        // (same Income Statement engine as Reports / Financial Statements).
+        const currentStart = start_date || null;
+        const priorStart = currentStart
+          ? format(subYears(new Date(currentStart), 1), 'yyyy-MM-dd')
+          : null;
 
         const { data: currentBalances, error: currError } = await userSupabase.rpc('get_balances_as_of_date', {
             p_end_date: currentDate,
@@ -64,6 +91,31 @@ serve(withEnterprisePlatform('reports', 'tenant', async (req, _ctx) => {
             p_company_id: company_id
         });
         if (priorError) throw priorError;
+
+        let netIncomeCurrent = 0;
+        let netIncomePrior = 0;
+        if (currentStart && priorStart) {
+            const [currAct, priorAct] = await Promise.all([
+                userSupabase.rpc('get_period_activity', {
+                    p_start_date: currentStart,
+                    p_end_date: currentDate,
+                    p_company_id: company_id,
+                }),
+                userSupabase.rpc('get_period_activity', {
+                    p_start_date: priorStart,
+                    p_end_date: priorDate,
+                    p_company_id: company_id,
+                }),
+            ]);
+            if (currAct.error) throw currAct.error;
+            if (priorAct.error) throw priorAct.error;
+            netIncomeCurrent = buildCanonicalFinancialAggregation({
+              periodActivity: currAct.data,
+            }).netProfit;
+            netIncomePrior = buildCanonicalFinancialAggregation({
+              periodActivity: priorAct.data,
+            }).netProfit;
+        }
 
         // Merge logic
         const reportData = {};
@@ -82,9 +134,15 @@ serve(withEnterprisePlatform('reports', 'tenant', async (req, _ctx) => {
         currentBalances?.forEach(acc => { reportData[acc.id].current = acc.balance; });
         priorBalances?.forEach(acc => { reportData[acc.id].prior = acc.balance; });
 
+        const accounts = Object.values(reportData);
+        const netIncome = { current: netIncomeCurrent, prior: netIncomePrior };
+        const totals = buildComparativeBalanceSheetTotals(accounts, netIncome);
+
         return new Response(JSON.stringify({ 
-            accounts: Object.values(reportData),
-            dates: { current: currentDate, prior: priorDate }
+            accounts,
+            dates: { current: currentDate, prior: priorDate },
+            netIncome,
+            totals,
         }), {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
             status: 200,
@@ -122,7 +180,13 @@ serve(withEnterprisePlatform('reports', 'tenant', async (req, _ctx) => {
             });
         }
 
-        return new Response(JSON.stringify({ months, accounts: Object.values(reportData) }), {
+        const accounts = Object.values(reportData);
+        const monthTotals = buildComparativePlMonthTotals(
+          accounts,
+          months.map((m) => m.label),
+        );
+
+        return new Response(JSON.stringify({ months, accounts, monthTotals }), {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
             status: 200,
         });
@@ -168,56 +232,117 @@ serve(withEnterprisePlatform('reports', 'tenant', async (req, _ctx) => {
     }
 
     if (method === 'GET_PROJECT_PROFITABILITY') {
-        const { data: projects, error: projError } = await supabaseAdmin.from('projects').select('id, name, status, customers(name)').eq('company_id', company_id).order('name');
+        // Company money = CFA only. Per-project JE aggregation removed (no parallel P&L engine).
+        const { data: projects, error: projError } = await supabaseAdmin
+          .from('projects')
+          .select('id, name, status, customers(name)')
+          .eq('company_id', company_id)
+          .order('name');
         if (projError) throw projError;
-        if (!projects || projects.length === 0) return new Response(JSON.stringify([]), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 });
-        const { data: projectItems, error: piError } = await supabaseAdmin.from('journal_entry_items').select(`amount, type, project_id, chart_of_accounts ( type )`).in('project_id', projects.map(p => p.id));
-        if (piError) throw piError;
-        const projectStats = {};
-        projects.forEach(p => { projectStats[p.id] = { id: p.id, name: p.name, customer: p.customers?.name || '-', status: p.status, revenue: 0, expenses: 0, profit: 0, margin: 0 }; });
-        projectItems.forEach(item => {
-            const pid = item.project_id;
-            const accType = item.chart_of_accounts?.type;
-            if (projectStats[pid]) {
-                if (accType === 'Income') projectStats[pid].revenue += item.type === 'credit' ? item.amount : -item.amount;
-                else if (accType === 'Expense' || accType === 'Cost of Goods Sold') projectStats[pid].expenses += item.type === 'debit' ? item.amount : -item.amount;
-            }
+
+        const cfa = await loadCanonicalAggregation({
+          admin: supabaseAdmin,
+          rpc: userSupabase,
+          company_id,
+          start_date: start_date || null,
+          end_date: end_date || format(new Date(), 'yyyy-MM-dd'),
         });
-        const result = Object.values(projectStats).map(p => { p.profit = p.revenue - p.expenses; p.margin = p.revenue > 0 ? (p.profit / p.revenue) * 100 : 0; return p; });
-        result.sort((a, b) => b.profit - a.profit);
-        return new Response(JSON.stringify(result), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 });
+
+        const rows = (projects || []).map((p) => ({
+          id: p.id,
+          name: p.name,
+          customer: p.customers?.name || '-',
+          status: p.status,
+          // Project-level allocation is not a CFA output — do not invent from journals.
+          revenue: null,
+          expenses: null,
+          profit: null,
+          margin: null,
+          money_source: 'canonical_financial_aggregation_company_only',
+        }));
+
+        return new Response(JSON.stringify({
+          projects: rows,
+          company: {
+            revenue: cfa.totalIncome,
+            expenses: cfa.totalExpenses,
+            profit: cfa.netIncome,
+            margin: cfa.totalIncome > 0 ? (cfa.netIncome / cfa.totalIncome) * 100 : 0,
+          },
+          canonicalAggregation: cfa,
+          money_source: 'canonical_financial_aggregation',
+        }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 });
     }
 
     if (method === 'GET_TAX_REPORT') {
-        const { data: taxData, error: taxError } = await supabaseAdmin.from('journal_entry_item_tax_rates').select(`tax_rates ( name, rate ), journal_entry_items!inner ( amount, type, journal_entries!inner ( entry_date, company_id ) )`).eq('journal_entry_items.journal_entries.company_id', company_id).gte('journal_entry_items.journal_entries.entry_date', start_date).lte('journal_entry_items.journal_entries.entry_date', end_date);
-        if (taxError) throw taxError;
-        const report = {};
-        taxData.forEach(row => {
-            const name = row.tax_rates?.name || 'Unknown';
-            const rate = row.tax_rates?.rate || 0;
-            const netAmount = row.journal_entry_items?.amount || 0;
-            const itemType = row.journal_entry_items?.type;
-            const taxAmount = netAmount * (rate / 100);
-            if (!report[name]) report[name] = { name, rate, netSales: 0, taxCollected: 0, netPurchases: 0, taxPaid: 0, netTax: 0 };
-            if (itemType === 'credit') { report[name].netSales += netAmount; report[name].taxCollected += taxAmount; }
-            else if (itemType === 'debit') { report[name].netPurchases += netAmount; report[name].taxPaid += taxAmount; }
-            report[name].netTax = report[name].taxCollected - report[name].taxPaid;
+        // VAT authority = CFA GL role balances (vatPayable / vatReceivable / vatNet).
+        // Rate × base schedule removed — no parallel VAT engine.
+        const cfa = await loadCanonicalAggregation({
+          admin: supabaseAdmin,
+          rpc: userSupabase,
+          company_id,
+          start_date: start_date || null,
+          end_date: end_date || format(new Date(), 'yyyy-MM-dd'),
         });
-        return new Response(JSON.stringify(Object.values(report)), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 });
+        return new Response(JSON.stringify({
+          money_source: 'canonical_financial_aggregation',
+          vatPayable: cfa.vatPayable,
+          vatReceivable: cfa.vatReceivable,
+          vatNet: cfa.vatNet,
+          outputVat: cfa.vatPayable,
+          inputVat: cfa.vatReceivable,
+          netVatLiability: cfa.vatNet,
+          canonicalAggregation: cfa,
+          // Empty schedule — CFA is sole monetary authority for this report.
+          schedule: [],
+        }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 });
     }
 
-    const promises = [];
-    if (end_date) promises.push(userSupabase.rpc('get_balances_as_of_date', { p_end_date: end_date, p_company_id: company_id }));
-    if (start_date && end_date) {
-        promises.push(userSupabase.rpc('get_period_activity', { p_start_date: start_date, p_end_date: end_date, p_company_id: company_id }));
-        promises.push(userSupabase.rpc('get_cash_flow_statement', { p_start_date: start_date, p_end_date: end_date, p_company_id: company_id }));
-    }
-    if (prior_date) promises.push(userSupabase.rpc('get_balances_as_of_date', { p_end_date: prior_date, p_company_id: company_id }));
-    promises.push(userSupabase.rpc('get_aged_receivables', { p_company_id: company_id }));
-    promises.push(userSupabase.rpc('get_aged_payables', { p_company_id: company_id }));
+    const balancesPromise = end_date
+      ? userSupabase.rpc('get_balances_as_of_date', { p_end_date: end_date, p_company_id: company_id })
+      : Promise.resolve({ data: null, error: null });
+    const periodPromise = start_date && end_date
+      ? userSupabase.rpc('get_period_activity', { p_start_date: start_date, p_end_date: end_date, p_company_id: company_id })
+      : Promise.resolve({ data: null, error: null });
+    const cashFlowPromise = start_date && end_date
+      ? userSupabase.rpc('get_cash_flow_statement', { p_start_date: start_date, p_end_date: end_date, p_company_id: company_id })
+      : Promise.resolve({ data: null, error: null });
+    const openingPromise = prior_date
+      ? userSupabase.rpc('get_balances_as_of_date', { p_end_date: prior_date, p_company_id: company_id })
+      : Promise.resolve({ data: null, error: null });
 
-    const [balancesAsOfRes, periodActivityRes, cashFlowRes, openingBalancesRes, agedReceivablesRes, agedPayablesRes] = await Promise.all(promises);
+    const [
+      balancesAsOfRes,
+      periodActivityRes,
+      cashFlowRes,
+      openingBalancesRes,
+      agedReceivablesRes,
+      agedPayablesRes,
+    ] = await Promise.all([
+      balancesPromise,
+      periodPromise,
+      cashFlowPromise,
+      openingPromise,
+      userSupabase.rpc('get_aged_receivables', { p_company_id: company_id }),
+      userSupabase.rpc('get_aged_payables', { p_company_id: company_id }),
+    ]);
     if (balancesAsOfRes?.error) throw balancesAsOfRes.error;
+    if (periodActivityRes?.error) throw periodActivityRes.error;
+    if (cashFlowRes?.error) throw cashFlowRes.error;
+    if (openingBalancesRes?.error) throw openingBalancesRes.error;
+
+    const accountMeta = await loadCoaAggregationMeta(supabaseAdmin, company_id);
+    const retainedEarningsAccountIds = accountMeta
+      .filter((r) => r.account_role === 'retained_earnings')
+      .map((r) => r.id);
+    const statementTotals = buildStatementTotals({
+      balancesAsOf: balancesAsOfRes?.data,
+      periodActivity: periodActivityRes?.data,
+      cashFlowData: cashFlowRes?.data,
+      openingBalances: openingBalancesRes?.data,
+      retainedEarningsAccountIds,
+      accountMeta,
+    });
 
     return new Response(JSON.stringify({
       balancesAsOf: balancesAsOfRes?.data,
@@ -226,6 +351,8 @@ serve(withEnterprisePlatform('reports', 'tenant', async (req, _ctx) => {
       openingBalances: openingBalancesRes?.data,
       agedReceivables: agedReceivablesRes?.data,
       agedPayables: agedPayablesRes?.data,
+      statementTotals,
+      canonicalAggregation: statementTotals,
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 200,

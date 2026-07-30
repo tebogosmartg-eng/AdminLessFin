@@ -1,13 +1,23 @@
 {
-  "timestamp": "2026-07-29T12:57:13.603Z",
-  "newCustomer": "SSCustomer 29833262",
-  "invMarker": "SS-833262",
-  "verdict": "FAIL",
-  "failure": "locator.click: Timeout 20000ms exceeded.\nCall log:\n\u001b[2m  - waiting for getByRole('banner').locator('button:has(svg.lucide-building)').first()\u001b[22m\n",
+  "timestamp": "2026-07-30T05:11:53.954Z",
+  "newCustomer": "SSCustomer 88313578",
+  "invMarker": "SS-313578",
+  "invoicingCompany": "My's Company",
+  "companiesTried": [
+    {
+      "name": "My's Company",
+      "ready": true
+    }
+  ],
+  "emptyStateShown": true,
+  "prefilled": true,
+  "modalClosed": true,
+  "autoSelected": true,
+  "focusReturned": true,
+  "workflowPreserved": true,
+  "customerCreateHttp200WithId": true,
+  "verdict": "PASS",
   "failedRequests": [],
   "pageErrors": [],
-  "consoleErrors": [
-    "[AuthContext] Error fetching user data: FunctionsHttpError: Edge Function returned a non-2xx status code\n    at Qr.<anonymous> (http://127.0.0.1:4173/assets/vendor-supabase-DZsgADxA.js:1:2506)\n    at Generator.next (<anonymous>)\n    at c (http://127.0.0.1:4173/assets/vendor-radix-CcMx2tYj.js:1:61494)",
-    "[AuthContext] Auth state change handling failed: FunctionsHttpError: Edge Function returned a non-2xx status code\n    at Qr.<anonymous> (http://127.0.0.1:4173/assets/vendor-supabase-DZsgADxA.js:1:2506)\n    at Generator.next (<anonymous>)\n    at c (http://127.0.0.1:4173/assets/vendor-radix-CcMx2tYj.js:1:61494)"
-  ]
+  "consoleErrors": []
 }

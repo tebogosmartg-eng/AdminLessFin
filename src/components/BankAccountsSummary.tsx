@@ -9,18 +9,28 @@ import { useAuth } from '../contexts/AuthContext';
 import { accountsQuery, bankAccountsQuery } from '../lib/queries';
 import { Account } from '../pages/ChartOfAccounts';
 
+type BankAccountsSummaryProps = {
+  /** When provided (Operations Dashboard), balances are as-of the reporting period — same engine accounts as KPI cards. */
+  asOfAccounts?: Account[];
+};
+
 /**
  * V3.0 Phase 3C: rewired from a Chart-of-Accounts name heuristic
  * ('bank'/'cash'/'checking'/'savings' substring match) to the real
  * bank_accounts Banking domain, joined to live GL balances.
  */
-const BankAccountsSummary = () => {
+const BankAccountsSummary = ({ asOfAccounts }: BankAccountsSummaryProps) => {
   const { activeCompany } = useAuth();
   const { data: bankAccounts, isLoading: loadingBank } = useQuery({ ...bankAccountsQuery(activeCompany!.id), enabled: !!activeCompany });
-  const { data: glAccounts, isLoading: loadingGl } = useQuery<Account[]>({ ...accountsQuery(activeCompany!.id), enabled: !!activeCompany });
-  const isLoading = loadingBank || loadingGl;
+  const useAsOf = Array.isArray(asOfAccounts);
+  const { data: glAccounts, isLoading: loadingGl } = useQuery<Account[]>({
+    ...accountsQuery(activeCompany!.id),
+    enabled: !!activeCompany && !useAsOf,
+  });
+  const isLoading = loadingBank || (!useAsOf && loadingGl);
 
-  const glBalanceByCoaId = new Map((glAccounts ?? []).map((a) => [a.id, a.balance]));
+  const sourceAccounts = useAsOf ? asOfAccounts! : (glAccounts ?? []);
+  const glBalanceByCoaId = new Map(sourceAccounts.map((a) => [a.id, a.balance]));
   const accounts = (bankAccounts ?? [])
     .filter((a) => a.status === 'active')
     .map((a) => ({ ...a, balance: glBalanceByCoaId.get(a.chart_of_account_id) ?? 0 }));
@@ -29,7 +39,9 @@ const BankAccountsSummary = () => {
     <Card>
       <CardHeader>
         <CardTitle>Bank Accounts</CardTitle>
-        <CardDescription>A summary of your cash balances.</CardDescription>
+        <CardDescription>
+          {useAsOf ? 'Cash balances as of the selected period end.' : 'A summary of your cash balances.'}
+        </CardDescription>
       </CardHeader>
       <CardContent>
         {isLoading ? <Skeleton className="h-24 w-full" /> : (

@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { format, formatDistanceToNow, startOfMonth, endOfMonth } from 'date-fns';
+import { safeFormatDate, safeFormatDistanceToNow } from '../lib/dates';
 import {
   Briefcase,
   Users,
@@ -13,12 +13,13 @@ import {
   ArrowRight,
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
-import { useEnterpriseCalendar } from '../hooks/useEnterpriseCalendar';
+import { useReportingPeriod } from '../contexts/ReportingPeriodContext';
 import { Badge } from '../components/ui/badge';
-import { payrollWorkspaceQuery, employeesQuery, expenseClaimsQuery, revenueWorkspaceQuery, purchasesWorkspaceQuery, fixedAssetsQuery } from '../lib/queries';
+import { payrollWorkspaceQuery, employeesQuery, expenseClaimsQuery, revenueWorkspaceQuery, fixedAssetsQuery } from '../lib/queries';
 import { EmployeeIdentity } from '../components/hr/EmployeeIdentity';
 import { formatCurrency } from '../lib/utils';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
+import ReportingPeriodPicker from '../components/ReportingPeriodPicker';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Skeleton } from '../components/ui/skeleton';
@@ -42,12 +43,9 @@ import type { Employee } from './Employees';
 const PayrollWorkspace = () => {
   useDocumentTitle('Payroll');
   const { activeCompany } = useAuth();
-  const { yearCode } = useEnterpriseCalendar(activeCompany?.id);
+  const { dateFrom, dateTo, yearCode, isReady } = useReportingPeriod();
   const navigate = useNavigate();
   const [previewEmployeeId, setPreviewEmployeeId] = useState<string | null>(null);
-
-  const dateFrom = format(startOfMonth(new Date()), 'yyyy-MM-dd');
-  const dateTo = format(endOfMonth(new Date()), 'yyyy-MM-dd');
 
   const { data: workspace, isLoading: wsLoading } = useQuery({
     ...payrollWorkspaceQuery(activeCompany?.id ?? ''),
@@ -62,12 +60,8 @@ const PayrollWorkspace = () => {
     enabled: !!activeCompany,
   });
   const { data: dashboard } = useQuery({
-    ...revenueWorkspaceQuery(activeCompany!.id, dateFrom, dateTo),
-    enabled: !!activeCompany,
-  });
-  const { data: purchases } = useQuery({
-    ...purchasesWorkspaceQuery(activeCompany!.id, dateFrom, dateTo),
-    enabled: !!activeCompany,
+    ...revenueWorkspaceQuery(activeCompany!.id, dateFrom ?? '', dateTo ?? ''),
+    enabled: !!activeCompany && isReady,
   });
   const { data: assets = [] } = useQuery({
     ...fixedAssetsQuery(activeCompany!.id),
@@ -91,22 +85,26 @@ const PayrollWorkspace = () => {
   const pendingClaimsList = workspace?.pendingClaimsList || [];
 
   const intelligence = useMemo(() => {
-    const openBillsTotal = (purchases?.openBillsList || [])
-      .filter((b: { due_date?: string }) => {
-        if (!b.due_date || !metrics?.upcomingPayDate) return true;
-        return b.due_date <= metrics.upcomingPayDate;
-      })
-      .reduce((sum: number, b: { total: number }) => sum + (b.total || 0), 0);
+    const cfaCash = Number(
+      dashboard?.canonicalAggregation?.cash ??
+        dashboard?.statementTotals?.cash ??
+        dashboard?.cashBalance ??
+        0,
+    );
+    // Obligations proxy = CFA payables (no open-bill invoice sum).
+    const openBillsTotal = Number(
+      dashboard?.canonicalAggregation?.payables ?? dashboard?.statementTotals?.payables ?? 0,
+    );
 
     return {
       readiness: computeReadinessScore(employees, workspace),
       timeline: buildPayrollTimeline(workspace, claims),
-      cash: computeCashImpact(dashboard?.accounts || [], workspace, openBillsTotal),
+      cash: computeCashImpact(dashboard?.accounts || [], workspace, openBillsTotal, cfaCash),
       alerts: buildOperationalAlerts(employees, workspace, claims),
       insights: buildPayrollInsights(employees, workspace, claims),
       calendarEvents: buildPayrollCalendarEvents(workspace, claims),
     };
-  }, [employees, workspace, claims, dashboard, purchases, metrics?.upcomingPayDate]);
+  }, [employees, workspace, claims, dashboard, metrics?.upcomingPayDate]);
 
   const previewEmployee = employees.find((e) => e.id === previewEmployeeId) || null;
 
@@ -136,19 +134,22 @@ const PayrollWorkspace = () => {
           <div className="text-sm text-muted-foreground">
             Operational intelligence for people, payroll and compliance.
             {yearCode && (
-              <> · Calendar <Badge variant="outline" className="ml-1 align-middle">{yearCode}</Badge></>
+              <> · <Badge variant="outline" className="ml-1 align-middle">Current Financial Year</Badge></>
             )}
           </div>
         </div>
-        <div className="flex flex-wrap gap-2">
-          <Button size="sm" onClick={() => navigate('/payroll-runs')}>
-            <PlusCircle className="mr-2 h-4 w-4" />
-            New Run
-          </Button>
-          <Button size="sm" variant="outline" onClick={() => navigate('/employees')}>
-            <Users className="mr-2 h-4 w-4" />
-            Employees
-          </Button>
+        <div className="flex flex-col items-stretch gap-2 sm:items-end">
+          <ReportingPeriodPicker showLabel={false} />
+          <div className="flex flex-wrap gap-2">
+            <Button size="sm" onClick={() => navigate('/payroll-runs')}>
+              <PlusCircle className="mr-2 h-4 w-4" />
+              New Run
+            </Button>
+            <Button size="sm" variant="outline" onClick={() => navigate('/employees')}>
+              <Users className="mr-2 h-4 w-4" />
+              Employees
+            </Button>
+          </div>
         </div>
       </div>
 
@@ -206,7 +207,7 @@ const PayrollWorkspace = () => {
                 Next Pay
               </CardDescription>
               <CardTitle className="text-lg">
-                {metrics?.upcomingPayDate ? format(new Date(metrics.upcomingPayDate), 'dd MMM') : '—'}
+                {safeFormatDate(metrics?.upcomingPayDate, 'dd MMM')}
               </CardTitle>
             </CardHeader>
           </Card>
@@ -247,8 +248,8 @@ const PayrollWorkspace = () => {
                   <li key={run.id}>
                     <Link to={`/payroll-runs/${run.id}`} className="flex items-center justify-between text-sm hover:bg-muted/50 rounded p-2 -mx-2">
                       <span>
-                        {format(new Date(run.pay_period_start), 'dd MMM')} – {format(new Date(run.pay_period_end), 'dd MMM')}
-                        <span className="text-muted-foreground ml-2">{formatDistanceToNow(new Date(run.pay_date), { addSuffix: true })}</span>
+                        {safeFormatDate(run.pay_period_start, 'dd MMM')} – {safeFormatDate(run.pay_period_end, 'dd MMM')}
+                        <span className="text-muted-foreground ml-2">{safeFormatDistanceToNow(run.pay_date, { addSuffix: true })}</span>
                       </span>
                       <Badge variant="outline" className="capitalize text-xs">{run.status}</Badge>
                     </Link>

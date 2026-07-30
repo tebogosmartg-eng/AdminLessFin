@@ -1,6 +1,6 @@
 {
-  "timestamp": "2026-07-29T04:38:44.267Z",
-  "invNum": "SILENT915408",
+  "timestamp": "2026-07-30T05:41:51.276Z",
+  "invNum": "SILENT102389",
   "dialogHidden": true,
   "rowVisible": true,
   "persistAfterReload": true,
@@ -9,7 +9,7 @@
   "invoicePosts": [
     {
       "status": 200,
-      "body": "[{\"id\":\"aaea8c70-72c9-4c2b-981c-b996e5df9b43\",\"invoice_number\":\"REGB154022\",\"invoice_date\":\"2026-07-29\",\"due_date\":\"2026-08-28\",\"status\":\"sent\",\"notes\":\"post-fix regression\",\"customers\":{\"name\":\"Itumeleng\"},\"journal_entries\":{\"journal_entry_items\":[{\"type\":\"credit\",\"amount\":175},{\"type\":\"debit\",\"amount\":175}]}},{\"id\":\"2f4e32a5-a942-4348-989b-a5e452704085\",\"invoice_number\":\"REGC153830\",\"invoice_date\":\"2026-07-29\",\"due_date\":\"2026-08-28\",\"status\":\"sent\",\"notes\":\"post-fix regression\",\"customers\":{\"name\":\"Itumeleng\"},\"journal_entries\":{\"journal_entry_items\":[{\"type\":\"credit\",\"amount\":175},{\"type\":\"debit\",\"amount\":175}]}},{\"id\":\"116e9e9e-1bb4-4efb-9947-238020beb979\",\"invoice_number\":\"SILENT178354\",\"invoice_date\":\"2026-07-29\",\"due_date\":\"2026-08-28\",\"status\":\"sent\",\"notes\":\"E2E QA terms 17852968"
+      "body": "[{\"id\":\"4f73a301-b941-431d-af2e-a6b23c38814b\",\"invoice_number\":\"INV-00001\",\"invoice_date\":\"2026-07-30\",\"due_date\":\"2026-08-29\",\"status\":\"sent\",\"notes\":\"E2E QA terms 1785388595338 — payment due 30 days\",\"customers\":{\"name\":\"INV Cust 88723882\"},\"journal_entries\":{\"journal_entry_items\":[{\"type\":\"credit\",\"amount\":20000},{\"type\":\"debit\",\"amount\":20000}]}},{\"id\":\"76bdd419-dfef-4906-aea7-f4bbc9c5913a\",\"invoice_number\":\"SILENT713717\",\"invoice_date\":\"2026-07-29\",\"due_date\":\"2026-08-28\",\"status\":\"sent\",\"notes\":\"E2E QA terms 1785388595338 — payment due 30 days\",\"customers\":{\"name\":\"SSCustomer 88313578\"},\"journal_entries\":{\"journal_entry_items\":[{\"type\":\"credit\",\"amount\":100},{\"type\":\"debit\",\"amount\":100}]}},{\"id\":\"6d9e7b9a-ac29-4ed4-8b54-f0149548f0b9\",\"invoice_number\":\"SILENT002623\",\"invoice_date\":\"2"
     },
     {
       "status": 200,
@@ -17,15 +17,15 @@
     },
     {
       "status": 200,
-      "body": "{\"id\":\"2a64e892-6e4e-40a6-ba5e-243f121699f9\"}"
+      "body": "{\"id\":\"ea387df6-204e-4a88-99bc-1a8be0f9a7f4\"}"
     },
     {
       "status": 200,
-      "body": "[{\"id\":\"71eb5f26-acb0-47d3-ba62-cb38050bbaff\",\"invoice_number\":\"INV-000011\",\"invoice_date\":\"2026-07-29\",\"due_date\":\"2026-08-28\",\"status\":\"sent\",\"notes\":\"E2E QA terms 1785296801601 — payment due 30 days\",\"customers\":{\"name\":\"Meat and Veg\"},\"journal_entries\":{\"journal_entry_items\":[{\"type\":\"credit\",\"amount\":100000},{\"type\":\"credit\",\"amount\":15000},{\"type\":\"debit\",\"amount\":115000}]}},{\"id\":\"aaea8c70-72c9-4c2b-981c-b996e5df9b43\",\"invoice_number\":\"REGB154022\",\"invoice_date\":\"2026-07-29\",\"due_date\":\"2026-08-28\",\"status\":\"sent\",\"notes\":\"post-fix regression\",\"customers\":{\"name\":\"Itumeleng\"},\"journal_entries\":{\"journal_entry_items\":[{\"type\":\"credit\",\"amount\":175},{\"type\":\"debit\",\"amount\":175}]}},{\"id\":\"2f4e32a5-a942-4348-989b-a5e452704085\",\"invoice_number\":\"REGC153830\",\"invoice_date\":\"2026-07-29\",\""
+      "body": "[{\"id\":\"4f73a301-b941-431d-af2e-a6b23c38814b\",\"invoice_number\":\"INV-00001\",\"invoice_date\":\"2026-07-30\",\"due_date\":\"2026-08-29\",\"status\":\"sent\",\"notes\":\"E2E QA terms 1785388595338 — payment due 30 days\",\"customers\":{\"name\":\"INV Cust 88723882\"},\"journal_entries\":{\"journal_entry_items\":[{\"type\":\"credit\",\"amount\":20000},{\"type\":\"debit\",\"amount\":20000}]}},{\"id\":\"76bdd419-dfef-4906-aea7-f4bbc9c5913a\",\"invoice_number\":\"SILENT713717\",\"invoice_date\":\"2026-07-29\",\"due_date\":\"2026-08-28\",\"status\":\"sent\",\"notes\":\"E2E QA terms 1785388595338 — payment due 30 days\",\"customers\":{\"name\":\"SSCustomer 88313578\"},\"journal_entries\":{\"journal_entry_items\":[{\"type\":\"credit\",\"amount\":100},{\"type\":\"debit\",\"amount\":100}]}},{\"id\":\"6d9e7b9a-ac29-4ed4-8b54-f0149548f0b9\",\"invoice_number\":\"SILENT002623\",\"invoice_date\":\"2"
     },
     {
       "status": 200,
-      "body": "[{\"id\":\"71eb5f26-acb0-47d3-ba62-cb38050bbaff\",\"invoice_number\":\"INV-000011\",\"invoice_date\":\"2026-07-29\",\"due_date\":\"2026-08-28\",\"status\":\"sent\",\"notes\":\"E2E QA terms 1785296801601 — payment due 30 days\",\"customers\":{\"name\":\"Meat and Veg\"},\"journal_entries\":{\"journal_entry_items\":[{\"type\":\"credit\",\"amount\":100000},{\"type\":\"credit\",\"amount\":15000},{\"type\":\"debit\",\"amount\":115000}]}},{\"id\":\"aaea8c70-72c9-4c2b-981c-b996e5df9b43\",\"invoice_number\":\"REGB154022\",\"invoice_date\":\"2026-07-29\",\"due_date\":\"2026-08-28\",\"status\":\"sent\",\"notes\":\"post-fix regression\",\"customers\":{\"name\":\"Itumeleng\"},\"journal_entries\":{\"journal_entry_items\":[{\"type\":\"credit\",\"amount\":175},{\"type\":\"debit\",\"amount\":175}]}},{\"id\":\"2f4e32a5-a942-4348-989b-a5e452704085\",\"invoice_number\":\"REGC153830\",\"invoice_date\":\"2026-07-29\",\""
+      "body": "[{\"id\":\"4f73a301-b941-431d-af2e-a6b23c38814b\",\"invoice_number\":\"INV-00001\",\"invoice_date\":\"2026-07-30\",\"due_date\":\"2026-08-29\",\"status\":\"sent\",\"notes\":\"E2E QA terms 1785388595338 — payment due 30 days\",\"customers\":{\"name\":\"INV Cust 88723882\"},\"journal_entries\":{\"journal_entry_items\":[{\"type\":\"credit\",\"amount\":20000},{\"type\":\"debit\",\"amount\":20000}]}},{\"id\":\"76bdd419-dfef-4906-aea7-f4bbc9c5913a\",\"invoice_number\":\"SILENT713717\",\"invoice_date\":\"2026-07-29\",\"due_date\":\"2026-08-28\",\"status\":\"sent\",\"notes\":\"E2E QA terms 1785388595338 — payment due 30 days\",\"customers\":{\"name\":\"SSCustomer 88313578\"},\"journal_entries\":{\"journal_entry_items\":[{\"type\":\"credit\",\"amount\":100},{\"type\":\"debit\",\"amount\":100}]}},{\"id\":\"6d9e7b9a-ac29-4ed4-8b54-f0149548f0b9\",\"invoice_number\":\"SILENT002623\",\"invoice_date\":\"2"
     }
   ],
   "failedRequests": [],

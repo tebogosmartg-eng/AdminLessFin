@@ -1,145 +1,148 @@
-import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/card';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from '../components/ui/table';
 import { Skeleton } from '../components/ui/skeleton';
 import { Button } from '../components/ui/button';
-import { Calendar as CalendarIcon, Download } from 'lucide-react';
-import { Popover, PopoverContent, PopoverTrigger } from '../components/ui/popover';
-import { Calendar } from '../components/ui/calendar';
-import { DateRange } from 'react-day-picker';
-import { format, startOfMonth, endOfMonth } from 'date-fns';
-import { cn, downloadCSV, formatCurrency } from '../lib/utils';
+import { Download } from 'lucide-react';
+import { format, parseISO } from 'date-fns';
+import { downloadCSV, formatCurrency, cn } from '../lib/utils';
 import { useAuth } from '../contexts/AuthContext';
+import { useReportingPeriod } from '../contexts/ReportingPeriodContext';
+import ReportingPeriodPicker from '../components/ReportingPeriodPicker';
 
-type TaxReportItem = {
-  name: string;
-  rate: number;
-  netSales: number;
-  taxCollected: number;
-  netPurchases: number;
-  taxPaid: number;
-  netTax: number;
+type TaxCfaPayload = {
+  money_source: string;
+  vatPayable: number;
+  vatReceivable: number;
+  vatNet: number;
+  outputVat: number;
+  inputVat: number;
+  netVatLiability: number;
 };
 
+/** VAT KPIs from Canonical Financial Aggregation only — no rate×base engine. */
 const TaxReport = () => {
   const { activeCompany } = useAuth();
-  const [date, setDate] = useState<DateRange | undefined>({
-    from: startOfMonth(new Date()),
-    to: endOfMonth(new Date()),
-  });
+  const { dateFrom, dateTo, isReady, currentReportingPeriod } = useReportingPeriod();
 
-  const fromDate = date?.from ?? new Date();
-  const toDate = date?.to ?? new Date();
+  const fromDate = currentReportingPeriod?.from ?? (dateFrom ? parseISO(dateFrom) : new Date());
+  const toDate = currentReportingPeriod?.to ?? (dateTo ? parseISO(dateTo) : new Date());
 
-  const { data: taxData, isLoading } = useQuery<TaxReportItem[]>({
-    queryKey: ['tax_report', fromDate, toDate, activeCompany?.id],
+  const { data, isLoading } = useQuery<TaxCfaPayload>({
+    queryKey: ['tax_report_cfa', dateFrom, dateTo, activeCompany?.id],
     queryFn: async () => {
-      if (!activeCompany) return [];
-      const { data, error } = await supabase.functions.invoke('reports', {
+      if (!activeCompany || !dateFrom || !dateTo) {
+        return {
+          money_source: 'canonical_financial_aggregation',
+          vatPayable: 0,
+          vatReceivable: 0,
+          vatNet: 0,
+          outputVat: 0,
+          inputVat: 0,
+          netVatLiability: 0,
+        };
+      }
+      const { data: payload, error } = await supabase.functions.invoke('reports', {
         body: {
           method: 'GET_TAX_REPORT',
           company_id: activeCompany.id,
-          start_date: format(fromDate, 'yyyy-MM-dd'),
-          end_date: format(toDate, 'yyyy-MM-dd'),
+          start_date: dateFrom,
+          end_date: dateTo,
         },
       });
       if (error) throw new Error(error.message);
-      return data;
+      return payload as TaxCfaPayload;
     },
-    enabled: !!activeCompany && !!fromDate && !!toDate,
+    enabled: !!activeCompany && isReady,
   });
 
-  const totalTaxCollected = taxData?.reduce((sum, item) => sum + item.taxCollected, 0) || 0;
-  const totalTaxPaid = taxData?.reduce((sum, item) => sum + item.taxPaid, 0) || 0;
-  const totalNetTax = totalTaxCollected - totalTaxPaid;
+  const vat = data || {
+    vatPayable: 0,
+    vatReceivable: 0,
+    vatNet: 0,
+    outputVat: 0,
+    inputVat: 0,
+    netVatLiability: 0,
+  };
 
   const handleDownload = () => {
-    if (!taxData) return;
-    const data = taxData.map(item => ({
-      'Tax Name': item.name,
-      'Rate (%)': item.rate.toString(),
-      'Net Sales': item.netSales.toFixed(2),
-      'Tax Collected (Output)': item.taxCollected.toFixed(2),
-      'Net Purchases': item.netPurchases.toFixed(2),
-      'Tax Paid (Input)': item.taxPaid.toFixed(2),
-      'Net Tax Due': item.netTax.toFixed(2)
-    }));
-    downloadCSV(data, `tax-report-${format(fromDate, 'yyyy-MM-dd')}.csv`);
+    if (!dateFrom) return;
+    downloadCSV(
+      [
+        {
+          Source: 'Canonical Financial Aggregation',
+          'As of': format(toDate, 'yyyy-MM-dd'),
+          'Output VAT / VAT Payable': Number(vat.outputVat ?? vat.vatPayable).toFixed(2),
+          'Input VAT / VAT Receivable': Number(vat.inputVat ?? vat.vatReceivable).toFixed(2),
+          'Net VAT Liability': Number(vat.netVatLiability ?? vat.vatNet).toFixed(2),
+        },
+      ],
+      `tax-report-cfa-${dateFrom}.csv`,
+    );
   };
 
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <h1 className="text-3xl font-bold">Sales Tax Report</h1>
-        <Popover>
-          <PopoverTrigger asChild>
-            <Button
-              variant={"outline"}
-              className={cn("w-[300px] justify-start text-left font-normal", !date && "text-muted-foreground")}
+        <div className="flex items-center gap-2">
+          <ReportingPeriodPicker />
+          <Button variant="outline" size="sm" onClick={handleDownload} disabled={isLoading}>
+            <Download className="mr-2 h-4 w-4" /> Download CSV
+          </Button>
+        </div>
+      </div>
+
+      <p className="text-sm text-muted-foreground">
+        VAT balances from Canonical Financial Aggregation (GL roles on Trial Balance as of{' '}
+        {format(toDate, 'PPP')}). Period {format(fromDate, 'PPP')} – {format(toDate, 'PPP')}.
+      </p>
+
+      <div className="grid gap-4 md:grid-cols-3">
+        <Card>
+          <CardHeader className="pb-2">
+            <CardDescription>Output VAT / VAT Payable (CFA)</CardDescription>
+            <CardTitle className="text-2xl font-mono text-green-700">
+              {isLoading ? <Skeleton className="h-8 w-28" /> : formatCurrency(Number(vat.outputVat ?? vat.vatPayable))}
+            </CardTitle>
+          </CardHeader>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardDescription>Input VAT / VAT Receivable (CFA)</CardDescription>
+            <CardTitle className="text-2xl font-mono text-amber-700">
+              {isLoading ? <Skeleton className="h-8 w-28" /> : formatCurrency(Number(vat.inputVat ?? vat.vatReceivable))}
+            </CardTitle>
+          </CardHeader>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardDescription>Net VAT Liability (CFA)</CardDescription>
+            <CardTitle
+              className={cn(
+                'text-2xl font-mono',
+                Number(vat.netVatLiability ?? vat.vatNet) > 0 ? 'text-red-600' : 'text-green-600',
+              )}
             >
-              <CalendarIcon className="mr-2 h-4 w-4" />
-              {date?.from ? (
-                date.to ? (<>{format(date.from, "LLL dd, y")} - {format(date.to, "LLL dd, y")}</>) : (format(date.from, "LLL dd, y"))
-              ) : (<span>Pick a date range</span>)}
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent className="w-auto p-0" align="end">
-            <Calendar initialFocus mode="range" selected={date} onSelect={setDate} numberOfMonths={2} />
-          </PopoverContent>
-        </Popover>
+              {isLoading ? (
+                <Skeleton className="h-8 w-28" />
+              ) : (
+                formatCurrency(Number(vat.netVatLiability ?? vat.vatNet))
+              )}
+            </CardTitle>
+          </CardHeader>
+        </Card>
       </div>
 
       <Card>
-        <CardHeader className="flex flex-row items-center justify-between">
-          <div>
-            <CardTitle>Tax Liability Summary</CardTitle>
-            <CardDescription>Net tax due (Output Tax - Input Tax) for the period {format(fromDate, "PPP")} to {format(toDate, "PPP")}</CardDescription>
-          </div>
-          <Button variant="outline" size="sm" onClick={handleDownload} disabled={!taxData || taxData.length === 0}>
-            <Download className="mr-2 h-4 w-4" /> Download CSV
-          </Button>
+        <CardHeader>
+          <CardTitle>Canonical VAT</CardTitle>
+          <CardDescription>
+            Same figures as Balance Sheet VAT role accounts via CFA — no tax-rate × base recalculation.
+          </CardDescription>
         </CardHeader>
-        <CardContent>
-          {isLoading ? <Skeleton className="h-64 w-full" /> : taxData && taxData.length > 0 ? (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Tax Name</TableHead>
-                  <TableHead className="text-right">Rate</TableHead>
-                  <TableHead className="text-right">Tax Collected (Output)</TableHead>
-                  <TableHead className="text-right">Tax Paid (Input)</TableHead>
-                  <TableHead className="text-right">Net Tax Due</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {taxData.map(item => (
-                  <TableRow key={item.name}>
-                    <TableCell className="font-medium">{item.name}</TableCell>
-                    <TableCell className="text-right">{item.rate}%</TableCell>
-                    <TableCell className="text-right font-mono text-green-600">{formatCurrency(item.taxCollected)}</TableCell>
-                    <TableCell className="text-right font-mono text-amber-600">{formatCurrency(item.taxPaid)}</TableCell>
-                    <TableCell className={cn("text-right font-mono font-bold", item.netTax > 0 ? "text-red-600" : "text-green-600")}>
-                        {formatCurrency(item.netTax)}
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-              <TableFooter>
-                <TableRow className="text-lg font-bold bg-gray-100 dark:bg-gray-800">
-                  <TableCell colSpan={2}>Totals</TableCell>
-                  <TableCell className="text-right font-mono text-green-700">{formatCurrency(totalTaxCollected)}</TableCell>
-                  <TableCell className="text-right font-mono text-amber-700">{formatCurrency(totalTaxPaid)}</TableCell>
-                  <TableCell className={cn("text-right font-mono", totalNetTax > 0 ? "text-red-600" : "text-green-600")}>
-                      {formatCurrency(totalNetTax)}
-                  </TableCell>
-                </TableRow>
-              </TableFooter>
-            </Table>
-          ) : (
-            <p className="text-center text-muted-foreground py-8">No tax data found for the selected period.</p>
-          )}
+        <CardContent className="text-sm text-muted-foreground">
+          Money source: {data?.money_source || 'canonical_financial_aggregation'}
         </CardContent>
       </Card>
     </div>

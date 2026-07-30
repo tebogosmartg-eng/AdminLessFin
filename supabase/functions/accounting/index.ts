@@ -11,6 +11,7 @@ import {
   withEnterprisePlatform,
   edgeFailure,
 } from '../_shared/enterpriseEdgePlatform.ts'
+import { loadCanonicalAggregation } from '../_shared/loadCanonicalAggregation.ts'
 
 const corsHeaders = ENTERPRISE_CORS_HEADERS
 
@@ -594,7 +595,7 @@ serve(withEnterprisePlatform('accounting', 'tenant', async (req, _ctx) => {
           r.opening_debit || r.opening_credit || r.period_debit || r.period_credit || r.closing_debit || r.closing_credit
         );
 
-        const totals = rows.reduce((acc: any, r: any) => ({
+        const presentationColumnTotals = rows.reduce((acc: any, r: any) => ({
           opening_debit: acc.opening_debit + r.opening_debit,
           opening_credit: acc.opening_credit + r.opening_credit,
           period_debit: acc.period_debit + r.period_debit,
@@ -603,10 +604,26 @@ serve(withEnterprisePlatform('accounting', 'tenant', async (req, _ctx) => {
           closing_credit: acc.closing_credit + r.closing_credit,
         }), { opening_debit: 0, opening_credit: 0, period_debit: 0, period_credit: 0, closing_debit: 0, closing_credit: 0 });
 
+        // Accounting totals (closing DR/CR + balanced) = CFA only.
+        const cfa = await loadCanonicalAggregation({
+          admin: supabaseAdmin,
+          rpc: userSupabase,
+          company_id,
+          start_date: startDate,
+          end_date: endDate,
+          prior_date: openingDate,
+        });
+
         data = {
           rows,
-          totals,
-          balanced: Math.abs(totals.closing_debit - totals.closing_credit) < 0.02,
+          totals: {
+            ...presentationColumnTotals,
+            closing_debit: cfa.totalDebits,
+            closing_credit: cfa.totalCredits,
+          },
+          balanced: cfa.trialBalanceBalanced,
+          canonicalAggregation: cfa,
+          money_source: 'canonical_financial_aggregation',
           start_date: startDate,
           end_date: endDate,
         };
@@ -1628,7 +1645,9 @@ serve(withEnterprisePlatform('accounting', 'tenant', async (req, _ctx) => {
           r.opening_debit || r.opening_credit || r.period_debit || r.period_credit || r.closing_debit || r.closing_credit
         );
 
-        const totals = rows.reduce((acc: any, r: any) => ({
+        // Column sums of displayed rows = presentation only.
+        // Closing DR/CR + balanced = CFA accounting authority.
+        const presentationColumnTotals = rows.reduce((acc: any, r: any) => ({
           opening_debit: acc.opening_debit + r.opening_debit,
           opening_credit: acc.opening_credit + r.opening_credit,
           period_debit: acc.period_debit + r.period_debit,
@@ -1637,10 +1656,25 @@ serve(withEnterprisePlatform('accounting', 'tenant', async (req, _ctx) => {
           closing_credit: acc.closing_credit + r.closing_credit,
         }), { opening_debit: 0, opening_credit: 0, period_debit: 0, period_credit: 0, closing_debit: 0, closing_credit: 0 });
 
+        const cfa = await loadCanonicalAggregation({
+          admin: supabaseAdmin,
+          rpc: userSupabase,
+          company_id,
+          start_date: startDate,
+          end_date: endDate,
+          prior_date: openingDate,
+        });
+
         data = {
           rows,
-          totals,
-          balanced: Math.abs(totals.closing_debit - totals.closing_credit) < 0.02,
+          totals: {
+            ...presentationColumnTotals,
+            closing_debit: cfa.totalDebits,
+            closing_credit: cfa.totalCredits,
+          },
+          balanced: cfa.trialBalanceBalanced,
+          canonicalAggregation: cfa,
+          money_source: 'canonical_financial_aggregation',
           start_date: startDate,
           end_date: endDate,
         };
@@ -2335,6 +2369,49 @@ serve(withEnterprisePlatform('accounting', 'tenant', async (req, _ctx) => {
     }
 
     if (error) throw error;
+
+    // Accounting Intelligence + related read models: company money = CFA only.
+    // Account-level movement series remain inquiry presentation of certified RPCs
+    // (get_account_movement_*), not a parallel statement aggregation engine.
+    const CFA_ATTACH = new Set([
+      'GET_ACCOUNT_BALANCE_EXPLAINER',
+      'GET_ACCOUNT_ANALYTICS',
+      'GET_ACCOUNT_SOURCE_ANALYSIS',
+      'GET_ACCOUNT_VARIANCE',
+      'GET_ACCOUNT_DRIVERS',
+      'GET_ACCOUNT_INSIGHTS',
+      'GET_ACCOUNT_COMPARISON',
+      'GET_INTELLIGENCE_DASHBOARD',
+    ]);
+    if (data && typeof data === 'object' && CFA_ATTACH.has(method) && !data.canonicalAggregation) {
+      const end = body.end_date || body.as_of_date || new Date().toISOString().slice(0, 10);
+      const start = body.start_date || `${String(end).slice(0, 7)}-01`;
+      const cfa = await loadCanonicalAggregation({
+        admin: supabaseAdmin,
+        rpc: userSupabase,
+        company_id,
+        start_date: start,
+        end_date: end,
+        prior_date: dayBefore(start),
+      });
+      data = {
+        ...data,
+        canonicalAggregation: cfa,
+        money_source: 'canonical_financial_aggregation',
+        company_financials: {
+          totalIncome: cfa.totalIncome,
+          totalExpenses: cfa.totalExpenses,
+          netIncome: cfa.netIncome,
+          totalAssets: cfa.totalAssets,
+          totalLiabilities: cfa.totalLiabilities,
+          totalEquity: cfa.totalEquity,
+          cash: cfa.cash,
+          receivables: cfa.receivables,
+          payables: cfa.payables,
+          vatNet: cfa.vatNet,
+        },
+      };
+    }
 
     return new Response(JSON.stringify(data), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },

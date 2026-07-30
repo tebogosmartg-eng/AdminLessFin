@@ -2,9 +2,13 @@
 -- capitalisation impossible for every new company.
 --
 -- fixed_assets carries a constraint named fixed_assets_user_id_fkey which is
--- actually defined on the company_id column and references public.users(id). A
+-- actually defined on the company_id column and references users(id). A
 -- company id is never a user id, so acquire_fixed_asset_atomic fails for any
--- company whose id has not been mirrored into public.users by hand.
+-- company whose id has not been mirrored into users by hand.
+--
+-- IMPORTANT (RT-004 follow-up): this migration's DROP filter matched only
+-- public.users. Production had company_id → auth.users, so the bad FK survived.
+-- See 20260730120000_rt004_drop_fixed_assets_company_id_auth_users_fk.sql.
 --
 -- Certification evidence: capitalising an asset on a brand-new company fails with
 --   insert or update on table "fixed_assets" violates foreign key constraint

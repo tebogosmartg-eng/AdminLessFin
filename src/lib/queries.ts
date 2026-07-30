@@ -1,5 +1,4 @@
 import { supabase } from '../integrations/supabase/client';
-import { endOfMonth, format, startOfMonth } from 'date-fns';
 import { buildWorkspaceSummary, aggregatePayrollSummaryItems } from './payrollIntelligence';
 import { invokePayroll } from './payrollOperations';
 import { isRunFinalized } from './payrollWorkflow';
@@ -145,11 +144,17 @@ export const customersQuery = (companyId: string) => ({
   },
 });
 
-export const accountsQuery = (companyId: string) => ({
-  queryKey: ['accounts', companyId],
+export const accountsQuery = (companyId: string, asOfDate?: string) => ({
+  // asOfDate aligns Banking / KPI cash with Dashboard (reporting period end).
+  // Omit for live CoA management (edge defaults to today).
+  queryKey: ['accounts', companyId, asOfDate ?? 'today'],
   queryFn: async () => {
     const { data, error } = await supabase.functions.invoke('chart-of-accounts', {
-      body: { method: 'GET', company_id: companyId },
+      body: {
+        method: 'GET',
+        company_id: companyId,
+        ...(asOfDate ? { as_of_date: asOfDate } : {}),
+      },
     });
     return parseFunctionResult(data, error);
   },
@@ -205,17 +210,16 @@ export const creditNotesQuery = (companyId: string) => ({
   },
 });
 
-export const revenueWorkspaceQuery = (companyId: string, dateFrom?: string, dateTo?: string) => {
-  const from = dateFrom ?? format(startOfMonth(new Date()), 'yyyy-MM-dd');
-  const to = dateTo ?? format(endOfMonth(new Date()), 'yyyy-MM-dd');
+export const revenueWorkspaceQuery = (companyId: string, dateFrom: string, dateTo: string) => {
+  // Callers must pass ReportingPeriodContext dateFrom/dateTo — no invented defaults.
   return {
-    queryKey: ['revenue_workspace', companyId, from, to],
+    queryKey: ['revenue_workspace', companyId, dateFrom, dateTo],
     queryFn: async () => {
       const { data, error } = await supabase.functions.invoke('dashboard-data', {
         body: {
           company_id: companyId,
-          date_from: from,
-          date_to: to,
+          date_from: dateFrom,
+          date_to: dateTo,
         },
       });
       return parseFunctionResult(data, error);
@@ -231,15 +235,14 @@ function mapBillTotal(entry: { journal_entry_items?: { type: string; amount: num
   );
 }
 
-export const purchasesWorkspaceQuery = (companyId: string, dateFrom?: string, dateTo?: string) => {
-  const from = dateFrom ?? format(startOfMonth(new Date()), 'yyyy-MM-dd');
-  const to = dateTo ?? format(endOfMonth(new Date()), 'yyyy-MM-dd');
+export const purchasesWorkspaceQuery = (companyId: string, dateFrom: string, dateTo: string) => {
+  // Callers must pass ReportingPeriodContext dateFrom/dateTo — no invented defaults.
   return {
-    queryKey: ['purchases_workspace', companyId, from, to],
+    queryKey: ['purchases_workspace', companyId, dateFrom, dateTo],
     queryFn: async () => {
       const [dashboardRes, billsRes, posRes, recurringRes] = await Promise.all([
         supabase.functions.invoke('dashboard-data', {
-          body: { company_id: companyId, date_from: from, date_to: to },
+          body: { company_id: companyId, date_from: dateFrom, date_to: dateTo },
         }),
         supabase.functions.invoke('bills', {
           body: { method: 'GET', company_id: companyId, filters: { status: 'open' } },

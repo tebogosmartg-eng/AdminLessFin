@@ -127,12 +127,12 @@ serve(withEnterprisePlatform('payments', 'tenant', async (req, _ctx) => {
 
     switch (method) {
       case 'GET_AR_BALANCES': {
-        ({ data, error } = await userSupabase.rpc('get_customer_ar_balances'));
+        ({ data, error } = await userSupabase.rpc('get_customer_ar_balances', { p_company_id: company_id }));
         break;
       }
 
       case 'GET_AP_BALANCES': {
-        ({ data, error } = await userSupabase.rpc('get_vendor_ap_balances'));
+        ({ data, error } = await userSupabase.rpc('get_vendor_ap_balances', { p_company_id: company_id }));
         break;
       }
 

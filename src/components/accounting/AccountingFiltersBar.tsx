@@ -1,15 +1,10 @@
+import { useEffect } from 'react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { Input } from '../ui/input';
-import { Button } from '../ui/button';
-import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
-import { Calendar } from '../ui/calendar';
-import { Calendar as CalendarIcon } from 'lucide-react';
-import { format } from 'date-fns';
-import { DateRange } from 'react-day-picker';
 import { cn } from '../../lib/utils';
 import { MODULE_OPTIONS, STATUS_OPTIONS, type AccountingFilters } from '../../lib/accountingWorkspace';
-import { useAccountingContext } from '../../lib/accountingQueries';
-import { useAuth } from '../../contexts/AuthContext';
+import { useReportingPeriod } from '../../contexts/ReportingPeriodContext';
+import ReportingPeriodPicker from '../ReportingPeriodPicker';
 
 type Props = {
   value: AccountingFilters;
@@ -28,15 +23,22 @@ export default function AccountingFiltersBar({
   showSearch = false,
   className,
 }: Props) {
-  const { activeCompany } = useAuth();
-  const { data: ctx } = useAccountingContext(activeCompany?.id);
+  const {
+    dateFrom,
+    dateTo,
+    isReady,
+    financialYears,
+    accountingPeriods,
+    activeFinancialYear,
+  } = useReportingPeriod();
 
-  const date: DateRange | undefined = value.date_from || value.date_to
-    ? {
-        from: value.date_from ? new Date(value.date_from) : undefined,
-        to: value.date_to ? new Date(value.date_to) : undefined,
-      }
-    : undefined;
+  // Keep filter date range bound to the shared Reporting Period Context.
+  useEffect(() => {
+    if (!isReady || !dateFrom || !dateTo) return;
+    if (value.date_from === dateFrom && value.date_to === dateTo) return;
+    onChange({ ...value, date_from: dateFrom, date_to: dateTo });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- sync only when shared period changes
+  }, [isReady, dateFrom, dateTo]);
 
   const set = (patch: Partial<AccountingFilters>) => onChange({ ...value, ...patch });
 
@@ -51,22 +53,33 @@ export default function AccountingFiltersBar({
         />
       )}
 
-      <Select value={value.financial_year_id || 'all'} onValueChange={(v) => set({ financial_year_id: v })}>
-        <SelectTrigger className="w-[160px]"><SelectValue placeholder="Financial Year" /></SelectTrigger>
+      <Select
+        value={value.financial_year_id || activeFinancialYear?.id || 'all'}
+        onValueChange={(v) => set({ financial_year_id: v === 'all' ? undefined : v })}
+      >
+        <SelectTrigger className="w-[180px]"><SelectValue placeholder="Current Financial Year" /></SelectTrigger>
         <SelectContent>
-          <SelectItem value="all">All years</SelectItem>
-          {(ctx as any)?.financial_years?.map((y: any) => (
-            <SelectItem key={y.id} value={y.id}>{y.year_code}</SelectItem>
+          <SelectItem value="all">All financial years</SelectItem>
+          {financialYears.map((y) => (
+            <SelectItem key={y.id} value={y.id}>
+              {y.status === 'open' || y.status === 'reopened' ? 'Current · ' : ''}
+              {y.startDate} – {y.endDate}
+            </SelectItem>
           ))}
         </SelectContent>
       </Select>
 
-      <Select value={value.accounting_period_id || 'all'} onValueChange={(v) => set({ accounting_period_id: v })}>
-        <SelectTrigger className="w-[160px]"><SelectValue placeholder="Period" /></SelectTrigger>
+      <Select
+        value={value.accounting_period_id || 'all'}
+        onValueChange={(v) => set({ accounting_period_id: v === 'all' ? undefined : v })}
+      >
+        <SelectTrigger className="w-[200px]"><SelectValue placeholder="Period" /></SelectTrigger>
         <SelectContent>
           <SelectItem value="all">All periods</SelectItem>
-          {(ctx as any)?.accounting_periods?.map((p: any) => (
-            <SelectItem key={p.id} value={p.id}>P{p.period_number} · {p.status}</SelectItem>
+          {accountingPeriods.map((p) => (
+            <SelectItem key={p.id} value={p.id}>
+              Period {p.periodNumber} · {p.startDate} – {p.endDate}
+            </SelectItem>
           ))}
         </SelectContent>
       </Select>
@@ -97,28 +110,7 @@ export default function AccountingFiltersBar({
         </Select>
       )}
 
-      <Popover>
-        <PopoverTrigger asChild>
-          <Button variant="outline" className={cn('w-[240px] justify-start text-left font-normal', !date && 'text-muted-foreground')}>
-            <CalendarIcon className="mr-2 h-4 w-4" />
-            {date?.from ? (
-              date.to ? `${format(date.from, 'LLL dd, y')} – ${format(date.to, 'LLL dd, y')}` : format(date.from, 'LLL dd, y')
-            ) : 'Date range'}
-          </Button>
-        </PopoverTrigger>
-        <PopoverContent className="w-auto p-0" align="start">
-          <Calendar
-            initialFocus
-            mode="range"
-            selected={date}
-            onSelect={(range) => set({
-              date_from: range?.from ? format(range.from, 'yyyy-MM-dd') : undefined,
-              date_to: range?.to ? format(range.to, 'yyyy-MM-dd') : undefined,
-            })}
-            numberOfMonths={2}
-          />
-        </PopoverContent>
-      </Popover>
+      <ReportingPeriodPicker showLabel={false} />
     </div>
   );
 }

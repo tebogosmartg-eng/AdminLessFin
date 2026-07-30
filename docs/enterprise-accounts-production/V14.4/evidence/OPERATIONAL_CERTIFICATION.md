@@ -1,29 +1,29 @@
 # V14.4 Operational Certification Evidence
 
-Generated: 2026-07-29T14:52:36.272Z
+Generated: 2026-07-30T06:22:32.349Z
 Decision: CERTIFIED FOR PRODUCTION
 
 ## Scenarios
-- trading: PASS | notes=17 policies=22 pdf=134736B docx=305721B pages=25
-- service: PASS | notes=17 policies=22 pdf=135071B docx=306437B pages=25
-- manufacturing: PASS | notes=17 policies=22 pdf=135025B docx=306464B pages=25
-- holding: PASS | notes=18 policies=22 pdf=137752B docx=307197B pages=26
-- subsidiaries: PASS | notes=18 policies=22 pdf=137883B docx=307208B pages=26
-- associates: PASS | notes=18 policies=22 pdf=139987B docx=317719B pages=26
-- joint_ventures: PASS | notes=18 policies=22 pdf=139848B docx=316268B pages=26
-- government_grants: PASS | notes=18 policies=22 pdf=140215B docx=317980B pages=26
-- leases: PASS | notes=18 policies=22 pdf=140390B docx=321166B pages=26
-- borrowing_costs: PASS | notes=17 policies=22 pdf=135351B docx=307244B pages=25
-- foreign_currency: PASS | notes=18 policies=22 pdf=138834B docx=315179B pages=26
-- impairment: PASS | notes=18 policies=22 pdf=140090B docx=320631B pages=26
-- biological: PASS | notes=18 policies=22 pdf=139987B docx=319301B pages=26
-- discontinued: PASS | notes=18 policies=22 pdf=141936B docx=322353B pages=26
-- first_time_adopter: PASS | notes=18 policies=22 pdf=141923B docx=320607B pages=26
-- loss_making: PASS | notes=18 policies=22 pdf=135570B docx=306440B pages=25
-- growing: PASS | notes=17 policies=22 pdf=134765B docx=305727B pages=25
-- asset_intensive: PASS | notes=18 policies=22 pdf=142319B docx=329372B pages=26
-- cash_intensive: PASS | notes=17 policies=22 pdf=131803B docx=292713B pages=25
-- high_debt: PASS | notes=17 policies=22 pdf=135046B docx=306483B pages=25
+- trading: PASS | notes=17 policies=22 pdf=134735B docx=305722B pages=25
+- service: PASS | notes=17 policies=22 pdf=135070B docx=306438B pages=25
+- manufacturing: PASS | notes=17 policies=22 pdf=135024B docx=306465B pages=25
+- holding: PASS | notes=18 policies=22 pdf=137751B docx=307198B pages=26
+- subsidiaries: PASS | notes=18 policies=22 pdf=137882B docx=307209B pages=26
+- associates: PASS | notes=18 policies=22 pdf=139986B docx=317720B pages=26
+- joint_ventures: PASS | notes=18 policies=22 pdf=139847B docx=316269B pages=26
+- government_grants: PASS | notes=18 policies=22 pdf=140214B docx=317981B pages=26
+- leases: PASS | notes=18 policies=22 pdf=140389B docx=321167B pages=26
+- borrowing_costs: PASS | notes=17 policies=22 pdf=135350B docx=307245B pages=25
+- foreign_currency: PASS | notes=18 policies=22 pdf=138833B docx=315180B pages=26
+- impairment: PASS | notes=18 policies=22 pdf=140089B docx=320632B pages=26
+- biological: PASS | notes=18 policies=22 pdf=139986B docx=319302B pages=26
+- discontinued: PASS | notes=18 policies=22 pdf=141935B docx=322354B pages=26
+- first_time_adopter: PASS | notes=18 policies=22 pdf=141922B docx=320608B pages=26
+- loss_making: PASS | notes=18 policies=22 pdf=135569B docx=306441B pages=25
+- growing: PASS | notes=17 policies=22 pdf=134764B docx=305728B pages=25
+- asset_intensive: PASS | notes=18 policies=22 pdf=142318B docx=329373B pages=26
+- cash_intensive: PASS | notes=17 policies=22 pdf=131802B docx=292714B pages=25
+- high_debt: PASS | notes=17 policies=22 pdf=135045B docx=306484B pages=25
 
 ## Policies
 - POL.BASIS: CERTIFIED

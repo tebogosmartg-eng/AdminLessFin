@@ -1,0 +1,33 @@
+name: CFA Architecture Governance Gate
+
+on:
+  push:
+    branches: [main, master, develop]
+  pull_request:
+    branches: [main, master, develop]
+
+jobs:
+  cfa-governance:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: CFA static architecture guard
+        run: npm run guard:cfa
+
+      - name: CFA architectural + convergence unit tests
+        run: npm run certify:cfa-gov
+
+      - name: ESLint (includes CFA restricted syntax)
+        run: npm run lint
+
+      - name: Production build
+        run: npm run build

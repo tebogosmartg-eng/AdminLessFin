@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { endOfMonth, endOfQuarter, format, startOfMonth, startOfQuarter, subMonths } from 'date-fns';
 import { CalendarCheck, Lock, Plus } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
-import { useEnterpriseCalendar } from '../../hooks/useEnterpriseCalendar';
+import { useReportingPeriod } from '../../contexts/ReportingPeriodContext';
 import {
   invokeFinancialClose,
   type EfcpCloseType,
@@ -25,15 +25,22 @@ import {
   SelectValue,
 } from '../../components/ui/select';
 import { showError, showSuccess } from '../../utils/toast';
+import { toIsoDate } from '../../lib/reportingPeriod/presets';
 
 /**
  * EFCP V6.8.0 — Financial Close home.
  * The accountant opens a Month-End, Quarter-End, or Year-End close.
  * The platform builds the checklist automatically.
+ * Year-end bounds come from ReportingPeriodContext (Settings Financial Calendar).
  */
 export default function FinancialCloseHome() {
   const { activeCompany } = useAuth();
-  const { startDate: fyStart, endDate: fyEnd, yearCode } = useEnterpriseCalendar(activeCompany?.id);
+  const {
+    financialYearStart,
+    financialYearEnd,
+  } = useReportingPeriod();
+  const fyStart = financialYearStart ? toIsoDate(financialYearStart) : null;
+  const fyEnd = financialYearEnd ? toIsoDate(financialYearEnd) : null;
   const navigate = useNavigate();
   const qc = useQueryClient();
   const companyId = activeCompany?.id;
@@ -66,10 +73,10 @@ export default function FinancialCloseHome() {
       year_end: {
         start: fyStart || format(startOfMonth(prevMonth), 'yyyy-MM-dd'),
         end: fyEnd || format(endOfMonth(prevMonth), 'yyyy-MM-dd'),
-        label: `${yearCode || 'Financial Year'} Close`,
+        label: 'Current Financial Year Close',
       },
     } as const;
-  }, [fyStart, fyEnd, yearCode]);
+  }, [fyStart, fyEnd]);
 
   const effStart = startDate || defaults[closeType].start;
   const effEnd = endDate || defaults[closeType].end;

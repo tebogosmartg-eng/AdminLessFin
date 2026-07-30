@@ -385,8 +385,9 @@ export function validateCanonicalLines(lines: CanonicalTbLineInput[]) {
   const equity = byType.Equity || 0;
   const income = byType.Income || 0;
   const expense = byType.Expense || 0;
-  const netIncome = round2(income + expense); // expense often negative in AdminLess
-  // Balance sheet articulation: Assets ≈ Liabilities + Equity + retained result proxy
+  const netIncome = round2(income - Math.abs(expense));
+  // Prefer income − |expense| so native (positive expense activity) and signed
+  // expense balances both articulate to the Canonical Financial Aggregation NI.
   const rhs = round2(liabilities + equity);
   const gap = round2(assets - rhs);
   // Soft check — imported TBs may store P&L separately from equity

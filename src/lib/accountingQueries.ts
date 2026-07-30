@@ -60,6 +60,8 @@ export function accountingExceptionsQuery(companyId: string) {
 // (not the old raw snake_case rows); src/pages/accounting/FinancialYears.tsx,
 // src/pages/accounting/FinancialPeriods.tsx, and src/pages/GeneralLedger.tsx
 // were updated in the same migration to read the new field names.
+// COMPATIBILITY: Prefer useReportingPeriod().financialYears / accountingPeriods.
+// These query helpers remain for non-React tooling only — do not use for reporting defaults.
 export function accountingPeriodsQuery(companyId: string) {
   return {
     queryKey: ['accounting-periods', companyId] as const,

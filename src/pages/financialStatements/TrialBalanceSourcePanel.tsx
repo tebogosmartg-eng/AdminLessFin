@@ -221,9 +221,11 @@ export default function TrialBalanceSourcePanel({
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="rounded-md border bg-muted/30 p-3 text-sm text-muted-foreground">
-            Native accounting continues to use <strong className="text-foreground">Refresh from
-            accounting</strong> on Overview. Use this panel only for an imported Trial Balance
-            (CSV / Excel rows from Sage, Xero, QuickBooks, Pastel, SAP, and others).
+            Prefer AdminLess books? Use <strong className="text-foreground">Generate</strong> or{' '}
+            <strong className="text-foreground">Refresh Financial Statements</strong> on the Financial
+            Statements tab — the platform captures the Trial Balance from accounting automatically.
+            Use this panel only when importing a Trial Balance from an external system (CSV / Excel
+            from Sage, Xero, QuickBooks, Pastel, SAP, and others).
           </div>
 
           <div className="grid gap-4 sm:grid-cols-2">

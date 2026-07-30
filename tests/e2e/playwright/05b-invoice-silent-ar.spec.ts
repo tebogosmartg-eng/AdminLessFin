@@ -47,7 +47,12 @@ test.describe('P0 Invoice silent A/R validation', () => {
     let persistAfterReload = false;
     let failure: string | null = null;
     try {
-      await expect(page.getByRole('dialog')).toBeHidden({ timeout: 25_000 });
+      // Scope to the named form dialog: the account picker is a Radix Popover
+      // combobox that also exposes role="dialog" and lingers (data-state closed),
+      // so an unscoped getByRole('dialog') matches two elements and aborts on
+      // strict mode before the real assertion evaluates. Assert the "New Invoice"
+      // form dialog itself closed — the true signal that the invoice persisted.
+      await expect(page.getByRole('dialog', { name: /new invoice/i })).toBeHidden({ timeout: 25_000 });
       dialogHidden = true;
       await expect(page.getByRole('row').filter({ hasText: invNum })).toBeVisible({ timeout: 20_000 });
       rowVisible = true;

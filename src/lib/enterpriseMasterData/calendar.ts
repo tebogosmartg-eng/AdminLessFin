@@ -15,9 +15,13 @@ export type EnterpriseCalendarContext = {
 };
 
 export function calendarContextFromYears(years: FinancialYearDomainModel[]): EnterpriseCalendarContext {
+  const openYears = years.filter((y) => y.status === 'open' || y.status === 'reopened');
+  const today = new Date().toISOString().slice(0, 10);
+  // Prefer the open year that contains today; else newest open by end_date; else first row.
+  // Prevents a stale open Mar YE from winning over a newly materialised Mar–Feb year.
   const activeYear =
-    years.find((y) => y.status === 'open') ||
-    years.find((y) => y.status === 'reopened') ||
+    openYears.find((y) => y.startDate <= today && today <= y.endDate) ||
+    [...openYears].sort((a, b) => (a.endDate < b.endDate ? 1 : -1))[0] ||
     years[0] ||
     null;
   return {

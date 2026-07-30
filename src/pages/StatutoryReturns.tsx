@@ -7,14 +7,12 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '.
 import { Badge } from '../components/ui/badge';
 import { Skeleton } from '../components/ui/skeleton';
 import { Alert, AlertDescription, AlertTitle } from '../components/ui/alert';
-import { Calendar as CalendarIcon, FileCheck2, ShieldAlert } from 'lucide-react';
-import { Popover, PopoverContent, PopoverTrigger } from '../components/ui/popover';
-import { Calendar } from '../components/ui/calendar';
-import { DateRange } from 'react-day-picker';
-import { format, startOfMonth, endOfMonth } from 'date-fns';
-import { cn, formatCurrency } from '../lib/utils';
+import { FileCheck2, ShieldAlert } from 'lucide-react';
+import { formatCurrency } from '../lib/utils';
 import { useAuth } from '../contexts/AuthContext';
+import { useReportingPeriod } from '../contexts/ReportingPeriodContext';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
+import ReportingPeriodPicker from '../components/ReportingPeriodPicker';
 import {
   STATUTORY_RETURNS_CATALOGUE,
   generateStatutoryReturn,
@@ -29,23 +27,20 @@ const StatutoryReturns = () => {
   useDocumentTitle('Statutory Returns');
   const { activeCompany, user } = useAuth();
   const companyId = activeCompany?.id;
+  const { dateFrom, dateTo, isReady, currentReportingPeriod } = useReportingPeriod();
   const [activeTab, setActiveTab] = useState<CatalogueTab>('EMP201');
   const [generated, setGenerated] = useState<StatutoryReturn | null>(null);
   const [history, setHistory] = useState<StatutoryReturn[]>([]);
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [date, setDate] = useState<DateRange | undefined>({
-    from: startOfMonth(new Date()),
-    to: endOfMonth(new Date()),
-  });
 
-  const startStr = format(date?.from ?? new Date(), 'yyyy-MM-dd');
-  const endStr = format(date?.to ?? new Date(), 'yyyy-MM-dd');
+  const startStr = dateFrom ?? '';
+  const endStr = dateTo ?? '';
 
   const { data: sources, isLoading } = useQuery({
     queryKey: ['statutory_return_sources', companyId, startStr, endStr],
     queryFn: () => loadFinalizedPayrollSources(companyId!, { startDate: startStr, endDate: endStr }),
-    enabled: !!companyId,
+    enabled: !!companyId && isReady,
     retry: 1,
   });
 
@@ -54,11 +49,11 @@ const StatutoryReturns = () => {
   const taxYearGuess = useMemo(() => {
     const fromSnapshot = sources?.find((r) => r.taxYear)?.taxYear;
     if (fromSnapshot) return fromSnapshot;
-    const d = date?.from ?? new Date();
+    const d = currentReportingPeriod?.from ?? new Date();
     const y = d.getFullYear();
     const m = d.getMonth() + 1;
     return m >= 3 ? `${y}-${y + 1}` : `${y - 1}-${y}`;
-  }, [sources, date]);
+  }, [sources, currentReportingPeriod]);
 
   const handleGenerate = async (returnType: string) => {
     if (!sources?.length) {
@@ -106,30 +101,7 @@ const StatutoryReturns = () => {
             Government declarations from finalized payroll — never recalculated
           </p>
         </div>
-        <Popover>
-          <PopoverTrigger asChild>
-            <Button
-              variant="outline"
-              className={cn('w-[300px] justify-start text-left font-normal', !date && 'text-muted-foreground')}
-            >
-              <CalendarIcon className="mr-2 h-4 w-4" />
-              {date?.from ? (
-                date.to ? (
-                  <>
-                    {format(date.from, 'LLL dd, y')} - {format(date.to, 'LLL dd, y')}
-                  </>
-                ) : (
-                  format(date.from, 'LLL dd, y')
-                )
-              ) : (
-                <span>Pick a date</span>
-              )}
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent className="w-auto p-0" align="end">
-            <Calendar initialFocus mode="range" defaultMonth={date?.from} selected={date} onSelect={setDate} numberOfMonths={2} />
-          </PopoverContent>
-        </Popover>
+        <ReportingPeriodPicker />
       </div>
 
       <Alert>

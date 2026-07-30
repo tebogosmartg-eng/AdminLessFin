@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState, useRef, useCallback } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { useVirtualizer } from '@tanstack/react-virtual';
-import { format, startOfYear, endOfYear } from 'date-fns';
+import { format, parseISO } from 'date-fns';
 import {
   AreaChart, Area, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend, CartesianGrid,
 } from 'recharts';
@@ -13,10 +13,10 @@ import {
 } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { useAuth } from '../contexts/AuthContext';
+import { useReportingPeriod } from '../contexts/ReportingPeriodContext';
 import { accountActivityQuery } from '../lib/accountingQueries';
 import { accountsQuery } from '../lib/queries';
 import { accountingApi } from '../lib/accountingWorkspace';
-import { financialCalendarService } from '@/governance/domains/financialCalendar/service';
 import type { FinancialYearDomainModel, AccountingPeriodDomainModel } from '@/governance/domains/financialCalendar/model';
 import { accountantPrefs, moduleColorClass } from '../lib/accountantProductivity';
 import { formatCurrency, downloadCSV, cn } from '../lib/utils';
@@ -24,6 +24,7 @@ import { useDocumentTitle } from '../hooks/useDocumentTitle';
 import AccountingSearch from '../components/accounting/AccountingSearch';
 import TraceabilityDrawer from '../components/accounting/TraceabilityDrawer';
 import EnterpriseAccountCard from '../components/accounting/EnterpriseAccountCard';
+import ReportingPeriodPicker from '../components/ReportingPeriodPicker';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Skeleton } from '../components/ui/skeleton';
@@ -31,10 +32,6 @@ import { Badge } from '../components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { Input } from '../components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
-import { Popover, PopoverContent, PopoverTrigger } from '../components/ui/popover';
-import { Calendar } from '../components/ui/calendar';
-import { DateRange } from 'react-day-picker';
-import { Calendar as CalendarIcon } from 'lucide-react';
 import { showSuccess } from '../utils/toast';
 
 const PAGE_SIZE = 80;
@@ -42,14 +39,19 @@ const PAGE_SIZE = 80;
 const GeneralLedger = () => {
   useDocumentTitle('Account Activity');
   const { activeCompany } = useAuth();
+  const {
+    dateFrom,
+    dateTo,
+    isReady,
+    setCustomRange,
+    selectedPreset,
+    financialYears,
+    accountingPeriods: financialPeriods,
+  } = useReportingPeriod();
   const companyId = activeCompany?.id;
   const [searchParams, setSearchParams] = useSearchParams();
   const accountId = searchParams.get('account_id') || '';
 
-  const [date, setDate] = useState<DateRange | undefined>({
-    from: startOfYear(new Date()),
-    to: endOfYear(new Date()),
-  });
   const [groupBy, setGroupBy] = useState<'day' | 'week' | 'month' | 'period' | 'year'>('day');
   const [page, setPage] = useState(1);
   const [pinned, setPinned] = useState<string[]>([]);
@@ -92,8 +94,8 @@ const GeneralLedger = () => {
     return () => window.removeEventListener('keydown', onKey);
   }, [accountId, companyId]);
 
-  const startDate = date?.from ? format(date.from, 'yyyy-MM-dd') : format(startOfYear(new Date()), 'yyyy-MM-dd');
-  const endDate = date?.to ? format(date.to, 'yyyy-MM-dd') : format(endOfYear(new Date()), 'yyyy-MM-dd');
+  const startDate = dateFrom ?? '';
+  const endDate = dateTo ?? '';
 
   const { data: accounts } = useQuery({
     ...accountsQuery(companyId!),
@@ -106,26 +108,26 @@ const GeneralLedger = () => {
 
   const { data, isLoading, isFetching, isError: activityIsError, error: activityError, refetch: refetchActivity } = useQuery({
     ...accountActivityQuery(companyId!, accountId, activityOpts),
-    enabled: !!companyId && !!accountId,
+    enabled: !!companyId && !!accountId && isReady,
     placeholderData: (prev) => prev,
   });
 
   const { data: explainer, isLoading: explainerLoading, isError: explainerIsError, error: explainerError, refetch: refetchExplainer } = useQuery({
     queryKey: ['account-explainer', companyId, accountId, endDate],
     queryFn: () => accountingApi.accountExplainer(companyId!, accountId, endDate),
-    enabled: !!companyId && !!accountId,
+    enabled: !!companyId && !!accountId && isReady,
   });
 
   const { data: analytics, isLoading: analyticsLoading, isError: analyticsIsError, error: analyticsError, refetch: refetchAnalytics } = useQuery({
     queryKey: ['account-analytics', companyId, accountId, startDate, endDate],
     queryFn: () => accountingApi.accountAnalytics(companyId!, accountId, startDate, endDate),
-    enabled: !!companyId && !!accountId,
+    enabled: !!companyId && !!accountId && isReady,
   });
 
   const { data: sourceAnalysis, isLoading: sourceLoading, isError: sourceIsError, error: sourceError, refetch: refetchSource } = useQuery({
     queryKey: ['account-source', companyId, accountId, startDate, endDate],
     queryFn: () => accountingApi.accountSourceAnalysis(companyId!, accountId, startDate, endDate),
-    enabled: !!companyId && !!accountId,
+    enabled: !!companyId && !!accountId && isReady,
   });
 
   // Phase 4C Part 1/7: Intelligence tabs, all backed by the certified
@@ -133,54 +135,50 @@ const GeneralLedger = () => {
   const { data: variance, isLoading: varianceLoading, isError: varianceIsError, error: varianceError, refetch: refetchVariance } = useQuery({
     queryKey: ['account-variance', companyId, accountId, endDate],
     queryFn: () => accountingApi.accountVariance(companyId!, accountId, endDate),
-    enabled: !!companyId && !!accountId,
+    enabled: !!companyId && !!accountId && isReady,
   });
   const { data: drivers, isLoading: driversLoading, isError: driversIsError, error: driversError, refetch: refetchDrivers } = useQuery({
     queryKey: ['account-drivers', companyId, accountId, startDate, endDate],
     queryFn: () => accountingApi.accountDrivers(companyId!, accountId, startDate, endDate),
-    enabled: !!companyId && !!accountId,
+    enabled: !!companyId && !!accountId && isReady,
   });
   const { data: insights, isLoading: insightsLoading, isError: insightsIsError, error: insightsError, refetch: refetchInsights } = useQuery({
     queryKey: ['account-insights', companyId, accountId, startDate, endDate],
     queryFn: () => accountingApi.accountInsights(companyId!, accountId, startDate, endDate),
-    enabled: !!companyId && !!accountId,
+    enabled: !!companyId && !!accountId && isReady,
   });
   const { data: comparison, isLoading: comparisonLoading, isError: comparisonIsError, error: comparisonError, refetch: refetchComparison } = useQuery({
     queryKey: ['account-comparison', companyId, accountId, endDate],
     queryFn: () => accountingApi.accountComparison(companyId!, accountId, endDate),
-    enabled: !!companyId && !!accountId,
+    enabled: !!companyId && !!accountId && isReady,
   });
 
-  // Phase 4C Part 8: Financial Year / Financial Period filter — resolves to
-  // a concrete date range fed into the same server-side queries every other
-  // filter already uses, so it stays server-driven rather than adding a
-  // separate client-side filtering path.
-  // Phase G3.2 — repointed onto Governance's FinancialCalendarService; the
-  // underlying edge function calls are unchanged, only the access path and
-  // the resulting field names (camelCase domain model) changed.
-  const { data: financialYears } = useQuery({
-    queryKey: ['financial-years', companyId],
-    queryFn: () => financialCalendarService.getFinancialYears(companyId!),
-    enabled: !!companyId,
-  });
-  const { data: financialPeriods } = useQuery({
-    queryKey: ['financial-periods', companyId],
-    queryFn: () => financialCalendarService.getAccountingPeriods(companyId!),
-    enabled: !!companyId,
-  });
-  const [periodFilter, setPeriodFilter] = useState<string>('custom');
+  // Phase 4C Part 8: Financial Year / Period shortcuts write into the shared
+  // Reporting Period Context (Custom Range) — never a parallel date authority.
+  const [periodFilter, setPeriodFilter] = useState<string>('reporting');
   const handlePeriodFilterChange = (value: string) => {
     setPeriodFilter(value);
-    if (value === 'custom') return;
+    if (value === 'reporting') return;
     const [kind, id] = value.split(':');
     const source = kind === 'fy' ? financialYears : financialPeriods;
     const row = (source || []).find(
       (r: FinancialYearDomainModel | AccountingPeriodDomainModel) => r.id === id
     );
     if (row?.startDate && row?.endDate) {
-      setDate({ from: new Date(`${row.startDate}T00:00:00`), to: new Date(`${row.endDate}T00:00:00`) });
+      setCustomRange({
+        from: parseISO(row.startDate),
+        to: parseISO(row.endDate),
+      });
+      setPage(1);
     }
   };
+
+  // Keep FY/period select in sync when shared reporting period changes away from a FY/period pick.
+  useEffect(() => {
+    if (selectedPreset !== 'custom' && periodFilter !== 'reporting') {
+      setPeriodFilter('reporting');
+    }
+  }, [selectedPreset, periodFilter]);
 
   // Phase 4C Part 8: contribution name filter (module/vendor/customer/
   // project/document type) — the underlying RPCs already return the full,
@@ -356,30 +354,28 @@ const GeneralLedger = () => {
                     </div>
                     <div className="flex flex-wrap gap-2">
                       <Select value={periodFilter} onValueChange={handlePeriodFilterChange}>
-                        <SelectTrigger className="w-[160px] h-9"><SelectValue placeholder="Financial Year/Period" /></SelectTrigger>
+                        <SelectTrigger className="w-[180px] h-9"><SelectValue placeholder="Reporting shortcut" /></SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="custom">Custom range</SelectItem>
+                          <SelectItem value="reporting">Reporting Period</SelectItem>
                           {(financialYears || []).map((fy) => (
-                            <SelectItem key={fy.id} value={`fy:${fy.id}`}>FY {fy.yearCode}</SelectItem>
+                            <SelectItem key={fy.id} value={`fy:${fy.id}`}>
+                              {fy.startDate} – {fy.endDate}
+                            </SelectItem>
                           ))}
                           {(financialPeriods || []).map((p) => (
                             <SelectItem key={p.id} value={`period:${p.id}`}>
-                              P{p.periodNumber} · {p.financialYearCode}
+                              Period {p.periodNumber} · {p.startDate} – {p.endDate}
                             </SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
-                      <Popover>
-                        <PopoverTrigger asChild>
-                          <Button variant="outline" size="sm">
-                            <CalendarIcon className="mr-2 h-4 w-4" />
-                            {date?.from ? (date.to ? `${format(date.from, 'LLL dd, y')} – ${format(date.to, 'LLL dd, y')}` : format(date.from, 'LLL dd, y')) : 'Dates'}
-                          </Button>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-auto p-0" align="end">
-                          <Calendar mode="range" selected={date} onSelect={(r) => { setDate(r); setPage(1); setPeriodFilter('custom'); }} numberOfMonths={2} />
-                        </PopoverContent>
-                      </Popover>
+                      <ReportingPeriodPicker
+                        showLabel={false}
+                        onPeriodChange={() => {
+                          setPage(1);
+                          setPeriodFilter('reporting');
+                        }}
+                      />
                       <Select value={groupBy} onValueChange={(v: any) => setGroupBy(v)}>
                         <SelectTrigger className="w-[140px] h-9"><SelectValue /></SelectTrigger>
                         <SelectContent>

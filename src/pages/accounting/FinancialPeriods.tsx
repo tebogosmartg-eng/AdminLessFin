@@ -1,26 +1,17 @@
-import { useQuery } from '@tanstack/react-query';
 import { CalendarRange } from 'lucide-react';
-import { useAuth } from '../../contexts/AuthContext';
-import { accountingPeriodsQuery } from '../../lib/accountingQueries';
-import type { AccountingPeriodDomainModel } from '@/governance/domains/financialCalendar/model';
+import { useReportingPeriod } from '../../contexts/ReportingPeriodContext';
 import { useDocumentTitle } from '../../hooks/useDocumentTitle';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../../components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../../components/ui/table';
 import { Badge } from '../../components/ui/badge';
 import { Skeleton } from '../../components/ui/skeleton';
 
+/**
+ * Read-only period register — same calendar as Settings → Financials via ReportingPeriodContext.
+ */
 const FinancialPeriods = () => {
   useDocumentTitle('Financial Periods');
-  const { activeCompany } = useAuth();
-  const { data, isLoading } = useQuery({
-    ...accountingPeriodsQuery(activeCompany!.id),
-    enabled: !!activeCompany,
-  });
-
-  // Phase G3.2 — now sourced via Governance's FinancialCalendarService,
-  // which returns the typed camelCase domain model instead of the old raw
-  // snake_case rows.
-  const periods = data || [];
+  const { accountingPeriods: periods, isLoading, yearCode } = useReportingPeriod();
 
   return (
     <div className="space-y-4">
@@ -29,13 +20,14 @@ const FinancialPeriods = () => {
           <CalendarRange className="h-7 w-7" /> Financial Periods
         </h1>
         <p className="text-sm text-muted-foreground mt-1">
-          Accounting period status from the period foundation — read-only control view.
+          Accounting periods for the company Financial Calendar
+          {yearCode ? ' · Current Financial Year' : ''}.
         </p>
       </div>
       <Card>
         <CardHeader>
           <CardTitle className="text-base">Periods</CardTitle>
-          <CardDescription>Created by · period status · financial year linkage</CardDescription>
+          <CardDescription>Period status linked to Settings → Financials years</CardDescription>
         </CardHeader>
         <CardContent>
           {isLoading ? <Skeleton className="h-64 w-full" /> : (
@@ -52,9 +44,9 @@ const FinancialPeriods = () => {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {periods.map((p: AccountingPeriodDomainModel) => (
+                {periods.map((p) => (
                   <TableRow key={p.id}>
-                    <TableCell className="font-semibold">P{p.periodNumber}</TableCell>
+                    <TableCell className="font-semibold">Period {p.periodNumber}</TableCell>
                     <TableCell>{p.financialYearCode || '—'}</TableCell>
                     <TableCell>{p.startDate}</TableCell>
                     <TableCell>{p.endDate}</TableCell>
@@ -63,6 +55,13 @@ const FinancialPeriods = () => {
                     <TableCell className="text-xs text-muted-foreground">{p.updatedAt ? new Date(p.updatedAt).toLocaleString() : '—'}</TableCell>
                   </TableRow>
                 ))}
+                {periods.length === 0 && (
+                  <TableRow>
+                    <TableCell colSpan={7} className="text-muted-foreground text-center py-8">
+                      No periods yet. Configure the Financial Year in Settings → Financials.
+                    </TableCell>
+                  </TableRow>
+                )}
               </TableBody>
             </Table>
           )}

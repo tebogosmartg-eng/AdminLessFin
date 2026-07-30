@@ -278,7 +278,13 @@ export const engagementSource: CorporateInformationSource = {
   read(ctx) {
     const e = entity(ctx);
     const m = ctx.model;
-    const periodLabel = m.period?.label || null;
+    const end = m.period?.end_date ?? null;
+    const start = m.period?.start_date ?? null;
+    // Derive from calendar dates / year_code — never prefer frozen slash labels.
+    const periodLabel =
+      m.period?.period_key ||
+      (start && end ? `${start} – ${end}` : null) ||
+      null;
     const comparative =
       e?.comparative_period ??
       (m.period as { comparative_label?: string })?.comparative_label ??

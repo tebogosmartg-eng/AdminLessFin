@@ -29,10 +29,7 @@ const ComparativePL = () => {
 
   const incomeAccounts = report?.accounts.filter(a => a.type === 'Income') || [];
   const expenseAccounts = report?.accounts.filter(a => a.type === 'Expense') || [];
-
-  const calculateTotal = (accounts: any[], month: string) => {
-    return accounts.reduce((sum, acc) => sum + (acc.values[month] || 0), 0);
-  };
+  const monthTotals = report?.monthTotals || {};
 
   return (
     <div className="space-y-6">
@@ -64,7 +61,7 @@ const ComparativePL = () => {
                 <TableRow className="font-bold border-t">
                   <TableCell>Total Income</TableCell>
                   {report?.months.map(m => (
-                    <TableCell key={m.label} className="text-right font-mono">{formatCurrency(calculateTotal(incomeAccounts, m.label))}</TableCell>
+                    <TableCell key={m.label} className="text-right font-mono">{formatCurrency(Number(monthTotals[m.label]?.totalIncome ?? 0))}</TableCell>
                   ))}
                 </TableRow>
 
@@ -81,7 +78,7 @@ const ComparativePL = () => {
                 <TableRow className="font-bold border-t">
                   <TableCell>Total Expenses</TableCell>
                   {report?.months.map(m => (
-                    <TableCell key={m.label} className="text-right font-mono">{formatCurrency(calculateTotal(expenseAccounts, m.label))}</TableCell>
+                    <TableCell key={m.label} className="text-right font-mono">{formatCurrency(Number(monthTotals[m.label]?.totalExpenses ?? 0))}</TableCell>
                   ))}
                 </TableRow>
               </TableBody>
@@ -89,7 +86,7 @@ const ComparativePL = () => {
                 <TableRow className="text-lg font-bold">
                   <TableCell>Net Profit</TableCell>
                   {report?.months.map(m => {
-                    const profit = calculateTotal(incomeAccounts, m.label) - calculateTotal(expenseAccounts, m.label);
+                    const profit = Number(monthTotals[m.label]?.netIncome ?? 0);
                     return (
                       <TableCell key={m.label} className={cn("text-right font-mono", profit >= 0 ? "text-green-600" : "text-red-600")}>
                         {formatCurrency(profit)}

@@ -8,6 +8,7 @@ import {
   Moon, Activity, Landmark, ShieldCheck, BookOpenCheck, Radio,
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
+import { useReportingPeriod } from '../../contexts/ReportingPeriodContext';
 import { accountingDashboardQuery } from '../../lib/accountingQueries';
 import { accountingPolicyDashboardQuery, accountingRulesDashboardQuery, businessEventsDashboardQuery } from '../../lib/queries';
 import { accountingApi } from '../../lib/accountingWorkspace';
@@ -15,6 +16,7 @@ import { useDocumentTitle } from '../../hooks/useDocumentTitle';
 import { formatCurrency, cn } from '../../lib/utils';
 import AccountingSearch from '../../components/accounting/AccountingSearch';
 import MaterialitySettingsDialog from '../../components/accounting/MaterialitySettingsDialog';
+import ReportingPeriodPicker from '../../components/ReportingPeriodPicker';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../components/ui/card';
 import { Button } from '../../components/ui/button';
 import { Badge } from '../../components/ui/badge';
@@ -23,6 +25,7 @@ import { Skeleton } from '../../components/ui/skeleton';
 const AccountingDashboard = () => {
   useDocumentTitle('Accounting Dashboard');
   const { activeCompany, role } = useAuth();
+  const { activeFinancialYearLabel, activeFinancialYear, openFinancialYears, closedFinancialYears } = useReportingPeriod();
   const isAdmin = role === 'owner' || role === 'admin';
   const [materialityOpen, setMaterialityOpen] = useState(false);
   const { data, isLoading } = useQuery({
@@ -70,7 +73,7 @@ const AccountingDashboard = () => {
     );
   }
 
-  const fy = d.current_financial_year;
+  const fy = activeFinancialYear;
   const period = d.current_accounting_period;
 
   return (
@@ -84,14 +87,17 @@ const AccountingDashboard = () => {
             Operational control centre — every posting is traceable to the ledger.
           </p>
         </div>
-        <AccountingSearch />
+        <div className="flex flex-wrap items-center gap-2">
+          <ReportingPeriodPicker showLabel={false} />
+          <AccountingSearch />
+        </div>
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <Stat label="Financial Year" value={fy?.year_code || '—'} hint={fy?.status} />
+        <Stat label="Current Financial Year" value={activeFinancialYearLabel || '—'} hint={fy?.status} />
         <Stat label="Accounting Period" value={period ? `P${period.period_number}` : '—'} hint={d.period_status} />
-        <Stat label="Open Periods" value={String(d.open_periods ?? '—')} />
-        <Stat label="Closed Periods" value={String(d.closed_periods ?? '—')} />
+        <Stat label="Open Financial Years" value={String(openFinancialYears.length)} />
+        <Stat label="Closed Financial Years" value={String(closedFinancialYears.length)} />
         <Stat label="Pending Postings" value={String(d.pending_posting_requests ?? '—')} tone={d.pending_posting_requests ? 'warn' : 'ok'} />
         <Stat label="Failed / Stuck" value={String(d.failed_posting_requests ?? '—')} tone={d.failed_posting_requests ? 'danger' : 'ok'} />
         <Stat label="Posted Journals Today" value={String(d.posted_journals_today ?? '—')} />

@@ -19,6 +19,14 @@ import Landing from "./pages/Landing";
 import AuthPage from "./pages/Auth";
 import NotFound from "./pages/NotFound";
 
+// Public marketing/legal pages. Eager (like Landing/Auth) — they are part of the
+// unauthenticated front door, are lightweight, and render outside Layout's
+// Suspense boundary, so lazy-loading them would need a separate boundary here.
+import PrivacyPolicy from "./pages/legal/PrivacyPolicy";
+import TermsOfService from "./pages/legal/TermsOfService";
+import SecurityPolicy from "./pages/legal/SecurityPolicy";
+import ContactSales from "./pages/ContactSales";
+
 // Every actual workspace/page below is lazy — each import() call is an
 // independent chunk boundary Rollup splits automatically. Rendered only
 // inside Layout's <Outlet/>, which already has a Suspense boundary
@@ -143,6 +151,10 @@ export const AppRouter = () => {
     <Routes>
       <Route path="/welcome" element={<Landing />} />
       <Route path="/auth" element={<AuthPage />} />
+      <Route path="/privacy" element={<PrivacyPolicy />} />
+      <Route path="/terms" element={<TermsOfService />} />
+      <Route path="/security" element={<SecurityPolicy />} />
+      <Route path="/contact" element={<ContactSales />} />
       <Route element={<ProtectedRoute />}>
         {/* Common Routes - Accessible by everyone */}
         <Route path="/" element={<Dashboard />} />

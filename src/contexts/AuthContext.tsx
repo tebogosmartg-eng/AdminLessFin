@@ -18,6 +18,13 @@ type Profile = {
   avatar_url: string;
   role: string; // Global app role
   active_company_id: string | null;
+  /**
+   * COMPATIBILITY-ONLY (legacy Settings write path).
+   * These fields are persisted when Settings → Financials saves year-end /
+   * active-year config, then materialised into `financial_years`.
+   * They MUST NEVER be read as the reporting authority.
+   * Authority: Settings → financialCalendarService → ReportingPeriodContext.
+   */
   financial_year_end_month?: number | null;
   financial_year_end_day?: number | null;
   current_financial_year_start?: string | null;

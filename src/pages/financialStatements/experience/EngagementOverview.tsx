@@ -8,6 +8,7 @@ import {
   buildAttentionSummary,
   buildPreparationChecklist,
   preparationStatusGlyph,
+  WORKFLOW_STEPS,
   type PreparationNavTarget,
 } from '../../../lib/financialStatements/engagementPreparation';
 import {
@@ -15,6 +16,11 @@ import {
   workspaceStatusLabel,
 } from '../../../lib/financialStatements/presentation';
 import { corporateDisplayFromEntity } from '../../../lib/financialStatements/corporateInformation/accessors';
+import {
+  formatCalendarYearRange,
+  resolveEngagementReportingPeriod,
+} from '../../../lib/financialStatements/calendarYearBinding';
+import { useReportingPeriod } from '../../../contexts/ReportingPeriodContext';
 import { cn } from '../../../lib/utils';
 
 function Widget({
@@ -35,8 +41,7 @@ function Widget({
 }
 
 /**
- * V6.10.0 Overview — accountant dashboard.
- * Answers: What am I preparing? What is missing? What next? Ready for review/publication?
+ * V6.10.2 Overview — accountant dashboard with truthful next-action workflow.
  */
 export default function WorkspaceOverview({
   dashboard,
@@ -49,11 +54,18 @@ export default function WorkspaceOverview({
   outstandingWorkingPapers?: number;
   onNavigate?: (target: PreparationNavTarget) => void;
 }) {
+  const { financialYears, activeFinancialYear } = useReportingPeriod();
   const d = dashboard;
   const checklist = buildPreparationChecklist(d, generalInfo, {
     outstandingWorkingPapers,
   });
   const summary = buildAttentionSummary(checklist);
+  const checklistById = Object.fromEntries(checklist.map((i) => [i.id, i]));
+  const nextItem = checklist.find(
+    (c) =>
+      c.target === summary.nextTarget &&
+      (c.status === 'blocking' || c.status === 'attention' || c.status === 'pending'),
+  );
 
   const frameworkLabel =
     d.framework?.efs_frameworks?.name ||
@@ -61,11 +73,11 @@ export default function WorkspaceOverview({
     corporateDisplayFromEntity(generalInfo).reportingFramework ||
     'Not selected';
 
-  const financialYear =
-    d.reportingPeriod?.label ||
-    (d.reportingPeriod?.start_date && d.reportingPeriod?.end_date
-      ? `${d.reportingPeriod.start_date} → ${d.reportingPeriod.end_date}`
-      : 'Not set');
+  const fy = resolveEngagementReportingPeriod(
+    d.reportingPeriod,
+    financialYears,
+    activeFinancialYear,
+  );
 
   const corporateDisplay = corporateDisplayFromEntity(generalInfo);
   const preparedBy = corporateDisplay.preparedBy || '—';
@@ -82,11 +94,38 @@ export default function WorkspaceOverview({
         <CardHeader className="pb-3">
           <CardTitle className="text-lg">Continue Preparing Annual Financial Statements</CardTitle>
           <CardDescription>
-            The platform determines the next logical task. Focus on professional judgement — not
-            software setup.
+            Follow the year-end workflow below. The next recommended action is always highlighted.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
+          <ol className="flex flex-wrap gap-1.5" aria-label="Engagement workflow">
+            {WORKFLOW_STEPS.map((step) => {
+              const item = checklistById[step.id];
+              const status = item?.status ?? 'pending';
+              const recommended = nextItem?.id === step.id;
+              return (
+                <li key={step.id}>
+                  <button
+                    type="button"
+                    onClick={() => onNavigate?.(step.target)}
+                    className={cn(
+                      'rounded-full border px-2.5 py-1 text-xs transition-colors',
+                      status === 'complete' &&
+                        'border-emerald-600/40 bg-emerald-500/10 text-emerald-800 dark:text-emerald-200',
+                      recommended && 'border-primary bg-primary text-primary-foreground',
+                      !recommended &&
+                        status !== 'complete' &&
+                        'border-border bg-background text-muted-foreground hover:text-foreground',
+                    )}
+                  >
+                    {status === 'complete' ? '✓ ' : recommended ? '→ ' : ''}
+                    {step.label}
+                  </button>
+                </li>
+              );
+            })}
+          </ol>
+
           <ul className="space-y-2 text-sm">
             {checklist.map((item) => (
               <li key={item.id}>
@@ -112,9 +151,10 @@ export default function WorkspaceOverview({
             <div>
               <div className="text-xs text-muted-foreground">Next Recommended Action</div>
               <div className="font-medium">{summary.nextActionLabel}</div>
+              <div className="text-xs text-muted-foreground">{summary.overallReadiness}</div>
             </div>
             <Button onClick={() => onNavigate?.(summary.nextTarget)}>
-              {summary.nextActionLabel}
+              Continue
               <ArrowRight className="ml-2 h-4 w-4" />
             </Button>
           </div>
@@ -132,11 +172,22 @@ export default function WorkspaceOverview({
         </Widget>
 
         <Widget title="Financial Year">
-          <div className="font-medium">{financialYear}</div>
-          {d.reportingPeriod?.start_date && d.reportingPeriod?.end_date && d.reportingPeriod?.label && (
+          <div className="font-medium">{fy.yearCode || fy.displayLabel}</div>
+          {fy.calendarYear ? (
             <div className="mt-1 text-xs text-muted-foreground">
-              {d.reportingPeriod.start_date} → {d.reportingPeriod.end_date}
+              {formatCalendarYearRange(fy.calendarYear)}
             </div>
+          ) : fy.startDate && fy.endDate ? (
+            <div className="mt-1 text-xs text-muted-foreground">
+              {fy.startDate} → {fy.endDate}
+            </div>
+          ) : null}
+          {fy.isHistorical && (
+            <Badge variant="outline" className="mt-2">
+              {fy.isLegacyUnbound
+                ? 'Legacy Financial Statement Engagement'
+                : 'Historical engagement'}
+            </Badge>
           )}
         </Widget>
 

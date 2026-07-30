@@ -1,40 +1,35 @@
-import { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
+import { useReportingPeriod } from '../contexts/ReportingPeriodContext';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/card';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../integrations/supabase/client';
 import { Account } from './ChartOfAccounts';
-import { Landmark, TrendingUp, TrendingDown, Wallet, DollarSign, Calendar as CalendarIcon, AlertTriangle, ListChecks, History, FileText, Receipt, Coins, MessageSquare, Briefcase } from 'lucide-react';
+import { Landmark, TrendingUp, TrendingDown, Wallet, DollarSign, AlertTriangle, ListChecks, History, FileText, Receipt, Coins, MessageSquare, Briefcase } from 'lucide-react';
 import { Skeleton } from '../components/ui/skeleton';
 import IncomeExpenseChart from '../components/IncomeExpenseChart';
 import { Link, useNavigate } from 'react-router-dom';
 import { Button } from '../components/ui/button';
 import QuickActions from '../components/QuickActions';
-import { formatDistanceToNow, startOfMonth, endOfMonth, format } from 'date-fns';
-import { formatCurrency, cn } from '../lib/utils';
+import { format } from 'date-fns';
+import { safeFormatDistanceToNow } from '../lib/dates';
+import { formatCurrency } from '../lib/utils';
 import BudgetStatus from '../components/BudgetStatus';
 import TopExpensesChart from '../components/TopExpensesChart';
 import TopCustomersChart from '../components/TopCustomersChart';
 import CashFlowForecastChart from '../components/CashFlowForecastChart';
 import BankAccountsSummary from '../components/BankAccountsSummary';
-import { Popover, PopoverContent, PopoverTrigger } from '../components/ui/popover';
-import { Calendar } from '../components/ui/calendar';
-import { DateRange } from 'react-day-picker';
 import { Alert, AlertTitle, AlertDescription } from '../components/ui/alert';
 import { Badge } from '../components/ui/badge';
 import SetupChecklist from '../components/SetupChecklist';
 import AccountingSetupProgressCard from '../components/accounting/AccountingSetupProgressCard';
-import AccountingHealthCard from '../components/accounting/AccountingHealthCard';
-import AccountingPolicyCard from '../components/accounting/AccountingPolicyCard';
-import AccountingRulesCard from '../components/accounting/AccountingRulesCard';
-import BusinessEventsCard from '../components/accounting/BusinessEventsCard';
 import DashboardInsights from '../components/DashboardInsights';
+import ReportingPeriodPicker from '../components/ReportingPeriodPicker';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
 import OperationsActionPanel from '../components/boe/OperationsActionPanel';
 import ActivityFeed from '../components/boe/ActivityFeed';
-import { accountsQuery as glAccountsQuery, bankAccountsQuery, bankTransactionsQuery, bankOutstandingLinesQuery, accountingReadinessQuery, accountingHealthQuery, accountingPolicyDashboardQuery, accountingRulesDashboardQuery, businessEventsDashboardQuery } from '../lib/queries';
+import { SectionErrorBoundary } from '../components/ErrorBoundary';
+import { bankAccountsQuery, bankTransactionsQuery, bankOutstandingLinesQuery, accountingReadinessQuery } from '../lib/queries';
 import { BANK_TRANSACTION_LABELS } from '../lib/banking/types';
-import { isCashEquivalentAccount } from '../lib/accounting/accountRoles';
 import { FileCheck2 } from 'lucide-react';
 
 type OverdueInvoice = {
@@ -48,36 +43,35 @@ type OverdueInvoice = {
 const Dashboard = () => {
   useDocumentTitle('Dashboard');
   const { user, profile, activeCompany } = useAuth();
+  const { dateFrom, dateTo, isReady } = useReportingPeriod();
   const navigate = useNavigate();
-  const [date, setDate] = useState<DateRange | undefined>({
-    from: startOfMonth(new Date()),
-    to: endOfMonth(new Date()),
-  });
-
-  const fromDate = date?.from;
-  const toDate = date?.to;
 
   const { data: dashboardData, isLoading, error: queryError } = useQuery({
-    queryKey: ['dashboardData', activeCompany?.id, fromDate, toDate],
+    queryKey: ['dashboardData', activeCompany?.id, dateFrom, dateTo],
     queryFn: async () => {
       if (!activeCompany) return null;
       const { data, error } = await supabase.functions.invoke('dashboard-data', {
         body: { 
           company_id: activeCompany.id,
-          date_from: fromDate ? format(fromDate, 'yyyy-MM-dd') : undefined,
-          date_to: toDate ? format(toDate, 'yyyy-MM-dd') : undefined,
+          date_from: dateFrom ?? undefined,
+          date_to: dateTo ?? undefined,
         },
       });
       if (error) throw new Error(error.message);
       return data;
     },
-    enabled: !!activeCompany,
+    enabled: !!activeCompany && isReady,
     retry: 1,
   });
 
   const {
     role = 'member',
     accounts = [],
+    periodNetIncome = 0,
+    totalAssets: engineTotalAssets = 0,
+    totalLiabilities: engineTotalLiabilities = 0,
+    cashBalance: engineCashBalance = 0,
+    reportingPeriod = null,
     monthlySummary = [],
     arBalances = [],
     apBalances = [],
@@ -90,71 +84,40 @@ const Dashboard = () => {
     recentActivity = [],
     setupStatus = { isComplete: true },
     payrollKpis = null,
+    canonicalAggregation = null,
+    statementTotals = null,
   } = dashboardData || {};
 
   const isAdmin = role === 'owner' || role === 'admin';
 
-  // Banking widgets: dashboard-data is frozen this phase, so these compose
-  // from the existing `banking` edge function's own GET_* methods rather
-  // than extending that response.
+  // Banking widgets: operational status (recon / recent txns) is as-of today.
+  // Cash Position / bank balances reuse dashboard as-of GL balances (same engine
+  // accounts array as Assets / Liabilities / Cash Balance).
   const { data: bankAccounts, isLoading: loadingBankAccounts } = useQuery({ ...bankAccountsQuery(activeCompany?.id ?? ''), enabled: !!activeCompany && isAdmin });
-  const { data: glAccountsForBanking } = useQuery<Account[]>({ ...glAccountsQuery(activeCompany?.id ?? ''), enabled: !!activeCompany && isAdmin });
   const { data: bankTransactions, isLoading: loadingBankTxns } = useQuery({ ...bankTransactionsQuery(activeCompany?.id ?? ''), enabled: !!activeCompany && isAdmin });
   const { data: outstandingLines, isLoading: loadingOutstanding } = useQuery({ ...bankOutstandingLinesQuery(activeCompany?.id ?? ''), enabled: !!activeCompany && isAdmin });
-  const bankingLoading = loadingBankAccounts || loadingBankTxns || loadingOutstanding;
+  const bankingLoading = loadingBankAccounts || loadingBankTxns || loadingOutstanding || isLoading;
 
   const { data: accountingReadiness } = useQuery({
     ...accountingReadinessQuery(activeCompany?.id ?? ''),
     enabled: !!activeCompany,
   });
 
-  const { data: accountingHealth } = useQuery({
-    ...accountingHealthQuery(activeCompany?.id ?? ''),
-    enabled: !!activeCompany,
-  });
-
-  const { data: accountingPolicyDashboard } = useQuery({
-    ...accountingPolicyDashboardQuery(activeCompany?.id ?? ''),
-    enabled: !!activeCompany,
-  });
-
-  const { data: accountingRulesDashboard } = useQuery({
-    ...accountingRulesDashboardQuery(activeCompany?.id ?? ''),
-    enabled: !!activeCompany,
-  });
-
-  const { data: businessEventsDashboard } = useQuery({
-    ...businessEventsDashboardQuery(activeCompany?.id ?? ''),
-    enabled: !!activeCompany,
-  });
-
-  const bankGlBalanceByCoaId = new Map((glAccountsForBanking ?? []).map((a) => [a.id, a.balance]));
-  const cashPosition = (bankAccounts ?? []).reduce((sum, a) => sum + (bankGlBalanceByCoaId.get(a.chart_of_account_id) ?? 0), 0);
+  const cfa = canonicalAggregation || statementTotals || {};
+  // KPI cash/assets/liab/AR/AP from CFA only — no UI reduce of subledger rows.
+  const cashPosition = Number(cfa.cash ?? engineCashBalance ?? 0);
   const recentBankingActivity = (bankTransactions ?? []).slice().sort((a, b) => (a.transaction_date < b.transaction_date ? 1 : -1)).slice(0, 5);
   const pendingReconciliationCount = (outstandingLines ?? []).length;
 
-  const calculateTotals = (accList: Account[]) => {
-    if (!accList || accList.length === 0) return { assets: 0, liabilities: 0, netIncome: 0, cash: 0 };
-    const totals = accList.reduce((acc, account) => {
-      const type = account.type.toLowerCase() as keyof typeof acc;
-      acc[type] = (acc[type] || 0) + (account.balance || 0);
-      if (account.type === 'Asset' && isCashEquivalentAccount(account)) {
-          acc.cash = (acc.cash || 0) + (account.balance || 0);
-      }
-      return acc;
-    }, { asset: 0, liability: 0, equity: 0, income: 0, expense: 0, cash: 0 });
-    return { assets: totals.asset, liabilities: totals.liability, netIncome: totals.income - totals.expense, cash: totals.cash };
-  };
-
-  const totals = calculateTotals(accounts);
-  const totalAr = arBalances?.reduce((sum: number, item: { balance: number }) => sum + item.balance, 0) || 0;
-  const totalAp = apBalances?.reduce((sum: number, item: { balance: number }) => sum + item.balance, 0) || 0;
+  const totalAr = Number(cfa.receivables ?? 0);
+  const totalAp = Number(cfa.payables ?? 0);
+  const netIncome = Number(cfa.netIncome ?? periodNetIncome ?? 0);
 
   const summaryCards = [
-    { title: 'Cash Balance', value: totals.cash, icon: DollarSign, link: '/chart-of-accounts', hidden: !isAdmin },
-    { title: 'Total Assets', value: totals.assets, icon: Wallet, link: '/reports/live-financial-statements', hidden: !isAdmin },
-    { title: 'Total Liabilities', value: totals.liabilities, icon: Landmark, link: '/reports/live-financial-statements', hidden: !isAdmin },
-    { title: 'Net Income (YTD)', value: totals.netIncome, icon: totals.netIncome >= 0 ? TrendingUp : TrendingDown, color: totals.netIncome >= 0 ? 'text-success' : 'text-destructive', link: '/reports', hidden: !isAdmin },
+    { title: 'Cash Balance', value: cashPosition, icon: DollarSign, link: '/banking/accounts', hidden: !isAdmin },
+    { title: 'Total Assets', value: Number(engineTotalAssets || 0), icon: Wallet, link: '/reports/live-financial-statements', hidden: !isAdmin },
+    { title: 'Total Liabilities', value: Number(engineTotalLiabilities || 0), icon: Landmark, link: '/reports/live-financial-statements', hidden: !isAdmin },
+    { title: 'Net Income', value: netIncome, icon: netIncome >= 0 ? TrendingUp : TrendingDown, color: netIncome >= 0 ? 'text-success' : 'text-destructive', link: '/reports', hidden: !isAdmin },
   ];
 
   if (queryError) {
@@ -175,25 +138,9 @@ const Dashboard = () => {
       <header className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
         <div>
           <h1 className="text-3xl font-semibold tracking-tight text-foreground">Operations Command Centre</h1>
-          <p className="text-muted-foreground">Welcome back, {profile?.full_name || user?.email}! What needs your attention today?</p>
+          <p className="text-muted-foreground">Welcome back, {profile?.full_name || user?.email}! How is your business doing today?</p>
         </div>
-        <Popover>
-          <PopoverTrigger asChild>
-            <Button
-              id="date"
-              variant={"outline"}
-              className={cn("w-full justify-start text-left font-normal sm:w-[260px]", !date && "text-muted-foreground")}
-            >
-              <CalendarIcon className="mr-2 h-4 w-4" />
-              {date?.from ? (
-                date.to ? (<>{format(date.from, "LLL dd, y")} - {format(date.to, "LLL dd, y")}</>) : (format(date.from, "LLL dd, y"))
-              ) : (<span>Pick a date range</span>)}
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent className="w-auto p-0" align="end">
-            <Calendar initialFocus mode="range" defaultMonth={date?.from} selected={date} onSelect={setDate} numberOfMonths={2} />
-          </PopoverContent>
-        </Popover>
+        <ReportingPeriodPicker />
       </header>
       
       {accountingReadiness && !accountingReadiness.accountingReady && (
@@ -203,22 +150,6 @@ const Dashboard = () => {
       {!isLoading &&
         accountingReadiness?.accountingReady &&
         !setupStatus.isComplete && <SetupChecklist status={setupStatus} />}
-
-      {accountingHealth && (
-        <AccountingHealthCard health={accountingHealth} />
-      )}
-
-      {accountingPolicyDashboard && (
-        <AccountingPolicyCard dashboard={accountingPolicyDashboard} />
-      )}
-
-      {accountingRulesDashboard && (
-        <AccountingRulesCard dashboard={accountingRulesDashboard} />
-      )}
-
-      {businessEventsDashboard && (
-        <BusinessEventsCard dashboard={businessEventsDashboard} />
-      )}
 
       {lowStockItems && lowStockItems.length > 0 && (
         <Alert variant="destructive">
@@ -254,7 +185,7 @@ const Dashboard = () => {
           actions={actions}
           totalAr={totalAr}
           totalAp={totalAp}
-          netIncome={totals.netIncome}
+          netIncome={netIncome}
         />
       )}
 
@@ -262,7 +193,9 @@ const Dashboard = () => {
         <section className="space-y-3" aria-label="Financial health KPIs">
           <div>
             <h2 className="text-lg font-semibold tracking-tight text-foreground">Financial health</h2>
-            <p className="text-sm text-muted-foreground">A concise overview of your current position.</p>
+            <p className="text-sm text-muted-foreground">
+              Position as of {reportingPeriod?.to ?? dateTo ?? 'period end'}; Net Income for the selected range.
+            </p>
           </div>
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
             {summaryCards.filter(c => !c.hidden).map((card, index) => (
@@ -366,16 +299,18 @@ const Dashboard = () => {
       </div>
 
       {isAdmin && (
-        <div className="grid gap-4 md:grid-cols-2">
+        <SectionErrorBoundary resetKeys={[isLoading]}>
+          <div className="grid gap-4 md:grid-cols-2">
             <Card>
-            <CardHeader><CardTitle>Cash Flow Forecast (30 Days)</CardTitle><CardDescription>Projected balance based on due invoices and bills.</CardDescription></CardHeader>
+            <CardHeader><CardTitle>Cash Flow Forecast (30 Days)</CardTitle><CardDescription>Operational outlook from open invoices/bills (not the Cash Flow Statement).</CardDescription></CardHeader>
             <CardContent>{isLoading ? <Skeleton className="h-[300px] w-full" /> : <CashFlowForecastChart data={cashFlowForecast} />}</CardContent>
             </Card>
             <Card>
             <CardHeader><CardTitle>Income vs Expenses Trend</CardTitle><CardDescription>6-month trend analysis.</CardDescription></CardHeader>
             <CardContent>{isLoading ? <Skeleton className="h-[300px] w-full" /> : monthlySummary && monthlySummary.length > 0 ? <IncomeExpenseChart data={monthlySummary} /> : <p className="text-md text-muted-foreground text-center py-8">Not enough data to display a chart.</p>}</CardContent>
             </Card>
-        </div>
+          </div>
+        </SectionErrorBoundary>
       )}
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
@@ -407,17 +342,18 @@ const Dashboard = () => {
             )}
           </CardContent>
         </Card>
-        {isAdmin && <BankAccountsSummary />}
+        {isAdmin && <BankAccountsSummary asOfAccounts={accounts as Account[]} />}
       </div>
 
       {isAdmin && (
+        <SectionErrorBoundary resetKeys={[bankingLoading]}>
         <section className="space-y-3" aria-label="Banking">
           <div className="flex items-center justify-between">
             <div>
               <h2 className="text-lg font-semibold tracking-tight text-foreground flex items-center gap-2">
                 <Landmark className="h-5 w-5 text-primary" /> Banking
               </h2>
-              <p className="text-sm text-muted-foreground">Cash position and reconciliation status.</p>
+              <p className="text-sm text-muted-foreground">Cash position as of the selected period end; reconciliation status is live.</p>
             </div>
             <Button variant="outline" size="sm" asChild><Link to="/banking">Banking Command Centre</Link></Button>
           </div>
@@ -456,6 +392,7 @@ const Dashboard = () => {
             </Card>
           </div>
         </section>
+        </SectionErrorBoundary>
       )}
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
@@ -469,7 +406,7 @@ const Dashboard = () => {
                     <li key={invoice.id}>
                       <Link to={`/invoices/${invoice.id}`} className="block p-2 -m-2 rounded-md transition-colors hover:bg-muted">
                         <div className="flex justify-between items-center text-sm"><span className="font-medium">{invoice.customer_name}</span><span className="font-mono">{formatCurrency(invoice.total)}</span></div>
-                        <div className="flex justify-between items-center text-xs text-muted-foreground"><span>#{invoice.invoice_number}</span><span className="text-destructive">Due {formatDistanceToNow(new Date(invoice.due_date), { addSuffix: true })}</span></div>
+                        <div className="flex justify-between items-center text-xs text-muted-foreground"><span>#{invoice.invoice_number}</span><span className="text-destructive">Due {safeFormatDistanceToNow(invoice.due_date, { addSuffix: true })}</span></div>
                       </Link>
                     </li>
                   ))}
@@ -478,10 +415,10 @@ const Dashboard = () => {
             )}
           </CardContent>
         </Card>
-        {isAdmin && <Card><CardHeader><CardTitle>Top Expenses</CardTitle><CardDescription>Spending for the current period.</CardDescription></CardHeader><CardContent>{isLoading ? <Skeleton className="h-[300px] w-full" /> : <TopExpensesChart data={topExpenses} />}</CardContent></Card>}
-        {isAdmin && <Card><CardHeader><CardTitle>Top Customers</CardTitle><CardDescription>Highest revenue by customer.</CardDescription></CardHeader><CardContent>{isLoading ? <Skeleton className="h-[300px] w-full" /> : <TopCustomersChart data={topCustomers} />}</CardContent></Card>}
+        {isAdmin && <SectionErrorBoundary resetKeys={[isLoading]}><Card><CardHeader><CardTitle>Top Expenses</CardTitle><CardDescription>Spending for the current period.</CardDescription></CardHeader><CardContent>{isLoading ? <Skeleton className="h-[300px] w-full" /> : <TopExpensesChart data={topExpenses} />}</CardContent></Card></SectionErrorBoundary>}
+        {isAdmin && <SectionErrorBoundary resetKeys={[isLoading]}><Card><CardHeader><CardTitle>Top Customers</CardTitle><CardDescription>Highest revenue by customer.</CardDescription></CardHeader><CardContent>{isLoading ? <Skeleton className="h-[300px] w-full" /> : <TopCustomersChart data={topCustomers} />}</CardContent></Card></SectionErrorBoundary>}
       </div>
-      {isAdmin && <BudgetStatus />}
+      {isAdmin && <SectionErrorBoundary><BudgetStatus /></SectionErrorBoundary>}
     </div>
   );
 };

@@ -1,23 +1,20 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from '../components/ui/table';
 import { Skeleton } from '../components/ui/skeleton';
 import { Button } from '../components/ui/button';
-import { Calendar as CalendarIcon, Download, Printer } from 'lucide-react';
-import { Popover, PopoverContent, PopoverTrigger } from '../components/ui/popover';
-import { Calendar } from '../components/ui/calendar';
-import { DateRange } from 'react-day-picker';
+import { Download, Printer } from 'lucide-react';
 import { format, subDays, parseISO } from 'date-fns';
-import { cn, downloadCSV, formatCurrency } from '../lib/utils';
+import { downloadCSV, formatCurrency } from '../lib/utils';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
 import FinancialRatios from '../components/FinancialRatios';
 import { useAuth } from '../contexts/AuthContext';
+import { useReportingPeriod } from '../contexts/ReportingPeriodContext';
 import ReportDrilldownDialog from '../components/ReportDrilldownDialog';
-import { useEnterpriseCalendar } from '../hooks/useEnterpriseCalendar';
 import { Badge } from '../components/ui/badge';
-import { isCurrentAssetAccount, isCurrentLiabilityAccount } from '../lib/accounting/accountRoles';
+import ReportingPeriodPicker from '../components/ReportingPeriodPicker';
 import { accountsQuery } from '../lib/queries';
 import type { Account } from './ChartOfAccounts';
 import { AnalyticsEvents, useFirstUsagePageView } from '../lib/analytics';
@@ -51,39 +48,31 @@ type CashFlowItem = {
 const FinancialStatements = () => {
   const { activeCompany } = useAuth();
   useFirstUsagePageView(AnalyticsEvents.USAGE_FIRST_FINANCIAL_STATEMENTS, 'financial_statements');
-  const { startDate, endDate, yearCode } = useEnterpriseCalendar(activeCompany?.id);
-  const [date, setDate] = useState<DateRange | undefined>();
+  const { dateFrom, dateTo, yearCode, isReady, currentReportingPeriod } = useReportingPeriod();
   
   // Drilldown state
   const [drilldownAccount, setDrilldownAccount] = useState<{ id: string; name: string } | null>(null);
 
-  // G3.6C — period defaults from Enterprise Financial Calendar (not profile copy).
-  useEffect(() => {
-    if (startDate && endDate && !date) {
-      setDate({ from: parseISO(startDate), to: parseISO(endDate) });
-    }
-  }, [startDate, endDate, date]);
-
-  const fromDate = date?.from;
-  const toDate = date?.to;
+  const fromDate = currentReportingPeriod?.from ?? (dateFrom ? parseISO(dateFrom) : undefined);
+  const toDate = currentReportingPeriod?.to ?? (dateTo ? parseISO(dateTo) : undefined);
   const priorDate = fromDate ? subDays(fromDate, 1) : undefined;
 
   const { data: reportData, isLoading } = useQuery({
-    queryKey: ['financial_statements', fromDate, toDate, activeCompany?.id],
+    queryKey: ['financial_statements', dateFrom, dateTo, activeCompany?.id],
     queryFn: async () => {
-      if (!activeCompany || !fromDate || !toDate || !priorDate) return null;
+      if (!activeCompany || !dateFrom || !dateTo || !priorDate) return null;
       const { data, error } = await supabase.functions.invoke('reports', {
         body: {
           company_id: activeCompany.id,
-          start_date: format(fromDate, 'yyyy-MM-dd'),
-          end_date: format(toDate, 'yyyy-MM-dd'),
+          start_date: dateFrom,
+          end_date: dateTo,
           prior_date: format(priorDate, 'yyyy-MM-dd'),
         },
       });
       if (error) throw new Error(error.message);
       return data;
     },
-    enabled: !!activeCompany && !!fromDate && !!toDate && !!priorDate,
+    enabled: !!activeCompany && isReady && !!priorDate,
   });
 
   const { data: coaMeta } = useQuery<Account[]>({
@@ -106,54 +95,48 @@ const FinancialStatements = () => {
   };
 
   const balancesAsOf: AccountBalance[] = (reportData?.balancesAsOf || []).map(enrichBalance);
-  const openingBalances: AccountBalance[] = (reportData?.openingBalances || []).map(enrichBalance);
   const periodActivity: AccountActivity[] = reportData?.periodActivity || [];
   const cashFlowData: CashFlowItem[] = reportData?.cashFlowData || [];
+  const t = reportData?.statementTotals;
 
-  // Income Statement Calculations
+  // Line items for display only — money totals come from reports.statementTotals (edge).
   const incomeAccounts = periodActivity?.filter(acc => acc.type === 'Income') || [];
   const expenseAccounts = periodActivity?.filter(acc => acc.type === 'Expense') || [];
-  const totalIncome = incomeAccounts.reduce((sum, acc) => sum + acc.activity, 0);
-  const totalExpenses = expenseAccounts.reduce((sum, acc) => sum + acc.activity, 0);
-  const netIncome = totalIncome - totalExpenses;
-
-  // Balance Sheet Calculations
   const assetAccounts = balancesAsOf?.filter(acc => acc.type === 'Asset') || [];
   const liabilityAccounts = balancesAsOf?.filter(acc => acc.type === 'Liability') || [];
   const equityAccounts = balancesAsOf?.filter(acc => acc.type === 'Equity') || [];
-  
-  const totalAssets = assetAccounts.reduce((sum, acc) => sum + acc.balance, 0);
-  const totalLiabilities = liabilityAccounts.reduce((sum, acc) => sum + acc.balance, 0);
-  const totalStoredEquity = equityAccounts.reduce((sum, acc) => sum + acc.balance, 0);
-  
-  const totalEquity = totalStoredEquity + netIncome;
-  const totalLiabilitiesAndEquity = totalLiabilities + totalEquity;
 
-  const openingRetainedEarnings = openingBalances?.find(acc => acc.name === 'Retained Earnings')?.balance || 0;
-  const closingRetainedEarnings = openingRetainedEarnings + netIncome;
-
-  let totalDebits = 0;
-  let totalCredits = 0;
-  balancesAsOf?.forEach(acc => {
-    if (['Asset', 'Expense'].includes(acc.type)) {
-      if (acc.balance >= 0) totalDebits += acc.balance;
-      else totalCredits += -acc.balance;
-    } else {
-      if (acc.balance >= 0) totalCredits += acc.balance;
-      else totalDebits += -acc.balance;
-    }
-  });
+  const totalIncome = Number(t?.totalIncome ?? 0);
+  const totalExpenses = Number(t?.totalExpenses ?? 0);
+  const netIncome = Number(t?.netIncome ?? 0);
+  // Canonical P&L partition — display only; amounts from reports.statementTotals.
+  const revenue = Number(t?.revenue ?? totalIncome);
+  const costOfSales = Number(t?.costOfSales ?? 0);
+  const grossProfit = Number(t?.grossProfit ?? revenue - costOfSales);
+  const otherIncome = Number(t?.otherIncome ?? 0);
+  const operatingExpenses = Number(t?.operatingExpenses ?? totalExpenses);
+  const financeCosts = Number(t?.financeCosts ?? 0);
+  const taxExpense = Number(t?.taxExpense ?? 0);
+  const totalAssets = Number(t?.totalAssets ?? 0);
+  const totalLiabilities = Number(t?.totalLiabilities ?? 0);
+  const totalEquity = Number(t?.totalEquity ?? 0);
+  const totalLiabilitiesAndEquity = Number(t?.totalLiabilitiesAndEquity ?? 0);
+  const openingRetainedEarnings = Number(t?.openingRetainedEarnings ?? 0);
+  const closingRetainedEarnings = Number(t?.closingRetainedEarningsPresented ?? 0);
+  const otherEquityMovements = Number(t?.otherEquityMovements ?? 0);
+  const totalDebits = Number(t?.totalDebits ?? 0);
+  const totalCredits = Number(t?.totalCredits ?? 0);
+  const totalOperating = Number(t?.cashOperating ?? 0);
+  const totalInvesting = Number(t?.cashInvesting ?? 0);
+  const totalFinancing = Number(t?.cashFinancing ?? 0);
+  const netCashFlow = Number(t?.netCashFlow ?? 0);
 
   const operatingActivities = cashFlowData?.filter(i => i.section === 'Operating') || [];
   const investingActivities = cashFlowData?.filter(i => i.section === 'Investing') || [];
   const financingActivities = cashFlowData?.filter(i => i.section === 'Financing') || [];
-  const totalOperating = operatingActivities.reduce((sum, i) => sum + i.amount, 0);
-  const totalInvesting = investingActivities.reduce((sum, i) => sum + i.amount, 0);
-  const totalFinancing = financingActivities.reduce((sum, i) => sum + i.amount, 0);
-  const netCashFlow = totalOperating + totalInvesting + totalFinancing;
 
-  const currentAssets = assetAccounts.filter((a) => isCurrentAssetAccount(a)).reduce((sum, a) => sum + a.balance, 0);
-  const currentLiabilities = liabilityAccounts.filter((l) => isCurrentLiabilityAccount(l)).reduce((sum, l) => sum + l.balance, 0);
+  const currentAssets = Number(t?.cash ?? 0) + Number(t?.receivables ?? 0);
+  const currentLiabilities = Number(t?.payables ?? 0) + Number(t?.vatPayable ?? 0);
   
   const ratios = {
     currentRatio: currentLiabilities > 0 ? currentAssets / currentLiabilities : null,
@@ -213,21 +196,11 @@ const FinancialStatements = () => {
         <h1 className="text-3xl font-bold">Financial Statements</h1>
         {yearCode && (
           <Badge variant="outline" className="ml-2 align-middle">
-            Calendar {yearCode}
+            Current Financial Year
           </Badge>
         )}
         <div className="flex items-center gap-2">
-          <Popover>
-            <PopoverTrigger asChild>
-              <Button id="date" variant={"outline"} className={cn("w-[300px] justify-start text-left font-normal", !date && "text-muted-foreground")}>
-                <CalendarIcon className="mr-2 h-4 w-4" />
-                {date?.from ? (date.to ? (<>{format(date.from, "LLL dd, y")} - {format(date.to, "LLL dd, y")}</>) : (format(date.from, "LLL dd, y"))) : (<span>Pick a date range</span>)}
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-auto p-0" align="end">
-              <Calendar initialFocus mode="range" defaultMonth={date?.from} selected={date} onSelect={setDate} numberOfMonths={2} />
-            </PopoverContent>
-          </Popover>
+          <ReportingPeriodPicker />
           <Button variant="outline" onClick={() => window.print()}><Printer className="mr-2 h-4 w-4" /> Print</Button>
         </div>
       </div>
@@ -259,6 +232,10 @@ const FinancialStatements = () => {
                         <TableCell className="text-right">{formatCurrency(acc.activity)}</TableCell>
                     </TableRow>
                   ))}
+                  <TableRow className="font-semibold"><TableCell>Revenue</TableCell><TableCell className="text-right">{formatCurrency(revenue)}</TableCell></TableRow>
+                  <TableRow><TableCell>Cost of Sales</TableCell><TableCell className="text-right">{formatCurrency(costOfSales)}</TableCell></TableRow>
+                  <TableRow className="font-semibold"><TableCell>Gross Profit</TableCell><TableCell className="text-right">{formatCurrency(grossProfit)}</TableCell></TableRow>
+                  <TableRow><TableCell>Other Income</TableCell><TableCell className="text-right">{formatCurrency(otherIncome)}</TableCell></TableRow>
                   <TableRow className="font-semibold"><TableCell>Total Income</TableCell><TableCell className="text-right">{formatCurrency(totalIncome)}</TableCell></TableRow>
                   <TableRow className="font-semibold bg-muted/50"><TableCell>Expenses</TableCell><TableCell></TableCell></TableRow>
                   {expenseAccounts.map(acc => (
@@ -267,9 +244,12 @@ const FinancialStatements = () => {
                         <TableCell className="text-right">{formatCurrency(acc.activity)}</TableCell>
                     </TableRow>
                   ))}
+                  <TableRow><TableCell>Operating Expenses</TableCell><TableCell className="text-right">{formatCurrency(operatingExpenses)}</TableCell></TableRow>
+                  <TableRow><TableCell>Finance Costs</TableCell><TableCell className="text-right">{formatCurrency(financeCosts)}</TableCell></TableRow>
+                  <TableRow><TableCell>Tax</TableCell><TableCell className="text-right">{formatCurrency(taxExpense)}</TableCell></TableRow>
                   <TableRow className="font-semibold"><TableCell>Total Expenses</TableCell><TableCell className="text-right">{formatCurrency(totalExpenses)}</TableCell></TableRow>
                 </TableBody>
-                <TableFooter><TableRow className="text-lg font-bold"><TableCell>Net Income</TableCell><TableCell className="text-right">{formatCurrency(netIncome)}</TableCell></TableRow></TableFooter>
+                <TableFooter><TableRow className="text-lg font-bold"><TableCell>Net Profit</TableCell><TableCell className="text-right">{formatCurrency(netIncome)}</TableCell></TableRow></TableFooter>
               </Table>
             )}</CardContent>
           </Card>
@@ -335,11 +315,13 @@ const FinancialStatements = () => {
               <Table>
                 <TableHeader><TableRow><TableHead>Description</TableHead><TableHead className="text-right">Amount</TableHead></TableRow></TableHeader>
                 <TableBody>
-                  <TableRow><TableCell>Retained Earnings at start of period</TableCell><TableCell className="text-right">{formatCurrency(openingRetainedEarnings)}</TableCell></TableRow>
-                  <TableRow><TableCell>Net Income for the period</TableCell><TableCell className="text-right">{formatCurrency(netIncome)}</TableCell></TableRow>
-                  <TableRow><TableCell>Dividends or Drawings</TableCell><TableCell className="text-right">{formatCurrency(0)}</TableCell></TableRow>
+                  <TableRow><TableCell>Opening equity (stored)</TableCell><TableCell className="text-right">{formatCurrency(Number(t?.openingStoredEquity ?? 0))}</TableCell></TableRow>
+                  <TableRow><TableCell>Opening Retained Earnings (role)</TableCell><TableCell className="text-right">{formatCurrency(openingRetainedEarnings)}</TableCell></TableRow>
+                  <TableRow><TableCell>Net Income / Current Year Earnings</TableCell><TableCell className="text-right">{formatCurrency(netIncome)}</TableCell></TableRow>
+                  <TableRow><TableCell>Capital movements − drawings (net, non-P&amp;L equity)</TableCell><TableCell className="text-right">{formatCurrency(otherEquityMovements)}</TableCell></TableRow>
+                  <TableRow><TableCell>Retained Earnings at end (presented close)</TableCell><TableCell className="text-right">{formatCurrency(closingRetainedEarnings)}</TableCell></TableRow>
                 </TableBody>
-                <TableFooter><TableRow className="text-lg font-bold"><TableCell>Retained Earnings at end of period</TableCell><TableCell className="text-right">{formatCurrency(closingRetainedEarnings)}</TableCell></TableRow></TableFooter>
+                <TableFooter><TableRow className="text-lg font-bold"><TableCell>Closing equity (stored + CYE)</TableCell><TableCell className="text-right">{formatCurrency(totalEquity)}</TableCell></TableRow></TableFooter>
               </Table>
             )}</CardContent>
           </Card>

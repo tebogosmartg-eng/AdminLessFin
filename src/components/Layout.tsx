@@ -1,5 +1,6 @@
 import { Suspense } from 'react';
-import { NavLink, Outlet } from 'react-router-dom';
+import { NavLink, Outlet, useLocation } from 'react-router-dom';
+import ErrorBoundary from './ErrorBoundary';
 import { useAuth } from '../contexts/AuthContext';
 import { Button } from './ui/button';
 import { LogOut, Menu, Settings, User as UserIcon } from 'lucide-react';
@@ -17,6 +18,7 @@ import RouteLoadingFallback from './RouteLoadingFallback';
 
 const Layout = () => {
   const { signOut, profile } = useAuth();
+  const location = useLocation();
 
   const navLinkClasses = ({ isActive }: { isActive: boolean }) =>
     cn(
@@ -105,9 +107,15 @@ const Layout = () => {
           </div>
         </header>
         <main className="flex-1 p-4 sm:p-6 print:p-0" role="main">
-          <Suspense fallback={<RouteLoadingFallback />}>
-            <Outlet />
-          </Suspense>
+          {/* Route-level boundary: a crashing page (or a failed lazy chunk)
+              degrades to a recoverable content-area fallback while the sidebar
+              and header shell stay live. Keyed on pathname so it auto-clears
+              when the user navigates away from the broken route. */}
+          <ErrorBoundary level="route" resetKeys={[location.pathname]}>
+            <Suspense fallback={<RouteLoadingFallback />}>
+              <Outlet />
+            </Suspense>
+          </ErrorBoundary>
         </main>
       </div>
     </div>

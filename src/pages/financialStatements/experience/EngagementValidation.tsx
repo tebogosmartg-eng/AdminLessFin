@@ -111,7 +111,7 @@ export default function WorkspaceValidation({
             </CardDescription>
           </div>
           <Button disabled={runValidation.isPending} onClick={() => runValidation.mutate()}>
-            Check again
+            {d?.latest_run ? 'Check again' : 'Run validation checks'}
           </Button>
         </CardHeader>
         <CardContent className="space-y-6">

@@ -11,11 +11,23 @@ import {
 import { Button } from './ui/button';
 import { Building, ChevronsUpDown, PlusCircle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { showError } from '../utils/toast';
 
 const CompanySwitcher = () => {
   const { activeCompany, companies, switchCompany } = useAuth();
   const { identity } = useEnterpriseIdentity(activeCompany?.id);
   const navigate = useNavigate();
+
+  // RB-004: switchCompany rethrows on failure. Awaiting inside a guarded handler
+  // turns a silent unhandled rejection (stale active company, no feedback) into a
+  // visible error toast, and prevents the fire-and-forget promise from escaping.
+  const handleSwitch = async (companyId: string) => {
+    try {
+      await switchCompany(companyId);
+    } catch {
+      showError('Could not switch company. Please try again.');
+    }
+  };
 
   if (!activeCompany) {
     return (
@@ -41,7 +53,7 @@ const CompanySwitcher = () => {
         <DropdownMenuLabel>Select Company</DropdownMenuLabel>
         <DropdownMenuSeparator />
         {companies?.map(company => (
-          <DropdownMenuItem key={company.id} onSelect={() => switchCompany(company.id)}>
+          <DropdownMenuItem key={company.id} onSelect={() => { void handleSwitch(company.id); }}>
             {company.name}
           </DropdownMenuItem>
         ))}

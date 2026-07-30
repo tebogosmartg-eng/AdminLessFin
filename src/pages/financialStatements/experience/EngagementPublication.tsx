@@ -242,14 +242,14 @@ export default function WorkspacePublication({
         {d?.latest_record && (
           <p className="text-sm text-muted-foreground">
             Archive recorded {format(new Date(d.latest_record.executed_at), 'dd MMM yyyy HH:mm')} ·
-            Server archive retained with this engagement (legacy engine).
+            Engagement archive retained with this publication.
           </p>
         )}
 
         {(d?.artifacts || []).length > 0 && (
           <div className="space-y-2">
             <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-              Server archive (optional)
+              Engagement archive (optional)
             </div>
             <div className="grid gap-2 sm:grid-cols-3">
               {(d?.artifacts || []).map((a) => (

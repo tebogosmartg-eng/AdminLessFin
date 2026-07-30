@@ -1,5 +1,12 @@
 /**
- * React access to Enterprise Financial Calendar (G3.6C).
+ * Data adapter for Enterprise Financial Calendar (G3.6C).
+ *
+ * Used ONLY by:
+ *   - ReportingPeriodContext (app-facing facade)
+ *   - Settings / Financial Years register (calendar writers & admin lists)
+ *
+ * Financial modules must consume `useReportingPeriod()` — never call this
+ * hook to invent reporting defaults or active-year labels.
  */
 import { useQuery } from '@tanstack/react-query';
 import { financialCalendarService } from '@/governance/domains/financialCalendar/service';

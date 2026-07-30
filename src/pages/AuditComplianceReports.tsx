@@ -119,13 +119,13 @@ const AuditComplianceReports = () => {
             value={String(taxYearStartYear)}
             onValueChange={(v) => setTaxYearStartYear(Number(v))}
           >
-            <SelectTrigger className="w-[180px]" aria-label="Tax year">
+            <SelectTrigger className="w-[200px]" aria-label="Tax year">
               <SelectValue placeholder="Tax year" />
             </SelectTrigger>
             <SelectContent>
               {yearChoices.map((y) => (
                 <SelectItem key={y} value={String(y)}>
-                  FY {y}/{String(y + 1).slice(-2)}
+                  Tax Year {y}/{String(y + 1).slice(-2)}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -169,7 +169,7 @@ const AuditComplianceReports = () => {
             <CardDescription>Tax year</CardDescription>
             <CardTitle className="text-xl">
               {report?.taxYearLabel ??
-                `FY ${taxYearStartYear}/${String(taxYearStartYear + 1).slice(-2)}`}
+                `Tax Year ${taxYearStartYear}/${String(taxYearStartYear + 1).slice(-2)}`}
             </CardTitle>
           </CardHeader>
         </Card>

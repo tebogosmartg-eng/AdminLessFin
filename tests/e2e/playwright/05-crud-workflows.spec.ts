@@ -198,7 +198,10 @@ test.describe('Suppliers (Vendors) — full UI CRUD workflow', () => {
     await waitForRouteSettled(page);
     await expectNoErrorBoundary(page);
 
-    await page.getByRole('button', { name: /new vendor/i }).first().click();
+    // The Suppliers list page's create button reads "New Supplier" (the module was
+    // renamed Vendors→Suppliers in the UI); the underlying form dialog is still
+    // titled "Add New Vendor". Match the current button text.
+    await page.getByRole('button', { name: /new supplier/i }).first().click();
     await expect(page.getByRole('dialog')).toBeVisible();
     await expect(page.getByText(/add new vendor/i)).toBeVisible();
 
@@ -361,7 +364,11 @@ test.describe('Sales (Invoices) — UI create + persist + edit workflow', () => 
 
     await page.getByRole('button', { name: /save invoice/i }).click();
 
-    await expect(page.getByRole('dialog')).toBeHidden({ timeout: 25_000 });
+    // Scope to the named form dialog: line-item/account pickers are Radix
+    // Popover comboboxes that also expose role="dialog" and linger (data-state
+    // closed) in the DOM, so an unscoped getByRole('dialog') flakily matches two
+    // elements. We assert the actual "New Invoice" form dialog has closed.
+    await expect(page.getByRole('dialog', { name: /new invoice/i })).toBeHidden({ timeout: 25_000 });
     await expect(page.getByRole('row').filter({ hasText: invNum })).toBeVisible({ timeout: 20_000 });
 
     await page.reload();
@@ -389,8 +396,31 @@ test.describe('Sales (Invoices) — UI create + persist + edit workflow', () => 
 test.describe('Purchasing (Bills) — UI create + persist + edit workflow', () => {
   const stamp = Date.now();
   const billNum = `E2E-BILL-${stamp}`;
+  const supplierName = `E2E QA Bill Supplier ${stamp}`;
 
   test('CREATE: a user records a bill through the form and it persists', async ({ page, diagnostics }) => {
+    const billPosts: { status: number; body?: string }[] = [];
+    page.on('response', async (res) => {
+      if (/functions\/v1\/bills/.test(res.url()) && res.request().method() !== 'GET') {
+        const body = res.status() >= 400 ? (await res.text().catch(() => '')).slice(0, 400) : undefined;
+        billPosts.push({ status: res.status(), body });
+      }
+    });
+
+    // Precondition: a bill needs a supplier to select. The Suppliers CRUD block
+    // creates then DELETES its vendor, so by the time Bills runs the tenant may
+    // have none. Create a dedicated supplier here so this workflow is
+    // self-contained and order-independent (the empty-dropdown timeout was a
+    // test data-ordering flaw, not an app fault).
+    await page.goto('/vendors');
+    await waitForRouteSettled(page);
+    await page.getByRole('button', { name: /new supplier/i }).first().click();
+    await expect(page.getByText(/add new vendor/i)).toBeVisible();
+    await page.getByPlaceholder('e.g., Office Supplies Co.').fill(supplierName);
+    await page.getByRole('button', { name: /save vendor/i }).click();
+    await expect(page.getByRole('dialog')).toBeHidden({ timeout: 20_000 });
+    await expect(page.getByRole('cell', { name: supplierName, exact: true })).toBeVisible({ timeout: 20_000 });
+
     await page.goto('/bills');
     await waitForRouteSettled(page);
     await expectNoErrorBoundary(page);
@@ -400,7 +430,7 @@ test.describe('Purchasing (Bills) — UI create + persist + edit workflow', () =
     await expect(page.getByRole('heading', { name: /record new bill/i })).toBeVisible();
 
     await page.getByRole('combobox', { name: /vendor/i }).click();
-    await page.getByRole('option').first().click();
+    await page.getByRole('option', { name: supplierName }).click();
     await page.getByLabel('Bill #').fill(billNum);
     await page.getByLabel('Bill Date').fill('2026-01-15');
     await page.getByLabel('Due Date').fill('2026-02-15');
@@ -408,7 +438,10 @@ test.describe('Purchasing (Bills) — UI create + persist + edit workflow', () =
     await page.getByPlaceholder('Description').first().fill('E2E purchased services');
     await page.getByRole('spinbutton').nth(1).fill('100'); // nth0 = qty (default 1), nth1 = unit cost
     await page.getByRole('combobox').filter({ hasText: /^Account$/ }).first().click();
-    await page.getByRole('option').first().click();
+    // The first expense-account option is Cost of Goods Sold, which the accounting
+    // engine CORRECTLY refuses to post from the Bills module (COGS is Inventory-only).
+    // Pick the first non-inventory operating-expense account instead.
+    await page.getByRole('option').filter({ hasNotText: /cost of goods sold|cogs|inventory/i }).first().click();
 
     await page.getByRole('button', { name: /show advanced accounting/i }).click();
     await page.getByRole('combobox', { name: /credit accounts payable/i }).click();
@@ -416,7 +449,15 @@ test.describe('Purchasing (Bills) — UI create + persist + edit workflow', () =
 
     await page.getByRole('button', { name: /record bill/i }).click();
 
-    await expect(page.getByRole('dialog')).toBeHidden({ timeout: 25_000 });
+    // Fail fast with the server error if the write 5xx'd (see RT-004-class
+    // diagnostics) rather than timing out on the dialog.
+    await page.waitForTimeout(1500);
+    const billServerErrors = billPosts.filter((p) => p.status >= 500);
+    expect(billServerErrors, `bills record returned a server error: ${JSON.stringify(billServerErrors)}`).toEqual([]);
+
+    // Scope to the named form dialog (Radix Popover comboboxes also expose
+    // role="dialog"); assert the "Record New Bill" form itself has closed.
+    await expect(page.getByRole('dialog', { name: /record new bill/i })).toBeHidden({ timeout: 25_000 });
     await expect(page.getByRole('row').filter({ hasText: billNum })).toBeVisible({ timeout: 20_000 });
 
     await page.reload();
@@ -642,6 +683,15 @@ test.describe('Fixed Assets — UI acquire (create) workflow', () => {
   const desc = `E2E QA Asset ${stamp}`;
 
   test('ACQUIRE: a user acquires a new asset and it persists after reload', async ({ page, diagnostics }) => {
+    const assetPosts: { status: number; url: string; body?: string }[] = [];
+    page.on('response', async (res) => {
+      const u = res.url();
+      if (/functions\/v1\/fixed-assets/.test(u) && res.request().method() !== 'GET') {
+        const body = res.status() >= 400 ? await res.text().catch(() => '') : undefined;
+        assetPosts.push({ status: res.status(), url: u.replace(/^.*functions\/v1\//, ''), body: body?.slice(0, 400) });
+      }
+    });
+
     await page.goto('/fixed-assets');
     await waitForRouteSettled(page);
     await expectNoErrorBoundary(page);
@@ -659,7 +709,16 @@ test.describe('Fixed Assets — UI acquire (create) workflow', () => {
 
     await page.getByRole('button', { name: /save asset/i }).click();
 
-    await expect(page.getByRole('dialog')).toBeHidden({ timeout: 25_000 });
+    // RT-004 regression guard: acquire must not 5xx. Fail fast with the
+    // server's error body (previously: fixed_assets_user_id_fkey on company_id
+    // → auth.users). Remediation: 20260730120000_rt004_drop_fixed_assets_...
+    await page.waitForTimeout(1500);
+    const serverErrors = assetPosts.filter((p) => p.status >= 500);
+    expect(serverErrors, `fixed-assets acquire returned a server error: ${JSON.stringify(serverErrors)}`).toEqual([]);
+
+    // Scope to the named form dialog (Radix Popover comboboxes also expose
+    // role="dialog"); assert the "Acquire New Asset" form itself has closed.
+    await expect(page.getByRole('dialog', { name: /acquire new asset/i })).toBeHidden({ timeout: 25_000 });
     await expect(page.getByRole('cell', { name: desc, exact: true })).toBeVisible({ timeout: 20_000 });
 
     await page.reload();

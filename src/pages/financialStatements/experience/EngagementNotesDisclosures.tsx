@@ -4,8 +4,10 @@ import { invokeFinancialStatements } from '../../../lib/financialStatements/api'
 import { evidenceStatusLabel } from '../../../lib/financialStatements/presentation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../../components/ui/card';
 import { Badge } from '../../../components/ui/badge';
+import { Button } from '../../../components/ui/button';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '../../../components/ui/accordion';
 import { Skeleton } from '../../../components/ui/skeleton';
+import { FileSpreadsheet } from 'lucide-react';
 
 type DiscDash = {
   disclosures: Array<{
@@ -70,10 +72,12 @@ export default function WorkspaceNotesDisclosures({
   companyId,
   workspaceId,
   frameworkPackId,
+  onGenerateStatements,
 }: {
   companyId: string;
   workspaceId: string;
   frameworkPackId?: string | null;
+  onGenerateStatements?: () => void;
 }) {
   const dashQuery = useQuery({
     queryKey: ['efs_disclosure_dash', companyId, workspaceId, frameworkPackId],
@@ -118,9 +122,17 @@ export default function WorkspaceNotesDisclosures({
         </CardHeader>
         <CardContent>
           {topicsWithContent.length === 0 ? (
-            <p className="text-sm text-muted-foreground">
-              Notes will appear here once the engagement is generated.
-            </p>
+            <div className="space-y-3">
+              <p className="text-sm text-muted-foreground">
+                Notes will appear here once Annual Financial Statements are generated.
+              </p>
+              {onGenerateStatements ? (
+                <Button type="button" onClick={onGenerateStatements}>
+                  <FileSpreadsheet className="mr-2 h-4 w-4" />
+                  Go to Financial Statements
+                </Button>
+              ) : null}
+            </div>
           ) : (
             <Accordion type="multiple" defaultValue={topicsWithContent.slice(0, 3)} className="w-full">
               {topicsWithContent.map((topic) => {

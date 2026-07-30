@@ -18,13 +18,11 @@ import {
   Check,
   ShieldCheck,
   Zap,
-  Layers,
   Brain,
   Wand2,
   TrendingUp,
   ScanLine,
   Bell,
-  Star,
   Menu,
 } from 'lucide-react';
 import { AppHeaderLogo, AppBrand } from '../components/brand';
@@ -113,13 +111,15 @@ const Hero = () => (
 
     <Section className="pb-16 pt-20 text-center sm:pt-28">
       <div className="mx-auto flex max-w-3xl flex-col items-center animate-fade-in">
-        <Pill><Sparkles className="h-3.5 w-3.5" /> The AI financial operating system</Pill>
+        <Pill><Sparkles className="h-3.5 w-3.5" /> The finance & growth platform for South African business</Pill>
         <h1 className="mt-6 text-5xl font-semibold leading-[1.05] tracking-tight text-foreground sm:text-6xl md:text-7xl">
           Less Admin.<br />
           <span className="text-primary">More Growth.</span>
         </h1>
-        <p className="mt-6 max-w-xl text-lg text-muted-foreground sm:text-xl">
-          {BRAND.description}
+        <p className="mt-6 max-w-2xl text-lg text-muted-foreground sm:text-xl">
+          Run your business, manage your money and stay tax compliant in one place — accounting,
+          invoicing, payroll and financial statements, built for South Africa with VAT, PAYE, UIF and
+          SDL handled and an AI assistant on the busywork. The professional foundation to grow with confidence.
         </p>
         <div className="mt-8 flex flex-col items-center gap-3 sm:flex-row">
           <Button size="lg" className="h-12 px-7 text-base" asChild>
@@ -129,7 +129,7 @@ const Hero = () => (
             <a href="#features">See how it works</a>
           </Button>
         </div>
-        <p className="mt-4 text-sm text-muted-foreground">No credit card required · Set up in minutes</p>
+        <p className="mt-4 text-sm text-muted-foreground">Private beta · No credit card required · Set up in minutes</p>
       </div>
 
       <ProductPreview />
@@ -193,10 +193,14 @@ const ProductPreview = () => (
 
 const TrustBar = () => (
   <Section className="py-12">
-    <p className="text-center text-sm text-muted-foreground">Trusted by modern teams who’d rather be building</p>
-    <div className="mt-6 flex flex-wrap items-center justify-center gap-x-10 gap-y-4 opacity-60">
-      {['Northwind', 'Meridian', 'Bluepeak', 'Cobalt', 'Loomly', 'Vantage'].map((n) => (
-        <span key={n} className="text-lg font-semibold tracking-tight text-muted-foreground">{n}</span>
+    <p className="text-center text-sm text-muted-foreground">
+      Now onboarding our founding cohort of South African businesses
+    </p>
+    <div className="mt-6 flex flex-wrap items-center justify-center gap-x-8 gap-y-3">
+      {['VAT', 'PAYE', 'UIF', 'SDL', 'Financial statements', 'Audit trail'].map((n) => (
+        <span key={n} className="inline-flex items-center gap-2 text-sm font-medium text-muted-foreground">
+          <Check className="h-4 w-4 text-primary" />{n}
+        </span>
       ))}
     </div>
   </Section>
@@ -207,11 +211,11 @@ const TrustBar = () => (
 /* ------------------------------------------------------------------ */
 
 const FEATURES = [
-  { icon: BookOpen, title: 'Accounting & Ledger', desc: 'Double-entry general ledger, chart of accounts and journals that stay balanced automatically.' },
-  { icon: FileSignature, title: 'Invoicing & Payments', desc: 'Send polished invoices and quotes, track payments and get paid faster with reminders.' },
-  { icon: Users, title: 'Payroll', desc: 'Run payroll, manage employees and expense claims, and stay compliant every cycle.' },
+  { icon: BookOpen, title: 'Accounting & Ledger', desc: 'Double-entry general ledger, chart of accounts and journals that stay balanced automatically, with VAT tracked on every transaction.' },
+  { icon: FileSignature, title: 'Invoicing & Payments', desc: 'Send polished, VAT-ready invoices and quotes, track payments and get paid faster with reminders.' },
+  { icon: Users, title: 'Payroll', desc: 'Run monthly payroll with PAYE, UIF and SDL calculated for you, plus employees and expense claims.' },
   { icon: Boxes, title: 'Inventory & Assets', desc: 'Track stock, valuations and fixed assets with depreciation handled for you.' },
-  { icon: BarChart3, title: 'Reporting & Statements', desc: 'Income statements, balance sheets and comparatives — accurate and always current.' },
+  { icon: BarChart3, title: 'Reporting & Statements', desc: 'Income statements, balance sheets and financial statements — audit-ready and always current.' },
   { icon: Workflow, title: 'Automation', desc: 'Recurring invoices, bills and journals run on schedule so nothing slips.' },
 ];
 
@@ -319,22 +323,27 @@ const AISection = () => (
 /* Benefits                                                           */
 /* ------------------------------------------------------------------ */
 
-const BENEFITS = [
-  { icon: Zap, title: 'Hours back every week', desc: 'Automation and AI cut manual data entry and month-end drudgery.' },
-  { icon: Layers, title: 'One source of truth', desc: 'Sales, purchases, payroll and assets all reconcile to the same ledger.' },
-  { icon: ShieldCheck, title: 'Bank-grade security', desc: 'Encryption, role-based access and audit trails on every action.' },
-  { icon: TrendingUp, title: 'Scales with you', desc: 'From sole trader to multi-entity — add companies without switching tools.' },
+const WHY = [
+  { icon: Zap, title: 'Save time', desc: 'Automation and AI cut manual data entry and month-end busywork.' },
+  { icon: ShieldCheck, title: 'Stay compliant', desc: 'VAT, PAYE, UIF and SDL calculated as you go, with a full audit trail.' },
+  { icon: BarChart3, title: 'Make better decisions', desc: 'Live dashboards and reports show where your business really stands.' },
+  { icon: TrendingUp, title: 'Be funding-ready', desc: 'Produce the financial statements banks and funders expect to see.' },
+  { icon: FileSignature, title: 'Impress the room', desc: 'Present clean, professional reports to your accountant, bank or investors.' },
 ];
 
-const Benefits = () => (
+const WhyChoose = () => (
   <Section className="py-24">
-    <SectionHeading eyebrow="Why AdminLess" title="Built to get out of your way" />
-    <div className="mt-14 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
-      {BENEFITS.map((b) => (
+    <SectionHeading
+      eyebrow="Why businesses choose AdminLess Fin"
+      title="Outcomes, not just admin"
+      subtitle="More than bookkeeping — the foundation to run, manage and grow your business with confidence."
+    />
+    <div className="mt-14 grid gap-5 sm:grid-cols-2 lg:grid-cols-5">
+      {WHY.map((b) => (
         <div key={b.title} className="rounded-xl border border-border bg-card p-6 shadow-sm">
           <b.icon className="h-6 w-6 text-primary" />
           <h3 className="mt-4 font-semibold text-foreground">{b.title}</h3>
-          <p className="mt-2 text-sm text-muted-foreground">{b.desc}</p>
+          <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{b.desc}</p>
         </div>
       ))}
     </div>
@@ -372,37 +381,120 @@ const Security = () => (
 /* Testimonials (placeholder)                                         */
 /* ------------------------------------------------------------------ */
 
-const TESTIMONIALS = [
-  { quote: 'We closed our first month in a day instead of a week. The AI reconciliation is genuinely magic.', name: 'Aisha M.', role: 'Founder, Meridian Studio' },
-  { quote: 'Finally a finance tool my whole team understands. Invoices out, bills tracked, zero training.', name: 'Thabo K.', role: 'Ops Lead, Bluepeak' },
-  { quote: 'The cash-flow forecast changed how we plan. It feels years ahead of what we used before.', name: 'Lena R.', role: 'CEO, Loomly' },
+const COHORT = [
+  { icon: Workflow, title: 'Hands-on onboarding', desc: 'We help set up your chart of accounts, VAT, payroll and opening balances.' },
+  { icon: Brain, title: 'Shape the roadmap', desc: 'A direct line to the team — your feedback drives what we build next.' },
+  { icon: Zap, title: 'Priority support', desc: 'Fast, direct help from the people building the product.' },
 ];
 
-const Testimonials = () => (
+const FoundingCohort = () => (
   <div className="border-y border-border bg-muted/30">
     <Section className="py-24">
-      <SectionHeading eyebrow="Loved by operators" title="Less time in the books, more time on the business" />
+      <SectionHeading
+        eyebrow="Private beta"
+        title="Join our founding cohort of South African businesses"
+        subtitle="AdminLess Fin is in private beta. We’re onboarding a first group of SMEs, finance teams and accountants — no invented reviews, just early partners we build alongside."
+      />
       <div className="mt-14 grid gap-5 md:grid-cols-3">
-        {TESTIMONIALS.map((t) => (
-          <figure key={t.name} className="flex flex-col rounded-xl border border-border bg-card p-6 shadow-sm">
-            <div className="flex gap-0.5 text-primary">
-              {Array.from({ length: 5 }).map((_, i) => <Star key={i} className="h-4 w-4 fill-current" />)}
+        {COHORT.map((c) => (
+          <div key={c.title} className="flex flex-col rounded-xl border border-border bg-card p-6 shadow-sm">
+            <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-primary/10 text-primary">
+              <c.icon className="h-5 w-5" />
             </div>
-            <blockquote className="mt-4 flex-1 text-sm leading-relaxed text-foreground">“{t.quote}”</blockquote>
-            <figcaption className="mt-5 flex items-center gap-3">
-              <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary/10 text-sm font-semibold text-primary">
-                {t.name.split(' ').map((n) => n[0]).join('')}
-              </div>
-              <div>
-                <p className="text-sm font-medium text-foreground">{t.name}</p>
-                <p className="text-xs text-muted-foreground">{t.role}</p>
-              </div>
-            </figcaption>
-          </figure>
+            <h3 className="mt-4 font-semibold text-foreground">{c.title}</h3>
+            <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{c.desc}</p>
+          </div>
         ))}
+      </div>
+      <div className="mt-12 flex flex-col items-center justify-center gap-3 sm:flex-row">
+        <Button size="lg" asChild>
+          <Link to="/auth">Become a beta partner<ArrowRight className="ml-1.5 h-4 w-4" /></Link>
+        </Button>
+        <Button size="lg" variant="outline" asChild>
+          <Link to="/contact">Talk to our team</Link>
+        </Button>
       </div>
     </Section>
   </div>
+);
+
+/* ------------------------------------------------------------------ */
+/* Built for South African businesses                                 */
+/* ------------------------------------------------------------------ */
+
+const INDUSTRIES = [
+  'Artists & creatives',
+  'Content creators',
+  'Salons & beauty',
+  'Day-care centres',
+  'Security companies',
+  'Retail & spaza shops',
+  'Township entrepreneurs',
+  'Construction companies',
+  'Transport & logistics',
+  'Growing SMEs',
+];
+
+const BuiltForSA = () => (
+  <Section className="py-24">
+    <SectionHeading
+      eyebrow="Who it's for"
+      title="Built for South African businesses"
+      subtitle="From side hustles to established operations — if you invoice customers, pay people and answer to SARS, AdminLess Fin fits the way you work."
+    />
+    <div className="mt-14 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+      {INDUSTRIES.map((name) => (
+        <div
+          key={name}
+          className="flex items-center gap-2.5 rounded-lg border border-border bg-card px-4 py-3 text-sm font-medium text-foreground shadow-sm"
+        >
+          <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-primary" />
+          {name}
+        </div>
+      ))}
+    </div>
+  </Section>
+);
+
+/* ------------------------------------------------------------------ */
+/* Roadmap — clearly labelled as not yet available                    */
+/* ------------------------------------------------------------------ */
+
+const ROADMAP = [
+  { icon: TrendingUp, title: 'Funding readiness', desc: 'Get your business ready to approach lenders and funders with confidence.' },
+  { icon: BarChart3, title: 'Investor packs', desc: 'Investor-ready summaries generated from your live financial data.' },
+  { icon: ShieldCheck, title: 'Governance packs', desc: 'Structured governance documentation for your business.' },
+  { icon: BookOpen, title: 'Compliance packs', desc: 'Bundled compliance documents, ready to review and share.' },
+  { icon: FileSignature, title: 'Tender & grant packs', desc: 'Documentation to support tender and grant applications.' },
+  { icon: Brain, title: 'AI business advisor', desc: 'Guidance on cash, growth and the next best action for your business.' },
+  { icon: Wand2, title: 'Advanced cash-flow forecasting', desc: 'Deeper, scenario-based projections beyond today’s 30-day view.' },
+];
+
+const Roadmap = () => (
+  <Section className="py-24">
+    <SectionHeading
+      eyebrow="Coming soon"
+      title="Your growth toolkit is expanding"
+      subtitle="We’re building AdminLess Fin into a full growth platform. The features below are planned for future releases and are not available yet."
+    />
+    <div className="mt-14 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+      {ROADMAP.map((r) => (
+        <div key={r.title} className="relative rounded-xl border border-dashed border-border bg-card/50 p-6 shadow-sm">
+          <span className="absolute right-4 top-4 rounded-full bg-muted px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+            Coming soon
+          </span>
+          <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-muted text-muted-foreground">
+            <r.icon className="h-5 w-5" />
+          </div>
+          <h3 className="mt-4 font-semibold text-foreground">{r.title}</h3>
+          <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{r.desc}</p>
+        </div>
+      ))}
+    </div>
+    <p className="mx-auto mt-8 max-w-2xl text-center text-sm text-muted-foreground">
+      Roadmap items are indicative and may change. Nothing here is available in the current release.
+    </p>
+  </Section>
 );
 
 /* ------------------------------------------------------------------ */
@@ -410,14 +502,25 @@ const Testimonials = () => (
 /* ------------------------------------------------------------------ */
 
 const PLANS = [
-  { name: 'Starter', price: 'R0', cadence: '/mo', desc: 'For solo founders getting organised.', features: ['1 company', 'Invoicing & bills', 'Basic reports', 'AI auto-categorization'], cta: 'Start free', highlight: false },
-  { name: 'Growth', price: 'R499', cadence: '/mo', desc: 'For growing teams that want it all.', features: ['Up to 3 companies', 'Payroll & assets', 'Full reporting suite', 'Cash-flow forecasting', 'Priority support'], cta: 'Start free trial', highlight: true },
-  { name: 'Scale', price: 'Custom', cadence: '', desc: 'For multi-entity operations.', features: ['Unlimited companies', 'Advanced roles & audit', 'API access', 'Dedicated onboarding'], cta: 'Talk to sales', highlight: false },
+  { name: 'Starter', price: 'R299', cadence: '/mo', desc: 'Perfect for startups, freelancers and small businesses.', features: ['1 company', 'Unlimited users', 'Quotes & invoicing', 'Expense management', 'General ledger', 'Financial statements', 'VAT tracking', 'Basic AI assistance', 'Email support'], cta: 'Start free trial', href: '/auth', highlight: false },
+  { name: 'Business', price: 'R699', cadence: '/mo', desc: 'Built for growing South African businesses.', features: ['Everything in Starter, plus:', 'Payroll', 'PAYE, UIF & SDL', 'Fixed assets', 'Advanced financial reporting', 'Cash flow insights', 'AI financial assistant', 'Priority support'], cta: 'Start free trial', href: '/auth', highlight: true },
+  { name: 'Enterprise', price: 'From R1,299', cadence: '/mo', desc: 'Enterprise finance for growing organisations.', features: ['Everything in Business, plus:', 'Multi-company', 'Advanced roles & permissions', 'Audit trail', 'API access (coming soon)', 'Dedicated onboarding', 'Priority implementation support'], cta: 'Talk to sales', href: '/contact', highlight: false },
 ];
 
 const Pricing = () => (
   <Section id="pricing" className="py-24">
-    <SectionHeading eyebrow="Pricing" title="Simple, transparent pricing" subtitle="Start free. Upgrade when you grow. Cancel anytime." />
+    <SectionHeading eyebrow="Pricing" title="Simple, transparent pricing" subtitle="Straightforward monthly pricing in Rands. Start with a free trial — cancel anytime." />
+
+    {/* Founding Customer Programme banner */}
+    <div className="mx-auto mt-10 max-w-3xl rounded-2xl border border-primary/20 bg-primary/5 px-6 py-6 text-center">
+      <p className="text-base font-semibold text-foreground">🎉 Founding Customer Programme</p>
+      <p className="mx-auto mt-2 max-w-xl text-sm text-muted-foreground">
+        We’re onboarding our first 50 South African businesses. Join today and receive{' '}
+        <span className="font-semibold text-primary">50% off your subscription for life</span> while
+        helping shape the future of AdminLess Fin.
+      </p>
+    </div>
+
     <div className="mt-14 grid gap-6 lg:grid-cols-3">
       {PLANS.map((p) => (
         <div
@@ -441,7 +544,7 @@ const Pricing = () => (
             ))}
           </ul>
           <Button className="mt-8 w-full" variant={p.highlight ? 'default' : 'outline'} asChild>
-            <Link to="/auth">{p.cta}</Link>
+            <Link to={p.href}>{p.cta}</Link>
           </Button>
         </div>
       ))}
@@ -454,11 +557,15 @@ const Pricing = () => (
 /* ------------------------------------------------------------------ */
 
 const FAQS = [
-  { q: `Is ${BRAND.product} really free to start?`, a: 'Yes. The Starter plan is free forever for a single company, with no credit card required. Upgrade only when you need more.' },
+  { q: `Can I try ${BRAND.product} before paying?`, a: 'Yes — every plan starts with a free trial, no credit card required. Through our Founding Customer Programme, our first 50 South African businesses also lock in 50% off their subscription for life.' },
   { q: 'Can I import my existing data?', a: 'Absolutely. You can import your chart of accounts, customers, vendors and opening balances via CSV during onboarding.' },
   { q: 'How does the AI keep my books accurate?', a: 'The AI proposes categorizations and reconciliations, but every posting follows double-entry rules and is fully auditable — you always stay in control.' },
   { q: 'Is my financial data secure?', a: 'Data is encrypted in transit and at rest, access is role-based per company, and every change is recorded in an audit trail.' },
   { q: 'Do you support multiple companies?', a: 'Yes — switch between companies from a single login. Growth and Scale plans raise or remove the company limit.' },
+  { q: `Can ${BRAND.product} help prepare my business for funding?`, a: 'Today you can produce the financial statements, reports and audit trail that banks and funders typically ask for. Dedicated funding-readiness and investor packs are on our roadmap and are not available yet.' },
+  { q: 'Can I generate reports for investors or banks?', a: 'Yes. You can generate income statements, balance sheets and other financial reports to share with your accountant, bank or investors. Purpose-built investor packs are planned for a future release.' },
+  { q: 'Will the platform help me stay compliant with my business obligations?', a: 'AdminLess Fin calculates VAT, PAYE, UIF and SDL as you work and keeps a full audit trail, which supports your compliance. It does not replace your accountant or a registered tax practitioner — always review figures before filing with SARS.' },
+  { q: 'What new features are coming next?', a: 'Our roadmap includes funding readiness, investor, governance, compliance and tender/grant packs, an AI business advisor and advanced cash-flow forecasting. These are planned for future releases and are clearly marked “Coming soon” on this page.' },
 ];
 
 const FAQ = () => (
@@ -533,10 +640,10 @@ const Footer = () => (
         <div>
           <h4 className="text-sm font-semibold text-foreground">Company</h4>
           <ul className="mt-4 space-y-2.5 text-sm text-muted-foreground">
-            <li><span className="transition-colors hover:text-foreground">About</span></li>
-            <li><span className="transition-colors hover:text-foreground">Security</span></li>
-            <li><span className="transition-colors hover:text-foreground">Privacy</span></li>
-            <li><span className="transition-colors hover:text-foreground">Terms</span></li>
+            <li><Link to="/security" className="transition-colors hover:text-foreground">Security</Link></li>
+            <li><Link to="/privacy" className="transition-colors hover:text-foreground">Privacy</Link></li>
+            <li><Link to="/terms" className="transition-colors hover:text-foreground">Terms</Link></li>
+            <li><Link to="/contact" className="transition-colors hover:text-foreground">Contact sales</Link></li>
           </ul>
         </div>
       </div>
@@ -566,9 +673,11 @@ const Landing = () => {
       <Features />
       <Modules />
       <AISection />
-      <Benefits />
+      <WhyChoose />
+      <BuiltForSA />
       <Security />
-      <Testimonials />
+      <FoundingCohort />
+      <Roadmap />
       <Pricing />
       <FAQ />
       <CTABand />

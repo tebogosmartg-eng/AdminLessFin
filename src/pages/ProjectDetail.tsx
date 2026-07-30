@@ -206,6 +206,7 @@ const ProjectDetail = () => {
               <CardContent>
                 <div className="flex justify-between items-end mb-2">
                   <div className="text-2xl font-bold">{formatCurrency(financials?.totalRevenue || 0)}</div>
+                  <p className="text-xs text-muted-foreground">Company CFA income (project allocation not available)</p>
                   <div className="text-sm text-muted-foreground">Budget: {formatCurrency(project.budget_amount)}</div>
                 </div>
                 <Progress value={budgetProgress} className={cn(budgetProgress > 100 ? "bg-green-600" : "")} />
