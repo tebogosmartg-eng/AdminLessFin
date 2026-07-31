@@ -1,30 +1,36 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../integrations/supabase/client';
 import { useAuth } from '../contexts/AuthContext';
+import { useReportingPeriod } from '../contexts/ReportingPeriodContext';
+import ReportingPeriodPicker from '../components/ReportingPeriodPicker';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from '../components/ui/table';
 import { Skeleton } from '../components/ui/skeleton';
 import { formatCurrency, cn } from '../lib/utils';
-import { format } from 'date-fns';
 
 const ComparativePL = () => {
   const { activeCompany } = useAuth();
+  // The reporting period is the single reporting authority. This page
+  // previously sent `end_date: format(new Date(), ...)`, so a comparative
+  // income statement anchored itself to the wall clock and could disagree with
+  // every other financial surface. The aggregation itself is unchanged.
+  const { dateTo, isReady } = useReportingPeriod();
 
   const { data: report, isLoading } = useQuery({
-    queryKey: ['comparative_pl', activeCompany?.id],
+    queryKey: ['comparative_pl', activeCompany?.id, dateTo],
     queryFn: async () => {
       if (!activeCompany) return null;
       const { data, error } = await supabase.functions.invoke('reports', {
         body: {
           method: 'GET_COMPARATIVE_PL',
           company_id: activeCompany.id,
-          end_date: format(new Date(), 'yyyy-MM-dd'),
+          end_date: dateTo,
         },
       });
       if (error) throw error;
       return data;
     },
-    enabled: !!activeCompany,
+    enabled: !!activeCompany && isReady,
   });
 
   const incomeAccounts = report?.accounts.filter(a => a.type === 'Income') || [];
@@ -33,7 +39,10 @@ const ComparativePL = () => {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-3xl font-bold">Comparative P&L</h1>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <h1 className="text-3xl font-bold">Comparative P&L</h1>
+        <ReportingPeriodPicker />
+      </div>
       <Card>
         <CardHeader>
           <CardTitle>Comparative Income Statement</CardTitle>

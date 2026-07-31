@@ -17,7 +17,7 @@ describe('CFA architectural governance — certified consumers', () => {
   it('Dashboard consumes CFA (no AR/AP reduce)', () => {
     const src = read('src/pages/Dashboard.tsx');
     mustConsumeCfa(src, ['canonicalAggregation', 'statementTotals']);
-    expect(src).toMatch(/cfa\.receivables|canonicalAggregation/);
+    expect(src).toMatch(/cfa\??\.receivables/);
     expect(src).not.toMatch(/arBalances\s*\.\s*reduce/);
     expect(src).not.toMatch(/apBalances\s*\.\s*reduce/);
   });
@@ -74,7 +74,7 @@ describe('CFA architectural governance — certified consumers', () => {
   it('dashboard-data KPIs originate from CFA buildStatementTotals', () => {
     const src = read('supabase/functions/dashboard-data/index.ts');
     expect(src).toMatch(/buildStatementTotals|buildCanonicalFinancialAggregation/);
-    expect(src).toMatch(/canonicalAggregation/);
+    expect(src).toMatch(/statementTotals/);
   });
 
   it('CFA authority files exist and export builder', () => {
@@ -83,6 +83,71 @@ describe('CFA architectural governance — certified consumers', () => {
     expect(client).toMatch(/export function buildCanonicalFinancialAggregation/);
     expect(edge).toMatch(/export function buildCanonicalFinancialAggregation/);
     expect(client).toMatch(/ONLY permitted monetary aggregation|sole|Canonical Financial Aggregation/i);
+  });
+});
+
+/**
+ * Single-source-of-truth regression gate for the Dashboard payload.
+ *
+ * Every one of these scalars used to be a *copy* of a `statementTotals`
+ * property. A copy is a second place a figure can drift from the General
+ * Ledger, and a fallback chain made the drift invisible. They are removed;
+ * these tests stop them coming back.
+ */
+describe('Dashboard single source of accounting truth', () => {
+  const OBSOLETE_MONEY_FIELDS = [
+    'periodNetIncome',
+    'periodRevenue',
+    'periodExpenses',
+    'totalStoredEquity',
+    'cashBalance',
+  ];
+
+  it('dashboard-data emits exactly one canonical money field', () => {
+    const src = read('supabase/functions/dashboard-data/index.ts');
+    // `statementTotals` is the only permitted money field on the response.
+    expect(src).toMatch(/\n\s*statementTotals,/);
+    expect(src).not.toMatch(/canonicalAggregation\s*:/);
+    // `totalAssets`/`totalLiabilities` survive only as CFA properties read from
+    // `totals.`, never as response scalars.
+    expect(src).not.toMatch(/\n\s*totalAssets,/);
+    expect(src).not.toMatch(/\n\s*totalLiabilities,/);
+  });
+
+  it.each(OBSOLETE_MONEY_FIELDS)(
+    'dashboard-data no longer emits the obsolete scalar %s',
+    (field) => {
+      const src = read('supabase/functions/dashboard-data/index.ts');
+      expect(src).not.toMatch(new RegExp(`\\n\\s*${field}[,:]`));
+    },
+  );
+
+  const payloadConsumers = [
+    'src/pages/Dashboard.tsx',
+    'src/pages/RevenueWorkspace.tsx',
+    'src/pages/PurchasesWorkspace.tsx',
+    'src/pages/PayrollWorkspace.tsx',
+    'src/components/accounting/SubLedgerReconciliationPanel.tsx',
+  ];
+
+  it.each(payloadConsumers)('%s reads only statementTotals from the payload', (file) => {
+    const src = read(file);
+    // No consumer may read the removed duplicate field off a payload object.
+    expect(src).not.toMatch(/\??\.\s*canonicalAggregation\b/);
+    // Nor fall back to an obsolete per-KPI scalar.
+    for (const field of OBSOLETE_MONEY_FIELDS) {
+      expect(src).not.toMatch(new RegExp(`(?:data|dashboard|dashboardData)\\?\\?\\.\\s*${field}\\b`));
+      expect(src).not.toMatch(new RegExp(`(?:data|dashboard|dashboardData)\\?\\.\\s*${field}\\b`));
+    }
+  });
+
+  it('Dashboard never renders a zero when CFA is absent', () => {
+    const src = read('src/pages/Dashboard.tsx');
+    // A missing aggregation must surface as unavailable, not as R0.00 — a
+    // silent zero is indistinguishable from a real nil balance.
+    expect(src).toMatch(/financialsUnavailable/);
+    expect(src).toMatch(/financialsReady/);
+    expect(src).toMatch(/Financial figures unavailable/);
   });
 });
 

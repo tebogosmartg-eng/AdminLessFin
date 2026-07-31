@@ -1,6 +1,9 @@
 import { format } from 'date-fns';
-import { jsPDF } from 'jspdf';
-import autoTable from 'jspdf-autotable';
+// Type-only: erased at build time, so this creates no runtime dependency on
+// jsPDF. The engine itself is fetched on demand via loadPdfEngine() inside
+// generatePayslipPdf — see src/lib/pdf/pdfEngine.ts for why.
+import type { jsPDF } from 'jspdf';
+import { loadPdfEngine } from './pdf/pdfEngine';
 import QRCode from 'qrcode';
 import { BRAND } from '../config/brand';
 import { downloadCSV } from './utils';
@@ -537,6 +540,7 @@ export function buildPayslipHtml(data: PayslipDocumentData, qrDataUrl?: string):
 }
 
 export async function generatePayslipPdf(data: PayslipDocumentData): Promise<jsPDF> {
+  const { jsPDF, autoTable } = await loadPdfEngine();
   const verificationUrl = buildPayslipVerificationUrl(data);
   let qrDataUrl: string | undefined;
   try {

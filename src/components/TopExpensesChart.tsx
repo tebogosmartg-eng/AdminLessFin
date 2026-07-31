@@ -29,6 +29,7 @@ const TopExpensesChart = ({ data }: TopExpensesChartProps) => {
           fill="#8884d8"
           dataKey="total_amount"
           nameKey="account_name"
+          isAnimationActive={false}
         >
           {data.map((entry, index) => (
             <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />

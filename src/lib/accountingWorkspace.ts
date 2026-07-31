@@ -72,8 +72,21 @@ export const accountingApi = {
     account_id?: string;
     document_id?: string;
   }) => invokeAccounting(companyId, 'GET_TRACEABILITY', anchors),
-  accountInquiry: (companyId: string, accountId: string) =>
-    invokeAccounting(companyId, 'GET_ACCOUNT_INQUIRY', { account_id: accountId }),
+  /**
+   * Reporting dates are optional and forwarded to the edge. Passing them makes
+   * the inquiry honour the configured financial year instead of the edge's
+   * calendar-year fallback; omitting them preserves the previous behaviour.
+   */
+  accountInquiry: (
+    companyId: string,
+    accountId: string,
+    period?: { start_date?: string | null; end_date?: string | null },
+  ) =>
+    invokeAccounting(companyId, 'GET_ACCOUNT_INQUIRY', {
+      account_id: accountId,
+      start_date: period?.start_date ?? undefined,
+      end_date: period?.end_date ?? undefined,
+    }),
   accountActivity: (companyId: string, accountId: string, opts: {
     page?: number; page_size?: number; start_date?: string; end_date?: string; group_by?: string;
   }) => invokeAccounting(companyId, 'GET_ACCOUNT_ACTIVITY_WORKSPACE', { account_id: accountId, ...opts }),

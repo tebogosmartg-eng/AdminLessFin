@@ -58,13 +58,11 @@ const PurchasesWorkspace = () => {
   const today = new Date();
   const weekEnd = addDays(today, 7);
 
-  const cfaPayables = Number(data?.canonicalAggregation?.payables ?? data?.statementTotals?.payables ?? 0);
-  const cfaExpenses = Number(
-    typeof data?.periodExpenses === 'number'
-      ? data.periodExpenses
-      : (data?.canonicalAggregation?.totalExpenses ?? data?.statementTotals?.totalExpenses ?? 0),
-  );
-  const cfaNetCash = Number(data?.canonicalAggregation?.netCashFlow ?? data?.statementTotals?.netCashFlow ?? 0);
+  // Money comes from the one canonical field. `periodExpenses` was a copy of
+  // statementTotals.totalExpenses and has been removed from the payload.
+  const cfaPayables = Number(data?.statementTotals?.payables ?? 0);
+  const cfaExpenses = Number(data?.statementTotals?.totalExpenses ?? 0);
+  const cfaNetCash = Number(data?.statementTotals?.netCashFlow ?? 0);
   const metrics = useMemo(() => {
     // AP / spend / cash outflow = CFA only (no AP-balance or bill/forecast reduces).
     const totalAp = cfaPayables;

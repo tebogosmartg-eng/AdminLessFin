@@ -11,6 +11,7 @@
 
 import { createClient } from '@supabase/supabase-js';
 import type { Database } from './database.types';
+import { installReadCoalescing } from './coalesceReads';
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
@@ -32,5 +33,13 @@ export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABL
     storage: typeof window !== 'undefined' ? window.localStorage : undefined,
   },
 });
+
+/**
+ * Merges Edge Function reads that are already in flight with an identical body
+ * (see ./coalesceReads for the measured duplicates this removes, and for the
+ * read-only allow-list that keeps every mutating call untouched). Nothing is
+ * cached, so data freshness is unchanged.
+ */
+installReadCoalescing(supabase);
 
 export type { Database };

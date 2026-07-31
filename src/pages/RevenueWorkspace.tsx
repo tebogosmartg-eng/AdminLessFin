@@ -112,13 +112,11 @@ const RevenueWorkspace = () => {
   const actions = data?.actions || { draftInvoices: 0, expiringQuotes: 0 };
   const expectedRaw: ExpectedPaymentRaw[] = data?.expectedPayments || [];
 
-  const cfaReceivables = Number(data?.canonicalAggregation?.receivables ?? data?.statementTotals?.receivables ?? 0);
-  const cfaIncome = Number(
-    typeof data?.periodRevenue === 'number'
-      ? data.periodRevenue
-      : (data?.canonicalAggregation?.totalIncome ?? data?.statementTotals?.totalIncome ?? 0),
-  );
-  const cfaNetCash = Number(data?.canonicalAggregation?.netCashFlow ?? data?.statementTotals?.netCashFlow ?? 0);
+  // Money comes from the one canonical field. `periodRevenue` was a copy of
+  // statementTotals.totalIncome and has been removed from the payload.
+  const cfaReceivables = Number(data?.statementTotals?.receivables ?? 0);
+  const cfaIncome = Number(data?.statementTotals?.totalIncome ?? 0);
+  const cfaNetCash = Number(data?.statementTotals?.netCashFlow ?? 0);
   const metrics = useMemo(
     () =>
       buildRevenueMetrics({

@@ -3,6 +3,9 @@ import { ArrowLeftRight, Landmark, FileCheck2 } from 'lucide-react';
 import { useDocumentTitle } from '../../hooks/useDocumentTitle';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../../components/ui/card';
 import { Button } from '../../components/ui/button';
+import { SectionErrorBoundary } from '../../components/ErrorBoundary';
+import ReportingPeriodPicker from '../../components/ReportingPeriodPicker';
+import SubLedgerReconciliationPanel from '../../components/accounting/SubLedgerReconciliationPanel';
 
 /**
  * Reconciliation Centre — navigation hub only.
@@ -13,14 +16,30 @@ const ReconciliationCentre = () => {
 
   return (
     <div className="space-y-4">
-      <div>
-        <h1 className="text-3xl font-bold flex items-center gap-2">
-          <FileCheck2 className="h-7 w-7" /> Reconciliation Centre
-        </h1>
-        <p className="text-sm text-muted-foreground mt-1">
-          Connected entry points to book and bank reconciliation — engines unchanged.
-        </p>
+      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+        <div>
+          <h1 className="text-3xl font-bold flex items-center gap-2">
+            <FileCheck2 className="h-7 w-7" /> Reconciliation Centre
+          </h1>
+          <p className="text-sm text-muted-foreground mt-1">
+            Connected entry points to book and bank reconciliation — engines unchanged.
+          </p>
+        </div>
+        {/* Period comes from the canonical reporting authority, so the controls
+            below are evaluated over the same window as every other module. */}
+        <ReportingPeriodPicker />
       </div>
+
+      {/* Read-only controls: they expose sub-ledger vs GL differences and
+          change no accounting figure. Boundaried so a feed failure degrades
+          this panel rather than the page. */}
+      <SectionErrorBoundary
+        title="Reconciliation controls unavailable"
+        description="One of the ledger or sub-ledger feeds could not be loaded. Accounting figures elsewhere are unaffected."
+      >
+        <SubLedgerReconciliationPanel />
+      </SectionErrorBoundary>
+
       <div className="grid md:grid-cols-2 gap-4">
         <Card>
           <CardHeader>

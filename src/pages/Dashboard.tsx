@@ -67,10 +67,6 @@ const Dashboard = () => {
   const {
     role = 'member',
     accounts = [],
-    periodNetIncome = 0,
-    totalAssets: engineTotalAssets = 0,
-    totalLiabilities: engineTotalLiabilities = 0,
-    cashBalance: engineCashBalance = 0,
     reportingPeriod = null,
     monthlySummary = [],
     arBalances = [],
@@ -84,7 +80,6 @@ const Dashboard = () => {
     recentActivity = [],
     setupStatus = { isComplete: true },
     payrollKpis = null,
-    canonicalAggregation = null,
     statementTotals = null,
   } = dashboardData || {};
 
@@ -103,20 +98,39 @@ const Dashboard = () => {
     enabled: !!activeCompany,
   });
 
-  const cfa = canonicalAggregation || statementTotals || {};
-  // KPI cash/assets/liab/AR/AP from CFA only — no UI reduce of subledger rows.
-  const cashPosition = Number(cfa.cash ?? engineCashBalance ?? 0);
+  /**
+   * SINGLE money source for this page: `statementTotals` — the Canonical
+   * Financial Aggregation produced by buildCanonicalFinancialAggregation()
+   * from get_balances_as_of_date + get_period_activity +
+   * get_cash_flow_statement, i.e. the same GL/TB engine the Trial Balance and
+   * Financial Statements read.
+   *
+   * There is deliberately NO fallback. The per-KPI scalars this page used to
+   * fall back to (cashBalance / totalAssets / totalLiabilities /
+   * periodNetIncome) were copies of these very properties, so a fallback could
+   * only ever return either the same number or a stale one — and when the
+   * payload carried neither, the page silently rendered R0.00 for Cash,
+   * Assets, Liabilities, AR and AP. A financial figure that is quietly wrong is
+   * worse than one that declares itself unavailable, so absence is now shown.
+   */
+  const cfa = statementTotals;
+  const financialsReady = !!cfa;
+  const financialsUnavailable = isAdmin && !isLoading && !queryError && !financialsReady;
+
+  const cashPosition = Number(cfa?.cash ?? 0);
   const recentBankingActivity = (bankTransactions ?? []).slice().sort((a, b) => (a.transaction_date < b.transaction_date ? 1 : -1)).slice(0, 5);
   const pendingReconciliationCount = (outstandingLines ?? []).length;
 
-  const totalAr = Number(cfa.receivables ?? 0);
-  const totalAp = Number(cfa.payables ?? 0);
-  const netIncome = Number(cfa.netIncome ?? periodNetIncome ?? 0);
+  const totalAr = Number(cfa?.receivables ?? 0);
+  const totalAp = Number(cfa?.payables ?? 0);
+  const netIncome = Number(cfa?.netIncome ?? 0);
 
+  // Every card below reads one CFA property. No card computes, re-sums or
+  // fetches a balance of its own.
   const summaryCards = [
     { title: 'Cash Balance', value: cashPosition, icon: DollarSign, link: '/banking/accounts', hidden: !isAdmin },
-    { title: 'Total Assets', value: Number(engineTotalAssets || 0), icon: Wallet, link: '/reports/live-financial-statements', hidden: !isAdmin },
-    { title: 'Total Liabilities', value: Number(engineTotalLiabilities || 0), icon: Landmark, link: '/reports/live-financial-statements', hidden: !isAdmin },
+    { title: 'Total Assets', value: Number(cfa?.totalAssets ?? 0), icon: Wallet, link: '/reports/live-financial-statements', hidden: !isAdmin },
+    { title: 'Total Liabilities', value: Number(cfa?.totalLiabilities ?? 0), icon: Landmark, link: '/reports/live-financial-statements', hidden: !isAdmin },
     { title: 'Net Income', value: netIncome, icon: netIncome >= 0 ? TrendingUp : TrendingDown, color: netIncome >= 0 ? 'text-success' : 'text-destructive', link: '/reports', hidden: !isAdmin },
   ];
 
@@ -197,6 +211,17 @@ const Dashboard = () => {
               Position as of {reportingPeriod?.to ?? dateTo ?? 'period end'}; Net Income for the selected range.
             </p>
           </div>
+          {financialsUnavailable && (
+            <Alert variant="destructive">
+              <AlertTriangle className="h-4 w-4" />
+              <AlertTitle>Financial figures unavailable</AlertTitle>
+              <AlertDescription>
+                The reporting service did not return a Canonical Financial Aggregation for this
+                period, so no balance can be shown. Amounts are left blank rather than displayed as
+                zero, because a zero here would be indistinguishable from a real nil balance.
+              </AlertDescription>
+            </Alert>
+          )}
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
             {summaryCards.filter(c => !c.hidden).map((card, index) => (
             <Card key={index} className="cursor-pointer transition-all duration-base ease-smooth hover:shadow-md hover:-translate-y-0.5" onClick={() => navigate(card.link)}>
@@ -207,7 +232,11 @@ const Dashboard = () => {
                 </div>
                 </CardHeader>
                 <CardContent>
-                {isLoading ? <Skeleton className="h-9 w-3/4" /> : <div className={`text-3xl font-semibold tracking-tight tabular-nums ${card.color || ''}`}>{formatCurrency(card.value)}</div>}
+                {isLoading ? <Skeleton className="h-9 w-3/4" /> : (
+                  <div className={`text-3xl font-semibold tracking-tight tabular-nums ${financialsReady ? (card.color || '') : 'text-muted-foreground'}`}>
+                    {financialsReady ? formatCurrency(card.value) : '—'}
+                  </div>
+                )}
                 </CardContent>
             </Card>
             ))}
@@ -319,8 +348,10 @@ const Dashboard = () => {
           <CardContent>
             {isLoading ? <Skeleton className="h-24 w-full" /> : (
               <>
-                <div className="text-2xl font-bold">{formatCurrency(totalAr)}</div>
-                <p className="text-xs text-muted-foreground">Total outstanding balance</p>
+                <div className="text-2xl font-bold">{financialsReady ? formatCurrency(totalAr) : '—'}</div>
+                <p className="text-xs text-muted-foreground">
+                  {financialsReady ? 'Total outstanding balance' : 'General Ledger balance unavailable'}
+                </p>
                 <div className="mt-4 space-y-2">
                   {arBalances && arBalances.length > 0 ? arBalances.slice(0, 3).map((item: any) => (<div key={item.customer_id} className="flex justify-between items-center text-sm"><span>{item.customer_name}</span><span className="font-mono">{formatCurrency(item.balance)}</span></div>)) : <p className="text-sm text-muted-foreground">No outstanding invoices.</p>}
                 </div>
@@ -333,8 +364,10 @@ const Dashboard = () => {
           <CardContent>
             {isLoading ? <Skeleton className="h-24 w-full" /> : (
               <>
-                <div className="text-2xl font-bold">{formatCurrency(totalAp)}</div>
-                <p className="text-xs text-muted-foreground">Total outstanding balance</p>
+                <div className="text-2xl font-bold">{financialsReady ? formatCurrency(totalAp) : '—'}</div>
+                <p className="text-xs text-muted-foreground">
+                  {financialsReady ? 'Total outstanding balance' : 'General Ledger balance unavailable'}
+                </p>
                 <div className="mt-4 space-y-2">
                   {apBalances && apBalances.length > 0 ? apBalances.slice(0, 3).map((item: any) => (<div key={item.vendor_id} className="flex justify-between items-center text-sm"><span>{item.vendor_name}</span><span className="font-mono">{formatCurrency(item.balance)}</span></div>)) : <p className="text-sm text-muted-foreground">No outstanding bills.</p>}
                 </div>
@@ -360,7 +393,13 @@ const Dashboard = () => {
           <div className="grid gap-4 md:grid-cols-3">
             <Card className="cursor-pointer hover:bg-muted/50 transition-colors" onClick={() => navigate('/banking/accounts')}>
               <CardHeader><CardTitle>Cash Position</CardTitle><CardDescription>Across all bank, cash, and petty cash accounts.</CardDescription></CardHeader>
-              <CardContent>{bankingLoading ? <Skeleton className="h-9 w-2/3" /> : <div className="text-3xl font-semibold tabular-nums">{formatCurrency(cashPosition)}</div>}</CardContent>
+              <CardContent>
+                {bankingLoading ? <Skeleton className="h-9 w-2/3" /> : (
+                  <div className={`text-3xl font-semibold tabular-nums ${financialsReady ? '' : 'text-muted-foreground'}`}>
+                    {financialsReady ? formatCurrency(cashPosition) : '—'}
+                  </div>
+                )}
+              </CardContent>
             </Card>
             <Card className="cursor-pointer hover:bg-muted/50 transition-colors" onClick={() => navigate('/banking/reconciliation')}>
               <CardHeader><CardTitle className="flex items-center gap-2"><FileCheck2 className="h-4 w-4" />Pending Reconciliation</CardTitle><CardDescription>Unmatched statement lines.</CardDescription></CardHeader>

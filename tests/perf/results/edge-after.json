@@ -1,0 +1,123 @@
+{
+  "generatedAt": "2026-07-31T06:03:05.124Z",
+  "runs": 6,
+  "results": [
+    {
+      "fn": "user-session",
+      "cold": 512,
+      "warmP50": 445,
+      "warmP95": 524,
+      "warmMin": 432,
+      "bytes": 4697,
+      "ok": true
+    },
+    {
+      "fn": "dashboard-data",
+      "cold": 768,
+      "warmP50": 600,
+      "warmP95": 646,
+      "warmMin": 593,
+      "bytes": 13306,
+      "ok": true
+    },
+    {
+      "fn": "chart-of-accounts",
+      "cold": 469,
+      "warmP50": 502,
+      "warmP95": 530,
+      "warmMin": 496,
+      "bytes": 10679,
+      "ok": true
+    },
+    {
+      "fn": "customers",
+      "cold": 472,
+      "warmP50": 437,
+      "warmP95": 470,
+      "warmMin": 419,
+      "bytes": 764,
+      "ok": true
+    },
+    {
+      "fn": "vendors",
+      "cold": 476,
+      "warmP50": 467,
+      "warmP95": 473,
+      "warmMin": 444,
+      "bytes": 1102,
+      "ok": true
+    },
+    {
+      "fn": "bills",
+      "cold": 487,
+      "warmP50": 483,
+      "warmP95": 501,
+      "warmMin": 406,
+      "bytes": 6770,
+      "ok": true
+    },
+    {
+      "fn": "products",
+      "cold": 491,
+      "warmP50": 478,
+      "warmP95": 511,
+      "warmMin": 338,
+      "bytes": 3200,
+      "ok": true
+    },
+    {
+      "fn": "employees",
+      "cold": 457,
+      "warmP50": 455,
+      "warmP95": 471,
+      "warmMin": 439,
+      "bytes": 1265,
+      "ok": true
+    },
+    {
+      "fn": "expense-claims",
+      "cold": 463,
+      "warmP50": 482,
+      "warmP95": 543,
+      "warmMin": 454,
+      "bytes": 510,
+      "ok": true
+    },
+    {
+      "fn": "projects",
+      "cold": 480,
+      "warmP50": 456,
+      "warmP95": 476,
+      "warmMin": 425,
+      "bytes": 333,
+      "ok": true
+    },
+    {
+      "fn": "tax-rates",
+      "cold": 426,
+      "warmP50": 463,
+      "warmP95": 541,
+      "warmMin": 426,
+      "bytes": 624,
+      "ok": true
+    },
+    {
+      "fn": "banking",
+      "cold": 748,
+      "warmP50": 575,
+      "warmP95": 630,
+      "warmMin": 533,
+      "bytes": 9229,
+      "ok": true
+    },
+    {
+      "fn": "fixed-assets",
+      "cold": 533,
+      "warmP50": 497,
+      "warmP95": 564,
+      "warmMin": 480,
+      "bytes": 35239,
+      "ok": true
+    }
+  ]
+}

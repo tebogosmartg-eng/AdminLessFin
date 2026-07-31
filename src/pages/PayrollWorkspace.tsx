@@ -85,16 +85,11 @@ const PayrollWorkspace = () => {
   const pendingClaimsList = workspace?.pendingClaimsList || [];
 
   const intelligence = useMemo(() => {
-    const cfaCash = Number(
-      dashboard?.canonicalAggregation?.cash ??
-        dashboard?.statementTotals?.cash ??
-        dashboard?.cashBalance ??
-        0,
-    );
+    // `cashBalance` was a copy of statementTotals.cash and is gone from the
+    // payload; the canonical field is the only source.
+    const cfaCash = Number(dashboard?.statementTotals?.cash ?? 0);
     // Obligations proxy = CFA payables (no open-bill invoice sum).
-    const openBillsTotal = Number(
-      dashboard?.canonicalAggregation?.payables ?? dashboard?.statementTotals?.payables ?? 0,
-    );
+    const openBillsTotal = Number(dashboard?.statementTotals?.payables ?? 0);
 
     return {
       readiness: computeReadinessScore(employees, workspace),

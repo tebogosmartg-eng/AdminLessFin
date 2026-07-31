@@ -94,24 +94,27 @@ serve(withEnterprisePlatform('dashboard-data', 'tenant', async (req, _ctx) => {
         promises.push(userSupabase.rpc('get_balances_as_of_date', { p_end_date: asOfDateStr, p_company_id: company_id }));
         // Period P&L activity — SAME engine call as Income Statement (reports edge).
         promises.push(userSupabase.rpc('get_period_activity', { p_start_date: startDateStr, p_end_date: asOfDateStr, p_company_id: company_id }));
-        promises.push(userSupabase.rpc('get_monthly_summary', { p_months: 6, p_company_id: company_id }));
+        // get_monthly_summary (index 16) — NOT fetched. Its result was assigned
+        // and then unconditionally overwritten with CFA partitions below, so the
+        // round trip was pure waste. Stubbed rather than deleted to keep the
+        // positional results[] mapping identical; nothing downstream changes.
+        promises.push(Promise.resolve({ data: [] }));
         promises.push(userSupabase.rpc('get_vendor_ap_balances', { p_company_id: company_id }));
-        promises.push(userSupabase.rpc('get_top_expenses', { p_start_date: startDateStr, p_end_date: asOfDateStr, p_company_id: company_id }));
+        // get_top_expenses (index 18) — NOT fetched, same reason as index 16.
+        promises.push(Promise.resolve({ data: [] }));
         // Bank CoA links — Cash Balance / forecast open from the same bank→GL map.
         promises.push(supabaseAdmin.from('bank_accounts').select('chart_of_account_id').eq('company_id', company_id).eq('status', 'active'));
         // CoA metadata for canonical aggregation (roles / categories) — no money math.
         promises.push(supabaseAdmin.from('chart_of_accounts').select('id, account_role, category, subcategory, account_code, tax_treatment, cash_flow_classification').eq('company_id', company_id));
         // Cash flow statement — same RPC as Reports / Financial Statements.
         promises.push(userSupabase.rpc('get_cash_flow_statement', { p_start_date: startDateStr, p_end_date: asOfDateStr, p_company_id: company_id }));
-        // Forecast Data: Current Open Payables/Receivables (enriched for Expected Payments Explorer)
-        // Intentional: forecast horizon is always today → +30d (operational cash outlook), not the reporting period.
-        promises.push(supabaseAdmin.from('invoices').select('id, invoice_number, due_date, status, customer_id, customers(name, payment_terms, email), journal_entries!journal_entry_id(journal_entry_items(amount, type))').eq('company_id', company_id).neq('status', 'paid').neq('status', 'void').gte('due_date', format(new Date(), 'yyyy-MM-dd')).order('due_date', { ascending: true }));
-        promises.push(supabaseAdmin.from('bills').select('due_date, journal_entries!journal_entry_id(journal_entry_items(amount, type))').eq('company_id', company_id).neq('status', 'paid').neq('status', 'void').gte('due_date', format(new Date(), 'yyyy-MM-dd')).order('due_date', { ascending: true }));
-        // Forecast Data: Future Recurring Payables/Receivables
-        promises.push(supabaseAdmin.from('recurring_invoices').select('next_run_date, recurring_invoice_items(quantity, unit_price)').eq('company_id', company_id).eq('status', 'active').lte('next_run_date', format(addDays(new Date(), 30), 'yyyy-MM-dd')));
-        promises.push(supabaseAdmin.from('recurring_bills').select('next_run_date, recurring_bill_items(quantity, unit_cost)').eq('company_id', company_id).eq('status', 'active').lte('next_run_date', format(addDays(new Date(), 30), 'yyyy-MM-dd')));
-        // Revenue Data for Top Customers chart
-        promises.push(supabaseAdmin.from('journal_entries').select('customer_id, customers(name), journal_entry_items(amount, type, account_id)').eq('company_id', company_id).gte('entry_date', startDateStr).lte('entry_date', asOfDateStr).not('customer_id', 'is', null));
+        // Former indices 22–26 (two joined document queries, two
+        // recurring-schedule queries and a journal-entry customer join) are
+        // gone. Since the CFA convergence they were assigned to locals that no
+        // code read: `expectedPayments`/`topCustomers` are [] and the cash
+        // forecast is CFA cash. They were briefly kept as no-op stubs to
+        // preserve the positional results[] mapping; nothing indexes past 21,
+        // so the stubs are removed too.
     }
 
     const results = await Promise.all(promises);
@@ -132,32 +135,25 @@ serve(withEnterprisePlatform('dashboard-data', 'tenant', async (req, _ctx) => {
     const entriesCheck = results[12];
     const payrollRunsCheck = results[13];
 
-    let accountsRes = { data: [] }, periodActivityRes = { data: [] }, monthlySummaryRes = { data: [] }, apBalancesRes = { data: [] }, topExpensesRes = { data: [] }, bankAccountsRes = { data: [] }, futureInvoicesRes = { data: [] }, futureBillsRes = { data: [] }, futureRecInvRes = { data: [] }, futureRecBillsRes = { data: [] }, revenueRes = { data: [] }, coaMetaRes = { data: [] }, cashFlowRes = { data: [] };
+    let accountsRes = { data: [] }, periodActivityRes = { data: [] }, monthlySummaryRes = { data: [] }, apBalancesRes = { data: [] }, topExpensesRes = { data: [] }, bankAccountsRes = { data: [] }, coaMetaRes = { data: [] }, cashFlowRes = { data: [] };
     let forecast = [], topCustomers = [], expectedPayments = [];
-    let periodNetIncome = 0;
-    let periodRevenue = 0;
-    let periodExpenses = 0;
-    let totalAssets = 0;
-    let totalLiabilities = 0;
-    let totalStoredEquity = 0;
-    let totalEquity = 0;
-    let cashBalance = 0;
-    let canonicalAggregation = null;
+    // SINGLE money field. Every monetary figure the Dashboard renders is read
+    // from this object; the former per-KPI scalars (periodNetIncome,
+    // periodRevenue, periodExpenses, totalAssets, totalLiabilities,
+    // totalStoredEquity, totalEquity, cashBalance) were copies of these very
+    // properties and are gone — a copy is a second place to drift.
+    let statementTotals = null;
 
     if (isAdmin) {
         accountsRes = results[14];
         periodActivityRes = results[15];
-        monthlySummaryRes = results[16];
+        // 16 and 18 are the retired get_monthly_summary / get_top_expenses
+        // slots: still pushed as no-op stubs to hold the positions of 17 and
+        // 19–21, but never read — both charts are rebuilt from CFA below.
         apBalancesRes = results[17];
-        topExpensesRes = results[18];
         bankAccountsRes = results[19];
         coaMetaRes = results[20];
         cashFlowRes = results[21];
-        futureInvoicesRes = results[22];
-        futureBillsRes = results[23];
-        futureRecInvRes = results[24];
-        futureRecBillsRes = results[25];
-        revenueRes = results[26];
 
         // Canonical Financial Aggregation — ONLY money authority for Dashboard KPIs.
         const bankCoaIds = (bankAccountsRes.data || []).map((a) => a.chart_of_account_id).filter(Boolean);
@@ -173,15 +169,7 @@ serve(withEnterprisePlatform('dashboard-data', 'tenant', async (req, _ctx) => {
           retainedEarningsAccountIds,
           bankCoaIds,
         });
-        canonicalAggregation = totals;
-        periodRevenue = totals.totalIncome;
-        periodExpenses = totals.totalExpenses;
-        periodNetIncome = totals.netIncome;
-        totalAssets = totals.totalAssets;
-        totalLiabilities = totals.totalLiabilities;
-        totalStoredEquity = totals.totalStoredEquity;
-        totalEquity = totals.totalEquity;
-        cashBalance = totals.cash;
+        statementTotals = totals;
 
         // Charts: CFA partitions only — no JE / monthly-summary / top-expenses engines.
         monthlySummaryRes = {
@@ -206,7 +194,7 @@ serve(withEnterprisePlatform('dashboard-data', 'tenant', async (req, _ctx) => {
         expectedPayments = [];
         // Forecast opening = CFA cash only (no invoice/bill projection sums).
         const todayStr = format(new Date(), 'yyyy-MM-dd');
-        forecast = [{ date: todayStr, balance: cashBalance, type: 'actual' }];
+        forecast = [{ date: todayStr, balance: totals.cash, type: 'actual' }];
     }
 
     // Payroll KPIs for dashboard
@@ -229,18 +217,14 @@ serve(withEnterprisePlatform('dashboard-data', 'tenant', async (req, _ctx) => {
 
     const responseData = {
       role: member.role, // Pass role back to UI for rendering logic
+      // Raw as-of GL balance rows. NOT a total — consumed only for per-account
+      // display (bank account list) and never summed into a KPI.
       accounts: accountsRes.data || [],
-      periodNetIncome,
-      periodRevenue,
-      periodExpenses,
-      totalAssets,
-      totalLiabilities,
-      totalStoredEquity,
-      totalEquity,
-      cashBalance,
-      // Full canonical payload — consumers must use these figures, not re-sum.
-      canonicalAggregation,
-      statementTotals: canonicalAggregation,
+      // The ONE canonical money field: buildStatementTotals() output, i.e.
+      // buildCanonicalFinancialAggregation() over get_balances_as_of_date +
+      // get_period_activity + get_cash_flow_statement. Null for non-admins.
+      // Consumers read these figures and must never re-sum or fall back.
+      statementTotals,
       reportingPeriod: { from: startDateStr, to: asOfDateStr },
       monthlySummary: monthlySummaryRes.data || [],
       arBalances: arBalancesRes.data || [],

@@ -48,10 +48,16 @@ export type ExportReportOptions = {
   detailRows?: Record<string, string | number>[];
 };
 
-export function exportReportRows(
+/**
+ * Async because the PDF branch now fetches the jsPDF engine on demand rather
+ * than importing it at module scope (see src/lib/pdf/pdfEngine.ts). The csv /
+ * excel / json branches do no extra work and resolve immediately — output and
+ * artifact shape are unchanged for every format.
+ */
+export async function exportReportRows(
   rows: Record<string, string | number>[],
   options: ExportReportOptions
-): ExportArtifact {
+): Promise<ExportArtifact> {
   const exportedAt = new Date().toISOString();
   const base = options.fileBaseName.replace(/\.+$/, '');
   const inBrowser = typeof document !== 'undefined';
@@ -105,7 +111,7 @@ export function exportReportRows(
   }
 
   if (inBrowser) assertExportBranding(options.branding, 'pdf');
-  const result = exportPdf(rows, {
+  const result = await exportPdf(rows, {
     fileName: base,
     title: options.branding?.reportTitle ?? options.title,
     subtitle: options.branding?.period ?? options.subtitle,
@@ -128,7 +134,7 @@ export async function exportReportRowsAsync(
   options: ExportReportOptions
 ): Promise<ExportArtifact> {
   if (options.format !== 'pdf') {
-    return exportReportRows(rows, options);
+    return await exportReportRows(rows, options);
   }
   const exportedAt = new Date().toISOString();
   const base = options.fileBaseName.replace(/\.+$/, '');

@@ -9,6 +9,7 @@ import { Book, BookOpen, LayoutDashboard, BookText, Library, Target, Repeat, Bui
 import { cn } from '../lib/utils';
 import { Button } from './ui/button';
 import { useAuth } from '../contexts/AuthContext';
+import { useReportingPeriod } from '../contexts/ReportingPeriodContext';
 // Phase P1.1 — named imports instead of `import * as queries`: SidebarNav is
 // part of the always-eager shell (Layout), so a namespace import was pulling
 // the entire lib/queries.ts module graph — all 58 exports, not just the 37
@@ -83,6 +84,8 @@ export const SidebarNav = ({ className, onNavigate }: SidebarNavProps) => {
   const pathname = location.pathname;
   const queryClient = useQueryClient();
   const { activeCompany, role, session, profile, user } = useAuth();
+  // Same reporting authority the pages use, so prefetched cache keys match.
+  const { dateFrom, dateTo, isReady: isReportingPeriodReady } = useReportingPeriod();
   const isAdmin = role === 'owner' || role === 'admin';
   const showFinancialStatementsNav = shouldShowFinancialStatementsNav({
     role,
@@ -106,8 +109,32 @@ export const SidebarNav = ({ className, onNavigate }: SidebarNavProps) => {
     });
   };
 
+  /**
+   * Prefetch for workspace queries whose cache key includes the reporting
+   * period. These were previously passed to `prefetch` above, which supplies
+   * only a company id — so the factory received `undefined` dates and built the
+   * key `[..., undefined, undefined]`. That key can never match the one the
+   * page itself builds, so every hover fired a `dashboard-data` request whose
+   * result was uncacheable and unusable. Binding the real period makes the
+   * prefetch actually warm the page's cache entry.
+   */
+  const prefetchForPeriod = (
+    query: (
+      companyId: string,
+      dateFrom: string,
+      dateTo: string,
+    ) => { queryKey: readonly unknown[]; queryFn: () => Promise<unknown> },
+    options?: { adminOnly?: boolean }
+  ) => {
+    if (!activeCompany || !isReportingPeriodReady || !dateFrom || !dateTo) return;
+    if (options?.adminOnly && !isAdmin) return;
+    queryClient.prefetchQuery(query(activeCompany.id, dateFrom, dateTo)).catch(() => {
+      // Prefetch is best-effort; avoid noisy console errors on hover.
+    });
+  };
+
   const salesLinks = [
-    { to: '/sales', label: 'Revenue', icon: TrendingUp, prefetch: () => prefetch(queries.revenueWorkspaceQuery) },
+    { to: '/sales', label: 'Revenue', icon: TrendingUp, prefetch: () => prefetchForPeriod(queries.revenueWorkspaceQuery) },
     { to: '/quotes', label: 'Quotes', icon: Quote, prefetch: () => prefetch(queries.quotesQuery) },
     { to: '/invoices', label: 'Invoices', icon: FileSignature, prefetch: () => prefetch(queries.invoicesQuery) },
     { to: '/credit-notes', label: 'Credit Notes', icon: ReceiptText, prefetch: () => prefetch(queries.creditNotesQuery) },
@@ -118,7 +145,7 @@ export const SidebarNav = ({ className, onNavigate }: SidebarNavProps) => {
   ];
 
   const purchasesLinks = [
-    { to: '/purchases', label: 'Spend', icon: Wallet, prefetch: () => prefetch(queries.purchasesWorkspaceQuery) },
+    { to: '/purchases', label: 'Spend', icon: Wallet, prefetch: () => prefetchForPeriod(queries.purchasesWorkspaceQuery) },
     { to: '/purchase-orders', label: 'Purchase Orders', icon: ShoppingBag, prefetch: () => prefetch(queries.purchaseOrdersQuery) },
     { to: '/bills', label: 'Bills', icon: Receipt, prefetch: () => prefetch(queries.billsQuery) },
     { to: '/vendor-credits', label: 'Vendor Credits', icon: TicketMinus, prefetch: () => prefetch(queries.vendorCreditsQuery) },

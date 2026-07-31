@@ -33,7 +33,7 @@ const TopCustomersChart = ({ data }: TopCustomersChartProps) => {
           cursor={{ fill: 'transparent' }}
           formatter={(value: number) => formatCurrency(value)}
         />
-        <Bar dataKey="amount" fill="#3b82f6" radius={[0, 4, 4, 0]} barSize={32}>
+        <Bar dataKey="amount" fill="#3b82f6" radius={[0, 4, 4, 0]} barSize={32} isAnimationActive={false}>
           {data.map((entry, index) => (
             <Cell key={`cell-${index}`} fill={index === 0 ? '#2563eb' : '#60a5fa'} />
           ))}

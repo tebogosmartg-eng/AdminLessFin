@@ -808,8 +808,14 @@ serve(withEnterprisePlatform('accounting', 'tenant', async (req, _ctx) => {
       case 'GET_ACCOUNT_INQUIRY': {
         const accountId = body.account_id;
         if (!accountId) throw new Error('account_id required');
-        const today = new Date().toISOString().slice(0, 10);
-        const yearStart = `${today.slice(0, 4)}-01-01`;
+        // Reporting dates come from the caller's reporting-period authority when
+        // supplied. The previous fallback derived the year start as
+        // `${year}-01-01`, which silently assumes a CALENDAR financial year and
+        // is wrong for any company whose financial year does not start in
+        // January. The fallback is retained only for callers that pass no dates,
+        // so behaviour is unchanged for them. No balance math is altered.
+        const today = body.end_date ?? new Date().toISOString().slice(0, 10);
+        const yearStart = body.start_date ?? `${today.slice(0, 4)}-01-01`;
 
         const [{ data: account }, { data: closing }, { data: opening }, { data: ytd }, { data: recentPr }, { data: recentLines }] = await Promise.all([
           supabaseAdmin.from('chart_of_accounts').select('*').eq('id', accountId).eq('company_id', company_id).single(),

@@ -1,0 +1,2906 @@
+{
+  "eagerFiles": [
+    "src/App.tsx",
+    "src/components/AdminRoute.tsx",
+    "src/components/BetaAnalyticsRoute.tsx",
+    "src/components/CommandMenu.tsx",
+    "src/components/CompanySwitcher.tsx",
+    "src/components/ErrorBoundary.tsx",
+    "src/components/FullScreenLoader.tsx",
+    "src/components/Layout.tsx",
+    "src/components/NotificationBell.tsx",
+    "src/components/ProtectedRoute.tsx",
+    "src/components/RouteLoadingFallback.tsx",
+    "src/components/SidebarNav.tsx",
+    "src/components/ThemeToggle.tsx",
+    "src/components/accounting/AccountingReadyGate.tsx",
+    "src/components/accounting/AccountingSetupGuidance.tsx",
+    "src/components/brand/AdminLessFinMark.tsx",
+    "src/components/brand/AppBrand.tsx",
+    "src/components/brand/AppHeaderLogo.tsx",
+    "src/components/brand/AppIcon.tsx",
+    "src/components/brand/AppLoadingLogo.tsx",
+    "src/components/brand/AppLogo.tsx",
+    "src/components/brand/AppSidebarLogo.tsx",
+    "src/components/brand/AppWordmark.tsx",
+    "src/components/brand/BrandImage.tsx",
+    "src/components/brand/CompanyLogo.tsx",
+    "src/components/brand/ProductBadge.tsx",
+    "src/components/brand/index.ts",
+    "src/components/financialClose/FinancialCloseGate.tsx",
+    "src/components/financialStatements/FinancialStatementsGate.tsx",
+    "src/components/marketing/MarketingShell.tsx",
+    "src/components/ui/accordion.tsx",
+    "src/components/ui/alert.tsx",
+    "src/components/ui/avatar.tsx",
+    "src/components/ui/button.tsx",
+    "src/components/ui/card.tsx",
+    "src/components/ui/collapsible.tsx",
+    "src/components/ui/command.tsx",
+    "src/components/ui/dialog.tsx",
+    "src/components/ui/dropdown-menu.tsx",
+    "src/components/ui/input.tsx",
+    "src/components/ui/label.tsx",
+    "src/components/ui/progress.tsx",
+    "src/components/ui/sheet.tsx",
+    "src/components/ui/skeleton.tsx",
+    "src/components/ui/sonner.tsx",
+    "src/components/ui/textarea.tsx",
+    "src/components/ui/toast.tsx",
+    "src/components/ui/toaster.tsx",
+    "src/components/ui/tooltip.tsx",
+    "src/config/brand.ts",
+    "src/contexts/AuthContext.tsx",
+    "src/contexts/ReportingPeriodContext.tsx",
+    "src/contexts/ThemeContext.tsx",
+    "src/globals.css",
+    "src/governance/domains/accountingHealth/service.ts",
+    "src/governance/domains/accountingPolicyEngine/service.ts",
+    "src/governance/domains/accountingReadiness/model.ts",
+    "src/governance/domains/accountingReadiness/service.ts",
+    "src/governance/domains/accountingRulesEngine/service.ts",
+    "src/governance/domains/businessEventOrchestrator/service.ts",
+    "src/governance/domains/corporateGovernance/service.ts",
+    "src/governance/domains/financialCalendar/model.ts",
+    "src/governance/domains/financialCalendar/service.ts",
+    "src/governance/domains/security/model.ts",
+    "src/governance/domains/security/service.ts",
+    "src/governance/featureFlags.ts",
+    "src/hooks/use-debounce.ts",
+    "src/hooks/use-toast.ts",
+    "src/hooks/useDocumentTitle.ts",
+    "src/hooks/useEnterpriseCalendar.ts",
+    "src/hooks/useEnterpriseIdentity.ts",
+    "src/integrations/supabase/client.ts",
+    "src/lib/accounting/accountRoles.ts",
+    "src/lib/accountingWorkspace.ts",
+    "src/lib/analytics/AnalyticsBootstrap.tsx",
+    "src/lib/analytics/betaAllowlist.ts",
+    "src/lib/analytics/events.ts",
+    "src/lib/analytics/productAnalytics.ts",
+    "src/lib/analytics/session.ts",
+    "src/lib/analytics/useAnalyticsContextSync.ts",
+    "src/lib/auth/ensureSessionForInvoke.ts",
+    "src/lib/boe/businessEvents.ts",
+    "src/lib/boe/commandTypes.ts",
+    "src/lib/boe/dispatchers/commandDispatcher.ts",
+    "src/lib/boe/dispatchers/eventDispatcher.ts",
+    "src/lib/boe/events/businessEvent.ts",
+    "src/lib/boe/executionContract.ts",
+    "src/lib/boe/orchestration.ts",
+    "src/lib/boe/subscribers/activitySubscriber.ts",
+    "src/lib/boe/subscribers/aiSubscriber.ts",
+    "src/lib/boe/subscribers/auditSubscriber.ts",
+    "src/lib/boe/subscribers/calendarSubscriber.ts",
+    "src/lib/boe/subscribers/dashboardSubscriber.ts",
+    "src/lib/boe/subscribers/documentSubscriber.ts",
+    "src/lib/boe/subscribers/notificationSubscriber.ts",
+    "src/lib/boe/subscribers/registry.ts",
+    "src/lib/employeeIdentity.ts",
+    "src/lib/enterpriseMasterData/calendar.ts",
+    "src/lib/enterpriseMasterData/identity.ts",
+    "src/lib/financialClose/flags.ts",
+    "src/lib/financialStatements/api.ts",
+    "src/lib/financialStatements/flags.ts",
+    "src/lib/financialStatements/masterData/deploymentVerification.ts",
+    "src/lib/financialStatements/masterData/hydration.ts",
+    "src/lib/financialStatements/masterData/index.ts",
+    "src/lib/financialStatements/masterData/legacyHydration.ts",
+    "src/lib/financialStatements/masterData/types.ts",
+    "src/lib/financialStatements/masterData/verifyDeployment.ts",
+    "src/lib/inventory/client.ts",
+    "src/lib/onboarding/copy.ts",
+    "src/lib/payrollIntelligence.ts",
+    "src/lib/payrollOperations.ts",
+    "src/lib/payrollWorkflow.ts",
+    "src/lib/platform/globalErrorHandlers.ts",
+    "src/lib/platform/observability.ts",
+    "src/lib/platform/platformError.ts",
+    "src/lib/queries.ts",
+    "src/lib/reportingPeriod/presets.ts",
+    "src/lib/utils.ts",
+    "src/main.tsx",
+    "src/pages/Auth.tsx",
+    "src/pages/ContactSales.tsx",
+    "src/pages/Landing.tsx",
+    "src/pages/NotFound.tsx",
+    "src/pages/legal/PrivacyPolicy.tsx",
+    "src/pages/legal/SecurityPolicy.tsx",
+    "src/pages/legal/TermsOfService.tsx",
+    "src/router.tsx",
+    "src/statutory/countries/botswana/registry.ts",
+    "src/statutory/countries/namibia/registry.ts",
+    "src/statutory/countries/south-africa/index.ts",
+    "src/statutory/countries/south-africa/registry.ts",
+    "src/statutory/countries/south-africa/years/2024-2025/index.ts",
+    "src/statutory/countries/south-africa/years/2024-2025/legislation/allowances/index.ts",
+    "src/statutory/countries/south-africa/years/2024-2025/legislation/deductions/index.ts",
+    "src/statutory/countries/south-africa/years/2024-2025/legislation/emp201/index.ts",
+    "src/statutory/countries/south-africa/years/2024-2025/legislation/fringe-benefits/index.ts",
+    "src/statutory/countries/south-africa/years/2024-2025/legislation/irp5/index.ts",
+    "src/statutory/countries/south-africa/years/2024-2025/legislation/medical/index.ts",
+    "src/statutory/countries/south-africa/years/2024-2025/legislation/paye/index.ts",
+    "src/statutory/countries/south-africa/years/2024-2025/legislation/rebates/index.ts",
+    "src/statutory/countries/south-africa/years/2024-2025/legislation/retirement/index.ts",
+    "src/statutory/countries/south-africa/years/2024-2025/legislation/sdl/index.ts",
+    "src/statutory/countries/south-africa/years/2024-2025/legislation/thresholds/index.ts",
+    "src/statutory/countries/south-africa/years/2024-2025/legislation/travel/index.ts",
+    "src/statutory/countries/south-africa/years/2024-2025/legislation/uif/index.ts",
+    "src/statutory/countries/south-africa/years/2024-2025/metadata.ts",
+    "src/statutory/countries/south-africa/years/2025-2026/index.ts",
+    "src/statutory/countries/south-africa/years/2025-2026/legislation/allowances/index.ts",
+    "src/statutory/countries/south-africa/years/2025-2026/legislation/deductions/index.ts",
+    "src/statutory/countries/south-africa/years/2025-2026/legislation/emp201/index.ts",
+    "src/statutory/countries/south-africa/years/2025-2026/legislation/fringe-benefits/index.ts",
+    "src/statutory/countries/south-africa/years/2025-2026/legislation/irp5/index.ts",
+    "src/statutory/countries/south-africa/years/2025-2026/legislation/medical/index.ts",
+    "src/statutory/countries/south-africa/years/2025-2026/legislation/paye/index.ts",
+    "src/statutory/countries/south-africa/years/2025-2026/legislation/rebates/index.ts",
+    "src/statutory/countries/south-africa/years/2025-2026/legislation/retirement/index.ts",
+    "src/statutory/countries/south-africa/years/2025-2026/legislation/sdl/index.ts",
+    "src/statutory/countries/south-africa/years/2025-2026/legislation/thresholds/index.ts",
+    "src/statutory/countries/south-africa/years/2025-2026/legislation/travel/index.ts",
+    "src/statutory/countries/south-africa/years/2025-2026/legislation/uif/index.ts",
+    "src/statutory/countries/south-africa/years/2025-2026/metadata.ts",
+    "src/statutory/countries/south-africa/years/2026-2027/index.ts",
+    "src/statutory/countries/south-africa/years/2026-2027/legislation/allowances/index.ts",
+    "src/statutory/countries/south-africa/years/2026-2027/legislation/deductions/index.ts",
+    "src/statutory/countries/south-africa/years/2026-2027/legislation/emp201/index.ts",
+    "src/statutory/countries/south-africa/years/2026-2027/legislation/fringe-benefits/index.ts",
+    "src/statutory/countries/south-africa/years/2026-2027/legislation/irp5/index.ts",
+    "src/statutory/countries/south-africa/years/2026-2027/legislation/medical/index.ts",
+    "src/statutory/countries/south-africa/years/2026-2027/legislation/paye/index.ts",
+    "src/statutory/countries/south-africa/years/2026-2027/legislation/rebates/index.ts",
+    "src/statutory/countries/south-africa/years/2026-2027/legislation/retirement/index.ts",
+    "src/statutory/countries/south-africa/years/2026-2027/legislation/sdl/index.ts",
+    "src/statutory/countries/south-africa/years/2026-2027/legislation/thresholds/index.ts",
+    "src/statutory/countries/south-africa/years/2026-2027/legislation/travel/index.ts",
+    "src/statutory/countries/south-africa/years/2026-2027/legislation/uif/index.ts",
+    "src/statutory/countries/south-africa/years/2026-2027/metadata.ts",
+    "src/statutory/index.ts",
+    "src/statutory/registry/checksum.ts",
+    "src/statutory/registry/countryPlugins.ts",
+    "src/statutory/registry/countryRegistry.ts",
+    "src/statutory/registry/provenance.ts",
+    "src/statutory/registry/resolveLegislation.ts",
+    "src/statutory/registry/toStatutoryRuleSet.ts",
+    "src/statutory/registry/types.ts",
+    "src/statutory/registry/verifyLegislation.ts",
+    "src/utils/toast.ts"
+  ],
+  "eagerPackages": [
+    ":0,",
+    "@radix-ui/react-accordion",
+    "@radix-ui/react-avatar",
+    "@radix-ui/react-collapsible",
+    "@radix-ui/react-dialog",
+    "@radix-ui/react-dropdown-menu",
+    "@radix-ui/react-label",
+    "@radix-ui/react-progress",
+    "@radix-ui/react-slot",
+    "@radix-ui/react-toast",
+    "@radix-ui/react-tooltip",
+    "@supabase/auth-ui-react",
+    "@supabase/auth-ui-shared",
+    "@supabase/supabase-js",
+    "@tanstack/react-query",
+    "class-variance-authority",
+    "clsx",
+    "cmdk",
+    "date-fns",
+    "lucide-react",
+    "next-themes",
+    "papaparse",
+    "react",
+    "react-dom",
+    "react-router-dom",
+    "sonner",
+    "tailwind-merge"
+  ],
+  "edges": [
+    {
+      "from": "src/main.tsx",
+      "to": "pkg:react-dom",
+      "specifier": "react-dom/client"
+    },
+    {
+      "from": "src/main.tsx",
+      "to": "src/App.tsx",
+      "specifier": "./App.tsx"
+    },
+    {
+      "from": "src/main.tsx",
+      "to": "src/contexts/ThemeContext.tsx",
+      "specifier": "./contexts/ThemeContext.tsx"
+    },
+    {
+      "from": "src/main.tsx",
+      "to": "src/statutory/index.ts",
+      "specifier": "./statutory"
+    },
+    {
+      "from": "src/main.tsx",
+      "to": "src/lib/platform/globalErrorHandlers.ts",
+      "specifier": "./lib/platform/globalErrorHandlers"
+    },
+    {
+      "from": "src/main.tsx",
+      "to": "src/globals.css",
+      "specifier": "./globals.css"
+    },
+    {
+      "from": "src/App.tsx",
+      "to": "src/components/ui/toaster.tsx",
+      "specifier": "./components/ui/toaster"
+    },
+    {
+      "from": "src/App.tsx",
+      "to": "src/components/ui/sonner.tsx",
+      "specifier": "./components/ui/sonner"
+    },
+    {
+      "from": "src/App.tsx",
+      "to": "src/components/ui/tooltip.tsx",
+      "specifier": "./components/ui/tooltip"
+    },
+    {
+      "from": "src/App.tsx",
+      "to": "pkg:@tanstack/react-query",
+      "specifier": "@tanstack/react-query"
+    },
+    {
+      "from": "src/App.tsx",
+      "to": "pkg:react-router-dom",
+      "specifier": "react-router-dom"
+    },
+    {
+      "from": "src/App.tsx",
+      "to": "src/contexts/AuthContext.tsx",
+      "specifier": "./contexts/AuthContext"
+    },
+    {
+      "from": "src/App.tsx",
+      "to": "src/contexts/ReportingPeriodContext.tsx",
+      "specifier": "./contexts/ReportingPeriodContext"
+    },
+    {
+      "from": "src/App.tsx",
+      "to": "src/components/ErrorBoundary.tsx",
+      "specifier": "./components/ErrorBoundary"
+    },
+    {
+      "from": "src/App.tsx",
+      "to": "src/lib/analytics/AnalyticsBootstrap.tsx",
+      "specifier": "./lib/analytics/AnalyticsBootstrap"
+    },
+    {
+      "from": "src/App.tsx",
+      "to": "src/router.tsx",
+      "specifier": "./router"
+    },
+    {
+      "from": "src/contexts/ThemeContext.tsx",
+      "to": "pkg:react",
+      "specifier": "react"
+    },
+    {
+      "from": "src/statutory/index.ts",
+      "to": "src/statutory/registry/types.ts",
+      "specifier": "./registry/types"
+    },
+    {
+      "from": "src/statutory/index.ts",
+      "to": "src/statutory/registry/checksum.ts",
+      "specifier": "./registry/checksum"
+    },
+    {
+      "from": "src/statutory/index.ts",
+      "to": "src/statutory/registry/countryRegistry.ts",
+      "specifier": "./registry/countryRegistry"
+    },
+    {
+      "from": "src/statutory/index.ts",
+      "to": "src/statutory/registry/countryPlugins.ts",
+      "specifier": "./registry/countryPlugins"
+    },
+    {
+      "from": "src/statutory/index.ts",
+      "to": "src/statutory/registry/resolveLegislation.ts",
+      "specifier": "./registry/resolveLegislation"
+    },
+    {
+      "from": "src/statutory/index.ts",
+      "to": "src/statutory/registry/verifyLegislation.ts",
+      "specifier": "./registry/verifyLegislation"
+    },
+    {
+      "from": "src/statutory/index.ts",
+      "to": "src/statutory/registry/toStatutoryRuleSet.ts",
+      "specifier": "./registry/toStatutoryRuleSet"
+    },
+    {
+      "from": "src/statutory/index.ts",
+      "to": "src/statutory/registry/provenance.ts",
+      "specifier": "./registry/provenance"
+    },
+    {
+      "from": "src/statutory/index.ts",
+      "to": "src/statutory/countries/south-africa/index.ts",
+      "specifier": "./countries/south-africa"
+    },
+    {
+      "from": "src/statutory/index.ts",
+      "to": "src/statutory/countries/south-africa/index.ts",
+      "specifier": "./countries/south-africa"
+    },
+    {
+      "from": "src/lib/platform/globalErrorHandlers.ts",
+      "to": "src/lib/analytics/productAnalytics.ts",
+      "specifier": "../analytics/productAnalytics"
+    },
+    {
+      "from": "src/components/ui/toaster.tsx",
+      "to": "src/hooks/use-toast.ts",
+      "specifier": "@/hooks/use-toast"
+    },
+    {
+      "from": "src/components/ui/toaster.tsx",
+      "to": "src/components/ui/toast.tsx",
+      "specifier": "@/components/ui/toast"
+    },
+    {
+      "from": "src/components/ui/sonner.tsx",
+      "to": "pkg:next-themes",
+      "specifier": "next-themes"
+    },
+    {
+      "from": "src/components/ui/sonner.tsx",
+      "to": "pkg:sonner",
+      "specifier": "sonner"
+    },
+    {
+      "from": "src/components/ui/tooltip.tsx",
+      "to": "pkg:react",
+      "specifier": "react"
+    },
+    {
+      "from": "src/components/ui/tooltip.tsx",
+      "to": "pkg:@radix-ui/react-tooltip",
+      "specifier": "@radix-ui/react-tooltip"
+    },
+    {
+      "from": "src/components/ui/tooltip.tsx",
+      "to": "src/lib/utils.ts",
+      "specifier": "@/lib/utils"
+    },
+    {
+      "from": "src/contexts/AuthContext.tsx",
+      "to": "pkg:react",
+      "specifier": "react"
+    },
+    {
+      "from": "src/contexts/AuthContext.tsx",
+      "to": "src/integrations/supabase/client.ts",
+      "specifier": "../integrations/supabase/client"
+    },
+    {
+      "from": "src/contexts/AuthContext.tsx",
+      "to": "pkg:@supabase/supabase-js",
+      "specifier": "@supabase/supabase-js"
+    },
+    {
+      "from": "src/contexts/AuthContext.tsx",
+      "to": "src/lib/auth/ensureSessionForInvoke.ts",
+      "specifier": "../lib/auth/ensureSessionForInvoke"
+    },
+    {
+      "from": "src/contexts/AuthContext.tsx",
+      "to": "src/lib/analytics/events.ts",
+      "specifier": "../lib/analytics/events"
+    },
+    {
+      "from": "src/contexts/AuthContext.tsx",
+      "to": "src/lib/analytics/productAnalytics.ts",
+      "specifier": "../lib/analytics/productAnalytics"
+    },
+    {
+      "from": "src/contexts/AuthContext.tsx",
+      "to": "src/lib/analytics/session.ts",
+      "specifier": "../lib/analytics/session"
+    },
+    {
+      "from": "src/contexts/ReportingPeriodContext.tsx",
+      "to": "pkg:react",
+      "specifier": "react"
+    },
+    {
+      "from": "src/contexts/ReportingPeriodContext.tsx",
+      "to": "pkg:@tanstack/react-query",
+      "specifier": "@tanstack/react-query"
+    },
+    {
+      "from": "src/contexts/ReportingPeriodContext.tsx",
+      "to": "pkg:date-fns",
+      "specifier": "date-fns"
+    },
+    {
+      "from": "src/contexts/ReportingPeriodContext.tsx",
+      "to": "src/contexts/AuthContext.tsx",
+      "specifier": "@/contexts/AuthContext"
+    },
+    {
+      "from": "src/contexts/ReportingPeriodContext.tsx",
+      "to": "src/hooks/useEnterpriseCalendar.ts",
+      "specifier": "@/hooks/useEnterpriseCalendar"
+    },
+    {
+      "from": "src/contexts/ReportingPeriodContext.tsx",
+      "to": "src/governance/domains/financialCalendar/service.ts",
+      "specifier": "@/governance/domains/financialCalendar/service"
+    },
+    {
+      "from": "src/contexts/ReportingPeriodContext.tsx",
+      "to": "src/lib/reportingPeriod/presets.ts",
+      "specifier": "@/lib/reportingPeriod/presets"
+    },
+    {
+      "from": "src/components/ErrorBoundary.tsx",
+      "to": "pkg:react",
+      "specifier": "react"
+    },
+    {
+      "from": "src/components/ErrorBoundary.tsx",
+      "to": "src/components/ui/card.tsx",
+      "specifier": "./ui/card"
+    },
+    {
+      "from": "src/components/ErrorBoundary.tsx",
+      "to": "pkg:lucide-react",
+      "specifier": "lucide-react"
+    },
+    {
+      "from": "src/components/ErrorBoundary.tsx",
+      "to": "src/components/ui/button.tsx",
+      "specifier": "./ui/button"
+    },
+    {
+      "from": "src/components/ErrorBoundary.tsx",
+      "to": "src/components/brand/index.ts",
+      "specifier": "./brand"
+    },
+    {
+      "from": "src/components/ErrorBoundary.tsx",
+      "to": "src/config/brand.ts",
+      "specifier": "../config/brand"
+    },
+    {
+      "from": "src/components/ErrorBoundary.tsx",
+      "to": "src/lib/analytics/productAnalytics.ts",
+      "specifier": "../lib/analytics/productAnalytics"
+    },
+    {
+      "from": "src/lib/analytics/AnalyticsBootstrap.tsx",
+      "to": "src/lib/analytics/useAnalyticsContextSync.ts",
+      "specifier": "@/lib/analytics/useAnalyticsContextSync"
+    },
+    {
+      "from": "src/router.tsx",
+      "to": "pkg:react",
+      "specifier": "react"
+    },
+    {
+      "from": "src/router.tsx",
+      "to": "pkg:react-router-dom",
+      "specifier": "react-router-dom"
+    },
+    {
+      "from": "src/router.tsx",
+      "to": "src/components/ProtectedRoute.tsx",
+      "specifier": "./components/ProtectedRoute"
+    },
+    {
+      "from": "src/router.tsx",
+      "to": "src/components/AdminRoute.tsx",
+      "specifier": "./components/AdminRoute"
+    },
+    {
+      "from": "src/router.tsx",
+      "to": "src/components/BetaAnalyticsRoute.tsx",
+      "specifier": "./components/BetaAnalyticsRoute"
+    },
+    {
+      "from": "src/router.tsx",
+      "to": "src/components/ErrorBoundary.tsx",
+      "specifier": "./components/ErrorBoundary"
+    },
+    {
+      "from": "src/router.tsx",
+      "to": "src/components/financialStatements/FinancialStatementsGate.tsx",
+      "specifier": "./components/financialStatements/FinancialStatementsGate"
+    },
+    {
+      "from": "src/router.tsx",
+      "to": "src/components/financialClose/FinancialCloseGate.tsx",
+      "specifier": "./components/financialClose/FinancialCloseGate"
+    },
+    {
+      "from": "src/router.tsx",
+      "to": "src/components/accounting/AccountingReadyGate.tsx",
+      "specifier": "./components/accounting/AccountingReadyGate"
+    },
+    {
+      "from": "src/router.tsx",
+      "to": "src/pages/Landing.tsx",
+      "specifier": "./pages/Landing"
+    },
+    {
+      "from": "src/router.tsx",
+      "to": "src/pages/Auth.tsx",
+      "specifier": "./pages/Auth"
+    },
+    {
+      "from": "src/router.tsx",
+      "to": "src/pages/NotFound.tsx",
+      "specifier": "./pages/NotFound"
+    },
+    {
+      "from": "src/router.tsx",
+      "to": "src/pages/legal/PrivacyPolicy.tsx",
+      "specifier": "./pages/legal/PrivacyPolicy"
+    },
+    {
+      "from": "src/router.tsx",
+      "to": "src/pages/legal/TermsOfService.tsx",
+      "specifier": "./pages/legal/TermsOfService"
+    },
+    {
+      "from": "src/router.tsx",
+      "to": "src/pages/legal/SecurityPolicy.tsx",
+      "specifier": "./pages/legal/SecurityPolicy"
+    },
+    {
+      "from": "src/router.tsx",
+      "to": "src/pages/ContactSales.tsx",
+      "specifier": "./pages/ContactSales"
+    },
+    {
+      "from": "src/statutory/registry/checksum.ts",
+      "to": "src/statutory/registry/types.ts",
+      "specifier": "./types"
+    },
+    {
+      "from": "src/statutory/registry/countryRegistry.ts",
+      "to": "src/statutory/countries/south-africa/registry.ts",
+      "specifier": "../countries/south-africa/registry"
+    },
+    {
+      "from": "src/statutory/registry/countryRegistry.ts",
+      "to": "src/statutory/countries/namibia/registry.ts",
+      "specifier": "../countries/namibia/registry"
+    },
+    {
+      "from": "src/statutory/registry/countryRegistry.ts",
+      "to": "src/statutory/countries/botswana/registry.ts",
+      "specifier": "../countries/botswana/registry"
+    },
+    {
+      "from": "src/statutory/registry/countryPlugins.ts",
+      "to": "src/statutory/registry/countryRegistry.ts",
+      "specifier": "./countryRegistry"
+    },
+    {
+      "from": "src/statutory/registry/countryPlugins.ts",
+      "to": "src/statutory/registry/toStatutoryRuleSet.ts",
+      "specifier": "./toStatutoryRuleSet"
+    },
+    {
+      "from": "src/statutory/registry/resolveLegislation.ts",
+      "to": "src/statutory/registry/types.ts",
+      "specifier": "./types"
+    },
+    {
+      "from": "src/statutory/registry/resolveLegislation.ts",
+      "to": "src/statutory/registry/countryRegistry.ts",
+      "specifier": "./countryRegistry"
+    },
+    {
+      "from": "src/statutory/registry/verifyLegislation.ts",
+      "to": "src/statutory/registry/types.ts",
+      "specifier": "./types"
+    },
+    {
+      "from": "src/statutory/registry/verifyLegislation.ts",
+      "to": "src/statutory/registry/countryRegistry.ts",
+      "specifier": "./countryRegistry"
+    },
+    {
+      "from": "src/statutory/registry/toStatutoryRuleSet.ts",
+      "to": "src/statutory/registry/types.ts",
+      "specifier": "./types"
+    },
+    {
+      "from": "src/statutory/registry/provenance.ts",
+      "to": "src/statutory/registry/resolveLegislation.ts",
+      "specifier": "./resolveLegislation"
+    },
+    {
+      "from": "src/statutory/countries/south-africa/index.ts",
+      "to": "src/statutory/countries/south-africa/registry.ts",
+      "specifier": "./registry"
+    },
+    {
+      "from": "src/lib/analytics/productAnalytics.ts",
+      "to": "src/integrations/supabase/client.ts",
+      "specifier": "@/integrations/supabase/client"
+    },
+    {
+      "from": "src/lib/analytics/productAnalytics.ts",
+      "to": "src/lib/analytics/events.ts",
+      "specifier": "./events"
+    },
+    {
+      "from": "src/lib/analytics/productAnalytics.ts",
+      "to": "src/lib/analytics/session.ts",
+      "specifier": "./session"
+    },
+    {
+      "from": "src/hooks/use-toast.ts",
+      "to": "pkg:react",
+      "specifier": "react"
+    },
+    {
+      "from": "src/components/ui/toast.tsx",
+      "to": "pkg:react",
+      "specifier": "react"
+    },
+    {
+      "from": "src/components/ui/toast.tsx",
+      "to": "pkg:@radix-ui/react-toast",
+      "specifier": "@radix-ui/react-toast"
+    },
+    {
+      "from": "src/components/ui/toast.tsx",
+      "to": "pkg:class-variance-authority",
+      "specifier": "class-variance-authority"
+    },
+    {
+      "from": "src/components/ui/toast.tsx",
+      "to": "pkg:lucide-react",
+      "specifier": "lucide-react"
+    },
+    {
+      "from": "src/components/ui/toast.tsx",
+      "to": "src/lib/utils.ts",
+      "specifier": "@/lib/utils"
+    },
+    {
+      "from": "src/lib/utils.ts",
+      "to": "pkg:clsx",
+      "specifier": "clsx"
+    },
+    {
+      "from": "src/lib/utils.ts",
+      "to": "pkg:tailwind-merge",
+      "specifier": "tailwind-merge"
+    },
+    {
+      "from": "src/lib/utils.ts",
+      "to": "pkg:papaparse",
+      "specifier": "papaparse"
+    },
+    {
+      "from": "src/integrations/supabase/client.ts",
+      "to": "pkg:@supabase/supabase-js",
+      "specifier": "@supabase/supabase-js"
+    },
+    {
+      "from": "src/lib/auth/ensureSessionForInvoke.ts",
+      "to": "src/integrations/supabase/client.ts",
+      "specifier": "../../integrations/supabase/client"
+    },
+    {
+      "from": "src/hooks/useEnterpriseCalendar.ts",
+      "to": "pkg:@tanstack/react-query",
+      "specifier": "@tanstack/react-query"
+    },
+    {
+      "from": "src/hooks/useEnterpriseCalendar.ts",
+      "to": "src/governance/domains/financialCalendar/service.ts",
+      "specifier": "@/governance/domains/financialCalendar/service"
+    },
+    {
+      "from": "src/hooks/useEnterpriseCalendar.ts",
+      "to": "src/lib/enterpriseMasterData/calendar.ts",
+      "specifier": "@/lib/enterpriseMasterData/calendar"
+    },
+    {
+      "from": "src/governance/domains/financialCalendar/service.ts",
+      "to": "src/lib/accountingWorkspace.ts",
+      "specifier": "@/lib/accountingWorkspace"
+    },
+    {
+      "from": "src/governance/domains/financialCalendar/service.ts",
+      "to": "src/integrations/supabase/client.ts",
+      "specifier": "@/integrations/supabase/client"
+    },
+    {
+      "from": "src/governance/domains/financialCalendar/service.ts",
+      "to": "src/governance/featureFlags.ts",
+      "specifier": "@/governance/featureFlags"
+    },
+    {
+      "from": "src/governance/domains/financialCalendar/service.ts",
+      "to": "src/governance/domains/financialCalendar/model.ts",
+      "specifier": "./model"
+    },
+    {
+      "from": "src/lib/reportingPeriod/presets.ts",
+      "to": "pkg:date-fns",
+      "specifier": "date-fns"
+    },
+    {
+      "from": "src/components/ui/card.tsx",
+      "to": "pkg:react",
+      "specifier": "react"
+    },
+    {
+      "from": "src/components/ui/card.tsx",
+      "to": "src/lib/utils.ts",
+      "specifier": "@/lib/utils"
+    },
+    {
+      "from": "src/components/ui/button.tsx",
+      "to": "pkg:react",
+      "specifier": "react"
+    },
+    {
+      "from": "src/components/ui/button.tsx",
+      "to": "pkg:@radix-ui/react-slot",
+      "specifier": "@radix-ui/react-slot"
+    },
+    {
+      "from": "src/components/ui/button.tsx",
+      "to": "pkg:class-variance-authority",
+      "specifier": "class-variance-authority"
+    },
+    {
+      "from": "src/components/ui/button.tsx",
+      "to": "src/lib/utils.ts",
+      "specifier": "@/lib/utils"
+    },
+    {
+      "from": "src/components/brand/index.ts",
+      "to": "src/components/brand/AdminLessFinMark.tsx",
+      "specifier": "./AdminLessFinMark"
+    },
+    {
+      "from": "src/components/brand/index.ts",
+      "to": "src/components/brand/AppIcon.tsx",
+      "specifier": "./AppIcon"
+    },
+    {
+      "from": "src/components/brand/index.ts",
+      "to": "src/components/brand/AppLogo.tsx",
+      "specifier": "./AppLogo"
+    },
+    {
+      "from": "src/components/brand/index.ts",
+      "to": "src/components/brand/AppWordmark.tsx",
+      "specifier": "./AppWordmark"
+    },
+    {
+      "from": "src/components/brand/index.ts",
+      "to": "src/components/brand/AppBrand.tsx",
+      "specifier": "./AppBrand"
+    },
+    {
+      "from": "src/components/brand/index.ts",
+      "to": "src/components/brand/ProductBadge.tsx",
+      "specifier": "./ProductBadge"
+    },
+    {
+      "from": "src/components/brand/index.ts",
+      "to": "src/components/brand/AppLoadingLogo.tsx",
+      "specifier": "./AppLoadingLogo"
+    },
+    {
+      "from": "src/components/brand/index.ts",
+      "to": "src/components/brand/AppHeaderLogo.tsx",
+      "specifier": "./AppHeaderLogo"
+    },
+    {
+      "from": "src/components/brand/index.ts",
+      "to": "src/components/brand/AppSidebarLogo.tsx",
+      "specifier": "./AppSidebarLogo"
+    },
+    {
+      "from": "src/components/brand/index.ts",
+      "to": "src/components/brand/CompanyLogo.tsx",
+      "specifier": "./CompanyLogo"
+    },
+    {
+      "from": "src/components/brand/index.ts",
+      "to": "src/components/brand/BrandImage.tsx",
+      "specifier": "./BrandImage"
+    },
+    {
+      "from": "src/lib/analytics/useAnalyticsContextSync.ts",
+      "to": "pkg:react",
+      "specifier": "react"
+    },
+    {
+      "from": "src/lib/analytics/useAnalyticsContextSync.ts",
+      "to": "src/contexts/AuthContext.tsx",
+      "specifier": "@/contexts/AuthContext"
+    },
+    {
+      "from": "src/lib/analytics/useAnalyticsContextSync.ts",
+      "to": "src/lib/analytics/productAnalytics.ts",
+      "specifier": "./productAnalytics"
+    },
+    {
+      "from": "src/components/ProtectedRoute.tsx",
+      "to": "src/contexts/AuthContext.tsx",
+      "specifier": "../contexts/AuthContext"
+    },
+    {
+      "from": "src/components/ProtectedRoute.tsx",
+      "to": "pkg:react-router-dom",
+      "specifier": "react-router-dom"
+    },
+    {
+      "from": "src/components/ProtectedRoute.tsx",
+      "to": "src/components/Layout.tsx",
+      "specifier": "./Layout"
+    },
+    {
+      "from": "src/components/ProtectedRoute.tsx",
+      "to": "src/components/FullScreenLoader.tsx",
+      "specifier": "./FullScreenLoader"
+    },
+    {
+      "from": "src/components/ProtectedRoute.tsx",
+      "to": "src/pages/Landing.tsx",
+      "specifier": "../pages/Landing"
+    },
+    {
+      "from": "src/components/AdminRoute.tsx",
+      "to": "src/contexts/AuthContext.tsx",
+      "specifier": "../contexts/AuthContext"
+    },
+    {
+      "from": "src/components/AdminRoute.tsx",
+      "to": "pkg:react-router-dom",
+      "specifier": "react-router-dom"
+    },
+    {
+      "from": "src/components/AdminRoute.tsx",
+      "to": "src/components/FullScreenLoader.tsx",
+      "specifier": "./FullScreenLoader"
+    },
+    {
+      "from": "src/components/BetaAnalyticsRoute.tsx",
+      "to": "src/contexts/AuthContext.tsx",
+      "specifier": "../contexts/AuthContext"
+    },
+    {
+      "from": "src/components/BetaAnalyticsRoute.tsx",
+      "to": "pkg:react-router-dom",
+      "specifier": "react-router-dom"
+    },
+    {
+      "from": "src/components/BetaAnalyticsRoute.tsx",
+      "to": "src/components/FullScreenLoader.tsx",
+      "specifier": "./FullScreenLoader"
+    },
+    {
+      "from": "src/components/BetaAnalyticsRoute.tsx",
+      "to": "src/lib/analytics/betaAllowlist.ts",
+      "specifier": "../lib/analytics/betaAllowlist"
+    },
+    {
+      "from": "src/components/financialStatements/FinancialStatementsGate.tsx",
+      "to": "pkg:react-router-dom",
+      "specifier": "react-router-dom"
+    },
+    {
+      "from": "src/components/financialStatements/FinancialStatementsGate.tsx",
+      "to": "src/contexts/AuthContext.tsx",
+      "specifier": "../../contexts/AuthContext"
+    },
+    {
+      "from": "src/components/financialStatements/FinancialStatementsGate.tsx",
+      "to": "src/lib/financialStatements/flags.ts",
+      "specifier": "../../lib/financialStatements/flags"
+    },
+    {
+      "from": "src/components/financialStatements/FinancialStatementsGate.tsx",
+      "to": "src/components/FullScreenLoader.tsx",
+      "specifier": "../FullScreenLoader"
+    },
+    {
+      "from": "src/components/financialClose/FinancialCloseGate.tsx",
+      "to": "pkg:react-router-dom",
+      "specifier": "react-router-dom"
+    },
+    {
+      "from": "src/components/financialClose/FinancialCloseGate.tsx",
+      "to": "src/contexts/AuthContext.tsx",
+      "specifier": "../../contexts/AuthContext"
+    },
+    {
+      "from": "src/components/financialClose/FinancialCloseGate.tsx",
+      "to": "src/lib/financialClose/flags.ts",
+      "specifier": "../../lib/financialClose/flags"
+    },
+    {
+      "from": "src/components/financialClose/FinancialCloseGate.tsx",
+      "to": "src/components/FullScreenLoader.tsx",
+      "specifier": "../FullScreenLoader"
+    },
+    {
+      "from": "src/components/accounting/AccountingReadyGate.tsx",
+      "to": "pkg:@tanstack/react-query",
+      "specifier": "@tanstack/react-query"
+    },
+    {
+      "from": "src/components/accounting/AccountingReadyGate.tsx",
+      "to": "src/contexts/AuthContext.tsx",
+      "specifier": "../../contexts/AuthContext"
+    },
+    {
+      "from": "src/components/accounting/AccountingReadyGate.tsx",
+      "to": "src/lib/queries.ts",
+      "specifier": "../../lib/queries"
+    },
+    {
+      "from": "src/components/accounting/AccountingReadyGate.tsx",
+      "to": "src/components/FullScreenLoader.tsx",
+      "specifier": "../FullScreenLoader"
+    },
+    {
+      "from": "src/components/accounting/AccountingReadyGate.tsx",
+      "to": "src/components/accounting/AccountingSetupGuidance.tsx",
+      "specifier": "./AccountingSetupGuidance"
+    },
+    {
+      "from": "src/pages/Landing.tsx",
+      "to": "pkg:react-router-dom",
+      "specifier": "react-router-dom"
+    },
+    {
+      "from": "src/pages/Landing.tsx",
+      "to": "src/components/ui/button.tsx",
+      "specifier": "../components/ui/button"
+    },
+    {
+      "from": "src/pages/Landing.tsx",
+      "to": "src/components/ui/accordion.tsx",
+      "specifier": "../components/ui/accordion"
+    },
+    {
+      "from": "src/pages/Landing.tsx",
+      "to": "pkg:lucide-react",
+      "specifier": "lucide-react"
+    },
+    {
+      "from": "src/pages/Landing.tsx",
+      "to": "src/components/brand/index.ts",
+      "specifier": "../components/brand"
+    },
+    {
+      "from": "src/pages/Landing.tsx",
+      "to": "src/config/brand.ts",
+      "specifier": "../config/brand"
+    },
+    {
+      "from": "src/pages/Landing.tsx",
+      "to": "src/hooks/useDocumentTitle.ts",
+      "specifier": "../hooks/useDocumentTitle"
+    },
+    {
+      "from": "src/pages/Landing.tsx",
+      "to": "src/components/ui/sheet.tsx",
+      "specifier": "../components/ui/sheet"
+    },
+    {
+      "from": "src/pages/Auth.tsx",
+      "to": "src/integrations/supabase/client.ts",
+      "specifier": "../integrations/supabase/client"
+    },
+    {
+      "from": "src/pages/Auth.tsx",
+      "to": "pkg:@supabase/auth-ui-react",
+      "specifier": "@supabase/auth-ui-react"
+    },
+    {
+      "from": "src/pages/Auth.tsx",
+      "to": "pkg:@supabase/auth-ui-shared",
+      "specifier": "@supabase/auth-ui-shared"
+    },
+    {
+      "from": "src/pages/Auth.tsx",
+      "to": "src/contexts/AuthContext.tsx",
+      "specifier": "../contexts/AuthContext"
+    },
+    {
+      "from": "src/pages/Auth.tsx",
+      "to": "pkg:react-router-dom",
+      "specifier": "react-router-dom"
+    },
+    {
+      "from": "src/pages/Auth.tsx",
+      "to": "pkg:lucide-react",
+      "specifier": "lucide-react"
+    },
+    {
+      "from": "src/pages/Auth.tsx",
+      "to": "src/components/brand/index.ts",
+      "specifier": "../components/brand"
+    },
+    {
+      "from": "src/pages/Auth.tsx",
+      "to": "src/config/brand.ts",
+      "specifier": "../config/brand"
+    },
+    {
+      "from": "src/pages/Auth.tsx",
+      "to": "src/hooks/useDocumentTitle.ts",
+      "specifier": "../hooks/useDocumentTitle"
+    },
+    {
+      "from": "src/pages/NotFound.tsx",
+      "to": "pkg:react-router-dom",
+      "specifier": "react-router-dom"
+    },
+    {
+      "from": "src/pages/NotFound.tsx",
+      "to": "pkg:react",
+      "specifier": "react"
+    },
+    {
+      "from": "src/pages/NotFound.tsx",
+      "to": "src/components/brand/index.ts",
+      "specifier": "@/components/brand"
+    },
+    {
+      "from": "src/pages/NotFound.tsx",
+      "to": "src/config/brand.ts",
+      "specifier": "@/config/brand"
+    },
+    {
+      "from": "src/pages/NotFound.tsx",
+      "to": "src/hooks/useDocumentTitle.ts",
+      "specifier": "@/hooks/useDocumentTitle"
+    },
+    {
+      "from": "src/pages/NotFound.tsx",
+      "to": "src/components/ui/button.tsx",
+      "specifier": "@/components/ui/button"
+    },
+    {
+      "from": "src/pages/legal/PrivacyPolicy.tsx",
+      "to": "pkg:react-router-dom",
+      "specifier": "react-router-dom"
+    },
+    {
+      "from": "src/pages/legal/PrivacyPolicy.tsx",
+      "to": "src/components/marketing/MarketingShell.tsx",
+      "specifier": "../../components/marketing/MarketingShell"
+    },
+    {
+      "from": "src/pages/legal/PrivacyPolicy.tsx",
+      "to": "src/config/brand.ts",
+      "specifier": "../../config/brand"
+    },
+    {
+      "from": "src/pages/legal/TermsOfService.tsx",
+      "to": "pkg:react-router-dom",
+      "specifier": "react-router-dom"
+    },
+    {
+      "from": "src/pages/legal/TermsOfService.tsx",
+      "to": "src/components/marketing/MarketingShell.tsx",
+      "specifier": "../../components/marketing/MarketingShell"
+    },
+    {
+      "from": "src/pages/legal/TermsOfService.tsx",
+      "to": "src/config/brand.ts",
+      "specifier": "../../config/brand"
+    },
+    {
+      "from": "src/pages/legal/SecurityPolicy.tsx",
+      "to": "pkg:react-router-dom",
+      "specifier": "react-router-dom"
+    },
+    {
+      "from": "src/pages/legal/SecurityPolicy.tsx",
+      "to": "pkg:lucide-react",
+      "specifier": "lucide-react"
+    },
+    {
+      "from": "src/pages/legal/SecurityPolicy.tsx",
+      "to": "src/components/marketing/MarketingShell.tsx",
+      "specifier": "../../components/marketing/MarketingShell"
+    },
+    {
+      "from": "src/pages/legal/SecurityPolicy.tsx",
+      "to": "src/config/brand.ts",
+      "specifier": "../../config/brand"
+    },
+    {
+      "from": "src/pages/ContactSales.tsx",
+      "to": "pkg:react",
+      "specifier": "react"
+    },
+    {
+      "from": "src/pages/ContactSales.tsx",
+      "to": "pkg:lucide-react",
+      "specifier": "lucide-react"
+    },
+    {
+      "from": "src/pages/ContactSales.tsx",
+      "to": "src/components/marketing/MarketingShell.tsx",
+      "specifier": "../components/marketing/MarketingShell"
+    },
+    {
+      "from": "src/pages/ContactSales.tsx",
+      "to": "src/components/ui/button.tsx",
+      "specifier": "../components/ui/button"
+    },
+    {
+      "from": "src/pages/ContactSales.tsx",
+      "to": "src/components/ui/input.tsx",
+      "specifier": "../components/ui/input"
+    },
+    {
+      "from": "src/pages/ContactSales.tsx",
+      "to": "src/components/ui/label.tsx",
+      "specifier": "../components/ui/label"
+    },
+    {
+      "from": "src/pages/ContactSales.tsx",
+      "to": "src/components/ui/textarea.tsx",
+      "specifier": "../components/ui/textarea"
+    },
+    {
+      "from": "src/pages/ContactSales.tsx",
+      "to": "src/config/brand.ts",
+      "specifier": "../config/brand"
+    },
+    {
+      "from": "src/statutory/countries/south-africa/registry.ts",
+      "to": "src/statutory/countries/south-africa/years/2024-2025/index.ts",
+      "specifier": "./years/2024-2025"
+    },
+    {
+      "from": "src/statutory/countries/south-africa/registry.ts",
+      "to": "src/statutory/countries/south-africa/years/2025-2026/index.ts",
+      "specifier": "./years/2025-2026"
+    },
+    {
+      "from": "src/statutory/countries/south-africa/registry.ts",
+      "to": "src/statutory/countries/south-africa/years/2026-2027/index.ts",
+      "specifier": "./years/2026-2027"
+    },
+    {
+      "from": "src/lib/enterpriseMasterData/calendar.ts",
+      "to": "src/governance/domains/financialCalendar/service.ts",
+      "specifier": "@/governance/domains/financialCalendar/service"
+    },
+    {
+      "from": "src/lib/accountingWorkspace.ts",
+      "to": "src/integrations/supabase/client.ts",
+      "specifier": "../integrations/supabase/client"
+    },
+    {
+      "from": "src/components/brand/AdminLessFinMark.tsx",
+      "to": "src/lib/utils.ts",
+      "specifier": "@/lib/utils"
+    },
+    {
+      "from": "src/components/brand/AdminLessFinMark.tsx",
+      "to": "pkg:react",
+      "specifier": "react"
+    },
+    {
+      "from": "src/components/brand/AppIcon.tsx",
+      "to": "src/components/brand/BrandImage.tsx",
+      "specifier": "./BrandImage"
+    },
+    {
+      "from": "src/components/brand/AppLogo.tsx",
+      "to": "src/lib/utils.ts",
+      "specifier": "@/lib/utils"
+    },
+    {
+      "from": "src/components/brand/AppLogo.tsx",
+      "to": "src/components/brand/AppIcon.tsx",
+      "specifier": "./AppIcon"
+    },
+    {
+      "from": "src/components/brand/AppLogo.tsx",
+      "to": "src/components/brand/AppWordmark.tsx",
+      "specifier": "./AppWordmark"
+    },
+    {
+      "from": "src/components/brand/AppLogo.tsx",
+      "to": "src/components/brand/ProductBadge.tsx",
+      "specifier": "./ProductBadge"
+    },
+    {
+      "from": "src/components/brand/AppWordmark.tsx",
+      "to": "src/lib/utils.ts",
+      "specifier": "@/lib/utils"
+    },
+    {
+      "from": "src/components/brand/AppWordmark.tsx",
+      "to": "src/config/brand.ts",
+      "specifier": "@/config/brand"
+    },
+    {
+      "from": "src/components/brand/AppBrand.tsx",
+      "to": "src/lib/utils.ts",
+      "specifier": "@/lib/utils"
+    },
+    {
+      "from": "src/components/brand/AppBrand.tsx",
+      "to": "src/components/brand/AppIcon.tsx",
+      "specifier": "./AppIcon"
+    },
+    {
+      "from": "src/components/brand/AppBrand.tsx",
+      "to": "src/components/brand/AppWordmark.tsx",
+      "specifier": "./AppWordmark"
+    },
+    {
+      "from": "src/components/brand/AppBrand.tsx",
+      "to": "src/components/brand/ProductBadge.tsx",
+      "specifier": "./ProductBadge"
+    },
+    {
+      "from": "src/components/brand/ProductBadge.tsx",
+      "to": "src/lib/utils.ts",
+      "specifier": "@/lib/utils"
+    },
+    {
+      "from": "src/components/brand/ProductBadge.tsx",
+      "to": "src/config/brand.ts",
+      "specifier": "@/config/brand"
+    },
+    {
+      "from": "src/components/brand/AppLoadingLogo.tsx",
+      "to": "src/lib/utils.ts",
+      "specifier": "@/lib/utils"
+    },
+    {
+      "from": "src/components/brand/AppLoadingLogo.tsx",
+      "to": "src/components/brand/AppIcon.tsx",
+      "specifier": "./AppIcon"
+    },
+    {
+      "from": "src/components/brand/AppLoadingLogo.tsx",
+      "to": "src/config/brand.ts",
+      "specifier": "@/config/brand"
+    },
+    {
+      "from": "src/components/brand/AppHeaderLogo.tsx",
+      "to": "pkg:react-router-dom",
+      "specifier": "react-router-dom"
+    },
+    {
+      "from": "src/components/brand/AppHeaderLogo.tsx",
+      "to": "src/lib/utils.ts",
+      "specifier": "@/lib/utils"
+    },
+    {
+      "from": "src/components/brand/AppHeaderLogo.tsx",
+      "to": "src/config/brand.ts",
+      "specifier": "@/config/brand"
+    },
+    {
+      "from": "src/components/brand/AppHeaderLogo.tsx",
+      "to": "src/components/brand/AppBrand.tsx",
+      "specifier": "./AppBrand"
+    },
+    {
+      "from": "src/components/brand/AppSidebarLogo.tsx",
+      "to": "pkg:react-router-dom",
+      "specifier": "react-router-dom"
+    },
+    {
+      "from": "src/components/brand/AppSidebarLogo.tsx",
+      "to": "src/lib/utils.ts",
+      "specifier": "@/lib/utils"
+    },
+    {
+      "from": "src/components/brand/AppSidebarLogo.tsx",
+      "to": "src/config/brand.ts",
+      "specifier": "@/config/brand"
+    },
+    {
+      "from": "src/components/brand/AppSidebarLogo.tsx",
+      "to": "src/components/brand/AppIcon.tsx",
+      "specifier": "./AppIcon"
+    },
+    {
+      "from": "src/components/brand/CompanyLogo.tsx",
+      "to": "src/lib/utils.ts",
+      "specifier": "@/lib/utils"
+    },
+    {
+      "from": "src/components/brand/CompanyLogo.tsx",
+      "to": "src/components/brand/AppIcon.tsx",
+      "specifier": "./AppIcon"
+    },
+    {
+      "from": "src/components/brand/BrandImage.tsx",
+      "to": "src/lib/utils.ts",
+      "specifier": "@/lib/utils"
+    },
+    {
+      "from": "src/components/brand/BrandImage.tsx",
+      "to": "src/config/brand.ts",
+      "specifier": "@/config/brand"
+    },
+    {
+      "from": "src/components/brand/BrandImage.tsx",
+      "to": "src/components/brand/AdminLessFinMark.tsx",
+      "specifier": "./AdminLessFinMark"
+    },
+    {
+      "from": "src/components/Layout.tsx",
+      "to": "pkg:react",
+      "specifier": "react"
+    },
+    {
+      "from": "src/components/Layout.tsx",
+      "to": "pkg:react-router-dom",
+      "specifier": "react-router-dom"
+    },
+    {
+      "from": "src/components/Layout.tsx",
+      "to": "src/components/ErrorBoundary.tsx",
+      "specifier": "./ErrorBoundary"
+    },
+    {
+      "from": "src/components/Layout.tsx",
+      "to": "src/contexts/AuthContext.tsx",
+      "specifier": "../contexts/AuthContext"
+    },
+    {
+      "from": "src/components/Layout.tsx",
+      "to": "src/components/ui/button.tsx",
+      "specifier": "./ui/button"
+    },
+    {
+      "from": "src/components/Layout.tsx",
+      "to": "pkg:lucide-react",
+      "specifier": "lucide-react"
+    },
+    {
+      "from": "src/components/Layout.tsx",
+      "to": "src/lib/utils.ts",
+      "specifier": "../lib/utils"
+    },
+    {
+      "from": "src/components/Layout.tsx",
+      "to": "src/components/ui/avatar.tsx",
+      "specifier": "./ui/avatar"
+    },
+    {
+      "from": "src/components/Layout.tsx",
+      "to": "src/components/ui/dropdown-menu.tsx",
+      "specifier": "./ui/dropdown-menu"
+    },
+    {
+      "from": "src/components/Layout.tsx",
+      "to": "src/components/SidebarNav.tsx",
+      "specifier": "./SidebarNav"
+    },
+    {
+      "from": "src/components/Layout.tsx",
+      "to": "src/components/ThemeToggle.tsx",
+      "specifier": "./ThemeToggle"
+    },
+    {
+      "from": "src/components/Layout.tsx",
+      "to": "src/components/CompanySwitcher.tsx",
+      "specifier": "./CompanySwitcher"
+    },
+    {
+      "from": "src/components/Layout.tsx",
+      "to": "src/components/NotificationBell.tsx",
+      "specifier": "./NotificationBell"
+    },
+    {
+      "from": "src/components/Layout.tsx",
+      "to": "src/components/CommandMenu.tsx",
+      "specifier": "./CommandMenu"
+    },
+    {
+      "from": "src/components/Layout.tsx",
+      "to": "src/components/brand/index.ts",
+      "specifier": "./brand"
+    },
+    {
+      "from": "src/components/Layout.tsx",
+      "to": "src/components/ui/sheet.tsx",
+      "specifier": "./ui/sheet"
+    },
+    {
+      "from": "src/components/Layout.tsx",
+      "to": "src/components/RouteLoadingFallback.tsx",
+      "specifier": "./RouteLoadingFallback"
+    },
+    {
+      "from": "src/components/FullScreenLoader.tsx",
+      "to": "src/components/brand/index.ts",
+      "specifier": "./brand"
+    },
+    {
+      "from": "src/lib/queries.ts",
+      "to": "src/integrations/supabase/client.ts",
+      "specifier": "../integrations/supabase/client"
+    },
+    {
+      "from": "src/lib/queries.ts",
+      "to": "src/lib/payrollIntelligence.ts",
+      "specifier": "./payrollIntelligence"
+    },
+    {
+      "from": "src/lib/queries.ts",
+      "to": "src/lib/payrollOperations.ts",
+      "specifier": "./payrollOperations"
+    },
+    {
+      "from": "src/lib/queries.ts",
+      "to": "src/lib/payrollWorkflow.ts",
+      "specifier": "./payrollWorkflow"
+    },
+    {
+      "from": "src/lib/queries.ts",
+      "to": "src/lib/inventory/client.ts",
+      "specifier": "./inventory/client"
+    },
+    {
+      "from": "src/lib/queries.ts",
+      "to": "src/governance/domains/security/service.ts",
+      "specifier": "@/governance/domains/security/service"
+    },
+    {
+      "from": "src/lib/queries.ts",
+      "to": "src/governance/domains/accountingReadiness/service.ts",
+      "specifier": "@/governance/domains/accountingReadiness/service"
+    },
+    {
+      "from": "src/lib/queries.ts",
+      "to": "src/governance/domains/accountingHealth/service.ts",
+      "specifier": "@/governance/domains/accountingHealth/service"
+    },
+    {
+      "from": "src/lib/queries.ts",
+      "to": "src/governance/domains/accountingPolicyEngine/service.ts",
+      "specifier": "@/governance/domains/accountingPolicyEngine/service"
+    },
+    {
+      "from": "src/lib/queries.ts",
+      "to": "src/governance/domains/accountingRulesEngine/service.ts",
+      "specifier": "@/governance/domains/accountingRulesEngine/service"
+    },
+    {
+      "from": "src/lib/queries.ts",
+      "to": "src/governance/domains/businessEventOrchestrator/service.ts",
+      "specifier": "@/governance/domains/businessEventOrchestrator/service"
+    },
+    {
+      "from": "src/components/accounting/AccountingSetupGuidance.tsx",
+      "to": "pkg:react-router-dom",
+      "specifier": "react-router-dom"
+    },
+    {
+      "from": "src/components/accounting/AccountingSetupGuidance.tsx",
+      "to": "pkg:lucide-react",
+      "specifier": "lucide-react"
+    },
+    {
+      "from": "src/components/accounting/AccountingSetupGuidance.tsx",
+      "to": "src/governance/domains/accountingReadiness/model.ts",
+      "specifier": "@/governance/domains/accountingReadiness/model"
+    },
+    {
+      "from": "src/components/accounting/AccountingSetupGuidance.tsx",
+      "to": "src/lib/onboarding/copy.ts",
+      "specifier": "@/lib/onboarding/copy"
+    },
+    {
+      "from": "src/components/accounting/AccountingSetupGuidance.tsx",
+      "to": "src/components/ui/card.tsx",
+      "specifier": "../ui/card"
+    },
+    {
+      "from": "src/components/accounting/AccountingSetupGuidance.tsx",
+      "to": "src/components/ui/button.tsx",
+      "specifier": "../ui/button"
+    },
+    {
+      "from": "src/components/accounting/AccountingSetupGuidance.tsx",
+      "to": "src/components/ui/alert.tsx",
+      "specifier": "../ui/alert"
+    },
+    {
+      "from": "src/components/accounting/AccountingSetupGuidance.tsx",
+      "to": "src/components/ui/progress.tsx",
+      "specifier": "../ui/progress"
+    },
+    {
+      "from": "src/components/ui/accordion.tsx",
+      "to": "pkg:react",
+      "specifier": "react"
+    },
+    {
+      "from": "src/components/ui/accordion.tsx",
+      "to": "pkg:@radix-ui/react-accordion",
+      "specifier": "@radix-ui/react-accordion"
+    },
+    {
+      "from": "src/components/ui/accordion.tsx",
+      "to": "pkg:lucide-react",
+      "specifier": "lucide-react"
+    },
+    {
+      "from": "src/components/ui/accordion.tsx",
+      "to": "src/lib/utils.ts",
+      "specifier": "@/lib/utils"
+    },
+    {
+      "from": "src/hooks/useDocumentTitle.ts",
+      "to": "pkg:react",
+      "specifier": "react"
+    },
+    {
+      "from": "src/hooks/useDocumentTitle.ts",
+      "to": "src/config/brand.ts",
+      "specifier": "@/config/brand"
+    },
+    {
+      "from": "src/components/ui/sheet.tsx",
+      "to": "pkg:@radix-ui/react-dialog",
+      "specifier": "@radix-ui/react-dialog"
+    },
+    {
+      "from": "src/components/ui/sheet.tsx",
+      "to": "pkg:class-variance-authority",
+      "specifier": "class-variance-authority"
+    },
+    {
+      "from": "src/components/ui/sheet.tsx",
+      "to": "pkg:lucide-react",
+      "specifier": "lucide-react"
+    },
+    {
+      "from": "src/components/ui/sheet.tsx",
+      "to": "pkg:react",
+      "specifier": "react"
+    },
+    {
+      "from": "src/components/ui/sheet.tsx",
+      "to": "src/lib/utils.ts",
+      "specifier": "@/lib/utils"
+    },
+    {
+      "from": "src/components/marketing/MarketingShell.tsx",
+      "to": "pkg:react-router-dom",
+      "specifier": "react-router-dom"
+    },
+    {
+      "from": "src/components/marketing/MarketingShell.tsx",
+      "to": "pkg:lucide-react",
+      "specifier": "lucide-react"
+    },
+    {
+      "from": "src/components/marketing/MarketingShell.tsx",
+      "to": "src/components/brand/index.ts",
+      "specifier": "../brand"
+    },
+    {
+      "from": "src/components/marketing/MarketingShell.tsx",
+      "to": "src/config/brand.ts",
+      "specifier": "../../config/brand"
+    },
+    {
+      "from": "src/components/marketing/MarketingShell.tsx",
+      "to": "src/components/ui/button.tsx",
+      "specifier": "../ui/button"
+    },
+    {
+      "from": "src/components/marketing/MarketingShell.tsx",
+      "to": "src/hooks/useDocumentTitle.ts",
+      "specifier": "../../hooks/useDocumentTitle"
+    },
+    {
+      "from": "src/components/ui/input.tsx",
+      "to": "pkg:react",
+      "specifier": "react"
+    },
+    {
+      "from": "src/components/ui/input.tsx",
+      "to": "src/lib/utils.ts",
+      "specifier": "@/lib/utils"
+    },
+    {
+      "from": "src/components/ui/label.tsx",
+      "to": "pkg:react",
+      "specifier": "react"
+    },
+    {
+      "from": "src/components/ui/label.tsx",
+      "to": "pkg:@radix-ui/react-label",
+      "specifier": "@radix-ui/react-label"
+    },
+    {
+      "from": "src/components/ui/label.tsx",
+      "to": "pkg:class-variance-authority",
+      "specifier": "class-variance-authority"
+    },
+    {
+      "from": "src/components/ui/label.tsx",
+      "to": "src/lib/utils.ts",
+      "specifier": "@/lib/utils"
+    },
+    {
+      "from": "src/components/ui/textarea.tsx",
+      "to": "pkg:react",
+      "specifier": "react"
+    },
+    {
+      "from": "src/components/ui/textarea.tsx",
+      "to": "src/lib/utils.ts",
+      "specifier": "@/lib/utils"
+    },
+    {
+      "from": "src/statutory/countries/south-africa/years/2024-2025/index.ts",
+      "to": "src/statutory/registry/types.ts",
+      "specifier": "../../../../registry/types"
+    },
+    {
+      "from": "src/statutory/countries/south-africa/years/2024-2025/index.ts",
+      "to": "src/statutory/countries/south-africa/years/2024-2025/metadata.ts",
+      "specifier": "./metadata"
+    },
+    {
+      "from": "src/statutory/countries/south-africa/years/2024-2025/index.ts",
+      "to": "src/statutory/countries/south-africa/years/2024-2025/legislation/paye/index.ts",
+      "specifier": "./legislation/paye"
+    },
+    {
+      "from": "src/statutory/countries/south-africa/years/2024-2025/index.ts",
+      "to": "src/statutory/countries/south-africa/years/2024-2025/legislation/rebates/index.ts",
+      "specifier": "./legislation/rebates"
+    },
+    {
+      "from": "src/statutory/countries/south-africa/years/2024-2025/index.ts",
+      "to": "src/statutory/countries/south-africa/years/2024-2025/legislation/medical/index.ts",
+      "specifier": "./legislation/medical"
+    },
+    {
+      "from": "src/statutory/countries/south-africa/years/2024-2025/index.ts",
+      "to": "src/statutory/countries/south-africa/years/2024-2025/legislation/uif/index.ts",
+      "specifier": "./legislation/uif"
+    },
+    {
+      "from": "src/statutory/countries/south-africa/years/2024-2025/index.ts",
+      "to": "src/statutory/countries/south-africa/years/2024-2025/legislation/sdl/index.ts",
+      "specifier": "./legislation/sdl"
+    },
+    {
+      "from": "src/statutory/countries/south-africa/years/2024-2025/index.ts",
+      "to": "src/statutory/countries/south-africa/years/2024-2025/legislation/retirement/index.ts",
+      "specifier": "./legislation/retirement"
+    },
+    {
+      "from": "src/statutory/countries/south-africa/years/2024-2025/index.ts",
+      "to": "src/statutory/countries/south-africa/years/2024-2025/legislation/travel/index.ts",
+      "specifier": "./legislation/travel"
+    },
+    {
+      "from": "src/statutory/countries/south-africa/years/2024-2025/index.ts",
+      "to": "src/statutory/countries/south-africa/years/2024-2025/legislation/fringe-benefits/index.ts",
+      "specifier": "./legislation/fringe-benefits"
+    },
+    {
+      "from": "src/statutory/countries/south-africa/years/2024-2025/index.ts",
+      "to": "src/statutory/countries/south-africa/years/2024-2025/legislation/irp5/index.ts",
+      "specifier": "./legislation/irp5"
+    },
+    {
+      "from": "src/statutory/countries/south-africa/years/2024-2025/index.ts",
+      "to": "src/statutory/countries/south-africa/years/2024-2025/legislation/emp201/index.ts",
+      "specifier": "./legislation/emp201"
+    },
+    {
+      "from": "src/statutory/countries/south-africa/years/2024-2025/index.ts",
+      "to": "src/statutory/countries/south-africa/years/2024-2025/legislation/thresholds/index.ts",
+      "specifier": "./legislation/thresholds"
+    },
+    {
+      "from": "src/statutory/countries/south-africa/years/2024-2025/index.ts",
+      "to": "src/statutory/countries/south-africa/years/2024-2025/legislation/allowances/index.ts",
+      "specifier": "./legislation/allowances"
+    },
+    {
+      "from": "src/statutory/countries/south-africa/years/2024-2025/index.ts",
+      "to": "src/statutory/countries/south-africa/years/2024-2025/legislation/deductions/index.ts",
+      "specifier": "./legislation/deductions"
+    },
+    {
+      "from": "src/statutory/countries/south-africa/years/2025-2026/index.ts",
+      "to": "src/statutory/registry/types.ts",
+      "specifier": "../../../../registry/types"
+    },
+    {
+      "from": "src/statutory/countries/south-africa/years/2025-2026/index.ts",
+      "to": "src/statutory/countries/south-africa/years/2025-2026/metadata.ts",
+      "specifier": "./metadata"
+    },
+    {
+      "from": "src/statutory/countries/south-africa/years/2025-2026/index.ts",
+      "to": "src/statutory/countries/south-africa/years/2025-2026/legislation/paye/index.ts",
+      "specifier": "./legislation/paye"
+    },
+    {
+      "from": "src/statutory/countries/south-africa/years/2025-2026/index.ts",
+      "to": "src/statutory/countries/south-africa/years/2025-2026/legislation/rebates/index.ts",
+      "specifier": "./legislation/rebates"
+    },
+    {
+      "from": "src/statutory/countries/south-africa/years/2025-2026/index.ts",
+      "to": "src/statutory/countries/south-africa/years/2025-2026/legislation/medical/index.ts",
+      "specifier": "./legislation/medical"
+    },
+    {
+      "from": "src/statutory/countries/south-africa/years/2025-2026/index.ts",
+      "to": "src/statutory/countries/south-africa/years/2025-2026/legislation/uif/index.ts",
+      "specifier": "./legislation/uif"
+    },
+    {
+      "from": "src/statutory/countries/south-africa/years/2025-2026/index.ts",
+      "to": "src/statutory/countries/south-africa/years/2025-2026/legislation/sdl/index.ts",
+      "specifier": "./legislation/sdl"
+    },
+    {
+      "from": "src/statutory/countries/south-africa/years/2025-2026/index.ts",
+      "to": "src/statutory/countries/south-africa/years/2025-2026/legislation/retirement/index.ts",
+      "specifier": "./legislation/retirement"
+    },
+    {
+      "from": "src/statutory/countries/south-africa/years/2025-2026/index.ts",
+      "to": "src/statutory/countries/south-africa/years/2025-2026/legislation/travel/index.ts",
+      "specifier": "./legislation/travel"
+    },
+    {
+      "from": "src/statutory/countries/south-africa/years/2025-2026/index.ts",
+      "to": "src/statutory/countries/south-africa/years/2025-2026/legislation/fringe-benefits/index.ts",
+      "specifier": "./legislation/fringe-benefits"
+    },
+    {
+      "from": "src/statutory/countries/south-africa/years/2025-2026/index.ts",
+      "to": "src/statutory/countries/south-africa/years/2025-2026/legislation/irp5/index.ts",
+      "specifier": "./legislation/irp5"
+    },
+    {
+      "from": "src/statutory/countries/south-africa/years/2025-2026/index.ts",
+      "to": "src/statutory/countries/south-africa/years/2025-2026/legislation/emp201/index.ts",
+      "specifier": "./legislation/emp201"
+    },
+    {
+      "from": "src/statutory/countries/south-africa/years/2025-2026/index.ts",
+      "to": "src/statutory/countries/south-africa/years/2025-2026/legislation/thresholds/index.ts",
+      "specifier": "./legislation/thresholds"
+    },
+    {
+      "from": "src/statutory/countries/south-africa/years/2025-2026/index.ts",
+      "to": "src/statutory/countries/south-africa/years/2025-2026/legislation/allowances/index.ts",
+      "specifier": "./legislation/allowances"
+    },
+    {
+      "from": "src/statutory/countries/south-africa/years/2025-2026/index.ts",
+      "to": "src/statutory/countries/south-africa/years/2025-2026/legislation/deductions/index.ts",
+      "specifier": "./legislation/deductions"
+    },
+    {
+      "from": "src/statutory/countries/south-africa/years/2026-2027/index.ts",
+      "to": "src/statutory/registry/types.ts",
+      "specifier": "../../../../registry/types"
+    },
+    {
+      "from": "src/statutory/countries/south-africa/years/2026-2027/index.ts",
+      "to": "src/statutory/countries/south-africa/years/2026-2027/metadata.ts",
+      "specifier": "./metadata"
+    },
+    {
+      "from": "src/statutory/countries/south-africa/years/2026-2027/index.ts",
+      "to": "src/statutory/countries/south-africa/years/2026-2027/legislation/paye/index.ts",
+      "specifier": "./legislation/paye"
+    },
+    {
+      "from": "src/statutory/countries/south-africa/years/2026-2027/index.ts",
+      "to": "src/statutory/countries/south-africa/years/2026-2027/legislation/rebates/index.ts",
+      "specifier": "./legislation/rebates"
+    },
+    {
+      "from": "src/statutory/countries/south-africa/years/2026-2027/index.ts",
+      "to": "src/statutory/countries/south-africa/years/2026-2027/legislation/medical/index.ts",
+      "specifier": "./legislation/medical"
+    },
+    {
+      "from": "src/statutory/countries/south-africa/years/2026-2027/index.ts",
+      "to": "src/statutory/countries/south-africa/years/2026-2027/legislation/uif/index.ts",
+      "specifier": "./legislation/uif"
+    },
+    {
+      "from": "src/statutory/countries/south-africa/years/2026-2027/index.ts",
+      "to": "src/statutory/countries/south-africa/years/2026-2027/legislation/sdl/index.ts",
+      "specifier": "./legislation/sdl"
+    },
+    {
+      "from": "src/statutory/countries/south-africa/years/2026-2027/index.ts",
+      "to": "src/statutory/countries/south-africa/years/2026-2027/legislation/retirement/index.ts",
+      "specifier": "./legislation/retirement"
+    },
+    {
+      "from": "src/statutory/countries/south-africa/years/2026-2027/index.ts",
+      "to": "src/statutory/countries/south-africa/years/2026-2027/legislation/travel/index.ts",
+      "specifier": "./legislation/travel"
+    },
+    {
+      "from": "src/statutory/countries/south-africa/years/2026-2027/index.ts",
+      "to": "src/statutory/countries/south-africa/years/2026-2027/legislation/fringe-benefits/index.ts",
+      "specifier": "./legislation/fringe-benefits"
+    },
+    {
+      "from": "src/statutory/countries/south-africa/years/2026-2027/index.ts",
+      "to": "src/statutory/countries/south-africa/years/2026-2027/legislation/irp5/index.ts",
+      "specifier": "./legislation/irp5"
+    },
+    {
+      "from": "src/statutory/countries/south-africa/years/2026-2027/index.ts",
+      "to": "src/statutory/countries/south-africa/years/2026-2027/legislation/emp201/index.ts",
+      "specifier": "./legislation/emp201"
+    },
+    {
+      "from": "src/statutory/countries/south-africa/years/2026-2027/index.ts",
+      "to": "src/statutory/countries/south-africa/years/2026-2027/legislation/thresholds/index.ts",
+      "specifier": "./legislation/thresholds"
+    },
+    {
+      "from": "src/statutory/countries/south-africa/years/2026-2027/index.ts",
+      "to": "src/statutory/countries/south-africa/years/2026-2027/legislation/allowances/index.ts",
+      "specifier": "./legislation/allowances"
+    },
+    {
+      "from": "src/statutory/countries/south-africa/years/2026-2027/index.ts",
+      "to": "src/statutory/countries/south-africa/years/2026-2027/legislation/deductions/index.ts",
+      "specifier": "./legislation/deductions"
+    },
+    {
+      "from": "src/components/ui/avatar.tsx",
+      "to": "pkg:react",
+      "specifier": "react"
+    },
+    {
+      "from": "src/components/ui/avatar.tsx",
+      "to": "pkg:@radix-ui/react-avatar",
+      "specifier": "@radix-ui/react-avatar"
+    },
+    {
+      "from": "src/components/ui/avatar.tsx",
+      "to": "src/lib/utils.ts",
+      "specifier": "@/lib/utils"
+    },
+    {
+      "from": "src/components/ui/dropdown-menu.tsx",
+      "to": "pkg:react",
+      "specifier": "react"
+    },
+    {
+      "from": "src/components/ui/dropdown-menu.tsx",
+      "to": "pkg:@radix-ui/react-dropdown-menu",
+      "specifier": "@radix-ui/react-dropdown-menu"
+    },
+    {
+      "from": "src/components/ui/dropdown-menu.tsx",
+      "to": "pkg:lucide-react",
+      "specifier": "lucide-react"
+    },
+    {
+      "from": "src/components/ui/dropdown-menu.tsx",
+      "to": "src/lib/utils.ts",
+      "specifier": "@/lib/utils"
+    },
+    {
+      "from": "src/components/SidebarNav.tsx",
+      "to": "pkg:react-router-dom",
+      "specifier": "react-router-dom"
+    },
+    {
+      "from": "src/components/SidebarNav.tsx",
+      "to": "pkg:@tanstack/react-query",
+      "specifier": "@tanstack/react-query"
+    },
+    {
+      "from": "src/components/SidebarNav.tsx",
+      "to": "src/components/ui/collapsible.tsx",
+      "specifier": "@/components/ui/collapsible"
+    },
+    {
+      "from": "src/components/SidebarNav.tsx",
+      "to": "pkg:lucide-react",
+      "specifier": "lucide-react"
+    },
+    {
+      "from": "src/components/SidebarNav.tsx",
+      "to": "src/lib/utils.ts",
+      "specifier": "../lib/utils"
+    },
+    {
+      "from": "src/components/SidebarNav.tsx",
+      "to": "src/components/ui/button.tsx",
+      "specifier": "./ui/button"
+    },
+    {
+      "from": "src/components/SidebarNav.tsx",
+      "to": "src/contexts/AuthContext.tsx",
+      "specifier": "../contexts/AuthContext"
+    },
+    {
+      "from": "src/components/SidebarNav.tsx",
+      "to": "src/lib/queries.ts",
+      "specifier": "../lib/queries"
+    },
+    {
+      "from": "src/components/SidebarNav.tsx",
+      "to": "src/lib/financialStatements/flags.ts",
+      "specifier": "../lib/financialStatements/flags"
+    },
+    {
+      "from": "src/components/SidebarNav.tsx",
+      "to": "src/lib/analytics/betaAllowlist.ts",
+      "specifier": "../lib/analytics/betaAllowlist"
+    },
+    {
+      "from": "src/components/SidebarNav.tsx",
+      "to": "src/lib/financialClose/flags.ts",
+      "specifier": "../lib/financialClose/flags"
+    },
+    {
+      "from": "src/components/ThemeToggle.tsx",
+      "to": "pkg:lucide-react",
+      "specifier": "lucide-react"
+    },
+    {
+      "from": "src/components/ThemeToggle.tsx",
+      "to": "src/components/ui/button.tsx",
+      "specifier": "@/components/ui/button"
+    },
+    {
+      "from": "src/components/ThemeToggle.tsx",
+      "to": "src/components/ui/dropdown-menu.tsx",
+      "specifier": "@/components/ui/dropdown-menu"
+    },
+    {
+      "from": "src/components/ThemeToggle.tsx",
+      "to": "src/contexts/ThemeContext.tsx",
+      "specifier": "@/contexts/ThemeContext"
+    },
+    {
+      "from": "src/components/CompanySwitcher.tsx",
+      "to": "src/contexts/AuthContext.tsx",
+      "specifier": "../contexts/AuthContext"
+    },
+    {
+      "from": "src/components/CompanySwitcher.tsx",
+      "to": "src/hooks/useEnterpriseIdentity.ts",
+      "specifier": "../hooks/useEnterpriseIdentity"
+    },
+    {
+      "from": "src/components/CompanySwitcher.tsx",
+      "to": "src/components/ui/dropdown-menu.tsx",
+      "specifier": "./ui/dropdown-menu"
+    },
+    {
+      "from": "src/components/CompanySwitcher.tsx",
+      "to": "src/components/ui/button.tsx",
+      "specifier": "./ui/button"
+    },
+    {
+      "from": "src/components/CompanySwitcher.tsx",
+      "to": "pkg:lucide-react",
+      "specifier": "lucide-react"
+    },
+    {
+      "from": "src/components/CompanySwitcher.tsx",
+      "to": "pkg:react-router-dom",
+      "specifier": "react-router-dom"
+    },
+    {
+      "from": "src/components/CompanySwitcher.tsx",
+      "to": "src/utils/toast.ts",
+      "specifier": "../utils/toast"
+    },
+    {
+      "from": "src/components/NotificationBell.tsx",
+      "to": "pkg:react",
+      "specifier": "react"
+    },
+    {
+      "from": "src/components/NotificationBell.tsx",
+      "to": "pkg:@tanstack/react-query",
+      "specifier": "@tanstack/react-query"
+    },
+    {
+      "from": "src/components/NotificationBell.tsx",
+      "to": "src/integrations/supabase/client.ts",
+      "specifier": "../integrations/supabase/client"
+    },
+    {
+      "from": "src/components/NotificationBell.tsx",
+      "to": "src/contexts/AuthContext.tsx",
+      "specifier": "../contexts/AuthContext"
+    },
+    {
+      "from": "src/components/NotificationBell.tsx",
+      "to": "pkg:lucide-react",
+      "specifier": "lucide-react"
+    },
+    {
+      "from": "src/components/NotificationBell.tsx",
+      "to": "src/components/ui/button.tsx",
+      "specifier": "./ui/button"
+    },
+    {
+      "from": "src/components/NotificationBell.tsx",
+      "to": "src/components/ui/dropdown-menu.tsx",
+      "specifier": "./ui/dropdown-menu"
+    },
+    {
+      "from": "src/components/NotificationBell.tsx",
+      "to": "pkg:date-fns",
+      "specifier": "date-fns"
+    },
+    {
+      "from": "src/components/NotificationBell.tsx",
+      "to": "pkg:react-router-dom",
+      "specifier": "react-router-dom"
+    },
+    {
+      "from": "src/components/CommandMenu.tsx",
+      "to": "pkg:react",
+      "specifier": "react"
+    },
+    {
+      "from": "src/components/CommandMenu.tsx",
+      "to": "pkg:lucide-react",
+      "specifier": "lucide-react"
+    },
+    {
+      "from": "src/components/CommandMenu.tsx",
+      "to": "src/components/ui/command.tsx",
+      "specifier": "@/components/ui/command"
+    },
+    {
+      "from": "src/components/CommandMenu.tsx",
+      "to": "pkg:react-router-dom",
+      "specifier": "react-router-dom"
+    },
+    {
+      "from": "src/components/CommandMenu.tsx",
+      "to": "pkg:@tanstack/react-query",
+      "specifier": "@tanstack/react-query"
+    },
+    {
+      "from": "src/components/CommandMenu.tsx",
+      "to": "src/integrations/supabase/client.ts",
+      "specifier": "@/integrations/supabase/client"
+    },
+    {
+      "from": "src/components/CommandMenu.tsx",
+      "to": "src/contexts/AuthContext.tsx",
+      "specifier": "@/contexts/AuthContext"
+    },
+    {
+      "from": "src/components/CommandMenu.tsx",
+      "to": "src/hooks/use-debounce.ts",
+      "specifier": "@/hooks/use-debounce"
+    },
+    {
+      "from": "src/components/CommandMenu.tsx",
+      "to": "src/components/ui/button.tsx",
+      "specifier": "./ui/button"
+    },
+    {
+      "from": "src/components/CommandMenu.tsx",
+      "to": "src/lib/queries.ts",
+      "specifier": "../lib/queries"
+    },
+    {
+      "from": "src/components/RouteLoadingFallback.tsx",
+      "to": "src/components/ui/skeleton.tsx",
+      "specifier": "./ui/skeleton"
+    },
+    {
+      "from": "src/lib/payrollIntelligence.ts",
+      "to": "pkg:date-fns",
+      "specifier": "date-fns"
+    },
+    {
+      "from": "src/lib/payrollIntelligence.ts",
+      "to": "src/lib/payrollWorkflow.ts",
+      "specifier": "./payrollWorkflow"
+    },
+    {
+      "from": "src/lib/payrollIntelligence.ts",
+      "to": "src/lib/employeeIdentity.ts",
+      "specifier": "./employeeIdentity"
+    },
+    {
+      "from": "src/lib/payrollIntelligence.ts",
+      "to": "src/lib/accounting/accountRoles.ts",
+      "specifier": "./accounting/accountRoles"
+    },
+    {
+      "from": "src/lib/payrollOperations.ts",
+      "to": "src/integrations/supabase/client.ts",
+      "specifier": "../integrations/supabase/client"
+    },
+    {
+      "from": "src/lib/payrollOperations.ts",
+      "to": "src/lib/utils.ts",
+      "specifier": "./utils"
+    },
+    {
+      "from": "src/lib/payrollOperations.ts",
+      "to": "src/lib/boe/dispatchers/commandDispatcher.ts",
+      "specifier": "./boe/dispatchers/commandDispatcher"
+    },
+    {
+      "from": "src/lib/payrollOperations.ts",
+      "to": "src/lib/boe/commandTypes.ts",
+      "specifier": "./boe/commandTypes"
+    },
+    {
+      "from": "src/lib/inventory/client.ts",
+      "to": "src/integrations/supabase/client.ts",
+      "specifier": "../../integrations/supabase/client"
+    },
+    {
+      "from": "src/governance/domains/security/service.ts",
+      "to": "src/integrations/supabase/client.ts",
+      "specifier": "@/integrations/supabase/client"
+    },
+    {
+      "from": "src/governance/domains/security/service.ts",
+      "to": "src/governance/featureFlags.ts",
+      "specifier": "@/governance/featureFlags"
+    },
+    {
+      "from": "src/governance/domains/security/service.ts",
+      "to": "src/governance/domains/security/model.ts",
+      "specifier": "./model"
+    },
+    {
+      "from": "src/governance/domains/accountingReadiness/service.ts",
+      "to": "src/integrations/supabase/client.ts",
+      "specifier": "@/integrations/supabase/client"
+    },
+    {
+      "from": "src/governance/domains/accountingReadiness/service.ts",
+      "to": "src/governance/domains/accountingReadiness/model.ts",
+      "specifier": "./model"
+    },
+    {
+      "from": "src/governance/domains/accountingHealth/service.ts",
+      "to": "src/integrations/supabase/client.ts",
+      "specifier": "@/integrations/supabase/client"
+    },
+    {
+      "from": "src/governance/domains/accountingPolicyEngine/service.ts",
+      "to": "src/integrations/supabase/client.ts",
+      "specifier": "@/integrations/supabase/client"
+    },
+    {
+      "from": "src/governance/domains/accountingRulesEngine/service.ts",
+      "to": "src/integrations/supabase/client.ts",
+      "specifier": "@/integrations/supabase/client"
+    },
+    {
+      "from": "src/governance/domains/businessEventOrchestrator/service.ts",
+      "to": "src/integrations/supabase/client.ts",
+      "specifier": "@/integrations/supabase/client"
+    },
+    {
+      "from": "src/components/ui/alert.tsx",
+      "to": "pkg:react",
+      "specifier": "react"
+    },
+    {
+      "from": "src/components/ui/alert.tsx",
+      "to": "pkg:class-variance-authority",
+      "specifier": "class-variance-authority"
+    },
+    {
+      "from": "src/components/ui/alert.tsx",
+      "to": "src/lib/utils.ts",
+      "specifier": "@/lib/utils"
+    },
+    {
+      "from": "src/components/ui/progress.tsx",
+      "to": "pkg:react",
+      "specifier": "react"
+    },
+    {
+      "from": "src/components/ui/progress.tsx",
+      "to": "pkg:@radix-ui/react-progress",
+      "specifier": "@radix-ui/react-progress"
+    },
+    {
+      "from": "src/components/ui/progress.tsx",
+      "to": "src/lib/utils.ts",
+      "specifier": "@/lib/utils"
+    },
+    {
+      "from": "src/statutory/countries/south-africa/years/2024-2025/legislation/paye/index.ts",
+      "to": "src/statutory/registry/types.ts",
+      "specifier": "../../../../../../registry/types"
+    },
+    {
+      "from": "src/statutory/countries/south-africa/years/2024-2025/legislation/paye/index.ts",
+      "to": "pkg::0,",
+      "specifier": ":0,"
+    },
+    {
+      "from": "src/statutory/countries/south-africa/years/2024-2025/legislation/rebates/index.ts",
+      "to": "src/statutory/registry/types.ts",
+      "specifier": "../../../../../../registry/types"
+    },
+    {
+      "from": "src/statutory/countries/south-africa/years/2024-2025/legislation/medical/index.ts",
+      "to": "src/statutory/registry/types.ts",
+      "specifier": "../../../../../../registry/types"
+    },
+    {
+      "from": "src/statutory/countries/south-africa/years/2024-2025/legislation/uif/index.ts",
+      "to": "src/statutory/registry/types.ts",
+      "specifier": "../../../../../../registry/types"
+    },
+    {
+      "from": "src/statutory/countries/south-africa/years/2024-2025/legislation/sdl/index.ts",
+      "to": "src/statutory/registry/types.ts",
+      "specifier": "../../../../../../registry/types"
+    },
+    {
+      "from": "src/statutory/countries/south-africa/years/2024-2025/legislation/retirement/index.ts",
+      "to": "src/statutory/registry/types.ts",
+      "specifier": "../../../../../../registry/types"
+    },
+    {
+      "from": "src/statutory/countries/south-africa/years/2024-2025/legislation/retirement/index.ts",
+      "to": "pkg::0,",
+      "specifier": ":0,"
+    },
+    {
+      "from": "src/statutory/countries/south-africa/years/2024-2025/legislation/travel/index.ts",
+      "to": "src/statutory/registry/types.ts",
+      "specifier": "../../../../../../registry/types"
+    },
+    {
+      "from": "src/statutory/countries/south-africa/years/2024-2025/legislation/fringe-benefits/index.ts",
+      "to": "src/statutory/registry/types.ts",
+      "specifier": "../../../../../../registry/types"
+    },
+    {
+      "from": "src/statutory/countries/south-africa/years/2024-2025/legislation/irp5/index.ts",
+      "to": "src/statutory/registry/types.ts",
+      "specifier": "../../../../../../registry/types"
+    },
+    {
+      "from": "src/statutory/countries/south-africa/years/2024-2025/legislation/emp201/index.ts",
+      "to": "src/statutory/registry/types.ts",
+      "specifier": "../../../../../../registry/types"
+    },
+    {
+      "from": "src/statutory/countries/south-africa/years/2024-2025/legislation/thresholds/index.ts",
+      "to": "src/statutory/registry/types.ts",
+      "specifier": "../../../../../../registry/types"
+    },
+    {
+      "from": "src/statutory/countries/south-africa/years/2024-2025/legislation/allowances/index.ts",
+      "to": "src/statutory/registry/types.ts",
+      "specifier": "../../../../../../registry/types"
+    },
+    {
+      "from": "src/statutory/countries/south-africa/years/2024-2025/legislation/deductions/index.ts",
+      "to": "src/statutory/registry/types.ts",
+      "specifier": "../../../../../../registry/types"
+    },
+    {
+      "from": "src/statutory/countries/south-africa/years/2025-2026/legislation/paye/index.ts",
+      "to": "src/statutory/registry/types.ts",
+      "specifier": "../../../../../../registry/types"
+    },
+    {
+      "from": "src/statutory/countries/south-africa/years/2025-2026/legislation/paye/index.ts",
+      "to": "pkg::0,",
+      "specifier": ":0,"
+    },
+    {
+      "from": "src/statutory/countries/south-africa/years/2025-2026/legislation/rebates/index.ts",
+      "to": "src/statutory/registry/types.ts",
+      "specifier": "../../../../../../registry/types"
+    },
+    {
+      "from": "src/statutory/countries/south-africa/years/2025-2026/legislation/medical/index.ts",
+      "to": "src/statutory/registry/types.ts",
+      "specifier": "../../../../../../registry/types"
+    },
+    {
+      "from": "src/statutory/countries/south-africa/years/2025-2026/legislation/uif/index.ts",
+      "to": "src/statutory/registry/types.ts",
+      "specifier": "../../../../../../registry/types"
+    },
+    {
+      "from": "src/statutory/countries/south-africa/years/2025-2026/legislation/sdl/index.ts",
+      "to": "src/statutory/registry/types.ts",
+      "specifier": "../../../../../../registry/types"
+    },
+    {
+      "from": "src/statutory/countries/south-africa/years/2025-2026/legislation/retirement/index.ts",
+      "to": "src/statutory/registry/types.ts",
+      "specifier": "../../../../../../registry/types"
+    },
+    {
+      "from": "src/statutory/countries/south-africa/years/2025-2026/legislation/retirement/index.ts",
+      "to": "pkg::0,",
+      "specifier": ":0,"
+    },
+    {
+      "from": "src/statutory/countries/south-africa/years/2025-2026/legislation/travel/index.ts",
+      "to": "src/statutory/registry/types.ts",
+      "specifier": "../../../../../../registry/types"
+    },
+    {
+      "from": "src/statutory/countries/south-africa/years/2025-2026/legislation/fringe-benefits/index.ts",
+      "to": "src/statutory/registry/types.ts",
+      "specifier": "../../../../../../registry/types"
+    },
+    {
+      "from": "src/statutory/countries/south-africa/years/2025-2026/legislation/irp5/index.ts",
+      "to": "src/statutory/registry/types.ts",
+      "specifier": "../../../../../../registry/types"
+    },
+    {
+      "from": "src/statutory/countries/south-africa/years/2025-2026/legislation/emp201/index.ts",
+      "to": "src/statutory/registry/types.ts",
+      "specifier": "../../../../../../registry/types"
+    },
+    {
+      "from": "src/statutory/countries/south-africa/years/2025-2026/legislation/thresholds/index.ts",
+      "to": "src/statutory/registry/types.ts",
+      "specifier": "../../../../../../registry/types"
+    },
+    {
+      "from": "src/statutory/countries/south-africa/years/2025-2026/legislation/allowances/index.ts",
+      "to": "src/statutory/registry/types.ts",
+      "specifier": "../../../../../../registry/types"
+    },
+    {
+      "from": "src/statutory/countries/south-africa/years/2025-2026/legislation/deductions/index.ts",
+      "to": "src/statutory/registry/types.ts",
+      "specifier": "../../../../../../registry/types"
+    },
+    {
+      "from": "src/statutory/countries/south-africa/years/2026-2027/legislation/paye/index.ts",
+      "to": "src/statutory/registry/types.ts",
+      "specifier": "../../../../../../registry/types"
+    },
+    {
+      "from": "src/statutory/countries/south-africa/years/2026-2027/legislation/paye/index.ts",
+      "to": "pkg::0,",
+      "specifier": ":0,"
+    },
+    {
+      "from": "src/statutory/countries/south-africa/years/2026-2027/legislation/rebates/index.ts",
+      "to": "src/statutory/registry/types.ts",
+      "specifier": "../../../../../../registry/types"
+    },
+    {
+      "from": "src/statutory/countries/south-africa/years/2026-2027/legislation/medical/index.ts",
+      "to": "src/statutory/registry/types.ts",
+      "specifier": "../../../../../../registry/types"
+    },
+    {
+      "from": "src/statutory/countries/south-africa/years/2026-2027/legislation/uif/index.ts",
+      "to": "src/statutory/registry/types.ts",
+      "specifier": "../../../../../../registry/types"
+    },
+    {
+      "from": "src/statutory/countries/south-africa/years/2026-2027/legislation/sdl/index.ts",
+      "to": "src/statutory/registry/types.ts",
+      "specifier": "../../../../../../registry/types"
+    },
+    {
+      "from": "src/statutory/countries/south-africa/years/2026-2027/legislation/retirement/index.ts",
+      "to": "src/statutory/registry/types.ts",
+      "specifier": "../../../../../../registry/types"
+    },
+    {
+      "from": "src/statutory/countries/south-africa/years/2026-2027/legislation/retirement/index.ts",
+      "to": "pkg::0,",
+      "specifier": ":0,"
+    },
+    {
+      "from": "src/statutory/countries/south-africa/years/2026-2027/legislation/travel/index.ts",
+      "to": "src/statutory/registry/types.ts",
+      "specifier": "../../../../../../registry/types"
+    },
+    {
+      "from": "src/statutory/countries/south-africa/years/2026-2027/legislation/fringe-benefits/index.ts",
+      "to": "src/statutory/registry/types.ts",
+      "specifier": "../../../../../../registry/types"
+    },
+    {
+      "from": "src/statutory/countries/south-africa/years/2026-2027/legislation/irp5/index.ts",
+      "to": "src/statutory/registry/types.ts",
+      "specifier": "../../../../../../registry/types"
+    },
+    {
+      "from": "src/statutory/countries/south-africa/years/2026-2027/legislation/emp201/index.ts",
+      "to": "src/statutory/registry/types.ts",
+      "specifier": "../../../../../../registry/types"
+    },
+    {
+      "from": "src/statutory/countries/south-africa/years/2026-2027/legislation/thresholds/index.ts",
+      "to": "src/statutory/registry/types.ts",
+      "specifier": "../../../../../../registry/types"
+    },
+    {
+      "from": "src/statutory/countries/south-africa/years/2026-2027/legislation/allowances/index.ts",
+      "to": "src/statutory/registry/types.ts",
+      "specifier": "../../../../../../registry/types"
+    },
+    {
+      "from": "src/statutory/countries/south-africa/years/2026-2027/legislation/deductions/index.ts",
+      "to": "src/statutory/registry/types.ts",
+      "specifier": "../../../../../../registry/types"
+    },
+    {
+      "from": "src/components/ui/collapsible.tsx",
+      "to": "pkg:react",
+      "specifier": "react"
+    },
+    {
+      "from": "src/components/ui/collapsible.tsx",
+      "to": "pkg:@radix-ui/react-collapsible",
+      "specifier": "@radix-ui/react-collapsible"
+    },
+    {
+      "from": "src/components/ui/collapsible.tsx",
+      "to": "src/lib/utils.ts",
+      "specifier": "@/lib/utils"
+    },
+    {
+      "from": "src/hooks/useEnterpriseIdentity.ts",
+      "to": "pkg:@tanstack/react-query",
+      "specifier": "@tanstack/react-query"
+    },
+    {
+      "from": "src/hooks/useEnterpriseIdentity.ts",
+      "to": "src/lib/financialStatements/masterData/index.ts",
+      "specifier": "@/lib/financialStatements/masterData"
+    },
+    {
+      "from": "src/hooks/useEnterpriseIdentity.ts",
+      "to": "src/lib/enterpriseMasterData/identity.ts",
+      "specifier": "@/lib/enterpriseMasterData/identity"
+    },
+    {
+      "from": "src/utils/toast.ts",
+      "to": "pkg:sonner",
+      "specifier": "sonner"
+    },
+    {
+      "from": "src/utils/toast.ts",
+      "to": "src/lib/platform/platformError.ts",
+      "specifier": "../lib/platform/platformError"
+    },
+    {
+      "from": "src/utils/toast.ts",
+      "to": "src/lib/analytics/events.ts",
+      "specifier": "../lib/analytics/events"
+    },
+    {
+      "from": "src/utils/toast.ts",
+      "to": "src/lib/analytics/productAnalytics.ts",
+      "specifier": "../lib/analytics/productAnalytics"
+    },
+    {
+      "from": "src/components/ui/command.tsx",
+      "to": "pkg:react",
+      "specifier": "react"
+    },
+    {
+      "from": "src/components/ui/command.tsx",
+      "to": "pkg:@radix-ui/react-dialog",
+      "specifier": "@radix-ui/react-dialog"
+    },
+    {
+      "from": "src/components/ui/command.tsx",
+      "to": "pkg:cmdk",
+      "specifier": "cmdk"
+    },
+    {
+      "from": "src/components/ui/command.tsx",
+      "to": "pkg:lucide-react",
+      "specifier": "lucide-react"
+    },
+    {
+      "from": "src/components/ui/command.tsx",
+      "to": "src/lib/utils.ts",
+      "specifier": "@/lib/utils"
+    },
+    {
+      "from": "src/components/ui/command.tsx",
+      "to": "src/components/ui/dialog.tsx",
+      "specifier": "@/components/ui/dialog"
+    },
+    {
+      "from": "src/hooks/use-debounce.ts",
+      "to": "pkg:react",
+      "specifier": "react"
+    },
+    {
+      "from": "src/components/ui/skeleton.tsx",
+      "to": "src/lib/utils.ts",
+      "specifier": "@/lib/utils"
+    },
+    {
+      "from": "src/lib/boe/dispatchers/commandDispatcher.ts",
+      "to": "src/lib/boe/businessEvents.ts",
+      "specifier": "../businessEvents"
+    },
+    {
+      "from": "src/lib/boe/dispatchers/commandDispatcher.ts",
+      "to": "src/lib/boe/commandTypes.ts",
+      "specifier": "../commandTypes"
+    },
+    {
+      "from": "src/lib/boe/dispatchers/commandDispatcher.ts",
+      "to": "src/lib/boe/events/businessEvent.ts",
+      "specifier": "../events/businessEvent"
+    },
+    {
+      "from": "src/lib/boe/dispatchers/commandDispatcher.ts",
+      "to": "src/lib/boe/executionContract.ts",
+      "specifier": "../executionContract"
+    },
+    {
+      "from": "src/lib/boe/dispatchers/commandDispatcher.ts",
+      "to": "src/lib/boe/dispatchers/eventDispatcher.ts",
+      "specifier": "./eventDispatcher"
+    },
+    {
+      "from": "src/lib/boe/dispatchers/commandDispatcher.ts",
+      "to": "src/lib/platform/platformError.ts",
+      "specifier": "../../platform/platformError"
+    },
+    {
+      "from": "src/lib/boe/dispatchers/commandDispatcher.ts",
+      "to": "src/lib/platform/observability.ts",
+      "specifier": "../../platform/observability"
+    },
+    {
+      "from": "src/lib/financialStatements/masterData/index.ts",
+      "to": "src/governance/domains/corporateGovernance/service.ts",
+      "specifier": "@/governance/domains/corporateGovernance/service"
+    },
+    {
+      "from": "src/lib/financialStatements/masterData/index.ts",
+      "to": "src/lib/financialStatements/masterData/hydration.ts",
+      "specifier": "./hydration"
+    },
+    {
+      "from": "src/lib/financialStatements/masterData/index.ts",
+      "to": "src/lib/financialStatements/masterData/legacyHydration.ts",
+      "specifier": "./legacyHydration"
+    },
+    {
+      "from": "src/lib/financialStatements/masterData/index.ts",
+      "to": "src/lib/financialStatements/masterData/types.ts",
+      "specifier": "./types"
+    },
+    {
+      "from": "src/lib/financialStatements/masterData/index.ts",
+      "to": "src/lib/financialStatements/masterData/verifyDeployment.ts",
+      "specifier": "./verifyDeployment"
+    },
+    {
+      "from": "src/lib/enterpriseMasterData/identity.ts",
+      "to": "src/lib/financialStatements/masterData/index.ts",
+      "specifier": "@/lib/financialStatements/masterData"
+    },
+    {
+      "from": "src/components/ui/dialog.tsx",
+      "to": "pkg:react",
+      "specifier": "react"
+    },
+    {
+      "from": "src/components/ui/dialog.tsx",
+      "to": "pkg:@radix-ui/react-dialog",
+      "specifier": "@radix-ui/react-dialog"
+    },
+    {
+      "from": "src/components/ui/dialog.tsx",
+      "to": "pkg:lucide-react",
+      "specifier": "lucide-react"
+    },
+    {
+      "from": "src/components/ui/dialog.tsx",
+      "to": "src/lib/utils.ts",
+      "specifier": "@/lib/utils"
+    },
+    {
+      "from": "src/lib/boe/executionContract.ts",
+      "to": "src/lib/boe/businessEvents.ts",
+      "specifier": "./businessEvents"
+    },
+    {
+      "from": "src/lib/boe/executionContract.ts",
+      "to": "src/lib/boe/orchestration.ts",
+      "specifier": "./orchestration"
+    },
+    {
+      "from": "src/lib/boe/executionContract.ts",
+      "to": "src/lib/boe/orchestration.ts",
+      "specifier": "./orchestration"
+    },
+    {
+      "from": "src/lib/boe/dispatchers/eventDispatcher.ts",
+      "to": "src/lib/boe/subscribers/registry.ts",
+      "specifier": "../subscribers/registry"
+    },
+    {
+      "from": "src/lib/boe/dispatchers/eventDispatcher.ts",
+      "to": "src/lib/platform/platformError.ts",
+      "specifier": "../../platform/platformError"
+    },
+    {
+      "from": "src/governance/domains/corporateGovernance/service.ts",
+      "to": "src/lib/financialStatements/api.ts",
+      "specifier": "@/lib/financialStatements/api"
+    },
+    {
+      "from": "src/governance/domains/corporateGovernance/service.ts",
+      "to": "src/governance/featureFlags.ts",
+      "specifier": "@/governance/featureFlags"
+    },
+    {
+      "from": "src/lib/financialStatements/masterData/legacyHydration.ts",
+      "to": "src/lib/financialStatements/masterData/types.ts",
+      "specifier": "./types"
+    },
+    {
+      "from": "src/lib/financialStatements/masterData/verifyDeployment.ts",
+      "to": "src/integrations/supabase/client.ts",
+      "specifier": "../../../integrations/supabase/client"
+    },
+    {
+      "from": "src/lib/financialStatements/masterData/verifyDeployment.ts",
+      "to": "src/lib/financialStatements/api.ts",
+      "specifier": "../api"
+    },
+    {
+      "from": "src/lib/financialStatements/masterData/verifyDeployment.ts",
+      "to": "src/lib/financialStatements/masterData/deploymentVerification.ts",
+      "specifier": "./deploymentVerification"
+    },
+    {
+      "from": "src/lib/financialStatements/masterData/verifyDeployment.ts",
+      "to": "src/lib/financialStatements/masterData/deploymentVerification.ts",
+      "specifier": "./deploymentVerification"
+    },
+    {
+      "from": "src/lib/boe/orchestration.ts",
+      "to": "src/lib/boe/businessEvents.ts",
+      "specifier": "./businessEvents"
+    },
+    {
+      "from": "src/lib/boe/subscribers/registry.ts",
+      "to": "src/lib/boe/subscribers/activitySubscriber.ts",
+      "specifier": "./activitySubscriber"
+    },
+    {
+      "from": "src/lib/boe/subscribers/registry.ts",
+      "to": "src/lib/boe/subscribers/aiSubscriber.ts",
+      "specifier": "./aiSubscriber"
+    },
+    {
+      "from": "src/lib/boe/subscribers/registry.ts",
+      "to": "src/lib/boe/subscribers/auditSubscriber.ts",
+      "specifier": "./auditSubscriber"
+    },
+    {
+      "from": "src/lib/boe/subscribers/registry.ts",
+      "to": "src/lib/boe/subscribers/calendarSubscriber.ts",
+      "specifier": "./calendarSubscriber"
+    },
+    {
+      "from": "src/lib/boe/subscribers/registry.ts",
+      "to": "src/lib/boe/subscribers/dashboardSubscriber.ts",
+      "specifier": "./dashboardSubscriber"
+    },
+    {
+      "from": "src/lib/boe/subscribers/registry.ts",
+      "to": "src/lib/boe/subscribers/documentSubscriber.ts",
+      "specifier": "./documentSubscriber"
+    },
+    {
+      "from": "src/lib/boe/subscribers/registry.ts",
+      "to": "src/lib/boe/subscribers/notificationSubscriber.ts",
+      "specifier": "./notificationSubscriber"
+    },
+    {
+      "from": "src/lib/financialStatements/api.ts",
+      "to": "src/integrations/supabase/client.ts",
+      "specifier": "../../integrations/supabase/client"
+    },
+    {
+      "from": "src/lib/financialStatements/api.ts",
+      "to": "src/lib/auth/ensureSessionForInvoke.ts",
+      "specifier": "../auth/ensureSessionForInvoke"
+    },
+    {
+      "from": "src/lib/financialStatements/api.ts",
+      "to": "src/lib/platform/platformError.ts",
+      "specifier": "../platform/platformError"
+    },
+    {
+      "from": "src/lib/boe/subscribers/auditSubscriber.ts",
+      "to": "src/lib/boe/businessEvents.ts",
+      "specifier": "../businessEvents"
+    },
+    {
+      "from": "src/lib/boe/subscribers/dashboardSubscriber.ts",
+      "to": "src/lib/boe/businessEvents.ts",
+      "specifier": "../businessEvents"
+    }
+  ],
+  "dynamicFrontier": [
+    "src/lib/assets/eamTypes.ts",
+    "src/pages/AssetAcquisitions.tsx",
+    "src/pages/AssetAnalyticsDashboard.tsx",
+    "src/pages/AssetCategories.tsx",
+    "src/pages/AssetCategoryWorkspace.tsx",
+    "src/pages/AssetDetail.tsx",
+    "src/pages/AssetFinancialCockpit.tsx",
+    "src/pages/AssetHealthDashboard.tsx",
+    "src/pages/AssetMaintenanceDashboard.tsx",
+    "src/pages/AssetReports.tsx",
+    "src/pages/AssetVerificationDashboard.tsx",
+    "src/pages/AuditComplianceReports.tsx",
+    "src/pages/BankAccountDetail.tsx",
+    "src/pages/BankAccountsWorkspace.tsx",
+    "src/pages/BankReconciliation.tsx",
+    "src/pages/BankTransactions.tsx",
+    "src/pages/BankTransfers.tsx",
+    "src/pages/Banking.tsx",
+    "src/pages/Bills.tsx",
+    "src/pages/Budgets.tsx",
+    "src/pages/ChartOfAccounts.tsx",
+    "src/pages/Chat.tsx",
+    "src/pages/ComparativeBalanceSheet.tsx",
+    "src/pages/ComparativePL.tsx",
+    "src/pages/CreateCompany.tsx",
+    "src/pages/CreditNotes.tsx",
+    "src/pages/CustomerDetail.tsx",
+    "src/pages/Customers.tsx",
+    "src/pages/Dashboard.tsx",
+    "src/pages/Employees.tsx",
+    "src/pages/ExpenseClaims.tsx",
+    "src/pages/FinancialCalendar.tsx",
+    "src/pages/FinancialStatements.tsx",
+    "src/pages/FixedAssets.tsx",
+    "src/pages/GeneralLedger.tsx",
+    "src/pages/Import.tsx",
+    "src/pages/InventoryValuation.tsx",
+    "src/pages/InvoiceDetail.tsx",
+    "src/pages/Invoices.tsx",
+    "src/pages/JournalEntries.tsx",
+    "src/pages/LoanDetail.tsx",
+    "src/pages/Loans.tsx",
+    "src/pages/OnboardingGuide.tsx",
+    "src/pages/PayBills.tsx",
+    "src/pages/PayrollReports.tsx",
+    "src/pages/PayrollRunDetail.tsx",
+    "src/pages/PayrollRuns.tsx",
+    "src/pages/PayrollWorkspace.tsx",
+    "src/pages/PettyCash.tsx",
+    "src/pages/Products.tsx",
+    "src/pages/ProjectDetail.tsx",
+    "src/pages/ProjectProfitabilityReport.tsx",
+    "src/pages/Projects.tsx",
+    "src/pages/PurchaseOrderDetail.tsx",
+    "src/pages/PurchaseOrders.tsx",
+    "src/pages/PurchasesWorkspace.tsx",
+    "src/pages/QuickCaptureExpense.tsx",
+    "src/pages/QuoteDetail.tsx",
+    "src/pages/Quotes.tsx",
+    "src/pages/ReceivePayments.tsx",
+    "src/pages/Reconciliation.tsx",
+    "src/pages/RecurringBills.tsx",
+    "src/pages/RecurringEntries.tsx",
+    "src/pages/RecurringInvoices.tsx",
+    "src/pages/Reports.tsx",
+    "src/pages/RevenueWorkspace.tsx",
+    "src/pages/Settings.tsx",
+    "src/pages/StatutoryReturns.tsx",
+    "src/pages/TaxRates.tsx",
+    "src/pages/TaxReport.tsx",
+    "src/pages/TimeTracking.tsx",
+    "src/pages/UserManual.tsx",
+    "src/pages/VendorCredits.tsx",
+    "src/pages/VendorDetail.tsx",
+    "src/pages/Vendors.tsx",
+    "src/pages/accounting/AccountingAuditTrail.tsx",
+    "src/pages/accounting/AccountingDashboard.tsx",
+    "src/pages/accounting/AccountingSetupWizard.tsx",
+    "src/pages/accounting/AccountingTimeline.tsx",
+    "src/pages/accounting/ExceptionsCentre.tsx",
+    "src/pages/accounting/FinancialHealth.tsx",
+    "src/pages/accounting/FinancialPeriods.tsx",
+    "src/pages/accounting/FinancialYears.tsx",
+    "src/pages/accounting/PeriodCloseReadiness.tsx",
+    "src/pages/accounting/PostingRequests.tsx",
+    "src/pages/accounting/ReconciliationCentre.tsx",
+    "src/pages/accounting/TrialBalance.tsx",
+    "src/pages/admin/BetaAnalyticsDashboard.tsx",
+    "src/pages/financialClose/FinancialCloseHome.tsx",
+    "src/pages/financialClose/FinancialCloseWorkspace.tsx",
+    "src/pages/financialStatements/FinancialStatementsWorkspaceDashboard.tsx",
+    "src/pages/financialStatements/FinancialStatementsWorkspaceHome.tsx",
+    "src/pages/inventory/InventoryAnalytics.tsx",
+    "src/pages/inventory/InventoryCosting.tsx",
+    "src/pages/inventory/InventoryCounts.tsx",
+    "src/pages/inventory/InventoryMovements.tsx",
+    "src/pages/inventory/InventoryReceipts.tsx",
+    "src/pages/inventory/InventoryRegister.tsx",
+    "src/pages/inventory/InventoryTransfers.tsx",
+    "src/pages/inventory/InventoryWarehouses.tsx",
+    "src/pages/inventory/InventoryWorkspace.tsx",
+    "src/pages/work/WorkClocking.tsx",
+    "src/pages/work/WorkExecutiveDashboard.tsx",
+    "src/pages/work/WorkProjectCommandCentre.tsx",
+    "src/pages/work/WorkProjects.tsx",
+    "src/pages/work/WorkResources.tsx",
+    "src/pages/work/WorkTime.tsx"
+  ]
+}

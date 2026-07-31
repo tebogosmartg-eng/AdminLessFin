@@ -19,6 +19,11 @@ const CFA_AUTHORITY_GLOBS = [
   'src/lib/accounting/canonicalFinancialAggregation.ts',
   'supabase/functions/_shared/canonicalFinancialAggregation.ts',
   'src/lib/accounting/dashboardReconciliation.ts',
+  // Reconciliation control authority. Sums SUB-LEDGER rows only (asset
+  // register, AR/AP ageing) so those totals can be compared against the GL.
+  // It derives no General Ledger figure and performs no classification — every
+  // GL number it handles is passed in from CFA unchanged.
+  'src/lib/accounting/subLedgerReconciliation.ts',
   'supabase/functions/_shared/accountingEngineTotals.ts',
   'supabase/functions/_shared/loadCanonicalAggregation.ts',
   'supabase/functions/_shared/efsStatementEngine/statementEngine.ts',
@@ -54,6 +59,13 @@ const RESTRICTED_PREFIXES = [
   'src/pages/',
   'src/components/',
   'src/lib/revenueIntelligence.ts',
+  // Extended: previously only pages/components and four edge functions were
+  // scanned, so a new parallel aggregator added under src/lib/ or
+  // src/reporting/ would have passed the guard unnoticed. The IGNORE_PREFIXES
+  // list above still exempts the domain engines (payroll, statutory,
+  // governance) that are legitimately outside CFA scope per ADR-0003.
+  'src/lib/',
+  'src/reporting/',
   'supabase/functions/reports/',
   'supabase/functions/dashboard-data/',
   'supabase/functions/projects/',

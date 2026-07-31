@@ -45,12 +45,13 @@ const CashFlowForecastChart = ({ data }: CashFlowForecastChartProps) => {
           formatter={(value: number) => [formatCurrency(value), 'Projected Balance']}
           labelFormatter={(label) => `Date: ${label}`}
         />
-        <Area 
-          type="monotone" 
-          dataKey="balance" 
-          stroke="#10b981" 
-          fillOpacity={1} 
-          fill="url(#colorBalance)" 
+        <Area
+          type="monotone"
+          dataKey="balance"
+          stroke="#10b981"
+          fillOpacity={1}
+          fill="url(#colorBalance)"
+          isAnimationActive={false}
         />
       </AreaChart>
     </ResponsiveContainer>

@@ -52,11 +52,16 @@ export function buildSpreadsheetMl(
   return platformBuildSpreadsheetMl(rows, options);
 }
 
-export function exportPayrollReportRows(
+/**
+ * Async because the PDF branch now fetches the jsPDF engine on demand rather
+ * than importing it at module scope (see src/lib/pdf/pdfEngine.ts). Non-PDF
+ * formats resolve immediately; the returned artifact is unchanged.
+ */
+export async function exportPayrollReportRows(
   rows: Record<string, string | number>[],
   options: PayrollExportOptions
-): PayrollExportArtifact {
-  const artifact = exportReportRows(rows, {
+): Promise<PayrollExportArtifact> {
+  const artifact = await exportReportRows(rows, {
     format: options.format,
     fileBaseName: options.fileBaseName,
     branding: options.branding,

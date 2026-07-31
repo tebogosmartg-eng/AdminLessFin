@@ -192,7 +192,7 @@ describe('VIP employee-first audit working paper (V3.6.6)', () => {
     expect(report.employees.map((e) => e.identity.employeeNumber)).toEqual(['EMP-1', 'EMP-2']);
   });
 
-  it('exports via VIP-owned branded pipeline (not management matrix)', () => {
+  it('exports via VIP-owned branded pipeline (not management matrix)', async () => {
     const fact = mapRawPayslipToPayrollFact(rawPayload({ payDate: '2026-06-25' }));
     const report = buildVipWorkingPaperFromFacts([fact], { taxYearStartYear: 2026 });
     const branding = createVipExportBranding({
@@ -203,7 +203,7 @@ describe('VIP employee-first audit working paper (V3.6.6)', () => {
       report,
     });
 
-    const excel = exportVipWorkingPaper(report, {
+    const excel = await exportVipWorkingPaper(report, {
       format: 'excel',
       fileBaseName: 'AdminLess-Fin-VIP-Working-Paper',
       branding,
@@ -217,7 +217,7 @@ describe('VIP employee-first audit working paper (V3.6.6)', () => {
     expect(excel.payload).toContain('AutoFilter');
     expect(excel.payload).toContain('CONFIDENTIAL');
 
-    const csv = exportVipWorkingPaper(report, {
+    const csv = await exportVipWorkingPaper(report, {
       format: 'csv',
       fileBaseName: 'AdminLess-Fin-VIP-Working-Paper',
       branding,
@@ -298,13 +298,13 @@ describe('Locked regressions — Register / Matrix / platform export', () => {
     expect(matrix.columns[11]).toBe('Feb 2027');
   });
 
-  it('leaves operational/platform SpreadsheetML helper usable without VIP branding', () => {
+  it('leaves operational/platform SpreadsheetML helper usable without VIP branding', async () => {
     const rows = [{ A: 1, B: 2 }];
     const xml = buildSpreadsheetMl(rows);
     expect(xml).toContain('Excel.Sheet');
     const csv = rowsToCsvString(rows);
     expect(csv).toContain('A');
-    const json = exportReportRows(rows, { format: 'json', fileBaseName: 'ops-demo' });
+    const json = await exportReportRows(rows, { format: 'json', fileBaseName: 'ops-demo' });
     expect(json.format).toBe('json');
   });
 });

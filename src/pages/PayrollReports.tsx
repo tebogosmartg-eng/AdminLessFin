@@ -37,6 +37,7 @@ import {
   type PayrollExportFormat,
 } from '../lib/payrollReportExport';
 import { buildReportId } from '../reporting/export';
+import { showError } from '../utils/toast';
 import {
   Select,
   SelectContent,
@@ -104,7 +105,27 @@ const PayrollReports = () => {
     if (value === 'statutory') setStatutoryTab('paye_summary');
   };
 
-  const handleDownload = () => {
+  /**
+   * Async because PDF export now fetches the jsPDF engine on demand. That adds
+   * a failure mode this handler did not previously have — the chunk request can
+   * fail on a flaky network or mid-deploy — and an un-awaited rejection would
+   * vanish silently, leaving the user staring at a button that did nothing. The
+   * try/catch below exists for that case; report selection and output are
+   * otherwise unchanged.
+   */
+  const handleDownload = async () => {
+    try {
+      await runDownload();
+    } catch (error) {
+      showError(
+        error instanceof Error
+          ? `Export failed: ${error.message}`
+          : 'Export failed. Please try again.',
+      );
+    }
+  };
+
+  const runDownload = async () => {
     const period = `${format(fromDate, 'PPP')} – ${format(toDate, 'PPP')}`;
 
     if (category === 'operational') {
@@ -116,7 +137,7 @@ const PayrollReports = () => {
       const catalog = PAYROLL_REPORT_CATALOG.find((r) => r.id === activeTab);
       const title = catalog?.label ?? 'Payroll Report';
       const rows = operationalRows(activeTab, reports);
-      exportPayrollReportRows(rows, {
+      await exportPayrollReportRows(rows, {
         format: exportFormat,
         fileBaseName: `AdminLess-Fin-payroll-${activeTab}-${periodLabel}`,
         branding: {
@@ -137,7 +158,7 @@ const PayrollReports = () => {
       const catalog = MANAGEMENT_REPORT_CATALOG.find((r) => r.id === managementTab);
       const title = catalog?.label ?? 'Management Report';
       const rows = managementReportToRows(managementTab, management);
-      exportPayrollReportRows(rows, {
+      await exportPayrollReportRows(rows, {
         format: exportFormat,
         fileBaseName: `AdminLess-Fin-payroll-${managementTab}-${management.taxYearLabel.replace(/\s+/g, '-')}`,
         branding: {
@@ -156,7 +177,7 @@ const PayrollReports = () => {
     const catalog = STATUTORY_REPORT_CATALOG.find((r) => r.id === statutoryTab);
     const title = catalog?.label ?? 'Statutory Report';
     const rows = statutoryReportToRows(statutoryTab, management);
-    exportPayrollReportRows(rows, {
+    await exportPayrollReportRows(rows, {
       format: exportFormat,
       fileBaseName: `AdminLess-Fin-payroll-${statutoryTab}-${periodLabel}`,
       branding: {

@@ -2,6 +2,7 @@ import { defineConfig } from "vite";
 import dyadComponentTagger from "@dyad-sh/react-vite-component-tagger";
 import react from "@vitejs/plugin-react-swc";
 import path from "path";
+import { eagerChunkGuard } from "./tools/perf/eagerChunkGuard";
 
 // Phase P1.1 — delivery-layer only. Groups third-party dependencies into
 // predictable, cacheable vendor chunks. Deliberately does NOT assign
@@ -29,6 +30,22 @@ import path from "path";
 //      code too, so they're deliberately left in the shared bucket instead
 //      — a few KB of eager cost is cheaper than that coupling.
 function vendorChunk(id: string): string | undefined {
+  // Vite's virtual helpers (`\0vite/preload-helper`, `\0vite/modulepreload-polyfill`,
+  // `\0commonjsHelpers`) contain no "node_modules" segment, so before this branch
+  // they fell through to `undefined` and Rollup was free to park them in whichever
+  // chunk it liked. It parked `preload-helper` in `vendor-pdf`.
+  //
+  // That single placement was expensive. Every lazy route's import() calls
+  // __vitePreload from that helper, so the entry chunk *statically* imports
+  // whatever chunk contains it — which made the browser download and parse all
+  // 794 kB (243 kB gzip) of jsPDF + html2canvas + canvg + core-js before the
+  // login screen could paint, even though no eager module imports jsPDF.
+  // Measured with tools/perf/bundleReport.ts + tools/perf/traceImporters.ts.
+  //
+  // Pinning the helpers to the always-eager shared bucket makes the placement
+  // deterministic instead of a side effect of module ordering.
+  if (id.startsWith("\0vite/") || id.startsWith("\0commonjsHelpers")) return "vendor";
+
   if (!id.includes("node_modules")) return undefined;
 
   // Eager startup path (confirmed via static import-graph walk from
@@ -62,7 +79,10 @@ export default defineConfig(() => ({
     host: "::",
     port: 8080,
   },
-  plugins: [dyadComponentTagger(), react()],
+  // The guard fails the build if a lazy-only vendor cluster becomes reachable
+  // from the entry by static import. It exists because that exact regression
+  // shipped silently once (see tools/perf/eagerChunkGuard.ts).
+  plugins: [dyadComponentTagger(), react(), eagerChunkGuard()],
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),

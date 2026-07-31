@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
+import { useReportingPeriod } from '../../contexts/ReportingPeriodContext';
 import { accountingApi } from '../../lib/accountingWorkspace';
 import { formatCurrency } from '../../lib/utils';
 import {
@@ -18,10 +19,17 @@ type Props = {
 
 export default function AccountBalanceCard({ accountId, open, onOpenChange }: Props) {
   const { activeCompany } = useAuth();
+  // Anchor the inquiry to the configured financial year rather than letting the
+  // edge fall back to a calendar year.
+  const { dateFrom, dateTo, isReady } = useReportingPeriod();
   const { data, isLoading } = useQuery({
-    queryKey: ['account-inquiry', activeCompany?.id, accountId],
-    queryFn: () => accountingApi.accountInquiry(activeCompany!.id, accountId!),
-    enabled: open && !!activeCompany && !!accountId,
+    queryKey: ['account-inquiry', activeCompany?.id, accountId, dateFrom, dateTo],
+    queryFn: () =>
+      accountingApi.accountInquiry(activeCompany!.id, accountId!, {
+        start_date: dateFrom,
+        end_date: dateTo,
+      }),
+    enabled: open && !!activeCompany && !!accountId && isReady,
   });
 
   const d = data as any;

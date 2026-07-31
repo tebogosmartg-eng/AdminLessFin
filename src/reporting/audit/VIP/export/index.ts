@@ -19,14 +19,20 @@ export type VipExportArtifact = {
   payload?: string;
 };
 
-export function exportVipWorkingPaper(
+/**
+ * Async because the PDF branch now fetches the jsPDF engine on demand rather
+ * than importing it at module scope (see src/lib/pdf/pdfEngine.ts). The csv /
+ * excel branches do no extra work and resolve immediately — output and artifact
+ * shape are unchanged for every format.
+ */
+export async function exportVipWorkingPaper(
   report: VipWorkingPaperReport,
   options: {
     format: VipExportFormat;
     fileBaseName: string;
     branding: VipExportBranding;
   }
-): VipExportArtifact {
+): Promise<VipExportArtifact> {
   const branding = assertVipBranding(options.branding);
   const exportedAt = new Date().toISOString();
   const base = options.fileBaseName.replace(/\.+$/, '');
@@ -55,7 +61,7 @@ export function exportVipWorkingPaper(
     };
   }
 
-  const result = exportVipPdf(report, branding, base);
+  const result = await exportVipPdf(report, branding, base);
   return {
     format: 'pdf',
     fileName: result.fileName,
@@ -74,7 +80,7 @@ export async function exportVipWorkingPaperAsync(
   }
 ): Promise<VipExportArtifact> {
   if (options.format !== 'pdf') {
-    return exportVipWorkingPaper(report, options);
+    return await exportVipWorkingPaper(report, options);
   }
   const branding = assertVipBranding(options.branding);
   const result = await exportVipPdfAsync(report, branding, options.fileBaseName.replace(/\.+$/, ''));

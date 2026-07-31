@@ -1,5 +1,8 @@
-import jsPDF from 'jspdf';
-import autoTable from 'jspdf-autotable';
+// Type-only: erased at build time, so this creates no runtime dependency on
+// jsPDF. The engine is fetched on demand via loadPdfEngine() — see
+// src/lib/pdf/pdfEngine.ts for why.
+import type jsPDF from 'jspdf';
+import { loadPdfEngine } from '../../../lib/pdf/pdfEngine';
 import { BRAND } from '../../../config/brand';
 import {
   assertExportBranding,
@@ -98,7 +101,13 @@ function writeIdentityBlock(doc: jsPDF, identity: Record<string, string>, startY
   return y + 2;
 }
 
-function exportPdfSync(
+/**
+ * Renders and saves the PDF. Async only because the engine is now fetched on
+ * demand; the drawing logic, page layout and output bytes are unchanged.
+ * Note the non-browser early return below still happens *before* the engine is
+ * requested, so Node/unit contexts never download it.
+ */
+async function renderPdf(
   rows: Record<string, string | number>[],
   options: {
     fileName: string;
@@ -106,12 +115,14 @@ function exportPdfSync(
     sections?: ExportSection[];
     logoDataUrl?: string | null;
   }
-): { fileName: string; contentType: string } {
+): Promise<{ fileName: string; contentType: string }> {
   const branding = assertExportBranding(options.branding, 'pdf');
   const name = options.fileName.endsWith('.pdf') ? options.fileName : `${options.fileName}.pdf`;
   if (typeof document === 'undefined') {
     return { fileName: name, contentType: 'application/pdf' };
   }
+
+  const { jsPDF, autoTable } = await loadPdfEngine();
 
   const wide =
     (options.sections?.[0]?.rows[0] && Object.keys(options.sections[0].rows[0]).length > 6) ||
@@ -161,7 +172,7 @@ function exportPdfSync(
  * Branded PDF export. Supports flat rows or employee sections (VIP working paper).
  * Logo load is best-effort; falls back to AdminLess Fin wordmark text in the header.
  */
-export function exportPdf(
+export async function exportPdf(
   rows: Record<string, string | number>[],
   options: {
     fileName: string;
@@ -170,7 +181,7 @@ export function exportPdf(
     branding?: ReportExportBranding;
     sections?: ExportSection[];
   }
-): { fileName: string; contentType: string } {
+): Promise<{ fileName: string; contentType: string }> {
   // Legacy title/subtitle path only allowed in non-browser (unit) contexts without branding
   if (!options.branding) {
     if (typeof document === 'undefined') {
@@ -190,7 +201,7 @@ export function exportPdf(
       period: options.subtitle,
     } satisfies ReportExportBranding);
 
-  return exportPdfSync(rows, {
+  return renderPdf(rows, {
     fileName: options.fileName,
     branding,
     sections: options.sections,
@@ -209,7 +220,7 @@ export async function exportPdfAsync(
 ): Promise<{ fileName: string; contentType: string }> {
   const branding = assertExportBranding(options.branding, 'pdf');
   const logoDataUrl = await tryLoadLogoDataUrl(branding.companyLogoUrl);
-  return exportPdfSync(rows, {
+  return renderPdf(rows, {
     fileName: options.fileName,
     branding,
     sections: options.sections,

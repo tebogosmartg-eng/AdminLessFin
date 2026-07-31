@@ -1,0 +1,491 @@
+{
+  "label": "dupcheck",
+  "generatedAt": "2026-07-31T02:22:21.538Z",
+  "baseUrl": "http://127.0.0.1:4173",
+  "results": [
+    {
+      "name": "Dashboard",
+      "path": "/",
+      "cold": {
+        "fcp": 116,
+        "lcp": 1468,
+        "domContentLoaded": 88.30000000447035,
+        "load": 88.5,
+        "longTasks": 3,
+        "totalBlockingTime": 10,
+        "reactCommits": 105,
+        "heapUsedMB": 18.111741065979004,
+        "settledAt": 7151
+      },
+      "warm": {
+        "transitionMs": 2749,
+        "reactCommits": 124,
+        "requests": 0
+      },
+      "network": {
+        "total": 50,
+        "supabase": 1,
+        "edgeFunctions": 17,
+        "static": 31,
+        "bytesTotal": 212204,
+        "slowest": [
+          {
+            "url": "https://zaulhnpohrgqqodvzhxp.supabase.co/functions/v1/dashboard-data",
+            "short": "/functions/v1/dashboard-data",
+            "method": "POST",
+            "kind": "edge-function",
+            "status": 200,
+            "ms": 1906.921,
+            "bytes": 3466,
+            "fromCache": false,
+            "body": "{\"company_id\":\"26014bd5-f03f-44ae-93bd-64b5add2e09f\",\"date_from\":\"2026-01-01\",\"date_to\":\"2026-12-31\"}"
+          },
+          {
+            "url": "https://zaulhnpohrgqqodvzhxp.supabase.co/functions/v1/financial-statements",
+            "short": "/functions/v1/financial-statements",
+            "method": "POST",
+            "kind": "edge-function",
+            "status": 200,
+            "ms": 1661.926,
+            "bytes": 1070,
+            "fromCache": false,
+            "body": "{\"method\":\"GET_COMPANY_MASTER_DATA\",\"company_id\":\"26014bd5-f03f-44ae-93bd-64b5add2e09f\"}"
+          },
+          {
+            "url": "https://zaulhnpohrgqqodvzhxp.supabase.co/functions/v1/accounting-setup",
+            "short": "/functions/v1/accounting-setup",
+            "method": "POST",
+            "kind": "edge-function",
+            "status": 200,
+            "ms": 1528.872,
+            "bytes": 1611,
+            "fromCache": false,
+            "body": "{\"method\":\"GET_STATUS\",\"company_id\":\"26014bd5-f03f-44ae-93bd-64b5add2e09f\"}"
+          },
+          {
+            "url": "https://zaulhnpohrgqqodvzhxp.supabase.co/functions/v1/chart-of-accounts",
+            "short": "/functions/v1/chart-of-accounts",
+            "method": "POST",
+            "kind": "edge-function",
+            "status": 200,
+            "ms": 1445.6399999999999,
+            "bytes": 1855,
+            "fromCache": false,
+            "body": "{\"method\":\"GET\",\"company_id\":\"26014bd5-f03f-44ae-93bd-64b5add2e09f\"}"
+          },
+          {
+            "url": "https://zaulhnpohrgqqodvzhxp.supabase.co/functions/v1/chart-of-accounts",
+            "short": "/functions/v1/chart-of-accounts",
+            "method": "POST",
+            "kind": "edge-function",
+            "status": 200,
+            "ms": 1445.26,
+            "bytes": 1854,
+            "fromCache": false,
+            "body": "{\"method\":\"GET\",\"company_id\":\"26014bd5-f03f-44ae-93bd-64b5add2e09f\"}"
+          },
+          {
+            "url": "https://zaulhnpohrgqqodvzhxp.supabase.co/functions/v1/accounting",
+            "short": "/functions/v1/accounting",
+            "method": "POST",
+            "kind": "edge-function",
+            "status": 200,
+            "ms": 1437.1000000000001,
+            "bytes": 1201,
+            "fromCache": false,
+            "body": "{\"method\":\"GET_FINANCIAL_YEARS\",\"company_id\":\"26014bd5-f03f-44ae-93bd-64b5add2e09f\"}"
+          },
+          {
+            "url": "https://zaulhnpohrgqqodvzhxp.supabase.co/functions/v1/accounting",
+            "short": "/functions/v1/accounting",
+            "method": "POST",
+            "kind": "edge-function",
+            "status": 200,
+            "ms": 1412.155,
+            "bytes": 1809,
+            "fromCache": false,
+            "body": "{\"method\":\"GET_FINANCIAL_PERIODS\",\"company_id\":\"26014bd5-f03f-44ae-93bd-64b5add2e09f\"}"
+          },
+          {
+            "url": "https://zaulhnpohrgqqodvzhxp.supabase.co/functions/v1/customers",
+            "short": "/functions/v1/customers",
+            "method": "POST",
+            "kind": "edge-function",
+            "status": 200,
+            "ms": 1384.056,
+            "bytes": 1190,
+            "fromCache": false,
+            "body": "{\"method\":\"GET\",\"company_id\":\"26014bd5-f03f-44ae-93bd-64b5add2e09f\"}"
+          }
+        ],
+        "duplicates": [
+          {
+            "short": "POST /functions/v1/chart-of-accounts {\"method\":\"GET\",\"company_id\":\"26014bd5-f03f-44ae-93bd-64b5add2e09f\"}",
+            "count": 2,
+            "totalMs": 2891
+          }
+        ]
+      }
+    },
+    {
+      "name": "Customers",
+      "path": "/customers",
+      "cold": {
+        "fcp": 116,
+        "lcp": 812,
+        "domContentLoaded": 90.5,
+        "load": 90.70000000298023,
+        "longTasks": 0,
+        "totalBlockingTime": 0,
+        "reactCommits": 15,
+        "heapUsedMB": 10.595396041870117,
+        "settledAt": 2705
+      },
+      "warm": {
+        "transitionMs": 800,
+        "reactCommits": 3,
+        "requests": 0
+      },
+      "network": {
+        "total": 24,
+        "supabase": 1,
+        "edgeFunctions": 5,
+        "static": 17,
+        "bytesTotal": 12930,
+        "slowest": [
+          {
+            "url": "https://zaulhnpohrgqqodvzhxp.supabase.co/functions/v1/financial-statements",
+            "short": "/functions/v1/financial-statements",
+            "method": "POST",
+            "kind": "edge-function",
+            "status": 200,
+            "ms": 974.0260000000001,
+            "bytes": 1068,
+            "fromCache": false,
+            "body": "{\"method\":\"GET_COMPANY_MASTER_DATA\",\"company_id\":\"26014bd5-f03f-44ae-93bd-64b5add2e09f\"}"
+          },
+          {
+            "url": "https://zaulhnpohrgqqodvzhxp.supabase.co/functions/v1/user-session",
+            "short": "/functions/v1/user-session",
+            "method": "POST",
+            "kind": "edge-function",
+            "status": 200,
+            "ms": 616.652,
+            "bytes": 2408,
+            "fromCache": false,
+            "body": "{\"method\":\"GET\"}"
+          },
+          {
+            "url": "https://zaulhnpohrgqqodvzhxp.supabase.co/functions/v1/accounting",
+            "short": "/functions/v1/accounting",
+            "method": "POST",
+            "kind": "edge-function",
+            "status": 200,
+            "ms": 610.52,
+            "bytes": 1204,
+            "fromCache": false,
+            "body": "{\"method\":\"GET_FINANCIAL_YEARS\",\"company_id\":\"26014bd5-f03f-44ae-93bd-64b5add2e09f\"}"
+          },
+          {
+            "url": "https://zaulhnpohrgqqodvzhxp.supabase.co/functions/v1/accounting",
+            "short": "/functions/v1/accounting",
+            "method": "POST",
+            "kind": "edge-function",
+            "status": 200,
+            "ms": 609.965,
+            "bytes": 1810,
+            "fromCache": false,
+            "body": "{\"method\":\"GET_FINANCIAL_PERIODS\",\"company_id\":\"26014bd5-f03f-44ae-93bd-64b5add2e09f\"}"
+          },
+          {
+            "url": "https://zaulhnpohrgqqodvzhxp.supabase.co/functions/v1/customers",
+            "short": "/functions/v1/customers",
+            "method": "POST",
+            "kind": "edge-function",
+            "status": 200,
+            "ms": 599.078,
+            "bytes": 1190,
+            "fromCache": false,
+            "body": "{\"method\":\"GET\",\"company_id\":\"26014bd5-f03f-44ae-93bd-64b5add2e09f\"}"
+          },
+          {
+            "url": "https://zaulhnpohrgqqodvzhxp.supabase.co/rest/v1/notifications?select=*&user_id=eq.908ad90e-ee0e-4957-943d-ed1ec2fb843a&company_id=eq.26014bd5-f03f-44ae-93bd-64b5add2e09f&order=created_at.desc&limit=10",
+            "short": "/rest/v1/notifications?select=*&user_id=eq.908ad90e-ee0e-4957-943d-ed1ec2fb843a&company_id=eq.26014bd5-f03f-44ae-93bd-64b5add2e09f&order=created_at.desc&limit=10",
+            "method": "GET",
+            "kind": "supabase-rest",
+            "status": 200,
+            "ms": 419.589,
+            "bytes": 837,
+            "fromCache": false,
+            "body": ""
+          },
+          {
+            "url": "http://127.0.0.1:4173/assets/vendor-pdf-_U-j6CMB.js",
+            "short": "/assets/vendor-pdf-_U-j6CMB.js",
+            "method": "GET",
+            "kind": "static",
+            "status": 200,
+            "ms": 8.872,
+            "bytes": 0,
+            "fromCache": false,
+            "body": ""
+          },
+          {
+            "url": "http://127.0.0.1:4173/assets/index-CVnQ_dcP.js",
+            "short": "/assets/index-CVnQ_dcP.js",
+            "method": "GET",
+            "kind": "static",
+            "status": 200,
+            "ms": 7.86,
+            "bytes": 0,
+            "fromCache": false,
+            "body": ""
+          }
+        ],
+        "duplicates": []
+      }
+    },
+    {
+      "name": "TrialBalance",
+      "path": "/trial-balance",
+      "cold": {
+        "fcp": 112,
+        "lcp": 1068,
+        "domContentLoaded": 85,
+        "load": 85.19999999552965,
+        "longTasks": 1,
+        "totalBlockingTime": 1,
+        "reactCommits": 18,
+        "heapUsedMB": 11.955297470092773,
+        "settledAt": 3320
+      },
+      "warm": {
+        "transitionMs": 783,
+        "reactCommits": 7,
+        "requests": 0
+      },
+      "network": {
+        "total": 33,
+        "supabase": 1,
+        "edgeFunctions": 5,
+        "static": 26,
+        "bytesTotal": 20764,
+        "slowest": [
+          {
+            "url": "https://zaulhnpohrgqqodvzhxp.supabase.co/functions/v1/financial-statements",
+            "short": "/functions/v1/financial-statements",
+            "method": "POST",
+            "kind": "edge-function",
+            "status": 200,
+            "ms": 1031.656,
+            "bytes": 1068,
+            "fromCache": false,
+            "body": "{\"method\":\"GET_COMPANY_MASTER_DATA\",\"company_id\":\"26014bd5-f03f-44ae-93bd-64b5add2e09f\"}"
+          },
+          {
+            "url": "https://zaulhnpohrgqqodvzhxp.supabase.co/functions/v1/accounting",
+            "short": "/functions/v1/accounting",
+            "method": "POST",
+            "kind": "edge-function",
+            "status": 200,
+            "ms": 823.898,
+            "bytes": 1736,
+            "fromCache": false,
+            "body": "{\"method\":\"GET_HIERARCHICAL_TRIAL_BALANCE\",\"company_id\":\"26014bd5-f03f-44ae-93bd-64b5add2e09f\",\"start_date\":\"2026-01-01\",\"end_date\":\"2026-12-31\"}"
+          },
+          {
+            "url": "https://zaulhnpohrgqqodvzhxp.supabase.co/functions/v1/user-session",
+            "short": "/functions/v1/user-session",
+            "method": "POST",
+            "kind": "edge-function",
+            "status": 200,
+            "ms": 683.683,
+            "bytes": 2404,
+            "fromCache": false,
+            "body": "{\"method\":\"GET\"}"
+          },
+          {
+            "url": "https://zaulhnpohrgqqodvzhxp.supabase.co/functions/v1/accounting",
+            "short": "/functions/v1/accounting",
+            "method": "POST",
+            "kind": "edge-function",
+            "status": 200,
+            "ms": 682.797,
+            "bytes": 1202,
+            "fromCache": false,
+            "body": "{\"method\":\"GET_FINANCIAL_YEARS\",\"company_id\":\"26014bd5-f03f-44ae-93bd-64b5add2e09f\"}"
+          },
+          {
+            "url": "https://zaulhnpohrgqqodvzhxp.supabase.co/functions/v1/accounting",
+            "short": "/functions/v1/accounting",
+            "method": "POST",
+            "kind": "edge-function",
+            "status": 200,
+            "ms": 682.566,
+            "bytes": 1814,
+            "fromCache": false,
+            "body": "{\"method\":\"GET_FINANCIAL_PERIODS\",\"company_id\":\"26014bd5-f03f-44ae-93bd-64b5add2e09f\"}"
+          },
+          {
+            "url": "https://zaulhnpohrgqqodvzhxp.supabase.co/rest/v1/notifications?select=*&user_id=eq.908ad90e-ee0e-4957-943d-ed1ec2fb843a&company_id=eq.26014bd5-f03f-44ae-93bd-64b5add2e09f&order=created_at.desc&limit=10",
+            "short": "/rest/v1/notifications?select=*&user_id=eq.908ad90e-ee0e-4957-943d-ed1ec2fb843a&company_id=eq.26014bd5-f03f-44ae-93bd-64b5add2e09f&order=created_at.desc&limit=10",
+            "method": "GET",
+            "kind": "supabase-rest",
+            "status": 200,
+            "ms": 477.01,
+            "bytes": 837,
+            "fromCache": false,
+            "body": ""
+          },
+          {
+            "url": "http://127.0.0.1:4173/assets/TraceabilityDrawer-Das4GfTO.js",
+            "short": "/assets/TraceabilityDrawer-Das4GfTO.js",
+            "method": "GET",
+            "kind": "static",
+            "status": 200,
+            "ms": 10.511,
+            "bytes": 2195,
+            "fromCache": false,
+            "body": ""
+          },
+          {
+            "url": "http://127.0.0.1:4173/assets/separator-BR4051EL.js",
+            "short": "/assets/separator-BR4051EL.js",
+            "method": "GET",
+            "kind": "static",
+            "status": 200,
+            "ms": 8.866,
+            "bytes": 411,
+            "fromCache": false,
+            "body": ""
+          }
+        ],
+        "duplicates": []
+      }
+    },
+    {
+      "name": "Banking",
+      "path": "/banking",
+      "cold": {
+        "fcp": 112,
+        "lcp": 1788,
+        "domContentLoaded": 86.5,
+        "load": 86.70000000298023,
+        "longTasks": 0,
+        "totalBlockingTime": 0,
+        "reactCommits": 25,
+        "heapUsedMB": 13.970088958740234,
+        "settledAt": 4010
+      },
+      "warm": {
+        "transitionMs": 768,
+        "reactCommits": 7,
+        "requests": 0
+      },
+      "network": {
+        "total": 41,
+        "supabase": 1,
+        "edgeFunctions": 11,
+        "static": 28,
+        "bytesTotal": 28571,
+        "slowest": [
+          {
+            "url": "https://zaulhnpohrgqqodvzhxp.supabase.co/functions/v1/reports",
+            "short": "/functions/v1/reports",
+            "method": "POST",
+            "kind": "edge-function",
+            "status": 200,
+            "ms": 1261.6660000000002,
+            "bytes": 1583,
+            "fromCache": false,
+            "body": "{\"company_id\":\"26014bd5-f03f-44ae-93bd-64b5add2e09f\",\"start_date\":\"2026-01-01\",\"end_date\":\"2026-12-31\"}"
+          },
+          {
+            "url": "https://zaulhnpohrgqqodvzhxp.supabase.co/functions/v1/financial-statements",
+            "short": "/functions/v1/financial-statements",
+            "method": "POST",
+            "kind": "edge-function",
+            "status": 200,
+            "ms": 1039.8960000000002,
+            "bytes": 1070,
+            "fromCache": false,
+            "body": "{\"method\":\"GET_COMPANY_MASTER_DATA\",\"company_id\":\"26014bd5-f03f-44ae-93bd-64b5add2e09f\"}"
+          },
+          {
+            "url": "https://zaulhnpohrgqqodvzhxp.supabase.co/functions/v1/accounting-setup",
+            "short": "/functions/v1/accounting-setup",
+            "method": "POST",
+            "kind": "edge-function",
+            "status": 200,
+            "ms": 870.4309999999999,
+            "bytes": 1609,
+            "fromCache": false,
+            "body": "{\"method\":\"GET_STATUS\",\"company_id\":\"26014bd5-f03f-44ae-93bd-64b5add2e09f\"}"
+          },
+          {
+            "url": "https://zaulhnpohrgqqodvzhxp.supabase.co/functions/v1/banking",
+            "short": "/functions/v1/banking",
+            "method": "POST",
+            "kind": "edge-function",
+            "status": 200,
+            "ms": 797.023,
+            "bytes": 877,
+            "fromCache": false,
+            "body": "{\"method\":\"GET_OUTSTANDING\",\"company_id\":\"26014bd5-f03f-44ae-93bd-64b5add2e09f\"}"
+          },
+          {
+            "url": "https://zaulhnpohrgqqodvzhxp.supabase.co/functions/v1/banking",
+            "short": "/functions/v1/banking",
+            "method": "POST",
+            "kind": "edge-function",
+            "status": 200,
+            "ms": 796.8929999999999,
+            "bytes": 874,
+            "fromCache": false,
+            "body": "{\"method\":\"GET_TRANSACTIONS\",\"company_id\":\"26014bd5-f03f-44ae-93bd-64b5add2e09f\"}"
+          },
+          {
+            "url": "https://zaulhnpohrgqqodvzhxp.supabase.co/functions/v1/banking",
+            "short": "/functions/v1/banking",
+            "method": "POST",
+            "kind": "edge-function",
+            "status": 200,
+            "ms": 740.947,
+            "bytes": 879,
+            "fromCache": false,
+            "body": "{\"method\":\"GET_TRANSACTIONS\",\"company_id\":\"26014bd5-f03f-44ae-93bd-64b5add2e09f\"}"
+          },
+          {
+            "url": "https://zaulhnpohrgqqodvzhxp.supabase.co/functions/v1/banking",
+            "short": "/functions/v1/banking",
+            "method": "POST",
+            "kind": "edge-function",
+            "status": 200,
+            "ms": 716.9069999999999,
+            "bytes": 1458,
+            "fromCache": false,
+            "body": "{\"method\":\"GET_BANK_ACCOUNTS\",\"company_id\":\"26014bd5-f03f-44ae-93bd-64b5add2e09f\"}"
+          },
+          {
+            "url": "https://zaulhnpohrgqqodvzhxp.supabase.co/functions/v1/accounting",
+            "short": "/functions/v1/accounting",
+            "method": "POST",
+            "kind": "edge-function",
+            "status": 200,
+            "ms": 709.815,
+            "bytes": 1810,
+            "fromCache": false,
+            "body": "{\"method\":\"GET_FINANCIAL_PERIODS\",\"company_id\":\"26014bd5-f03f-44ae-93bd-64b5add2e09f\"}"
+          }
+        ],
+        "duplicates": [
+          {
+            "short": "POST /functions/v1/banking {\"method\":\"GET_TRANSACTIONS\",\"company_id\":\"26014bd5-f03f-44ae-93bd-64b5add2e09f\"}",
+            "count": 2,
+            "totalMs": 1538
+          }
+        ]
+      }
+    }
+  ]
+}

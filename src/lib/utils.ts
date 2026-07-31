@@ -1,6 +1,5 @@
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
-import Papa from "papaparse";
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -38,7 +37,18 @@ export function statusBadgeVariant(status?: string | null): StatusBadgeVariant {
   return "secondary";
 }
 
-export function downloadCSV(data: any[], filename: string) {
+/**
+ * CSV export. Papa Parse is imported dynamically rather than at module scope:
+ * this file also exports `cn()`, which every UI component imports, so a static
+ * import put the whole CSV parser in the eager startup bundle for the sake of a
+ * user-triggered export that most sessions never perform.
+ *
+ * Returns a promise so callers *may* await it; every existing call site invokes
+ * it as a statement and is unaffected. Output bytes are byte-for-byte identical
+ * \u2014 same BOM, same Papa.unparse, same blob type and filename.
+ */
+export async function downloadCSV(data: any[], filename: string) {
+  const { default: Papa } = await import("papaparse");
   const csv = Papa.unparse(data);
   const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
   const link = document.createElement("a");

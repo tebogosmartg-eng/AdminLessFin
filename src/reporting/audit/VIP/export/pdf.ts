@@ -2,8 +2,11 @@
  * VIP-owned PDF export (V3.6.6) — independent of operational export framework.
  */
 
-import jsPDF from 'jspdf';
-import autoTable from 'jspdf-autotable';
+// Type-only: erased at build time, so this creates no runtime dependency on
+// jsPDF. The engine is fetched on demand via loadPdfEngine() — see
+// src/lib/pdf/pdfEngine.ts for why.
+import type jsPDF from 'jspdf';
+import { loadPdfEngine } from '../../../../lib/pdf/pdfEngine';
 import { assertVipBranding, VIP_FOOTER_LINES } from '../branding';
 import { VIP_LAYOUT } from '../layout';
 import { VIP_ANNUAL_TOTAL_COLUMN, type VipExportBranding, type VipWorkingPaperReport } from '../types';
@@ -89,17 +92,25 @@ function drawFooters(doc: jsPDF): void {
   }
 }
 
-function exportVipPdfSync(
+/**
+ * Renders and saves the working paper. Async only because the engine is now
+ * fetched on demand; layout and output bytes are unchanged. The non-browser
+ * early return still happens before the engine is requested, so Node/unit
+ * contexts never download it.
+ */
+async function renderVipPdf(
   report: VipWorkingPaperReport,
   branding: VipExportBranding,
   fileBaseName: string,
   logo: string | null
-): { fileName: string; contentType: string } {
+): Promise<{ fileName: string; contentType: string }> {
   const b = assertVipBranding(branding);
   const name = fileBaseName.endsWith('.pdf') ? fileBaseName : `${fileBaseName}.pdf`;
   if (typeof document === 'undefined') {
     return { fileName: name, contentType: 'application/pdf' };
   }
+
+  const { jsPDF, autoTable } = await loadPdfEngine();
 
   const doc = new jsPDF({ orientation: 'landscape' }) as JsPdfDoc;
 
@@ -161,12 +172,12 @@ function exportVipPdfSync(
   return { fileName: name, contentType: 'application/pdf' };
 }
 
-export function exportVipPdf(
+export async function exportVipPdf(
   report: VipWorkingPaperReport,
   branding: VipExportBranding,
   fileBaseName: string
-): { fileName: string; contentType: string } {
-  return exportVipPdfSync(report, branding, fileBaseName, null);
+): Promise<{ fileName: string; contentType: string }> {
+  return renderVipPdf(report, branding, fileBaseName, null);
 }
 
 export async function exportVipPdfAsync(
@@ -175,5 +186,5 @@ export async function exportVipPdfAsync(
   fileBaseName: string
 ): Promise<{ fileName: string; contentType: string }> {
   const logo = await tryLoadLogo(branding.companyLogoUrl);
-  return exportVipPdfSync(report, branding, fileBaseName, logo);
+  return renderVipPdf(report, branding, fileBaseName, logo);
 }

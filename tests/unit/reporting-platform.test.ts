@@ -102,12 +102,12 @@ describe('Enterprise Reporting Platform (V3.6.3)', () => {
     expect(direct.register[0].cost_to_company).toBe(10100);
   });
 
-  it('exports csv/excel/json via platform facade', () => {
+  it('exports csv/excel/json via platform facade', async () => {
     const rows = [{ Metric: 'Revenue', North: 150, Total: 150 }];
     expect(rowsToCsvString(rows)).toContain('Revenue');
     expect(buildSpreadsheetMl(rows)).toContain('Excel.Sheet');
 
-    const json = exportReportRows(rows, { format: 'json', fileBaseName: 'demo' });
+    const json = await exportReportRows(rows, { format: 'json', fileBaseName: 'demo' });
     expect(json.format).toBe('json');
     expect(json.payload).toContain('Revenue');
   });
