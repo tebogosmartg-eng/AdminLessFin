@@ -10,8 +10,7 @@ import IncomeExpenseChart from '../components/IncomeExpenseChart';
 import { Link, useNavigate } from 'react-router-dom';
 import { Button } from '../components/ui/button';
 import QuickActions from '../components/QuickActions';
-import { format } from 'date-fns';
-import { safeFormatDistanceToNow } from '../lib/dates';
+import { safeFormatDate, safeFormatDistanceToNow } from '../lib/dates';
 import { formatCurrency } from '../lib/utils';
 import BudgetStatus from '../components/BudgetStatus';
 import TopExpensesChart from '../components/TopExpensesChart';
@@ -262,7 +261,7 @@ const Dashboard = () => {
               <CardHeader className="p-3 pb-1">
                 <CardDescription className="text-xs">Upcoming Payroll</CardDescription>
                 <CardTitle className="text-sm">
-                  {payrollKpis.upcomingPayDate ? format(new Date(payrollKpis.upcomingPayDate), 'dd MMM yyyy') : '—'}
+                  {safeFormatDate(payrollKpis.upcomingPayDate, 'dd MMM yyyy')}
                 </CardTitle>
               </CardHeader>
             </Card>

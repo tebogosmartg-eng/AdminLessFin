@@ -1,6 +1,6 @@
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-import { format } from 'date-fns';
 import { formatCurrency } from '../lib/utils';
+import { safeFormatDate } from '../lib/dates';
 
 type ChartData = {
   month_start: string;
@@ -15,7 +15,7 @@ interface IncomeExpenseChartProps {
 const IncomeExpenseChart = ({ data }: IncomeExpenseChartProps) => {
   const formattedData = data.map(item => ({
     ...item,
-    month: format(new Date(item.month_start), 'MMM yyyy'),
+    month: safeFormatDate(item.month_start, 'MMM yyyy'),
   }));
 
   return (

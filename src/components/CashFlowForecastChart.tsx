@@ -1,6 +1,6 @@
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { format } from 'date-fns';
 import { formatCurrency } from '../lib/utils';
+import { safeFormatDate } from '../lib/dates';
 
 type ForecastData = {
   date: string;
@@ -17,7 +17,7 @@ const CashFlowForecastChart = ({ data }: CashFlowForecastChartProps) => {
 
   const formattedData = data.map(item => ({
     ...item,
-    formattedDate: format(new Date(item.date), 'MMM d'),
+    formattedDate: safeFormatDate(item.date, 'MMM d'),
   }));
 
   const minBalance = Math.min(...data.map(d => d.balance));

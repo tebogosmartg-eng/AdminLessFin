@@ -1,9 +1,9 @@
 import { Link } from 'react-router-dom';
-import { formatDistanceToNow } from 'date-fns';
 import { Badge } from '../ui/badge';
 import { Skeleton } from '../ui/skeleton';
 import { BUSINESS_LIFECYCLES } from '../../lib/businessLifecycles';
 import { normalizeJournalActivities, type ActivityFeedItem } from '../../lib/boe/activityEngine';
+import { safeFormatDistanceToNow } from '../../lib/dates';
 
 type JournalEntry = {
   id: string;
@@ -44,7 +44,7 @@ function ActivityRow({ item, showLifecycleBadge }: { item: ActivityFeedItem; sho
         </div>
         <p className="text-sm text-muted-foreground truncate">{item.summary}</p>
         <p className="text-xs text-muted-foreground mt-1">
-          {formatDistanceToNow(new Date(item.timestamp), { addSuffix: true })}
+          {safeFormatDistanceToNow(item.timestamp, { addSuffix: true })}
         </p>
       </div>
     </div>
