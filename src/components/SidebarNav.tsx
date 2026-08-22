@@ -220,8 +220,20 @@ export const SidebarNav = ({ className, onNavigate }: SidebarNavProps) => {
     },
   ];
 
-  /** G3.7 / V6.10.0 — Statutory AFS workspace (not operational live reports). */
+  /**
+   * Financial Statements section. Both tracks are listed here so the separation
+   * is visible: the LIVE management view is available while the period is being
+   * prepared, and the statutory AFS workspace keeps its close/review/approval
+   * controls. Previously only the statutory workspace appeared here, which is
+   * why statements looked available only after closure.
+   */
   const financialStatementsLinks = [
+    {
+      to: '/financial-statements',
+      label: 'Live Financial Statements',
+      icon: FileText,
+      prefetch: () => {},
+    },
     {
       to: '/financial-statements-workspace',
       label: 'Annual Financial Statements',
@@ -244,7 +256,7 @@ export const SidebarNav = ({ className, onNavigate }: SidebarNavProps) => {
 
   const reportsLinks = [
     { to: '/reports', label: 'Operational Reports', icon: FileText, prefetch: () => {} },
-    { to: '/reports/live-financial-statements', label: 'Financial Statements', icon: FileSignature, prefetch: () => {} },
+    { to: '/financial-statements', label: 'Live Financial Statements', icon: FileSignature, prefetch: () => {} },
     { to: '/comparative-pl', label: 'Comparative P&L', icon: TrendingUp, prefetch: () => {} },
     { to: '/comparative-bs', label: 'Comparative B/S', icon: Scale, prefetch: () => {} },
     { to: '/inventory-valuation', label: 'Inventory Valuation', icon: Package, prefetch: () => {} },

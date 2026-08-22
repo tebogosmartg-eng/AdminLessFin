@@ -18,6 +18,9 @@ import ReportingPeriodPicker from '../components/ReportingPeriodPicker';
 import { accountsQuery } from '../lib/queries';
 import type { Account } from './ChartOfAccounts';
 import { AnalyticsEvents, useFirstUsagePageView } from '../lib/analytics';
+import { Link } from 'react-router-dom';
+import { Alert, AlertDescription, AlertTitle } from '../components/ui/alert';
+import { accountingReadinessQuery } from '../lib/queries';
 
 type AccountBalance = {
   id: string;
@@ -46,6 +49,13 @@ type CashFlowItem = {
 };
 
 const FinancialStatements = () => {
+  // Advisory only — this page is deliberately not gated on readiness, so the
+  // query result never blocks rendering.
+  const { activeCompany: readinessCompany } = useAuth();
+  const { data: readiness } = useQuery({
+    ...accountingReadinessQuery(readinessCompany?.id ?? ''),
+    enabled: !!readinessCompany?.id,
+  });
   const { activeCompany } = useAuth();
   useFirstUsagePageView(AnalyticsEvents.USAGE_FIRST_FINANCIAL_STATEMENTS, 'financial_statements');
   const { dateFrom, dateTo, yearCode, isReady, currentReportingPeriod } = useReportingPeriod();
@@ -193,7 +203,15 @@ const FinancialStatements = () => {
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center print:hidden">
-        <h1 className="text-3xl font-bold">Financial Statements</h1>
+        <div>
+          <h1 className="text-3xl font-bold">Financial Statements</h1>
+          <p className="text-sm text-muted-foreground">
+            Live management view of the current ledger. Adjustments appear as soon as they are
+            posted. Statutory annual financial statements are produced in the{' '}
+            <Link className="underline" to="/financial-statements-workspace">AFS workspace</Link>,
+            which keeps its own close, review and approval controls.
+          </p>
+        </div>
         {yearCode && (
           <Badge variant="outline" className="ml-2 align-middle">
             Current Financial Year
@@ -204,6 +222,18 @@ const FinancialStatements = () => {
           <Button variant="outline" onClick={() => window.print()}><Printer className="mr-2 h-4 w-4" /> Print</Button>
         </div>
       </div>
+
+      {readiness && readiness.accountingReady === false && (
+        <Alert className="print:hidden">
+          <AlertTitle>Accounting setup is still in progress</AlertTitle>
+          <AlertDescription>
+            These figures are live and reflect everything posted so far, but the accounting
+            foundation is not yet validated, so some balances may be incomplete. Final statutory
+            statements require a completed setup and period close.{' '}
+            <Link className="underline" to="/accounting-setup">Continue Accounting Setup</Link>
+          </AlertDescription>
+        </Alert>
+      )}
 
       <Tabs defaultValue="income-statement">
         <TabsList className="print:hidden">

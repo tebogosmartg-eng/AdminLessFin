@@ -230,8 +230,18 @@ export const AppRouter = () => {
         <Route path="/reports" element={<Reports />} />
         {/* Legacy path retained for sidebar/dashboard links (V6.4.0 dual-track) */}
         <Route path="/reports/live-financial-statements" element={<Navigate to="/financial-statements" replace />} />
-        {/* Operational live Financial Statements — unchanged (V6.4.0 dual-track) */}
-        <Route path="/financial-statements" element={<AccountingReadyGate module="financial_statements"><FinancialStatements /></AccountingReadyGate>} />
+        {/*
+          Operational LIVE financial statements — deliberately NOT behind
+          AccountingReadyGate. That gate protects POSTING: it stops modules
+          writing to the ledger before the foundation is validated. This route
+          only READS the ledger, and reporting on what has been posted so far is
+          exactly what is needed while the period is still being prepared —
+          blocking it made statements look available only after closure.
+          The page shows a non-blocking readiness advisory instead.
+          Statutory AFS (/financial-statements-workspace) keeps its own close,
+          validation, review and approval workflow, untouched.
+        */}
+        <Route path="/financial-statements" element={<FinancialStatements />} />
         {/* Statutory Financial Statements Workspace — Phase A foundation; flag-gated; no sidebar */}
         <Route
           path="/financial-statements-workspace"
