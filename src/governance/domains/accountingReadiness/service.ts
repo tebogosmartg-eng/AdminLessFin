@@ -54,6 +54,8 @@ function mapSnapshot(row: RawReadinessRow): AccountingReadinessSnapshot {
     validation: row.validation ?? {
       activeFinancialYear: false,
       chartOfAccountsExists: false,
+      accountCount: 0,
+      mappingsComplete: false,
       mandatoryControlAccounts: false,
       coaIntegrity: false,
       taxConfigurationExists: false,

@@ -12,8 +12,9 @@ export const SETUP_STEP_GUIDANCE: Record<
   },
   chart_of_accounts: {
     why: 'The Chart of Accounts defines how money is classified. Invoices, bills, and journals all post to these accounts.',
-    action: 'Generate the standard chart (recommended), import an existing chart, or add accounts manually.',
-    next: 'After your chart is in place, configure at least one tax rate.',
+    action:
+      'If you have no accounts yet, generate the standard chart, import, or add accounts manually. If a chart already exists, review mappings — do not generate another chart.',
+    next: 'After required control accounts are mapped, configure at least one tax rate.',
   },
   tax_configuration: {
     why: 'Invoices and bills apply tax rates when posting. At least one tax rate is required before accounting can go live.',
@@ -48,7 +49,7 @@ export const MODULE_BLOCKED_GUIDANCE: Record<
   },
   journal_entries: {
     why: 'Journal entries write directly to the general ledger. Posting is blocked until your chart, tax, and calendar are validated.',
-    tip: 'Most day-to-day activity starts with an invoice or bill. Manual journals are for adjustments and corrections.',
+    tip: 'Complete only the unresolved Accounting Setup items. If a Chart of Accounts already exists, you will be taken to control-account mapping — not asked to generate a new chart.',
   },
   payroll: {
     why: 'Payroll posts to dedicated clearing and expense accounts. These control accounts must exist and be validated first.',

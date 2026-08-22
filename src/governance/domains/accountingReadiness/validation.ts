@@ -4,7 +4,7 @@
 // Mirrors supabase/functions/_shared/accountingReadiness/evaluate.ts.
 
 import type { ControlAccountRole, SetupStepKey } from './model';
-import { SETUP_STEP_LABELS } from './model';
+import { SETUP_STEP_LABELS, requiredControlRoles } from './model';
 import {
   validateAccount,
   type AccountType,
@@ -25,6 +25,7 @@ export type CoaRow = {
   normal_balance?: string | null;
   account_code?: string | null;
   account_number?: number | null;
+  description?: string | null;
   is_active?: boolean | null;
 };
 
@@ -44,6 +45,8 @@ export type ReadinessEvaluation = {
   validation: {
     activeFinancialYear: boolean;
     chartOfAccountsExists: boolean;
+    accountCount: number;
+    mappingsComplete: boolean;
     mandatoryControlAccounts: boolean;
     coaIntegrity: boolean;
     taxConfigurationExists: boolean;
@@ -76,6 +79,10 @@ const ROLE_TO_ACCOUNT_ROLE: Record<string, string | string[]> = {
   fixed_assets: 'fixed_asset',
   payroll_clearing: 'payroll_clearing',
 };
+
+export function accountSatisfiesControlRole(account: CoaRow, role: ControlAccountRole): boolean {
+  return matchesRole(account, role);
+}
 
 function matchesRole(account: CoaRow, role: ControlAccountRole): boolean {
   if (role === 'bank') {
@@ -207,17 +214,7 @@ export function evaluateAccountingReadiness(input: {
   const integrity = evaluateCoaIntegrity(accounts);
   const coaIntegrity = integrity.pass;
 
-  const mandatoryRoles: ControlAccountRole[] = [
-    'trade_debtors',
-    'trade_creditors',
-    'vat_control',
-    'bank',
-    'retained_earnings',
-    'profit_loss',
-  ];
-  if (flags.inventory_enabled) mandatoryRoles.push('inventory');
-  if (flags.fixed_assets_enabled) mandatoryRoles.push('fixed_assets');
-  if (flags.payroll_enabled) mandatoryRoles.push('payroll_clearing');
+  const mandatoryRoles: ControlAccountRole[] = requiredControlRoles(flags);
 
   const controlAccounts = {} as Record<ControlAccountRole, boolean>;
   const missingControlAccounts: ControlAccountRole[] = [];
@@ -231,6 +228,8 @@ export function evaluateAccountingReadiness(input: {
   }
 
   const mandatoryControlAccounts = missingControlAccounts.length === 0;
+  const mappingsComplete = mandatoryControlAccounts;
+  const accountCount = accounts.length;
 
   // ── Tax ─────────────────────────────────────────────────────────────────
   const taxConfigurationExists = taxRates.length > 0;
@@ -319,6 +318,8 @@ export function evaluateAccountingReadiness(input: {
     steps,
     validation: {
       ...validationChecks,
+      accountCount,
+      mappingsComplete,
       controlAccounts,
       missingControlAccounts,
       coaIntegrityErrors: integrity.errors,

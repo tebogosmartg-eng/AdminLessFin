@@ -11,6 +11,10 @@ import {
   getTemplate,
   listTemplates,
 } from '../_shared/chartOfAccounts/templates.ts'
+import {
+  ACCOUNT_ROLES,
+  SINGLETON_ACCOUNT_ROLES,
+} from '../_shared/chartOfAccounts/accountRoles.ts'
 
 
 const corsHeaders = ENTERPRISE_CORS_HEADERS
@@ -174,6 +178,75 @@ serve(withEnterprisePlatform('chart-of-accounts', 'tenant', async (req, _ctx) =>
         data = listTemplates();
         break;
 
+      case 'MAP_ROLE': {
+        if (!isAdmin) throw new Error("Access Denied: Only Admins can map control accounts.");
+        const accountId = body.accountId;
+        const accountRole = body.account_role;
+        if (!accountId) throw new Error('accountId is required.');
+        if (!accountRole || !(ACCOUNT_ROLES as readonly string[]).includes(accountRole)) {
+          throw new Error('A valid account_role is required.');
+        }
+
+        const { data: target, error: targetError } = await supabaseAdmin
+          .from('chart_of_accounts')
+          .select('id, system_account, account_role, name')
+          .eq('id', accountId)
+          .eq('company_id', company_id)
+          .single();
+        if (targetError || !target) throw new Error('Account not found in this company.');
+
+        if (target.system_account && target.account_role && target.account_role !== accountRole) {
+          throw new Error(
+            `System account "${target.name}" cannot have its account role changed.`,
+          );
+        }
+
+        if (SINGLETON_ACCOUNT_ROLES.has(accountRole)) {
+          const { data: holders, error: holdersError } = await supabaseAdmin
+            .from('chart_of_accounts')
+            .select('id, system_account, name')
+            .eq('company_id', company_id)
+            .eq('account_role', accountRole)
+            .neq('id', accountId);
+          if (holdersError) throw holdersError;
+          for (const holder of holders ?? []) {
+            if (holder.system_account) {
+              throw new Error(
+                `That role is already held by system account "${holder.name}" and cannot be reassigned.`,
+              );
+            }
+            const { error: clearError } = await supabaseAdmin
+              .from('chart_of_accounts')
+              .update({ account_role: null })
+              .eq('id', holder.id)
+              .eq('company_id', company_id);
+            if (clearError) throw clearError;
+          }
+        }
+
+        const markControl = [
+          'trade_receivable',
+          'trade_payable',
+          'vat_control',
+          'output_vat',
+          'input_vat',
+          'inventory_asset',
+          'payroll_clearing',
+        ].includes(accountRole);
+
+        ({ data, error } = await supabaseAdmin
+          .from('chart_of_accounts')
+          .update({
+            account_role: accountRole,
+            ...(markControl ? { control_account: true } : {}),
+          })
+          .eq('id', accountId)
+          .eq('company_id', company_id)
+          .select('id, name, account_role, account_code, account_number')
+          .single());
+        break;
+      }
+
       case 'GENERATE': {
         if (!isAdmin) throw new Error("Access Denied: Only Admins can generate a Chart of Accounts.");
 
@@ -181,12 +254,8 @@ serve(withEnterprisePlatform('chart-of-accounts', 'tenant', async (req, _ctx) =>
         const template = getTemplate(templateKey);
         if (!template) throw new Error(`Unknown Chart of Accounts template: ${templateKey}`);
 
-        // Company creation seeds a handful of placeholder accounts, so a brand-new
-        // company is never literally empty and an "empty chart only" guard made
-        // this template permanently unreachable for every customer. Generation is
-        // therefore allowed to replace a placeholder chart, but only while that is
-        // provably safe: never over a chart this generator already produced, and
-        // never once anything has been posted to it.
+        // Existing charts are authoritative. Generation is only for a company
+        // that still has no accounts — never delete, replace, or duplicate.
         const { data: existingAccounts, error: existingError } = await supabaseAdmin
           .from('chart_of_accounts')
           .select('id, source')
@@ -194,33 +263,9 @@ serve(withEnterprisePlatform('chart-of-accounts', 'tenant', async (req, _ctx) =>
         if (existingError) throw existingError;
 
         if ((existingAccounts ?? []).length > 0) {
-          if ((existingAccounts ?? []).some((a) => a.source === 'generator')) {
-            throw new Error('This company already has a generated Chart of Accounts. Generation is only available once.');
-          }
-
-          const existingIds = (existingAccounts ?? []).map((a) => a.id);
-          const { count: postedCount, error: postedError } = await supabaseAdmin
-            .from('journal_entry_items')
-            .select('id', { count: 'exact', head: true })
-            .in('account_id', existingIds);
-          if (postedError) throw postedError;
-          if ((postedCount ?? 0) > 0) {
-            throw new Error(
-              'This company has already posted transactions to its Chart of Accounts. Generation is only available before the first posting.',
-            );
-          }
-
-          const { error: replaceError } = await supabaseAdmin
-            .from('chart_of_accounts')
-            .delete()
-            .in('id', existingIds);
-          // A foreign key here means something still references the placeholder
-          // chart, so replacing it is not safe — surface that rather than force it.
-          if (replaceError) {
-            throw new Error(
-              `The existing Chart of Accounts is still referenced by other records and cannot be replaced: ${replaceError.message}`,
-            );
-          }
+          throw new Error(
+            'This company already has a Chart of Accounts. Map the existing accounts in Accounting Setup instead of generating another chart.',
+          );
         }
 
         // Pass 1 — insert every account (parent left null; codes carry hierarchy).

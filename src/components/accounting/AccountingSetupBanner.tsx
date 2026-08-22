@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { AlertTriangle, ArrowRight } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { accountingReadinessQuery } from '../../lib/queries';
+import { accountingSetupPath } from '@/governance/domains/accountingReadiness/model';
 import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
 import { Button } from '../ui/button';
 
@@ -35,7 +36,7 @@ const AccountingSetupBanner = ({ actionLabel = 'Posting transactions' }: Account
           before posting — otherwise you may see errors when saving.
         </p>
         <Button asChild size="sm" variant="outline">
-          <Link to="/accounting-setup">
+          <Link to={accountingSetupPath(readiness.currentStep)}>
             Continue setup
             <ArrowRight className="ml-2 h-4 w-4" />
           </Link>

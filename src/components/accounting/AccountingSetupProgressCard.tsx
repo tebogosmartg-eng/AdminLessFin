@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom';
 import { CheckCircle2, Circle, Clock3, ArrowRight, BookOpen } from 'lucide-react';
 import type { AccountingReadinessSnapshot, SetupStepKey } from '@/governance/domains/accountingReadiness/model';
-import { SETUP_STEP_ORDER } from '@/governance/domains/accountingReadiness/model';
+import { SETUP_STEP_ORDER, accountingSetupPath } from '@/governance/domains/accountingReadiness/model';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
 import { Progress } from '../ui/progress';
 import { Button } from '../ui/button';
@@ -60,7 +60,15 @@ const AccountingSetupProgressCard = ({ readiness }: AccountingSetupProgressCardP
                   <span className={step.complete ? 'text-muted-foreground' : undefined}>{step.label}</span>
                 </div>
                 <span className="text-xs text-muted-foreground">
-                  {step.complete ? 'Complete' : isCurrent ? 'In progress' : 'Pending'}
+                  {step.complete
+                    ? 'Complete'
+                    : isCurrent && step.key === 'chart_of_accounts' && readiness.validation.chartOfAccountsExists
+                      ? readiness.validation.missingControlAccounts.length > 0
+                        ? `Existing chart · ${readiness.validation.missingControlAccounts.length} mapping${readiness.validation.missingControlAccounts.length === 1 ? '' : 's'} required`
+                        : 'Existing chart detected'
+                      : isCurrent
+                        ? 'In progress'
+                        : 'Pending'}
                 </span>
               </div>
             );
@@ -79,7 +87,7 @@ const AccountingSetupProgressCard = ({ readiness }: AccountingSetupProgressCardP
               </Link>
             </Button>
             <Button asChild size="sm">
-              <Link to="/accounting-setup">
+              <Link to={accountingSetupPath(readiness.currentStep)}>
                 Continue setup
                 <ArrowRight className="ml-2 h-4 w-4" />
               </Link>

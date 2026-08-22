@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import {
   CalendarDays,
   Landmark,
@@ -8,6 +8,7 @@ import {
   Building2,
   Scale,
   ShieldCheck,
+  AlertTriangle,
   CheckCircle2,
   Loader2,
   RefreshCw,
@@ -30,6 +31,7 @@ import {
   SETUP_STEP_LABELS,
 } from '@/governance/domains/accountingReadiness/model';
 import CoaOnboarding from '../../components/accounting/CoaOnboarding';
+import CoaControlMapping from '../../components/accounting/CoaControlMapping';
 import FinancialYearSettings from '../../components/FinancialYearSettings';
 import BankAccountForm from '../../components/BankAccountForm';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../components/ui/card';
@@ -61,9 +63,15 @@ const AccountingSetupWizard = () => {
   useDocumentTitle('Accounting Setup');
   const { activeCompany } = useAuth();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const queryClient = useQueryClient();
   const [bankFormOpen, setBankFormOpen] = useState(false);
-  const [selectedStep, setSelectedStep] = useState<SetupStepKey | null>(null);
+  const stepFromUrl = searchParams.get('step');
+  const [selectedStep, setSelectedStep] = useState<SetupStepKey | null>(() =>
+    SETUP_STEP_ORDER.includes(stepFromUrl as SetupStepKey)
+      ? (stepFromUrl as SetupStepKey)
+      : null,
+  );
 
   const { data: readiness, isFetching, isError, error, refetch } = useQuery({
     ...accountingReadinessQuery(activeCompany!.id),
@@ -94,6 +102,12 @@ const AccountingSetupWizard = () => {
   const activeStep = selectedStep ?? derivedActiveStep;
 
   useAccountingSetupAnalytics(activeCompany?.id, readiness, activeStep);
+
+  useEffect(() => {
+    if (SETUP_STEP_ORDER.includes(stepFromUrl as SetupStepKey)) {
+      setSelectedStep(stepFromUrl as SetupStepKey);
+    }
+  }, [stepFromUrl]);
 
   useEffect(() => {
     // Keep selected step in sync when validation advances past it
@@ -198,6 +212,37 @@ const AccountingSetupWizard = () => {
             <span>{readiness.progressPercent}%</span>
           </div>
           <Progress value={readiness.progressPercent} className="h-2" />
+          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
+            {(
+              [
+                ['financial_calendar', readiness.validation.activeFinancialYear, 'Financial Calendar'],
+                [
+                  'chart_of_accounts',
+                  readiness.validation.chartOfAccountsExists,
+                  readiness.validation.chartOfAccountsExists
+                    ? 'Chart of Accounts detected'
+                    : 'Chart of Accounts',
+                ],
+                ['tax_configuration', readiness.validation.taxConfigurationExists, 'Tax configured'],
+                ['bank_accounts', readiness.validation.bankAccountOrSkipped, 'Banking configured'],
+                ['opening_balances', readiness.validation.openingBalancesComplete, 'Opening Balances configured'],
+              ] as const
+            ).map(([key, ok, label]) => (
+              <button
+                key={key}
+                type="button"
+                onClick={() => setSelectedStep(key)}
+                className="flex items-center gap-2 rounded-md border px-2 py-1.5 text-left text-xs"
+              >
+                {ok ? (
+                  <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-emerald-600" />
+                ) : (
+                  <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-amber-600" />
+                )}
+                <span>{label}</span>
+              </button>
+            ))}
+          </div>
         </div>
       </header>
 
@@ -212,6 +257,11 @@ const AccountingSetupWizard = () => {
               const Icon = STEP_ICONS[key];
               const complete = readiness.steps[key]?.complete;
               const isActive = key === activeStep;
+              const coaDetected =
+                key === 'chart_of_accounts' &&
+                readiness.validation.chartOfAccountsExists &&
+                !complete;
+              const mappingGap = readiness.validation.missingControlAccounts.length;
               return (
                 <button
                   key={key}
@@ -224,11 +274,18 @@ const AccountingSetupWizard = () => {
                 >
                   {complete ? (
                     <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600" />
+                  ) : coaDetected ? (
+                    <AlertTriangle className="h-4 w-4 shrink-0 text-amber-600" />
                   ) : (
                     <Icon className="h-4 w-4 shrink-0 text-muted-foreground" />
                   )}
                   <span className={complete ? 'text-muted-foreground' : undefined}>
                     {SETUP_STEP_LABELS[key]}
+                    {coaDetected
+                      ? mappingGap > 0
+                        ? ` · ${mappingGap} mapping${mappingGap === 1 ? '' : 's'} required`
+                        : ' · Existing chart detected'
+                      : ''}
                   </span>
                 </button>
               );
@@ -246,11 +303,19 @@ const AccountingSetupWizard = () => {
                 </CardTitle>
                 <CardDescription>
                   Step {stepIndex + 1} of {SETUP_STEP_ORDER.length}
-                  {stepPassed ? ' · Complete' : ' · In progress'}
+                  {stepPassed
+                    ? ' · Complete'
+                    : activeStep === 'chart_of_accounts' && accounts.length > 0
+                      ? ' · Existing chart — mapping required'
+                      : ' · In progress'}
                 </CardDescription>
               </div>
               <Badge variant={stepPassed ? 'outline' : 'secondary'}>
-                {stepPassed ? 'Complete' : 'Pending'}
+                {stepPassed
+                  ? 'Complete'
+                  : activeStep === 'chart_of_accounts' && accounts.length > 0
+                    ? 'Mapping required'
+                    : 'Pending'}
               </Badge>
             </div>
           </CardHeader>
@@ -259,7 +324,11 @@ const AccountingSetupWizard = () => {
               <AlertTitle>Why this step matters</AlertTitle>
               <AlertDescription>{stepGuidance.why}</AlertDescription>
             </Alert>
-            <p className="text-sm text-muted-foreground">{stepGuidance.action}</p>
+            <p className="text-sm text-muted-foreground">
+              {activeStep === 'chart_of_accounts' && accounts.length > 0
+                ? 'Review recognised control mappings. Create or select only what is still missing — do not generate another Chart of Accounts.'
+                : stepGuidance.action}
+            </p>
 
             {activeStep === 'financial_calendar' && (
               <>
@@ -282,20 +351,16 @@ const AccountingSetupWizard = () => {
                     }}
                   />
                 ) : (
-                  <Alert>
-                    <AlertTitle>Chart of Accounts detected</AlertTitle>
-                    <AlertDescription className="space-y-2">
-                      <p>{accounts.length} accounts configured.</p>
-                      <p className="text-xs text-muted-foreground">
-                        Control accounts: {readiness.validation.mandatoryControlAccounts ? 'PASS' : 'FAIL'}
-                        {' · '}
-                        Integrity: {readiness.validation.coaIntegrity ? 'PASS' : 'FAIL'}
-                      </p>
-                      <Button asChild variant="outline" size="sm">
-                        <Link to="/chart-of-accounts">Review Chart of Accounts</Link>
-                      </Button>
-                    </AlertDescription>
-                  </Alert>
+                  <CoaControlMapping
+                    accounts={accounts}
+                    inventoryEnabled={readiness.inventoryEnabled}
+                    fixedAssetsEnabled={readiness.fixedAssetsEnabled}
+                    payrollEnabled={readiness.payrollEnabled}
+                    bankAccountsCount={bankAccounts.length}
+                    bankAccountsSkipped={readiness.bankAccountsSkipped}
+                    mappingsComplete={readiness.validation.mappingsComplete ?? readiness.validation.mandatoryControlAccounts}
+                    missingControlAccounts={readiness.validation.missingControlAccounts}
+                  />
                 )}
                 <div className="grid gap-3 sm:grid-cols-3">
                   <div className="flex items-center justify-between rounded-md border p-3">
@@ -461,6 +526,7 @@ const AccountingSetupWizard = () => {
                   {[
                     ['Active Financial Year', readiness.validation.activeFinancialYear],
                     ['Chart of Accounts', readiness.validation.chartOfAccountsExists],
+                    ['Control mappings', readiness.validation.mappingsComplete ?? readiness.validation.mandatoryControlAccounts],
                     ['Mandatory Control Accounts', readiness.validation.mandatoryControlAccounts],
                     ['COA Integrity', readiness.validation.coaIntegrity],
                     ['Tax Configuration', readiness.validation.taxConfigurationExists],

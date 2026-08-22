@@ -27,6 +27,9 @@ describe('Accounting Validation Engine (Phase 1B)', () => {
     expect(result.status).toBe('NOT_STARTED');
     expect(result.accountingReady).toBe(false);
     expect(result.progressPercent).toBe(0);
+    expect(result.validation.chartOfAccountsExists).toBe(false);
+    expect(result.validation.accountCount).toBe(0);
+    expect(result.validation.mappingsComplete).toBe(false);
   });
 
   it('derives step completion from master data without manual flags', () => {
@@ -73,6 +76,8 @@ describe('Accounting Validation Engine (Phase 1B)', () => {
     expect(result.validation.missingControlAccounts).toHaveLength(0);
     expect(result.validation.coaIntegrity).toBe(true);
     expect(result.validation.taxConfigurationExists).toBe(true);
+    expect(result.validation.accountCount).toBe(standardAccounts.length);
+    expect(result.validation.mappingsComplete).toBe(true);
   });
 
   it('allows banking to be explicitly skipped via intent flag', () => {

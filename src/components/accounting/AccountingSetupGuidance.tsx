@@ -1,7 +1,11 @@
 import { Link } from 'react-router-dom';
 import { ShieldAlert, ArrowRight, Settings2, BookOpen, Lightbulb, Loader2 } from 'lucide-react';
 import type { AccountingGatedModule, AccountingReadinessSnapshot } from '@/governance/domains/accountingReadiness/model';
-import { ACCOUNTING_MODULE_LABELS, CONTROL_ACCOUNT_LABELS } from '@/governance/domains/accountingReadiness/model';
+import {
+  ACCOUNTING_MODULE_LABELS,
+  CONTROL_ACCOUNT_LABELS,
+  accountingSetupPath,
+} from '@/governance/domains/accountingReadiness/model';
 import { MODULE_BLOCKED_GUIDANCE } from '@/lib/onboarding/copy';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
 import { Button } from '../ui/button';
@@ -21,6 +25,11 @@ const AccountingSetupGuidance = ({ module, readiness, pending, errorMessage }: A
   const errors = readiness?.validation?.errors ?? [];
   const progress = readiness?.progressPercent ?? 0;
   const missingControls = readiness?.validation?.missingControlAccounts ?? [];
+  const setupHref = accountingSetupPath(readiness?.currentStep);
+  const postingBlockedDetail =
+    missingControls.length > 0
+      ? `${missingControls.length} accounting control${missingControls.length === 1 ? '' : 's'} still require configuration.`
+      : errors[0] ?? 'Complete the remaining Accounting Setup steps.';
 
   return (
     <div className="mx-auto flex min-h-[60vh] max-w-2xl items-center justify-center p-6">
@@ -32,7 +41,7 @@ const AccountingSetupGuidance = ({ module, readiness, pending, errorMessage }: A
             ) : (
               <ShieldAlert className="h-5 w-5 text-amber-600" />
             )}
-            {pending ? 'Checking accounting setup' : 'Complete Accounting Setup'}
+            {pending ? 'Checking accounting setup' : 'Posting is temporarily unavailable'}
           </CardTitle>
           <CardDescription>
             {pending ? (
@@ -40,7 +49,8 @@ const AccountingSetupGuidance = ({ module, readiness, pending, errorMessage }: A
             ) : (
               <>
                 <strong>{moduleLabel}</strong> will be available once your accounting foundation is
-                validated. This protects ledger integrity — partial setup is not permitted.
+                validated. {postingBlockedDetail} This protects ledger integrity — partial setup is
+                not permitted.
               </>
             )}
           </CardDescription>
@@ -107,9 +117,9 @@ const AccountingSetupGuidance = ({ module, readiness, pending, errorMessage }: A
 
           <div className="flex flex-wrap gap-2">
             <Button asChild>
-              <Link to="/accounting-setup">
+              <Link to={setupHref}>
                 <Settings2 className="mr-2 h-4 w-4" />
-                Continue Accounting Setup
+                Complete Accounting Setup
                 <ArrowRight className="ml-2 h-4 w-4" />
               </Link>
             </Button>

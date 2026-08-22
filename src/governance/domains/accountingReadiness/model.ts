@@ -55,6 +55,60 @@ export const CONTROL_ACCOUNT_LABELS: Record<ControlAccountRole, string> = {
   payroll_clearing: 'Payroll Clearing',
 };
 
+/** Why each control is required — shown when a mapping is missing. */
+export const CONTROL_ACCOUNT_WHY: Record<ControlAccountRole, string> = {
+  trade_debtors: 'Used to record amounts owed by customers from posted invoices.',
+  trade_creditors: 'Used to record amounts owed to suppliers from posted bills.',
+  vat_control: 'Used to record VAT input, output, and net VAT payable or receivable.',
+  bank: 'Used to record cash at bank so receipts, payments, and reconciliation can post.',
+  retained_earnings: 'Used to accumulate prior-period profit or loss after close.',
+  profit_loss: 'At least one income account and one expense account are required to record trading activity.',
+  inventory: 'Used to record stock on hand when the Inventory module is enabled.',
+  fixed_assets: 'Used to record property, plant and equipment when the Fixed Assets module is enabled.',
+  payroll_clearing: 'Used to clear net pay and statutory deductions when the Payroll module is enabled.',
+};
+
+/** Core controls required for Accounting Ready regardless of optional modules. */
+export const CORE_CONTROL_ROLES: ControlAccountRole[] = [
+  'trade_debtors',
+  'trade_creditors',
+  'vat_control',
+  'bank',
+  'retained_earnings',
+  'profit_loss',
+];
+
+export function requiredControlRoles(flags: {
+  inventoryEnabled?: boolean;
+  inventory_enabled?: boolean;
+  fixedAssetsEnabled?: boolean;
+  fixed_assets_enabled?: boolean;
+  payrollEnabled?: boolean;
+  payroll_enabled?: boolean;
+}): ControlAccountRole[] {
+  const roles: ControlAccountRole[] = [...CORE_CONTROL_ROLES];
+  if (flags.inventoryEnabled || flags.inventory_enabled) roles.push('inventory');
+  if (flags.fixedAssetsEnabled || flags.fixed_assets_enabled) roles.push('fixed_assets');
+  if (flags.payrollEnabled || flags.payroll_enabled) roles.push('payroll_clearing');
+  return roles;
+}
+
+/** Canonical CoA account_role written when a readiness control is mapped. */
+export const CONTROL_TO_ACCOUNT_ROLE: Record<Exclude<ControlAccountRole, 'profit_loss'>, string> = {
+  trade_debtors: 'trade_receivable',
+  trade_creditors: 'trade_payable',
+  vat_control: 'vat_control',
+  bank: 'bank',
+  retained_earnings: 'retained_earnings',
+  inventory: 'inventory_asset',
+  fixed_assets: 'fixed_asset',
+  payroll_clearing: 'payroll_clearing',
+};
+
+export function accountingSetupPath(step?: SetupStepKey): string {
+  return step ? `/accounting-setup?step=${step}` : '/accounting-setup';
+}
+
 export type AccountingReadinessRecord = {
   companyId: string;
   status: AccountingReadinessStatus;
@@ -80,6 +134,8 @@ export type AccountingReadinessSnapshot = AccountingReadinessRecord & {
   validation: {
     activeFinancialYear: boolean;
     chartOfAccountsExists: boolean;
+    accountCount: number;
+    mappingsComplete: boolean;
     mandatoryControlAccounts: boolean;
     coaIntegrity: boolean;
     taxConfigurationExists: boolean;

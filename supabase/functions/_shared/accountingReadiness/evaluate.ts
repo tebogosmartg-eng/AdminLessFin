@@ -56,6 +56,8 @@ export type ReadinessEvaluation = {
   validation: {
     activeFinancialYear: boolean;
     chartOfAccountsExists: boolean;
+    accountCount: number;
+    mappingsComplete: boolean;
     mandatoryControlAccounts: boolean;
     coaIntegrity: boolean;
     taxConfigurationExists: boolean;
@@ -103,6 +105,23 @@ const ROLE_TO_ACCOUNT_ROLE: Record<string, string | string[]> = {
   fixed_assets: 'fixed_asset',
   payroll_clearing: 'payroll_clearing',
 };
+
+const CORE_CONTROL_ROLES: ControlAccountRole[] = [
+  'trade_debtors',
+  'trade_creditors',
+  'vat_control',
+  'bank',
+  'retained_earnings',
+  'profit_loss',
+];
+
+function requiredControlRoles(flags: ReadinessFlags): ControlAccountRole[] {
+  const roles: ControlAccountRole[] = [...CORE_CONTROL_ROLES];
+  if (flags.inventory_enabled) roles.push('inventory');
+  if (flags.fixed_assets_enabled) roles.push('fixed_assets');
+  if (flags.payroll_enabled) roles.push('payroll_clearing');
+  return roles;
+}
 
 function matchesRole(account: CoaRow, role: ControlAccountRole): boolean {
   if (role === 'bank') {
@@ -241,17 +260,7 @@ export function evaluateAccountingReadiness(input: {
   const integrity = evaluateCoaIntegrity(accounts);
   const coaIntegrity = integrity.pass;
 
-  const mandatoryRoles: ControlAccountRole[] = [
-    'trade_debtors',
-    'trade_creditors',
-    'vat_control',
-    'bank',
-    'retained_earnings',
-    'profit_loss',
-  ];
-  if (flags.inventory_enabled) mandatoryRoles.push('inventory');
-  if (flags.fixed_assets_enabled) mandatoryRoles.push('fixed_assets');
-  if (flags.payroll_enabled) mandatoryRoles.push('payroll_clearing');
+  const mandatoryRoles: ControlAccountRole[] = requiredControlRoles(flags);
 
   const controlAccounts = {} as Record<ControlAccountRole, boolean>;
   const missingControlAccounts: ControlAccountRole[] = [];
@@ -269,6 +278,8 @@ export function evaluateAccountingReadiness(input: {
   }
 
   const mandatoryControlAccounts = missingControlAccounts.length === 0;
+  const mappingsComplete = mandatoryControlAccounts;
+  const accountCount = accounts.length;
   const taxConfigurationExists = taxRates.length > 0;
   const bankAccountOrSkipped = bankAccounts.length > 0 || !!flags.bank_accounts_skipped;
 
@@ -352,6 +363,8 @@ export function evaluateAccountingReadiness(input: {
     steps,
     validation: {
       ...validationChecks,
+      accountCount,
+      mappingsComplete,
       controlAccounts,
       missingControlAccounts,
       coaIntegrityErrors: integrity.errors,
