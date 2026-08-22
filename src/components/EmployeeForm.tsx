@@ -1,4 +1,3 @@
-import { useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -32,6 +31,7 @@ import {
 } from './ui/select';
 import { showError, showSuccess } from '../utils/toast';
 import { Employee } from '../pages/Employees';
+import { useDialogFormReset } from '../hooks/useDialogFormReset';
 
 const employeeSchema = z.object({
   first_name: z.string().min(1, 'First name is required.'),
@@ -67,7 +67,7 @@ const EmployeeForm = ({ isOpen, setIsOpen, employee }: EmployeeFormProps) => {
     resolver: zodResolver(employeeSchema),
   });
 
-  useEffect(() => {
+  useDialogFormReset(isOpen, employee?.id ?? 'new', () => {
     if (employee) {
       form.reset({
         ...employee,
@@ -104,7 +104,7 @@ const EmployeeForm = ({ isOpen, setIsOpen, employee }: EmployeeFormProps) => {
         salary_period: undefined,
       });
     }
-  }, [employee, form, isOpen]);
+  });
 
   const mutation = useMutation({
     mutationFn: async (values: EmployeeFormValues) => {

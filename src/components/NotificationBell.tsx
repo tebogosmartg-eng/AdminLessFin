@@ -48,19 +48,20 @@ const NotificationBell = () => {
   });
 
   useEffect(() => {
-    if (!user) return;
+    const userId = user?.id;
+    if (!userId) return;
 
     const channel = supabase
-      .channel(`public:notifications:user_id=eq.${user.id}`)
+      .channel(`public:notifications:user_id=eq.${userId}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'notifications' }, () => {
-        queryClient.invalidateQueries({ queryKey: ['notifications', user.id, activeCompany?.id] });
+        queryClient.invalidateQueries({ queryKey: ['notifications', userId, activeCompany?.id] });
       })
       .subscribe();
 
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [user, activeCompany, queryClient]);
+  }, [user?.id, activeCompany?.id, queryClient]);
 
   const markAsReadMutation = useMutation({
     mutationFn: async (notificationIds: string[]) => {

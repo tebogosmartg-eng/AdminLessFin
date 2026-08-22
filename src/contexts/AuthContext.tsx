@@ -1,10 +1,18 @@
-import { createContext, useContext, useEffect, useState, useRef } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { supabase } from '../integrations/supabase/client';
 import { Session, User } from '@supabase/supabase-js';
 import {
   authorizationHeaderFromSession,
   ensureSessionForInvoke,
 } from '../lib/auth/ensureSessionForInvoke';
+import {
+  isAuthHydrating,
+  sameAccessToken,
+  sameUserId,
+  shouldClearSession,
+  shouldFetchCompany,
+  type AuthLifecycle,
+} from '../lib/auth/authLifecycle';
 import { AnalyticsEvents } from '../lib/analytics/events';
 import { trackEvent, flushEvents } from '../lib/analytics/productAnalytics';
 import {
@@ -56,6 +64,30 @@ type AuthContextType = {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+function sameCompany(a: Company | null | undefined, b: Company | null | undefined): boolean {
+  if (a === b) return true;
+  if (!a || !b) return false;
+  return (
+    a.id === b.id &&
+    a.name === b.name &&
+    a.user_role === b.user_role &&
+    a.logo_url === b.logo_url &&
+    a.default_invoice_notes === b.default_invoice_notes
+  );
+}
+
+function sameProfile(a: Profile | null | undefined, b: Profile | null | undefined): boolean {
+  if (a === b) return true;
+  if (!a || !b) return false;
+  return (
+    a.id === b.id &&
+    a.full_name === b.full_name &&
+    a.avatar_url === b.avatar_url &&
+    a.role === b.role &&
+    a.active_company_id === b.active_company_id
+  );
+}
+
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<User | null>(null);
@@ -63,12 +95,27 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [companies, setCompanies] = useState<Company[] | null>(null);
   const [activeCompany, setActiveCompany] = useState<Company | null>(null);
   const [role, setRole] = useState<'owner' | 'admin' | 'member'>('member');
-  const [loading, setLoading] = useState(true);
+  const [lifecycle, setLifecycle] = useState<AuthLifecycle>('BOOTING');
   const lastFetchUserId = useRef<string | null>(null);
   /** Shared in-flight bootstrap so init + SIGNED_IN do not race-wipe company role. */
   const inFlightBootstrap = useRef<Promise<void> | null>(null);
+  const lifecycleRef = useRef<AuthLifecycle>('BOOTING');
+  lifecycleRef.current = lifecycle;
 
-  const fetchUserAndCompanyData = async (currentUser: User | null, force = false) => {
+  const applySession = useCallback((next: Session | null) => {
+    setSession((prev) => (sameAccessToken(prev, next) ? prev : next));
+    setUser((prev) => {
+      const nextUser = next?.user ?? null;
+      return sameUserId(prev, nextUser) ? prev : nextUser;
+    });
+  }, []);
+
+  const fetchUserAndCompanyData = useCallback(async (
+    currentUser: User | null,
+    options?: { force?: boolean; session?: Session | null },
+  ) => {
+    const force = options?.force === true;
+
     if (!currentUser) {
       inFlightBootstrap.current = null;
       setProfile(null);
@@ -88,9 +135,13 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
     const bootstrap = (async () => {
       try {
-        // Propagate a real user JWT (never anon fallback) for session bootstrap.
-        const session = await ensureSessionForInvoke({ redirectOnFailure: false });
-        const headers = authorizationHeaderFromSession(session);
+        // Prefer the session from the auth event so we never call getSession()
+        // or refreshSession() inside onAuthStateChange (supabase-js deadlock).
+        const invokeSession =
+          options?.session && !options.force
+            ? options.session
+            : await ensureSessionForInvoke({ redirectOnFailure: false });
+        const headers = authorizationHeaderFromSession(invokeSession);
 
         let data = null;
         let error = null;
@@ -111,9 +162,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
         if (error) throw error;
 
-        setProfile(data.profile);
+        setProfile((prev) => (sameProfile(prev, data.profile) ? prev : data.profile));
         setCompanies(data.companies);
-        setActiveCompany(data.activeCompany);
+        setActiveCompany((prev) => (sameCompany(prev, data.activeCompany) ? prev : data.activeCompany));
         setRole(data.role);
         lastFetchUserId.current = currentUser.id;
       } catch (error) {
@@ -132,7 +183,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         // Last-resort: direct fetch — supabase.functions.invoke can throw
         // FunctionsFetchError even when the edge request completed (abort/race).
         try {
-          const session = await ensureSessionForInvoke({ redirectOnFailure: false });
+          const recoverSession = await ensureSessionForInvoke({ redirectOnFailure: false });
           const res = await fetch(
             `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/user-session`,
             {
@@ -140,22 +191,30 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
               headers: {
                 'Content-Type': 'application/json',
                 apikey: import.meta.env.VITE_SUPABASE_ANON_KEY,
-                Authorization: `Bearer ${session.access_token}`,
+                Authorization: `Bearer ${recoverSession.access_token}`,
               },
               body: JSON.stringify({ method: 'GET' }),
             },
           );
           if (res.ok) {
             const payload = await res.json();
-            setProfile(payload.profile);
+            setProfile((prev) => (sameProfile(prev, payload.profile) ? prev : payload.profile));
             setCompanies(payload.companies);
-            setActiveCompany(payload.activeCompany);
+            setActiveCompany((prev) =>
+              sameCompany(prev, payload.activeCompany) ? prev : payload.activeCompany,
+            );
             setRole(payload.role);
             lastFetchUserId.current = currentUser.id;
             return;
           }
         } catch {
-          /* fall through to wipe */
+          /* fall through */
+        }
+
+        // Keep an already-hydrated company. Wiping it sends ProtectedRoute to
+        // /create-company and back, which unmounts every form.
+        if (lastFetchUserId.current === currentUser.id) {
+          return;
         }
 
         setProfile(null);
@@ -174,83 +233,145 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
     inFlightBootstrap.current = bootstrap;
     await bootstrap;
-  };
+  }, []);
 
   useEffect(() => {
-    // Single bootstrap path. Do not call getSession()+fetch in parallel with
-    // onAuthStateChange — INITIAL_SESSION used to set loading=false before
-    // company/role hydration, which redirected AFS/ProtectedRoute away.
-    const { data: authListener } = supabase.auth.onAuthStateChange(
-      async (event, currentSession) => {
-        setSession(currentSession);
-        setUser(currentSession?.user ?? null);
+    let cancelled = false;
+
+    const handleAuthEvent = (event: string, currentSession: Session | null) => {
+      if (cancelled) return;
+
+      // Token refresh must not re-bootstrap profile/company or flip loading.
+      if (event === 'TOKEN_REFRESHED') {
+        if (currentSession) applySession(currentSession);
+        return;
+      }
+
+      if (shouldClearSession(event, Boolean(currentSession?.user))) {
+        applySession(null);
+        void fetchUserAndCompanyData(null);
+        if (!cancelled) setLifecycle('AUTH_REQUIRED');
+        return;
+      }
+
+      if (!currentSession?.user || !shouldFetchCompany(event, currentSession.user.id)) {
+        if (currentSession) applySession(currentSession);
+        return;
+      }
+
+      applySession(currentSession);
+
+      if (event === 'SIGNED_IN' && currentSession.user) {
+        const createdAt = new Date(currentSession.user.created_at).getTime();
+        const isRecentRegistration = Date.now() - createdAt < 5 * 60 * 1000;
+        if (isRecentRegistration && !wasRegistrationTracked(currentSession.user.id)) {
+          markRegistrationTracked(currentSession.user.id);
+          trackEvent({
+            eventName: AnalyticsEvents.AUTH_REGISTRATION,
+            userId: currentSession.user.id,
+          });
+        }
+        trackEvent({
+          eventName: AnalyticsEvents.AUTH_LOGIN,
+          userId: currentSession.user.id,
+          properties: { auth_event: event },
+        });
+      }
+
+      // Stay in BOOTING until company hydration finishes. Never paint the
+      // shell with session && !activeCompany (that redirected to create-company).
+      if (lifecycleRef.current !== 'APPLICATION_READY') {
+        setLifecycle('BOOTING');
+      }
+
+      void (async () => {
         try {
-          if (event === 'SIGNED_OUT' || !currentSession?.user) {
-            if (event === 'SIGNED_OUT') {
-              trackEvent({ eventName: AnalyticsEvents.AUTH_LOGOUT });
-              void flushEvents();
-            }
-            await fetchUserAndCompanyData(null);
-          } else if (
-            event === 'INITIAL_SESSION' ||
-            event === 'SIGNED_IN' ||
-            event === 'TOKEN_REFRESHED'
-          ) {
-            if (event === 'SIGNED_IN' && currentSession.user) {
-              const createdAt = new Date(currentSession.user.created_at).getTime();
-              const isRecentRegistration = Date.now() - createdAt < 5 * 60 * 1000;
-              if (isRecentRegistration && !wasRegistrationTracked(currentSession.user.id)) {
-                markRegistrationTracked(currentSession.user.id);
-                trackEvent({
-                  eventName: AnalyticsEvents.AUTH_REGISTRATION,
-                  userId: currentSession.user.id,
-                });
-              }
-              trackEvent({
-                eventName: AnalyticsEvents.AUTH_LOGIN,
-                userId: currentSession.user.id,
-                properties: { auth_event: event },
-              });
-            }
-            await fetchUserAndCompanyData(currentSession.user);
-          }
+          await fetchUserAndCompanyData(currentSession.user, { session: currentSession });
+          if (!cancelled) setLifecycle('APPLICATION_READY');
         } catch (error) {
           if (import.meta.env.DEV) {
             console.error('[AuthContext] Auth state change handling failed:', error);
           }
-        } finally {
-          setLoading(false);
+          if (cancelled) return;
+          // Preserve a working session; only first-boot failure is ERROR.
+          setLifecycle((prev) => (prev === 'APPLICATION_READY' ? prev : 'ERROR'));
         }
-      },
-    );
+      })();
+    };
 
-    return () => authListener.subscription.unsubscribe();
-  }, []);
+    // Do not use an async listener: supabase-js holds an auth lock while the
+    // callback runs. getSession/refreshSession/invoke inside it deadlocks and
+    // can loop TOKEN_REFRESHED.
+    const { data: authListener } = supabase.auth.onAuthStateChange((event, currentSession) => {
+      // setTimeout(0) is the supported way to leave the supabase-js auth lock.
+      // Calling getSession/invoke inside the listener deadlocks the client and
+      // prevents the Auth UI from ever painting email/password fields.
+      setTimeout(() => handleAuthEvent(event, currentSession), 0);
+    });
 
-  const signOut = async () => {
+    return () => {
+      cancelled = true;
+      authListener.subscription.unsubscribe();
+    };
+  }, [applySession, fetchUserAndCompanyData]);
+
+  const signOut = useCallback(async () => {
     trackEvent({ eventName: AnalyticsEvents.AUTH_LOGOUT });
     await flushEvents();
     await supabase.auth.signOut();
-  };
-  const refreshProfile = async () => await fetchUserAndCompanyData(user, true);
-  const switchCompany = async (companyId: string) => {
-    if (user) {
-      const { error } = await supabase.functions.invoke('settings', {
-        body: { method: 'SWITCH_COMPANY', company_id: companyId, target_company_id: companyId },
-      });
-      if (error) throw error;
-      trackEvent({
-        eventName: AnalyticsEvents.COMPANY_SWITCHED,
-        companyId,
-        userId: user.id,
-        properties: { target_company_id: companyId },
-      });
-      await refreshProfile();
-    }
-  };
+  }, []);
+
+  const refreshProfile = useCallback(async () => {
+    if (!user) return;
+    await fetchUserAndCompanyData(user, { force: true });
+  }, [user, fetchUserAndCompanyData]);
+
+  const switchCompany = useCallback(async (companyId: string) => {
+    if (!user) return;
+    const { error } = await supabase.functions.invoke('settings', {
+      body: { method: 'SWITCH_COMPANY', company_id: companyId, target_company_id: companyId },
+    });
+    if (error) throw error;
+    trackEvent({
+      eventName: AnalyticsEvents.COMPANY_SWITCHED,
+      companyId,
+      userId: user.id,
+      properties: { target_company_id: companyId },
+    });
+    await fetchUserAndCompanyData(user, { force: true });
+  }, [user, fetchUserAndCompanyData]);
+
+  const loading = isAuthHydrating(lifecycle);
+
+  const value = useMemo<AuthContextType>(
+    () => ({
+      session,
+      user,
+      profile,
+      companies,
+      activeCompany,
+      role,
+      loading,
+      signOut,
+      refreshProfile,
+      switchCompany,
+    }),
+    [
+      session,
+      user,
+      profile,
+      companies,
+      activeCompany,
+      role,
+      loading,
+      signOut,
+      refreshProfile,
+      switchCompany,
+    ],
+  );
 
   return (
-    <AuthContext.Provider value={{ session, user, profile, companies, activeCompany, role, loading, signOut, refreshProfile, switchCompany }}>
+    <AuthContext.Provider value={value}>
       {children}
     </AuthContext.Provider>
   );

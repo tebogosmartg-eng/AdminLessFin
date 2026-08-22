@@ -6,6 +6,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../integrations/supabase/client';
 import { useAuth } from '../contexts/AuthContext';
 import { accountsQuery, bankAccountsQuery } from '../lib/queries';
+import { useDialogFormReset } from '../hooks/useDialogFormReset';
 import { Account } from '../pages/ChartOfAccounts';
 import { BANK_TRANSACTION_TYPES, BANK_TRANSACTION_LABELS, INCREASE_TYPES, BankAccountType } from '../lib/banking/types';
 import {
@@ -61,16 +62,13 @@ const BankTransactionForm = ({ isOpen, setIsOpen, defaultBankAccountId, restrict
     },
   });
 
-  useEffect(() => {
-    if (isOpen) {
-      form.reset({
-        bank_account_id: defaultBankAccountId ?? '', transaction_type: selectableTypes[0] as TransactionFormValues['transaction_type'],
-        direction: 'increase', transaction_date: new Date().toISOString().split('T')[0], amount: 0,
-        contra_account_id: '', description: '', reference: '',
-      });
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isOpen, defaultBankAccountId]);
+  useDialogFormReset(isOpen, defaultBankAccountId ?? 'none', () => {
+    form.reset({
+      bank_account_id: defaultBankAccountId ?? '', transaction_type: selectableTypes[0] as TransactionFormValues['transaction_type'],
+      direction: 'increase', transaction_date: new Date().toISOString().split('T')[0], amount: 0,
+      contra_account_id: '', description: '', reference: '',
+    });
+  });
 
   const transactionType = form.watch('transaction_type');
   useEffect(() => {

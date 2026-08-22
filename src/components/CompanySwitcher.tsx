@@ -44,7 +44,7 @@ const CompanySwitcher = () => {
         <Button variant="outline" className="w-56 justify-between">
           <div className="flex items-center truncate">
             <Building className="mr-2 h-4 w-4" />
-            <span className="truncate">{identity?.name || 'Company'}</span>
+            <span className="truncate">{identity?.name || activeCompany.name}</span>
           </div>
           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
         </Button>

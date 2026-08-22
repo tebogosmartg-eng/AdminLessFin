@@ -1,13 +1,13 @@
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { canAccessFinancialClose } from '../../lib/financialClose/flags';
-import FullScreenLoader from '../FullScreenLoader';
+import RouteLoadingFallback from '../RouteLoadingFallback';
 
 /** EFCP V6.8.0 gate — persona + feature-flag enforced. */
 export default function FinancialCloseGate({ children }: { children: React.ReactNode }) {
   const { session, profile, role, loading } = useAuth();
 
-  if (loading) return <FullScreenLoader />;
+  if (loading) return <RouteLoadingFallback />;
 
   const allowed = canAccessFinancialClose({
     role,

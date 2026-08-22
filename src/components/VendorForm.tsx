@@ -1,4 +1,3 @@
-import { useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -29,6 +28,7 @@ import { showError, showSuccess } from '../utils/toast';
 import { AnalyticsEvents } from '@/lib/analytics/events';
 import { trackFirstUsageEvent } from '@/lib/analytics/productAnalytics';
 import { Vendor } from '../pages/Vendors';
+import { useDialogFormReset } from '../hooks/useDialogFormReset';
 
 const vendorSchema = z.object({
   name: z.string().min(1, 'Vendor name is required.'),
@@ -64,7 +64,7 @@ const VendorForm = ({ isOpen, setIsOpen, vendor }: VendorFormProps) => {
     },
   });
 
-  useEffect(() => {
+  useDialogFormReset(isOpen, vendor?.id ?? 'new', () => {
     if (vendor) {
       form.reset({
         name: vendor.name,
@@ -86,7 +86,7 @@ const VendorForm = ({ isOpen, setIsOpen, vendor }: VendorFormProps) => {
         payment_terms: 30,
       });
     }
-  }, [vendor, form, isOpen]);
+  });
 
   const mutation = useMutation({
     mutationFn: async (values: VendorFormValues) => {

@@ -65,10 +65,9 @@ const AccountingSetupWizard = () => {
   const [bankFormOpen, setBankFormOpen] = useState(false);
   const [selectedStep, setSelectedStep] = useState<SetupStepKey | null>(null);
 
-  const { data: readiness, isLoading, isFetching, refetch } = useQuery({
+  const { data: readiness, isFetching, isError, error, refetch } = useQuery({
     ...accountingReadinessQuery(activeCompany!.id),
     enabled: !!activeCompany,
-    refetchOnWindowFocus: true,
   });
 
   const { data: accounts = [] } = useQuery({
@@ -127,7 +126,21 @@ const AccountingSetupWizard = () => {
 
   if (!activeCompany) return null;
 
-  if (isLoading || !readiness) {
+  if (!readiness) {
+    if (isError) {
+      return (
+        <div className="mx-auto max-w-lg space-y-3 py-16 text-center">
+          <p className="text-sm text-muted-foreground">
+            Accounting setup status could not be loaded
+            {error instanceof Error ? `: ${error.message}` : '.'}
+          </p>
+          <Button variant="outline" onClick={() => refetch()}>
+            <RefreshCw className="mr-2 h-4 w-4" />
+            Try again
+          </Button>
+        </div>
+      );
+    }
     return (
       <div className="flex min-h-[50vh] items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />

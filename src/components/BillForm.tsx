@@ -24,6 +24,7 @@ import { Alert, AlertDescription } from './ui/alert';
 import { addDays, format, isValid } from 'date-fns';
 import { formatCurrency } from '../lib/utils';
 import { projectsQuery, taxRatesQuery } from '../lib/queries';
+import { useDialogFormReset } from '../hooks/useDialogFormReset';
 import {
   findAccountByRole,
   resolveControlAccounts,
@@ -135,12 +136,12 @@ const BillForm = ({ isOpen, setIsOpen, billId, duplicateFromId, initialData, onS
   const vendorId = form.watch('vendor_id');
   const billDate = form.watch('bill_date');
 
-  // Smart Defaults: resolve AP via account_role
+  // Smart Defaults: apply once per open so a CoA refetch cannot overwrite AP.
   useEffect(() => {
-    if (isOpen && accounts && !isEditing && !isDuplicating) {
-      const controls = resolveControlAccounts(accounts);
-      if (controls.ap) form.setValue('accounts_payable_id', controls.ap.id);
-    }
+    if (!isOpen || isEditing || isDuplicating || !accounts) return;
+    if (form.getValues('accounts_payable_id')) return;
+    const controls = resolveControlAccounts(accounts);
+    if (controls.ap) form.setValue('accounts_payable_id', controls.ap.id);
   }, [isOpen, accounts, isEditing, isDuplicating, form]);
 
   // Apply initial data (e.g. PO → Bill conversion)
@@ -182,8 +183,8 @@ const BillForm = ({ isOpen, setIsOpen, billId, duplicateFromId, initialData, onS
     enabled: isOpen && isDuplicating && !!duplicateFromId && !!activeCompany,
   });
 
-  useEffect(() => {
-    if (!isOpen || !isDuplicating || !sourceBill) return;
+  useDialogFormReset(isOpen, sourceBill ? `dup:${duplicateFromId}` : 'new', () => {
+    if (!isDuplicating || !sourceBill) return;
 
     const debitItems =
       sourceBill.journal_entries?.journal_entry_items?.filter(
@@ -223,7 +224,7 @@ const BillForm = ({ isOpen, setIsOpen, billId, duplicateFromId, initialData, onS
             }))
           : [{ description: '', quantity: 1, unit_cost: 0, expense_account_id: defaultExpenseId, project_id: '', tax_rate_id: '' }],
     });
-  }, [isOpen, isDuplicating, sourceBill, form, expenseAccounts, assetAccounts]);
+  });
 
   useEffect(() => {
     if (vendorId && billDate && !isEditing && vendors) {

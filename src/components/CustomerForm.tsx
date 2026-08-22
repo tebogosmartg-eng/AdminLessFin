@@ -1,4 +1,3 @@
-import { useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -29,6 +28,7 @@ import { showError, showSuccess } from '../utils/toast';
 import { AnalyticsEvents } from '@/lib/analytics/events';
 import { trackFirstUsageEvent } from '@/lib/analytics/productAnalytics';
 import { Customer } from '../pages/Customers';
+import { useDialogFormReset } from '../hooks/useDialogFormReset';
 
 const customerSchema = z.object({
   name: z.string().min(1, 'Customer name is required.'),
@@ -64,7 +64,7 @@ const CustomerForm = ({ isOpen, setIsOpen, customer }: CustomerFormProps) => {
     },
   });
 
-  useEffect(() => {
+  useDialogFormReset(isOpen, customer?.id ?? 'new', () => {
     if (customer) {
       form.reset({
         name: customer.name,
@@ -86,7 +86,7 @@ const CustomerForm = ({ isOpen, setIsOpen, customer }: CustomerFormProps) => {
         payment_terms: 30,
       });
     }
-  }, [customer, form, isOpen]);
+  });
 
   const mutation = useMutation({
     mutationFn: async (values: CustomerFormValues) => {

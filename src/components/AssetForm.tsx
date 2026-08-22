@@ -15,6 +15,7 @@ import { Vendor } from '../pages/Vendors';
 import { Account } from '../pages/ChartOfAccounts';
 import { Employee } from '../pages/Employees';
 import { EmployeeSelector } from './hr/EmployeeSelector';
+import { useDialogFormReset } from '../hooks/useDialogFormReset';
 import {
   accountsQuery,
   assetCategoriesQuery,
@@ -77,12 +78,10 @@ const AssetForm = ({ isOpen, setIsOpen, assetId }: AssetFormProps) => {
 
   const [categoryIntel, setCategoryIntel] = useState<CategoryIntelState>({});
 
-  useEffect(() => {
-    if (!isOpen) {
-      form.reset({ purchase_date: new Date().toISOString().split('T')[0], residual_value: 0 });
-      setCategoryIntel({});
-    }
-  }, [isOpen, form]);
+  useDialogFormReset(isOpen, isEditing ? 'edit' : 'new', () => {
+    form.reset({ purchase_date: new Date().toISOString().split('T')[0], residual_value: 0 });
+    setCategoryIntel({});
+  });
 
   const { data: vendors } = useQuery<Vendor[]>({ ...vendorsQuery(activeCompany!.id), enabled: !!activeCompany });
   const { data: employees } = useQuery<Employee[]>({ ...employeesQuery(activeCompany!.id), enabled: !!activeCompany });

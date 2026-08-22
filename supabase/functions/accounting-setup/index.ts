@@ -212,16 +212,36 @@ serve(withEnterprisePlatform('accounting-setup', 'tenant', async (req, _ctx) => 
     let row = await ensureReadinessRow(supabaseAdmin, companyId);
 
     switch (method) {
-      case 'GET_STATUS':
+      case 'GET_STATUS': {
+        // Derive from master data. Persist cache only when derived flags changed
+        // so a status poll is not a write + second full CoA scan on every page.
+        const evaluation = await loadEvaluation(supabaseAdmin, companyId, row);
+        const patch = cachePatchFromEvaluation(evaluation, row);
+        const cacheUnchanged =
+          row.status === patch.status &&
+          row.accounting_ready === patch.accounting_ready &&
+          row.current_step === patch.current_step &&
+          row.financial_calendar_complete === patch.financial_calendar_complete &&
+          row.chart_of_accounts_complete === patch.chart_of_accounts_complete &&
+          row.tax_configuration_complete === patch.tax_configuration_complete &&
+          row.bank_accounts_complete === patch.bank_accounts_complete &&
+          row.opening_balances_complete === patch.opening_balances_complete &&
+          row.validation_complete === patch.validation_complete;
+        if (!cacheUnchanged) {
+          row = await persistCache(supabaseAdmin, companyId, row, evaluation);
+        }
+        return new Response(JSON.stringify(composeResponse(row, evaluation)), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 200,
+        });
+      }
+
       case 'EVALUATE':
       case 'COMPLETE_VALIDATION': {
-        // Phase 1B: always derive from master data. Cache refresh on EVALUATE /
-        // COMPLETE_VALIDATION (alias). GET_STATUS also refreshes cache so
-        // dashboard progress stays current without a separate manual step.
+        // Phase 1B: always derive from master data and refresh the cache.
         const evaluation = await loadEvaluation(supabaseAdmin, companyId, row);
         row = await persistCache(supabaseAdmin, companyId, row, evaluation);
-        const freshEval = await loadEvaluation(supabaseAdmin, companyId, row);
-        return new Response(JSON.stringify(composeResponse(row, freshEval)), {
+        return new Response(JSON.stringify(composeResponse(row, evaluation)), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           status: 200,
         });

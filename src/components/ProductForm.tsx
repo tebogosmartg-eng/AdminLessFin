@@ -1,4 +1,3 @@
-import { useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -34,6 +33,7 @@ import { Textarea } from './ui/textarea';
 import { showError, showSuccess } from '../utils/toast';
 import { Account } from '../pages/ChartOfAccounts';
 import { Product } from '../pages/Products';
+import { useDialogFormReset } from '../hooks/useDialogFormReset';
 import { accountsQuery, vendorsQuery } from '../lib/queries';
 
 const costMethodEnum = z.enum(['fifo', 'weighted_average', 'standard', 'specific']);
@@ -98,7 +98,7 @@ const ProductForm = ({ isOpen, setIsOpen, product }: ProductFormProps) => {
 
   const watchType = form.watch('type');
 
-  useEffect(() => {
+  useDialogFormReset(isOpen, product?.id ?? 'new', () => {
     if (product) {
       const p = product as Product & Record<string, unknown>;
       form.reset({
@@ -143,7 +143,7 @@ const ProductForm = ({ isOpen, setIsOpen, product }: ProductFormProps) => {
         supplier_id: '',
       });
     }
-  }, [product, form, isOpen]);
+  });
 
   const { data: accounts } = useQuery<Account[]>({ 
     ...accountsQuery(activeCompany!.id),

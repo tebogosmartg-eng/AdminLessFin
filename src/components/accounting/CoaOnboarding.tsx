@@ -54,6 +54,7 @@ const CoaOnboarding = ({ onCreateManually }: CoaOnboardingProps) => {
     },
     onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ['accounts', activeCompany?.id] });
+      queryClient.invalidateQueries({ queryKey: ['accountingReadiness', activeCompany?.id] });
       if (activeCompany) {
         trackEvent({
           eventName: AnalyticsEvents.SETUP_COA_GENERATED,

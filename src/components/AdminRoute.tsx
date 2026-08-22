@@ -1,12 +1,12 @@
 import { useAuth } from '../contexts/AuthContext';
 import { Navigate, Outlet } from 'react-router-dom';
-import FullScreenLoader from './FullScreenLoader';
+import RouteLoadingFallback from './RouteLoadingFallback';
 
 const AdminRoute = () => {
   const { role, loading } = useAuth();
 
   if (loading) {
-    return <FullScreenLoader />;
+    return <RouteLoadingFallback />;
   }
 
   // Only allow Owners and Admins

@@ -1,4 +1,3 @@
-import { useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -32,6 +31,7 @@ import {
 import { Textarea } from './ui/textarea';
 import { showError, showSuccess } from '../utils/toast';
 import { Account } from '../pages/ChartOfAccounts';
+import { useDialogFormReset } from '../hooks/useDialogFormReset';
 
 const accountSchema = z.object({
   name: z.string().min(1, 'Account name is required.'),
@@ -60,7 +60,7 @@ const AccountForm = ({ isOpen, setIsOpen, account }: AccountFormProps) => {
     },
   });
 
-  useEffect(() => {
+  useDialogFormReset(isOpen, account?.id ?? 'new', () => {
     if (account) {
       form.reset({
         name: account.name,
@@ -74,7 +74,7 @@ const AccountForm = ({ isOpen, setIsOpen, account }: AccountFormProps) => {
         description: '',
       });
     }
-  }, [account, form, isOpen]);
+  });
 
   // This mutation creates or updates data by calling a secure Supabase Edge Function.
   const mutation = useMutation({

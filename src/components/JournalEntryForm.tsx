@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -40,6 +40,7 @@ import { Customer } from '../pages/Customers';
 import { Trash2, X, Sparkles, Loader2 } from 'lucide-react';
 import { formatCurrency } from '../lib/utils';
 import { accountsQuery, customersQuery, vendorsQuery } from '../lib/queries';
+import { useDialogFormReset } from '../hooks/useDialogFormReset';
 
 const journalEntryItemSchema = z.object({
   account_id: z.string().min(1, "Account is required."),
@@ -113,7 +114,13 @@ const JournalEntryForm = ({ isOpen, setIsOpen, entryId }: JournalEntryFormProps)
     enabled: isEditing && isOpen && !!activeCompany,
   });
 
-  useEffect(() => {
+  const formResetKey = isEditing
+    ? entryToEdit
+      ? `edit:${entryId}`
+      : `pending:${entryId}`
+    : 'new';
+
+  useDialogFormReset(isOpen, formResetKey, () => {
     if (isEditing && entryToEdit) {
       form.reset({
         entry_date: entryToEdit.entry_date,
@@ -139,7 +146,7 @@ const JournalEntryForm = ({ isOpen, setIsOpen, entryId }: JournalEntryFormProps)
     setAttachmentFile(null);
     setRemoveAttachment(false);
     setAiPrompt('');
-  }, [entryToEdit, isEditing, isOpen, form]);
+  });
 
   const { fields, append, remove, replace } = useFieldArray({
     control: form.control,

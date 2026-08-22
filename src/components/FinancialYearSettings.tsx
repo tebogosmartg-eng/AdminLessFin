@@ -113,6 +113,7 @@ const FinancialYearSettings = () => {
     onSuccess: async () => {
       await refreshProfile();
       queryClient.invalidateQueries({ queryKey: ['financial_years'] });
+      queryClient.invalidateQueries({ queryKey: ['accountingReadiness'] });
       queryClient.invalidateQueries({ queryKey: ['efs_dashboard'] });
       queryClient.invalidateQueries({ queryKey: ['efs_workspaces'] });
       queryClient.invalidateQueries({ queryKey: ['efs_doc_model'] });
@@ -211,6 +212,7 @@ const FinancialYearSettings = () => {
     onSuccess: async () => {
       await refreshProfile();
       queryClient.invalidateQueries({ queryKey: ['financial_years'] });
+      queryClient.invalidateQueries({ queryKey: ['accountingReadiness'] });
       queryClient.invalidateQueries({ queryKey: ['efs_dashboard'] });
       queryClient.invalidateQueries({ queryKey: ['efs_workspaces'] });
       queryClient.invalidateQueries({ queryKey: ['efs_doc_model'] });

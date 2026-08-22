@@ -27,6 +27,7 @@ import { formatCurrency } from '../lib/utils';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from './ui/sheet';
 import InvoicePreview from './InvoicePreview';
 import { taxRatesQuery, projectsQuery, customersQuery } from '../lib/queries';
+import { useDialogFormReset } from '../hooks/useDialogFormReset';
 import {
   buildCreateInvoiceCommand,
   dispatchBusinessCommandOrThrow,
@@ -204,15 +205,18 @@ const InvoiceForm = ({ isOpen, setIsOpen, invoiceId, duplicateFromId, initialCus
   const customerId = form.watch('customer_id');
   const invoiceDate = form.watch('invoice_date');
 
-  // Smart Defaults: resolve A/R, tax, inventory via canonical account_role metadata.
+  // Smart Defaults: apply once per dialog open so a CoA refetch cannot
+  // overwrite the user's A/R / tax selection while they type.
   useEffect(() => {
-    if (isOpen && accounts && !isEditing) {
-      const controls = resolveControlAccounts(accounts);
-      if (controls.ar) form.setValue('accounts_receivable_id', controls.ar.id);
-      if (controls.outputVat) form.setValue('tax_payable_account_id', controls.outputVat.id);
-      else if (controls.vatControl) form.setValue('tax_payable_account_id', controls.vatControl.id);
-      if (controls.inventory) form.setValue('inventory_asset_account_id', controls.inventory.id);
-    }
+    if (!isOpen) return;
+    if (isEditing || !accounts) return;
+    const alreadySet = form.getValues('accounts_receivable_id');
+    if (alreadySet) return;
+    const controls = resolveControlAccounts(accounts);
+    if (controls.ar) form.setValue('accounts_receivable_id', controls.ar.id);
+    if (controls.outputVat) form.setValue('tax_payable_account_id', controls.outputVat.id);
+    else if (controls.vatControl) form.setValue('tax_payable_account_id', controls.vatControl.id);
+    if (controls.inventory) form.setValue('inventory_asset_account_id', controls.inventory.id);
   }, [isOpen, accounts, isEditing, form]);
 
   useEffect(() => {
@@ -240,7 +244,7 @@ const InvoiceForm = ({ isOpen, setIsOpen, invoiceId, duplicateFromId, initialCus
         form.setValue('notes', activeCompany.default_invoice_notes);
       }
     }
-  }, [isOpen, isEditing, isDuplicating, initialCustomerId, activeCompany, form]);
+  }, [isOpen, isEditing, isDuplicating, initialCustomerId, activeCompany?.default_invoice_notes, form]);
 
   const sourceId = invoiceId || duplicateFromId;
   const { data: sourceInvoice } = useQuery({
@@ -255,19 +259,22 @@ const InvoiceForm = ({ isOpen, setIsOpen, invoiceId, duplicateFromId, initialCus
     enabled: !!sourceId && isOpen && !!activeCompany,
   });
 
-  useEffect(() => {
-    if (sourceInvoice && isOpen) {
+  useDialogFormReset(
+    isOpen,
+    sourceInvoice ? `src:${sourceId}` : 'new',
+    () => {
+      if (!sourceInvoice) return;
       const jeItems = invoiceJournalItems<any>(sourceInvoice.journal_entries);
       const arItem = jeItems.find((item: any) => item.type === 'debit');
-      
+
       const items = jeItems
         .filter((item: any) => item.type === 'credit' && !isTaxLedgerAccount(item.chart_of_accounts))
         .map((item: any) => ({
-          product_id: item.product_id || '', 
-          description: item.description || item.chart_of_accounts?.name || 'Item', 
-          quantity: item.quantity || 1, 
+          product_id: item.product_id || '',
+          description: item.description || item.chart_of_accounts?.name || 'Item',
+          quantity: item.quantity || 1,
           unit_price: item.unit_price || item.amount,
-          income_account_id: item.account_id, 
+          income_account_id: item.account_id,
           tax_rate_id: item.journal_entry_item_tax_rates?.[0]?.tax_rates?.id || '',
           project_id: item.project_id || '',
         }));
@@ -279,11 +286,11 @@ const InvoiceForm = ({ isOpen, setIsOpen, invoiceId, duplicateFromId, initialCus
         customer_id: sourceInvoice.customers?.id || '',
         description: sourceInvoice.description || '',
         notes: sourceInvoice.notes || activeCompany?.default_invoice_notes || '',
-        accounts_receivable_id: arItem?.account_id || '', 
+        accounts_receivable_id: arItem?.account_id || '',
         items: items.length > 0 ? items : [{ product_id: '', description: '', quantity: 1, unit_price: 0, income_account_id: '', tax_rate_id: '', project_id: '' }],
       });
-    }
-  }, [sourceInvoice, isEditing, isDuplicating, isOpen, activeCompany, form]);
+    },
+  );
 
   const { data: nextInvoiceNumber } = useQuery({
     queryKey: ['next_invoice_number', activeCompany?.id],

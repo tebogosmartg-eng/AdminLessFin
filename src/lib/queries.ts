@@ -1,3 +1,4 @@
+import { keepPreviousData } from '@tanstack/react-query';
 import { supabase } from '../integrations/supabase/client';
 import { buildWorkspaceSummary, aggregatePayrollSummaryItems } from './payrollIntelligence';
 import { invokePayroll } from './payrollOperations';
@@ -772,6 +773,10 @@ export const accountingReadinessQuery = (companyId: string) => ({
   queryFn: async () => accountingReadinessService.getStatus(companyId),
   // Setup endpoint failures are environment/deploy issues — avoid retry storms in the console.
   retry: 1,
+  // Keep the last snapshot visible while a background re-check runs so the
+  // gate never unmounts Journal Entry / Invoice back to a loading state.
+  placeholderData: keepPreviousData,
+  refetchOnMount: false,
 });
 
 export const accountingHealthQuery = (companyId: string) => ({

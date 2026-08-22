@@ -1,5 +1,4 @@
 import { useEffect, useRef } from 'react';
-import { useLocation } from 'react-router-dom';
 import type { AccountingReadinessSnapshot, SetupStepKey } from '@/governance/domains/accountingReadiness/model';
 import { SETUP_STEP_ORDER } from '@/governance/domains/accountingReadiness/model';
 import { AnalyticsEvents } from './events';
@@ -25,6 +24,10 @@ export function useAccountingSetupAnalytics(
   const readyTrackedRef = useRef(false);
   const completedStepsRef = useRef<Set<SetupStepKey>>(new Set());
   const lastErrorsRef = useRef<string>('');
+  const companyIdRef = useRef(companyId);
+  const activeStepRef = useRef(activeStep);
+  companyIdRef.current = companyId;
+  activeStepRef.current = activeStep;
 
   useEffect(() => {
     if (!companyId || !readiness) return;
@@ -104,21 +107,22 @@ export function useAccountingSetupAnalytics(
 
   useEffect(() => {
     return () => {
-      if (!companyId || readyTrackedRef.current) return;
+      if (!companyIdRef.current || readyTrackedRef.current) return;
+      const completed = Array.from(completedStepsRef.current);
       trackEvent({
         eventName: AnalyticsEvents.SETUP_ABANDONED,
-        companyId,
+        companyId: companyIdRef.current,
         properties: {
-          step: activeStep,
-          completed_steps: Array.from(completedStepsRef.current),
+          step: activeStepRef.current,
+          completed_steps: completed,
         },
       });
       trackEvent({
         eventName: AnalyticsEvents.JOURNEY_DROPOFF,
         category: 'journey',
-        companyId,
-        properties: { step: activeStep, phase: 'accounting_setup' },
+        companyId: companyIdRef.current,
+        properties: { step: activeStepRef.current, phase: 'accounting_setup' },
       });
     };
-  }, [companyId, activeStep]);
+  }, []);
 }
