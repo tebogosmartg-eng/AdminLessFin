@@ -9,6 +9,11 @@ on:
 jobs:
   certify:
     runs-on: ubuntu-latest
+    # The Supabase client throws at import when these are absent, so any test
+    # file that transitively imports it fails before a single assertion runs.
+    env:
+      VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+      VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
     steps:
       - uses: actions/checkout@v4
 
