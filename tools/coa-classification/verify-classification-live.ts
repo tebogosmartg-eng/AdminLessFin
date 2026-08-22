@@ -93,9 +93,17 @@ async function main() {
   const hierarchyPaths = tally(
     tbRows.map((r) => `${r.hierarchy_l1} > ${r.hierarchy_l2} > ${r.hierarchy_l3}`),
   );
-  const duplicatedLevels = Object.keys(hierarchyPaths).filter((p) => {
+  // l3 === l2 is the DESIGNED signal for "this account carries no statement
+  // line" — the Trial Balance renders that as a single level. A genuine defect
+  // is a repeated level with a DIFFERENT classification above it, or the same
+  // label appearing at l1 and l2.
+  const collapsedLevels = Object.keys(hierarchyPaths).filter((p) => {
     const [, l2, l3] = p.split(' > ');
     return l2 === l3;
+  });
+  const repeatedHeadings = Object.keys(hierarchyPaths).filter((p) => {
+    const [l1, l2] = p.split(' > ');
+    return l1 === l2 && l1 !== 'Equity';
   });
 
   const unclassified = accounts
@@ -130,7 +138,8 @@ async function main() {
       balanced: tb?.balanced ?? null,
       totals: tb?.totals ?? null,
       hierarchy_paths: hierarchyPaths,
-      duplicated_hierarchy_levels: duplicatedLevels,
+      collapsed_single_levels: collapsedLevels,
+      repeated_headings: repeatedHeadings,
     },
     // What the classification model says the hierarchy SHOULD be, computed from
     // the Chart of Accounts alone. Compared against what the edge returned.
@@ -154,7 +163,8 @@ async function main() {
   console.log(`Category tally ......... ${JSON.stringify(report.category_tally)}`);
   console.log(`TB rows / balanced ..... ${report.trial_balance.row_count} / ${report.trial_balance.balanced}`);
   console.log(`TB hierarchy paths ..... ${JSON.stringify(report.trial_balance.hierarchy_paths, null, 2)}`);
-  console.log(`Duplicated TB levels ... ${JSON.stringify(duplicatedLevels)}`);
+  console.log(`Collapsed levels ....... ${collapsedLevels.length} (rendered as one level)`);
+  console.log(`Repeated headings ...... ${JSON.stringify(repeatedHeadings)}`);
   console.log(`Written ................ ${OUT}`);
 }
 

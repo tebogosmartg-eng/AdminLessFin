@@ -203,8 +203,15 @@ test.describe('System accounts — UI protection', () => {
     await row.getByRole('button').last().click();
     await page.getByRole('menuitem', { name: /^edit$/i }).click();
     await expect(page.getByRole('heading', { name: /edit account/i })).toBeVisible();
-    await expect(page.locator('[role="dialog"] button[role="combobox"]')).toBeDisabled();
+    // The dialog now carries Account Type, Classification, and (where the
+    // classification has statement lines) Statement line. Account Type is the
+    // first select and is the one a system account locks: its classification
+    // stays editable because classification is presentation metadata the
+    // customer owns, while type / role / control flags are immutable.
+    const dialogSelects = page.locator('[role="dialog"] button[role="combobox"]');
+    await expect(dialogSelects.first()).toBeDisabled();
     await expect(page.getByText(/system account type is locked/i)).toBeVisible();
+    await expect(dialogSelects.nth(1)).toBeEnabled();
 
     const evidence = {
       companyId: CERT_COA_COMPANY,
