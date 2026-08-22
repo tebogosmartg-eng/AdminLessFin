@@ -5,7 +5,6 @@ import {
   ENTERPRISE_CORS_HEADERS,
   withEnterprisePlatform,
   edgeFailure,
-  requireServiceRole,
 } from '../_shared/enterpriseEdgePlatform.ts'
 
 
@@ -21,10 +20,33 @@ const formatCurrency = (amount: number) => {
   }).format(amount);
 };
 
-serve(withEnterprisePlatform('send-statement-email', 'service', async (req, _ctx) => {
+serve(withEnterprisePlatform('send-statement-email', 'tenant', async (req, _ctx) => {
 
   try {
-    requireServiceRole(req, _ctx);
+    // Sending is a CUSTOMER action taken from the browser, so this is a
+    // tenant-authenticated endpoint: authenticate the user, then authorise them
+    // against the record's own company. It previously called requireServiceRole,
+    // which demands the Authorization header equal the service-role key — a
+    // browser session can never satisfy that, so every send returned 401.
+    const supabase = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+      { global: { headers: { Authorization: req.headers.get('Authorization') ?? '' } } }
+    );
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    if (userError || !user) throw new Error("User not authenticated.");
+
+    const assertMember = async (companyId: string) => {
+      const { data: membership, error: membershipError } = await supabase
+        .from('company_users')
+        .select('role')
+        .eq('user_id', user.id)
+        .eq('company_id', companyId)
+        .single();
+      if (membershipError || !membership) throw new Error("Permission denied.");
+      _ctx.companyId = companyId;
+    };
+
     if (!RESEND_API_KEY || !RESEND_DOMAIN) {
       throw new Error("Email service is not configured.");
     }
@@ -39,6 +61,9 @@ serve(withEnterprisePlatform('send-statement-email', 'service', async (req, _ctx
     // However, to avoid code duplication hell, let's fetch the data we need.
     // Since we are already in an edge function context, let's just use the Supabase client to fetch what we need.
     
+    if (!company_id) throw new Error("company_id is required.");
+    await assertMember(company_id);
+
     const supabaseAdmin = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''

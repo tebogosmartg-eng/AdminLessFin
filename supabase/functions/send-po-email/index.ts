@@ -5,7 +5,6 @@ import {
   ENTERPRISE_CORS_HEADERS,
   withEnterprisePlatform,
   edgeFailure,
-  requireServiceRole,
 } from '../_shared/enterpriseEdgePlatform.ts'
 import { resolveEnterpriseIdentityEdge } from '../_shared/enterpriseIdentity.ts'
 
@@ -22,10 +21,33 @@ const formatCurrency = (amount: number) => {
   }).format(amount);
 };
 
-serve(withEnterprisePlatform('send-po-email', 'service', async (req, _ctx) => {
+serve(withEnterprisePlatform('send-po-email', 'tenant', async (req, _ctx) => {
 
   try {
-    requireServiceRole(req, _ctx);
+    // Sending is a CUSTOMER action taken from the browser, so this is a
+    // tenant-authenticated endpoint: authenticate the user, then authorise them
+    // against the record's own company. It previously called requireServiceRole,
+    // which demands the Authorization header equal the service-role key — a
+    // browser session can never satisfy that, so every send returned 401.
+    const supabase = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+      { global: { headers: { Authorization: req.headers.get('Authorization') ?? '' } } }
+    );
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    if (userError || !user) throw new Error("User not authenticated.");
+
+    const assertMember = async (companyId: string) => {
+      const { data: membership, error: membershipError } = await supabase
+        .from('company_users')
+        .select('role')
+        .eq('user_id', user.id)
+        .eq('company_id', companyId)
+        .single();
+      if (membershipError || !membership) throw new Error("Permission denied.");
+      _ctx.companyId = companyId;
+    };
+
     if (!RESEND_API_KEY || !RESEND_DOMAIN) {
       throw new Error("Email service is not configured. Please set RESEND_API_KEY and RESEND_DOMAIN secrets.");
     }
@@ -58,6 +80,8 @@ serve(withEnterprisePlatform('send-po-email', 'service', async (req, _ctx) => {
       .single();
 
     if (poError) throw poError;
+    if (!po) throw new Error("Purchase order not found.");
+    await assertMember(po.company_id);
     if (!po) throw new Error("Purchase Order not found.");
 
     const identity = await resolveEnterpriseIdentityEdge(supabaseAdmin, po.company_id);

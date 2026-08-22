@@ -5,7 +5,6 @@ import {
   ENTERPRISE_CORS_HEADERS,
   withEnterprisePlatform,
   edgeFailure,
-  requireServiceRole,
 } from '../_shared/enterpriseEdgePlatform.ts'
 import { resolveEnterpriseIdentityEdge } from '../_shared/enterpriseIdentity.ts'
 
@@ -22,10 +21,22 @@ const formatCurrency = (amount: number) => {
   }).format(amount);
 };
 
-serve(withEnterprisePlatform('send-quote-email', 'service', async (req, _ctx) => {
+serve(withEnterprisePlatform('send-quote-email', 'tenant', async (req, _ctx) => {
 
   try {
-    requireServiceRole(req, _ctx);
+    // Sending a quote is a CUSTOMER action taken from the browser, so this is a
+    // tenant-authenticated endpoint: authenticate the user, then authorise them
+    // against the quote's own company. It previously called requireServiceRole,
+    // which demands the Authorization header equal the service-role key — a
+    // browser session can never satisfy that, so every send returned 401.
+    const supabase = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+      { global: { headers: { Authorization: req.headers.get('Authorization') ?? '' } } }
+    );
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    if (userError || !user) throw new Error("User not authenticated.");
+
     if (!RESEND_API_KEY || !RESEND_DOMAIN) {
       throw new Error("Email service is not configured. Please set RESEND_API_KEY and RESEND_DOMAIN secrets.");
     }
@@ -59,6 +70,16 @@ serve(withEnterprisePlatform('send-quote-email', 'service', async (req, _ctx) =>
 
     if (quoteError) throw quoteError;
     if (!quote) throw new Error("Quote not found.");
+
+    // Tenant isolation: the caller must belong to the quote's company.
+    const { data: membership, error: membershipError } = await supabase
+      .from('company_users')
+      .select('role')
+      .eq('user_id', user.id)
+      .eq('company_id', quote.company_id)
+      .single();
+    if (membershipError || !membership) throw new Error("Permission denied.");
+    _ctx.companyId = quote.company_id;
 
     const identity = await resolveEnterpriseIdentityEdge(supabaseAdmin, quote.company_id);
     const totalAmount = quote.quote_items.reduce((sum: number, item: any) => sum + (item.quantity * item.unit_price), 0);
