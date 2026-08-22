@@ -19,7 +19,9 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          # 20 has no global WebSocket, which the Supabase realtime client
+          # requires the moment it is constructed.
+          node-version: '22'
           cache: 'npm'
 
       - name: Install dependencies
