@@ -31,7 +31,7 @@
  *
  * Install AFTER installReadCoalescing so it wraps the outermost invoke.
  */
-import { resolveEdgeFunctionError, isOpaqueEdgeMessage } from '@/lib/platform/edgeError';
+import { resolveEdgeFunctionError, isOpaqueEdgeMessage, bestEnvelopeMessage } from '@/lib/platform/edgeError';
 import { PlatformError } from '@/lib/platform/platformError';
 
 type InvokeArgs = [functionName: string, options?: Record<string, unknown>];
@@ -58,7 +58,7 @@ async function enrich(error: unknown): Promise<void> {
 
   if (resolved instanceof PlatformError) {
     envelope = resolved.envelope;
-    message = envelope.businessMessage || envelope.technicalMessage;
+    message = bestEnvelopeMessage(envelope);
   } else {
     const m = (resolved as { message?: unknown })?.message;
     if (typeof m === 'string' && m.trim() && !isOpaqueEdgeMessage(m)) message = m;
