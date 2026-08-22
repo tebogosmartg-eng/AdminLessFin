@@ -30,6 +30,8 @@ supabase/.temp/
 tests/e2e/.auth/
 tests/e2e/artifacts/
 tests/e2e/report/
+# Regenerable screenshots; the JSON evidence beside them IS committed.
+tests/e2e/evidence/coa-classification-production/
 
 # Certification probes, lint dumps, and scratch output
 tmp/

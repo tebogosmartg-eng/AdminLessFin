@@ -10,7 +10,7 @@
  *
  *   npx tsx tools/coa-classification/verify-classification-live.ts [label]
  *
- * Writes tests/e2e/artifacts/coa-classification-<label>.json
+ * Writes tests/e2e/evidence/coa-classification/coa-classification-<label>.json
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -22,7 +22,8 @@ import {
 } from '../../src/lib/accounting/accountClassification';
 
 const label = process.argv[2] || 'snapshot';
-const OUT_DIR = path.join(process.cwd(), 'tests/e2e/artifacts');
+// NOT tests/e2e/artifacts — Playwright clears that directory on every run.
+const OUT_DIR = path.join(process.cwd(), 'tests/e2e/evidence/coa-classification');
 const OUT = path.join(OUT_DIR, `coa-classification-${label}.json`);
 
 type Account = {

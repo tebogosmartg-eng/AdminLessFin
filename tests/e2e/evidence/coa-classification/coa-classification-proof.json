@@ -1,0 +1,218 @@
+{
+  "captured_at": "2026-08-22T08:18:00.485Z",
+  "company_id": "0a2ff5bb-3796-4467-b227-a6dd4306bcdb",
+  "kept_test_accounts": false,
+  "phase_10_hierarchy": [
+    {
+      "case": "1. Accounts Payable",
+      "pass": true,
+      "stored": {
+        "type": "Liability",
+        "category": "Current Liabilities",
+        "subcategory": "Trade and Other Payables"
+      },
+      "expected": {
+        "l1": "Liabilities",
+        "l2": "Current Liabilities",
+        "l3": "Trade and Other Payables"
+      },
+      "actual": {
+        "l1": "Liabilities",
+        "l2": "Current Liabilities",
+        "l3": "Trade and Other Payables"
+      },
+      "renders_single_level": false
+    },
+    {
+      "case": "2. Shareholders Loan",
+      "pass": true,
+      "stored": {
+        "type": "Liability",
+        "category": "Non-Current Liabilities",
+        "subcategory": "Related-party Payables"
+      },
+      "expected": {
+        "l1": "Liabilities",
+        "l2": "Non-Current Liabilities",
+        "l3": "Related-party Payables"
+      },
+      "actual": {
+        "l1": "Liabilities",
+        "l2": "Non-Current Liabilities",
+        "l3": "Related-party Payables"
+      },
+      "renders_single_level": false
+    },
+    {
+      "case": "3. Inventory",
+      "pass": true,
+      "stored": {
+        "type": "Asset",
+        "category": "Current Assets",
+        "subcategory": "Inventory"
+      },
+      "expected": {
+        "l1": "Assets",
+        "l2": "Current Assets",
+        "l3": "Inventory"
+      },
+      "actual": {
+        "l1": "Assets",
+        "l2": "Current Assets",
+        "l3": "Inventory"
+      },
+      "renders_single_level": false
+    },
+    {
+      "case": "4. Computer Equipment",
+      "pass": true,
+      "stored": {
+        "type": "Asset",
+        "category": "Non-Current Assets",
+        "subcategory": "Property, Plant and Equipment"
+      },
+      "expected": {
+        "l1": "Assets",
+        "l2": "Non-Current Assets",
+        "l3": "Property, Plant and Equipment"
+      },
+      "actual": {
+        "l1": "Assets",
+        "l2": "Non-Current Assets",
+        "l3": "Property, Plant and Equipment"
+      },
+      "renders_single_level": false
+    },
+    {
+      "case": "5. Sales",
+      "pass": true,
+      "stored": {
+        "type": "Income",
+        "category": "Revenue",
+        "subcategory": null
+      },
+      "expected": {
+        "l1": "Income",
+        "l2": "Revenue",
+        "l3": "Revenue"
+      },
+      "actual": {
+        "l1": "Income",
+        "l2": "Revenue",
+        "l3": "Revenue"
+      },
+      "renders_single_level": true
+    },
+    {
+      "case": "6. Advertising",
+      "pass": true,
+      "stored": {
+        "type": "Expense",
+        "category": "Operating Expenses",
+        "subcategory": null
+      },
+      "expected": {
+        "l1": "Expenses",
+        "l2": "Operating Expenses",
+        "l3": "Operating Expenses"
+      },
+      "actual": {
+        "l1": "Expenses",
+        "l2": "Operating Expenses",
+        "l3": "Operating Expenses"
+      },
+      "renders_single_level": true
+    }
+  ],
+  "phase_11_reclassification": {
+    "pass": true,
+    "was": "Non-Current Liabilities",
+    "now": "Current Liabilities",
+    "stored": {
+      "type": "Liability",
+      "category": "Current Liabilities",
+      "subcategory": "Related-party Payables"
+    }
+  },
+  "phase_4_invalid_rejected": [
+    {
+      "attempted": "Liability + Non-Current Assets",
+      "rejected": true,
+      "message": "Edge Function returned a non-2xx status code {\"version\":\"1.0\",\"code\":\"UNKNOWNPLATFORM_FAILED\",\"category\":\"UnknownPlatformError\",\"severity\":\"error\",\"businessMessage\":\"An unexpected platform error occurred.\",\"technicalMessage\":\"\\\"Non-Current Assets\\\" is not a valid classification for a Liability accou"
+    },
+    {
+      "attempted": "Asset + Current Liabilities",
+      "rejected": true,
+      "message": "Edge Function returned a non-2xx status code {\"version\":\"1.0\",\"code\":\"UNKNOWNPLATFORM_FAILED\",\"category\":\"UnknownPlatformError\",\"severity\":\"error\",\"businessMessage\":\"An unexpected platform error occurred.\",\"technicalMessage\":\"\\\"Current Liabilities\\\" is not a valid classification for a Asset account."
+    },
+    {
+      "attempted": "Expense + Current Assets",
+      "rejected": true,
+      "message": "Edge Function returned a non-2xx status code {\"version\":\"1.0\",\"code\":\"UNKNOWNPLATFORM_FAILED\",\"category\":\"UnknownPlatformError\",\"severity\":\"error\",\"businessMessage\":\"An unexpected platform error occurred.\",\"technicalMessage\":\"\\\"Current Assets\\\" is not a valid classification for a Expense account. Ch"
+    },
+    {
+      "attempted": "Liability + NULL",
+      "rejected": true,
+      "message": "Edge Function returned a non-2xx status code {\"version\":\"1.0\",\"code\":\"VALIDATION_FAILED\",\"category\":\"ValidationError\",\"severity\":\"error\",\"businessMessage\":\"Some information is missing or invalid. Please review and try again.\",\"technicalMessage\":\"Classification is required for a Liability account.\",\""
+    },
+    {
+      "attempted": "Asset + Current Assets + Property, Plant and Equipment",
+      "rejected": true,
+      "message": "Edge Function returned a non-2xx status code {\"version\":\"1.0\",\"code\":\"UNKNOWNPLATFORM_FAILED\",\"category\":\"UnknownPlatformError\",\"severity\":\"error\",\"businessMessage\":\"An unexpected platform error occurred.\",\"technicalMessage\":\"\\\"Property, Plant and Equipment\\\" is not a valid statement line for Curren"
+    }
+  ],
+  "phase_12_integrity": {
+    "totals_unchanged": true,
+    "balanced_before": true,
+    "balanced_after": true,
+    "totals_before": {
+      "opening_debit": 0,
+      "opening_credit": 0,
+      "period_debit": 0,
+      "period_credit": 0,
+      "closing_debit": 0,
+      "closing_credit": 0
+    },
+    "totals_after": {
+      "opening_debit": 0,
+      "opening_credit": 0,
+      "period_debit": 0,
+      "period_credit": 0,
+      "closing_debit": 0,
+      "closing_credit": 0
+    }
+  },
+  "cleanup": [
+    {
+      "label": "1. Accounts Payable",
+      "deleted": true,
+      "detail": ""
+    },
+    {
+      "label": "2. Shareholders Loan",
+      "deleted": true,
+      "detail": ""
+    },
+    {
+      "label": "3. Inventory",
+      "deleted": true,
+      "detail": ""
+    },
+    {
+      "label": "4. Computer Equipment",
+      "deleted": true,
+      "detail": ""
+    },
+    {
+      "label": "5. Sales",
+      "deleted": true,
+      "detail": ""
+    },
+    {
+      "label": "6. Advertising",
+      "deleted": true,
+      "detail": ""
+    }
+  ],
+  "overall_pass": true
+}

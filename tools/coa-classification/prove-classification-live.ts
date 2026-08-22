@@ -10,7 +10,7 @@
  *   npx tsx tools/coa-classification/prove-classification-live.ts
  *   npx tsx tools/coa-classification/prove-classification-live.ts --keep
  *
- * Writes tests/e2e/artifacts/coa-classification-proof.json
+ * Writes tests/e2e/evidence/coa-classification/coa-classification-proof.json
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -18,7 +18,8 @@ import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { loadE2EEnv } from '../../tests/e2e/playwright/env';
 
 const KEEP = process.argv.includes('--keep');
-const OUT_DIR = path.join(process.cwd(), 'tests/e2e/artifacts');
+// NOT tests/e2e/artifacts — Playwright clears that directory on every run.
+const OUT_DIR = path.join(process.cwd(), 'tests/e2e/evidence/coa-classification');
 const OUT = path.join(OUT_DIR, 'coa-classification-proof.json');
 
 // Deliberately high, unused numbers so nothing collides with a real account.

@@ -502,7 +502,12 @@ test.describe('Chart of Accounts — full UI CRUD workflow', () => {
     await expect(page.getByRole('heading', { name: /add new account/i })).toBeVisible();
 
     await page.getByPlaceholder('e.g., Checking Account').fill(name);
-    // Type defaults to "Asset" — name is the only required field.
+    // Type defaults to "Asset". Classification is mandatory — the Chart of
+    // Accounts owns where the account presents in the Trial Balance and the
+    // financial statements, and the system must not decide current vs
+    // non-current on the customer's behalf.
+    await page.getByRole('combobox').filter({ hasText: /select a classification/i }).first().click();
+    await page.getByRole('option', { name: 'Current Assets', exact: true }).click();
     await page.getByRole('button', { name: /save account/i }).click();
 
     await expect(page.getByRole('dialog')).toBeHidden({ timeout: 20_000 });
@@ -513,6 +518,10 @@ test.describe('Chart of Accounts — full UI CRUD workflow', () => {
     await waitForRouteSettled(page);
     await page.getByPlaceholder(/search by name or number/i).fill(name);
     await expect(page.getByRole('cell', { name, exact: true })).toBeVisible({ timeout: 20_000 });
+    // The chosen classification is stored and displayed, never re-derived.
+    await expect(
+      page.getByRole('row').filter({ hasText: name }).getByText('Current Assets'),
+    ).toBeVisible({ timeout: 20_000 });
 
     expect(diagnostics.failedRequests, diagnostics.failedRequests.join('\n')).toEqual([]);
     expect(diagnostics.pageErrors, diagnostics.pageErrors.join('\n')).toEqual([]);
