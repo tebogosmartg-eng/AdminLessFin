@@ -7,13 +7,14 @@
     "logo_url": "https://zaulhnpohrgqqodvzhxp.supabase.co/storage/v1/object/public/attachments/3cbfd4eb-a095-43f3-837a-0b4f1e2c1752/logo-1785228804345.png",
     "owner_id": "3cbfd4eb-a095-43f3-837a-0b4f1e2c1752",
     "created_at": "2025-11-06T04:26:35.470798+00:00",
+    "default_quote_terms": null,
     "default_invoice_notes": "E2E QA terms 1785296801601 — payment due 30 days",
     "user_role": "owner"
   },
   "out": [
     {
       "finding": "4 products",
-      "existing": 6,
+      "existing": 4,
       "create_service": {
         "label": "service",
         "status": 200,
@@ -82,27 +83,27 @@
       "db_rows": 500,
       "db_actions": [
         "products:INSERT",
+        "quotes:DELETE",
+        "quote_items:INSERT",
+        "quote_items:DELETE",
+        "quotes:UPDATE",
+        "quotes:INSERT",
         "journal_entries:INSERT",
         "journal_entry_items:INSERT",
+        "invoices:UPDATE",
+        "invoices:INSERT",
         "bills:UPDATE",
         "bills:INSERT",
+        "products:DELETE",
         "chart_of_accounts:UPDATE",
-        "invoices:INSERT",
-        "invoices:UPDATE",
         "inventory_transactions:INSERT",
         "products:UPDATE",
         "payroll_runs:UPDATE",
         "fixed_assets:UPDATE",
         "payslips:UPDATE",
-        "payslips:INSERT",
-        "payroll_runs:INSERT",
-        "employees:EMPLOYEE_NUMBER_GENERATED",
-        "employees:INSERT",
-        "journal_entries:UPDATE",
-        "quote_items:INSERT",
-        "quotes:INSERT"
+        "payslips:INSERT"
       ],
-      "newest": "2026-08-22T10:18:34.90482+00:00"
+      "newest": "2026-08-22T10:52:57.066289+00:00"
     },
     {
       "finding": "17/18 supplier statement",
@@ -111,10 +112,15 @@
       "details_keys": [
         "vendor",
         "statement",
-        "opening_balance"
+        "opening_balance",
+        "ageing"
       ],
-      "ap_rows": 0,
-      "ap_row_keys": [],
+      "ap_rows": 4,
+      "ap_row_keys": [
+        "vendor_id",
+        "vendor_name",
+        "balance"
+      ],
       "has_ageing_buckets": false
     },
     {

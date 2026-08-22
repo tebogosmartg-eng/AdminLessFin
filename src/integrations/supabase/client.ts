@@ -12,6 +12,7 @@
 import { createClient } from '@supabase/supabase-js';
 import type { Database } from './database.types';
 import { installReadCoalescing } from './coalesceReads';
+import { installEdgeErrorResolution } from './resolveEdgeErrors';
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
@@ -41,5 +42,13 @@ export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABL
  * cached, so data freshness is unchanged.
  */
 installReadCoalescing(supabase);
+
+/**
+ * Replaces the opaque "Edge Function returned a non-2xx status code" message
+ * with the server's own diagnosis, once, for every caller (see
+ * ./resolveEdgeErrors). Installed AFTER coalescing so it wraps the outermost
+ * invoke and therefore also sees errors from coalesced reads.
+ */
+installEdgeErrorResolution(supabase);
 
 export type { Database };

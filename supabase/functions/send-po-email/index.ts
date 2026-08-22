@@ -48,10 +48,6 @@ serve(withEnterprisePlatform('send-po-email', 'tenant', async (req, _ctx) => {
       _ctx.companyId = companyId;
     };
 
-    if (!RESEND_API_KEY || !RESEND_DOMAIN) {
-      throw new Error("Email service is not configured. Please set RESEND_API_KEY and RESEND_DOMAIN secrets.");
-    }
-
     const { poId, to, subject, body } = await req.json();
     if (!poId || !to || !subject || !body) {
       throw new Error("Missing required parameters.");
@@ -77,7 +73,7 @@ serve(withEnterprisePlatform('send-po-email', 'tenant', async (req, _ctx) => {
         )
       `)
       .eq('id', poId)
-      .single();
+      .maybeSingle();
 
     if (poError) throw poError;
     if (!po) throw new Error("Purchase order not found.");
@@ -144,6 +140,17 @@ serve(withEnterprisePlatform('send-po-email', 'tenant', async (req, _ctx) => {
       </html>
     `;
 
+    // Configuration is checked immediately before the send, not on entry.
+    // Checking it first made a missing secret mask every real problem
+    // behind it - a bad recipient or an unknown quote reported itself as
+    // "email service is not configured".
+    if (!RESEND_API_KEY || !RESEND_DOMAIN) {
+      throw new Error(
+        'Email service is not configured. Set the RESEND_API_KEY and RESEND_DOMAIN ' +
+        'secrets on the Supabase project to enable sending.'
+      );
+    }
+
     const resendResponse = await fetch('https://api.resend.com/emails', {
       method: 'POST',
       headers: {
@@ -158,12 +165,17 @@ serve(withEnterprisePlatform('send-po-email', 'tenant', async (req, _ctx) => {
       }),
     });
 
+    const resendBody = await resendResponse.json().catch(() => ({}));
     if (!resendResponse.ok) {
-      const errorBody = await resendResponse.json();
-      throw new Error(`Failed to send email: ${errorBody.message || 'Unknown error'}`);
+      throw new Error(
+        `Failed to send email: ${(resendBody as { message?: string }).message || 'Unknown error'}`
+      );
     }
 
-    return new Response(JSON.stringify({ message: "PO sent successfully." }), {
+    return new Response(JSON.stringify({
+      message: "PO sent successfully.",
+      providerMessageId: (resendBody as { id?: string }).id ?? null,
+    }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 200,
     });

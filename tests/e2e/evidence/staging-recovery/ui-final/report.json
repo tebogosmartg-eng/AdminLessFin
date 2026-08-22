@@ -1,0 +1,48 @@
+{
+  "company": "Spaceman",
+  "results": [
+    {
+      "route": "/general-ledger",
+      "renders_expected_content": false,
+      "error_boundary": false,
+      "posting_blocked_banner": false,
+      "failed_calls": []
+    },
+    {
+      "route": "/accounting/account-activity",
+      "renders_expected_content": false,
+      "error_boundary": false,
+      "posting_blocked_banner": false,
+      "failed_calls": []
+    },
+    {
+      "route": "/accounting/audit-trail",
+      "renders_expected_content": true,
+      "error_boundary": false,
+      "posting_blocked_banner": false,
+      "failed_calls": []
+    },
+    {
+      "route": "/financial-statements",
+      "renders_expected_content": true,
+      "error_boundary": false,
+      "posting_blocked_banner": false,
+      "failed_calls": []
+    },
+    {
+      "route": "/bills",
+      "renders_expected_content": true,
+      "error_boundary": false,
+      "posting_blocked_banner": false,
+      "failed_calls": []
+    },
+    {
+      "route": "/reconciliation",
+      "renders_expected_content": true,
+      "error_boundary": false,
+      "posting_blocked_banner": false,
+      "failed_calls": []
+    }
+  ],
+  "console_errors": []
+}

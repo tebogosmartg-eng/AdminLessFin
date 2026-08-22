@@ -24,8 +24,11 @@ const CompanySwitcher = () => {
   const handleSwitch = async (companyId: string) => {
     try {
       await switchCompany(companyId);
-    } catch {
-      showError('Could not switch company. Please try again.');
+    } catch (error) {
+      // Report what actually failed. The edge client resolves the opaque
+      // transport message to the server's own diagnosis before it reaches here.
+      const message = error instanceof Error ? error.message : '';
+      showError(message.trim() || 'Could not switch company. Please try again.');
     }
   };
 
