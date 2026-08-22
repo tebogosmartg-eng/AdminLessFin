@@ -128,6 +128,47 @@ describe('Edge Function error resolution at the client boundary', () => {
     expect(error.message).toBe('VAT account is not configured.');
   });
 
+  it('prefers the technical cause when the platform could not classify the failure', async () => {
+    // A bare `throw new Error(...)` in an edge function becomes
+    // UnknownPlatformError, whose businessMessage is a fixed placeholder.
+    // Showing it would swap one opaque string for another.
+    const { client } = makeGetterClient(async () => ({
+      data: null,
+      error: edgeError(
+        envelope({
+          category: 'UnknownPlatformError',
+          code: 'UNKNOWNPLATFORM_FAILED',
+          businessMessage: 'An unexpected platform error occurred.',
+          technicalMessage:
+            'Email service is not configured. Set the RESEND_API_KEY and RESEND_DOMAIN secrets.',
+        }),
+        500,
+      ),
+    }));
+    installEdgeErrorResolution(client as never);
+
+    const { error } = await (client as never as { functions: { invoke: (f: string) => Promise<{ error: Error }> } })
+      .functions.invoke('send-quote-email');
+
+    expect(error.message).toBe(
+      'Email service is not configured. Set the RESEND_API_KEY and RESEND_DOMAIN secrets.',
+    );
+    expect(error.message).not.toBe('An unexpected platform error occurred.');
+  });
+
+  it('keeps a real business message for a classified failure', async () => {
+    const { client } = makeGetterClient(async () => ({
+      data: null,
+      error: edgeError(envelope({ category: 'ValidationError' })),
+    }));
+    installEdgeErrorResolution(client as never);
+
+    const { error } = await (client as never as { functions: { invoke: (f: string) => Promise<{ error: Error }> } })
+      .functions.invoke('invoices');
+
+    expect(error.message).toBe('Unable to post invoice: Accounts Receivable account is required.');
+  });
+
   it('leaves an already-specific message untouched', async () => {
     const network = new Error('Failed to send a request to the Edge Function');
     const { client } = makeGetterClient(async () => ({ data: null, error: network }));

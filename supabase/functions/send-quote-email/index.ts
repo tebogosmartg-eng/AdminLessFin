@@ -189,6 +189,23 @@ serve(withEnterprisePlatform('send-quote-email', 'tenant', async (req, _ctx) => 
     });
 
   } catch (error) {
+    // A missing mail configuration is a known, actionable condition, not an
+    // unclassified server fault. Left to the default classifier it becomes
+    // UnknownPlatformError, whose business message ("An unexpected platform
+    // error occurred.") tells the customer nothing and hides the one sentence
+    // that would let an administrator fix it.
+    const raw = error instanceof Error ? error.message : String(error);
+    if (raw.includes('RESEND_API_KEY') || raw.includes('RESEND_DOMAIN')) {
+      return edgeFailure(_ctx, error, {
+        category: 'IntegrationError',
+        code: 'EMAIL_NOT_CONFIGURED',
+        businessMessage:
+          'Email sending is not set up for this workspace yet, so the message was not sent.',
+        recoverySuggestion:
+          'Ask your administrator to set the RESEND_API_KEY and RESEND_DOMAIN secrets on the Supabase project.',
+        retryable: false,
+      });
+    }
     return edgeFailure(_ctx, error);
   }
 }))
