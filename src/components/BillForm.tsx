@@ -28,7 +28,9 @@ import { projectsQuery, taxRatesQuery } from '../lib/queries';
 import { useDialogFormReset } from '../hooks/useDialogFormReset';
 import {
   findAccountByRole,
+  manuallyPostableAccounts,
   resolveControlAccounts,
+  restrictedToModule,
 } from '../lib/accounting/accountRoles';
 
 const billItemSchema = z.object({
@@ -121,10 +123,17 @@ const BillForm = ({ isOpen, setIsOpen, billId, duplicateFromId, initialData, onS
   const expenseAccounts = useMemo(() => accounts?.filter(a => a.type === 'Expense'), [accounts]);
   const assetAccounts = useMemo(() => accounts?.filter(a => a.type === 'Asset'), [accounts]);
   const apAccounts = useMemo(() => accounts?.filter(a => a.type === 'Liability'), [accounts]);
+  // A bill may not post to an account the Accounting Policy Engine reserves to
+  // the Inventory or Fixed Assets module — it rejects the posting with
+  // "may only be posted from the Inventory module". Offering such an account
+  // here guaranteed a failure the customer could not anticipate, so the picker
+  // shows only what a bill can legitimately post to. The database rule is
+  // unchanged and remains the authority.
   const lineAccountOptions = useMemo(
-    () => [...(expenseAccounts || []), ...(assetAccounts || [])],
+    () => manuallyPostableAccounts([...(expenseAccounts || []), ...(assetAccounts || [])]),
     [expenseAccounts, assetAccounts],
   );
+  const noPostableAccounts = !!accounts && lineAccountOptions.length === 0;
 
   const { fields, append, remove } = useFieldArray({ control: form.control, name: "items" });
   const { data: products } = useQuery<Product[]>({
@@ -271,13 +280,13 @@ const BillForm = ({ isOpen, setIsOpen, billId, duplicateFromId, initialData, onS
     if (product) {
       form.setValue(`items.${index}.description`, product.description || product.name);
       form.setValue(`items.${index}.unit_cost`, product.cost || 0);
-      if (product.type === 'inventory') {
-        const inventoryAssetAccount = findAccountByRole(assetAccounts, 'inventory_asset');
-        if (inventoryAssetAccount) {
-          form.setValue(`items.${index}.expense_account_id`, inventoryAssetAccount.id);
-        }
-      } else if (product.cogs_account_id) {
-        form.setValue(`items.${index}.expense_account_id`, product.cogs_account_id);
+      // Only assign an account the bill can actually post to. The inventory
+      // asset and COGS accounts belong to the Inventory module; assigning them
+      // here produced a policy rejection at save time.
+      const assignable = (id: string | null | undefined) =>
+        !!id && lineAccountOptions.some((a) => a.id === id);
+      if (product.type !== 'inventory' && assignable(product.cogs_account_id)) {
+        form.setValue(`items.${index}.expense_account_id`, product.cogs_account_id!);
       }
     }
   };
@@ -379,6 +388,17 @@ const BillForm = ({ isOpen, setIsOpen, billId, duplicateFromId, initialData, onS
           <DialogTitle>{isEditing ? 'Edit Bill' : isDuplicating ? 'Duplicate Bill' : 'Record New Bill'}</DialogTitle>
           <DialogDescription>Enter the supplier invoice details below.</DialogDescription>
         </DialogHeader>
+        {noPostableAccounts && (
+          <Alert variant="destructive">
+            <AlertDescription>
+              This company has no expense or asset account a bill can post to.
+              {accounts?.some((a) => restrictedToModule(a))
+                ? ' The only candidates are reserved to the Inventory or Fixed Assets module.'
+                : ''}{' '}
+              Add an operating expense account in the Chart of Accounts, then record this bill.
+            </AlertDescription>
+          </Alert>
+        )}
         {!findAccountByRole(accounts, 'trade_payable') && (
             <Alert variant="destructive"><AlertDescription>Warning: You don't have a Trade Payables control account. Please assign account_role trade_payable in your Chart of Accounts (Type: Liability).</AlertDescription></Alert>
         )}

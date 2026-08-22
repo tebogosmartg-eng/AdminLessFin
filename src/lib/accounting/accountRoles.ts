@@ -250,3 +250,41 @@ export function roleForTemplateCode(code: string, tax?: string | null): AccountR
   if (tax && TAX_TREATMENT_TO_ROLE[tax]) return TAX_TREATMENT_TO_ROLE[tax];
   return CODE_TO_ROLE[code];
 }
+
+/**
+ * Accounts the Accounting Policy Engine reserves to a specific module.
+ *
+ * Mirrors the `inventory_module_only` and `depreciation_module_only` evaluation
+ * hooks in migration 20260729120000_coa_account_role_metadata.sql, which reject
+ * a posting whose lines touch these roles from any other module:
+ *
+ *   inventory_asset, cogs                      -> Inventory module
+ *   depreciation_expense, accumulated_depreciation -> Fixed Assets module
+ *
+ * Offering these in a Bill or Invoice account picker guarantees a rejected
+ * posting the customer cannot predict, so pickers use this to filter. This
+ * ENFORCES the control at the point of choice — it never bypasses it; the
+ * database remains the authority and still rejects the posting.
+ */
+export const MODULE_RESTRICTED_ACCOUNT_ROLES: Record<string, AccountRole[]> = {
+  Inventory: ['inventory_asset', 'cogs'],
+  'Fixed Assets': ['depreciation_expense', 'accumulated_depreciation'],
+};
+
+/** The module that exclusively owns this account, or null when freely postable. */
+export function restrictedToModule(account: AccountRoleMetadata): string | null {
+  const role = (account.account_role as AccountRole | null) ?? inferAccountRole(account);
+  if (!role) return null;
+  for (const [module, roles] of Object.entries(MODULE_RESTRICTED_ACCOUNT_ROLES)) {
+    if (roles.includes(role)) return module;
+  }
+  return null;
+}
+
+/** Accounts a manually-entered document (Bill, Invoice, Journal) may post to. */
+export function manuallyPostableAccounts<T extends AccountRoleMetadata>(
+  accounts: T[] | undefined | null,
+): T[] {
+  if (!accounts?.length) return [];
+  return accounts.filter((a) => isActive(a) && !restrictedToModule(a));
+}
