@@ -1,0 +1,122 @@
+{
+  "at": "2026-08-22T11:56:29.938Z",
+  "company": "Spaceman",
+  "login": {
+    "landed": "/",
+    "stillThere": "/",
+    "afterReload": "/"
+  },
+  "sweep": [
+    {
+      "route": "/chart-of-accounts",
+      "renders": true,
+      "error_boundary": false,
+      "opaque_message_on_screen": false,
+      "failed_calls": [],
+      "edge_calls": 5,
+      "looping": []
+    },
+    {
+      "route": "/quotes",
+      "renders": true,
+      "error_boundary": false,
+      "opaque_message_on_screen": false,
+      "failed_calls": [],
+      "edge_calls": 9,
+      "looping": []
+    },
+    {
+      "route": "/invoices",
+      "renders": true,
+      "error_boundary": false,
+      "opaque_message_on_screen": false,
+      "failed_calls": [],
+      "edge_calls": 11,
+      "looping": []
+    },
+    {
+      "route": "/bills",
+      "renders": true,
+      "error_boundary": false,
+      "opaque_message_on_screen": false,
+      "failed_calls": [],
+      "edge_calls": 12,
+      "looping": []
+    },
+    {
+      "route": "/vendors",
+      "renders": true,
+      "error_boundary": false,
+      "opaque_message_on_screen": false,
+      "failed_calls": [],
+      "edge_calls": 5,
+      "looping": []
+    },
+    {
+      "route": "/banking",
+      "renders": true,
+      "error_boundary": false,
+      "opaque_message_on_screen": false,
+      "failed_calls": [],
+      "edge_calls": 10,
+      "looping": []
+    },
+    {
+      "route": "/reconciliation",
+      "renders": true,
+      "error_boundary": false,
+      "opaque_message_on_screen": false,
+      "failed_calls": [],
+      "edge_calls": 5,
+      "looping": []
+    },
+    {
+      "route": "/general-ledger",
+      "renders": true,
+      "error_boundary": false,
+      "opaque_message_on_screen": false,
+      "failed_calls": [],
+      "edge_calls": 5,
+      "looping": []
+    },
+    {
+      "route": "/trial-balance",
+      "renders": true,
+      "error_boundary": false,
+      "opaque_message_on_screen": false,
+      "failed_calls": [],
+      "edge_calls": 5,
+      "looping": []
+    },
+    {
+      "route": "/accounting/audit-trail",
+      "renders": true,
+      "error_boundary": false,
+      "opaque_message_on_screen": false,
+      "failed_calls": [],
+      "edge_calls": 5,
+      "looping": []
+    },
+    {
+      "route": "/financial-statements",
+      "renders": true,
+      "error_boundary": false,
+      "opaque_message_on_screen": false,
+      "failed_calls": [],
+      "edge_calls": 7,
+      "looping": []
+    }
+  ],
+  "errorUx": {
+    "toastText": "Function Error: An unexpected platform error occurred.",
+    "opaqueShown": false,
+    "realShown": false
+  },
+  "consoleErrors": [],
+  "failedCalls": [
+    {
+      "fn": "send-quote-email",
+      "status": 500
+    }
+  ]
+}

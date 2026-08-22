@@ -1,0 +1,168 @@
+{
+  "company": "Spaceman",
+  "at": "2026-08-22T11:49:11.834Z",
+  "before": {
+    "dr": 353978894,
+    "cr": 353978894,
+    "diff": 0,
+    "journals": 211
+  },
+  "after": {
+    "dr": 354338894,
+    "cr": 354338894,
+    "diff": 0,
+    "journals": 217
+  },
+  "results": [
+    {
+      "n": 1,
+      "item": "Chart of Accounts",
+      "result": "PASS",
+      "evidence": "34 accounts, 14 without a classification"
+    },
+    {
+      "n": 2,
+      "item": "Customer creation",
+      "result": "PASS",
+      "evidence": "id=b90e04de-814c-481e-8ae9-0579a222f203"
+    },
+    {
+      "n": 3,
+      "item": "Supplier creation",
+      "result": "PASS",
+      "evidence": "id=d2279c6f-89bc-4b36-ae4d-b46533b19a3b"
+    },
+    {
+      "n": 4,
+      "item": "Product creation",
+      "result": "PASS",
+      "evidence": "id=82e15c25-853f-420b-9785-76ce1297c169"
+    },
+    {
+      "n": 5,
+      "item": "Quotation creation",
+      "result": "PASS",
+      "evidence": "id=70f6c0c7-0754-4851-843f-76b30292e9f6, terms persisted"
+    },
+    {
+      "n": 6,
+      "item": "Quotation email",
+      "result": "BLOCKED",
+      "evidence": "reaches the provider boundary; RESEND_API_KEY/RESEND_DOMAIN not set on the project"
+    },
+    {
+      "n": 7,
+      "item": "Sales Invoice",
+      "result": "PASS",
+      "evidence": "id=ea334b61-e353-41ef-b803-4097690dff87"
+    },
+    {
+      "n": 8,
+      "item": "Invoice journal",
+      "result": "PASS",
+      "evidence": "Dr=1000 Cr=1000 diff=0c"
+    },
+    {
+      "n": 9,
+      "item": "Purchase Order",
+      "result": "PASS",
+      "evidence": "id=2f87a90b-19f7-480b-b0f5-ee242cb9462b"
+    },
+    {
+      "n": 10,
+      "item": "Direct Bill",
+      "result": "PASS",
+      "evidence": "id=6d0c329c-6f5c-431c-9e47-e10c6f01f40f journal=e395ff8a-28d4-4a9a-a605-a56ead0246ba"
+    },
+    {
+      "n": 11,
+      "item": "PO to Bill",
+      "result": "PASS",
+      "evidence": "id=71ce185e-f0dd-4160-a01f-31434360e374 journal=f719ee27-5b71-4060-bb50-fe4a73221939"
+    },
+    {
+      "n": 12,
+      "item": "Bill payment",
+      "result": "PASS",
+      "evidence": "R100 recorded against the bill"
+    },
+    {
+      "n": 13,
+      "item": "Bill void",
+      "result": "PASS",
+      "evidence": "supplier balance 900 -> 400 (voided bill no longer owed)"
+    },
+    {
+      "n": 14,
+      "item": "Supplier statement",
+      "result": "PASS",
+      "evidence": "1 open bills, AP control balance 400"
+    },
+    {
+      "n": 15,
+      "item": "Supplier ageing",
+      "result": "PASS",
+      "evidence": "buckets: current, days_1_30, days_31_60, days_61_90, days_120_plus | total=500 unallocated=-100"
+    },
+    {
+      "n": 16,
+      "item": "Bank account",
+      "result": "PASS",
+      "evidence": "11 bank accounts"
+    },
+    {
+      "n": 17,
+      "item": "Bank transaction",
+      "result": "PASS",
+      "evidence": "edge returned 11, database holds 12"
+    },
+    {
+      "n": 18,
+      "item": "Statement lines",
+      "result": "PASS",
+      "evidence": "edge returned 0, database holds 0"
+    },
+    {
+      "n": 19,
+      "item": "Reconciliation",
+      "result": "PASS",
+      "evidence": "38 transactions to reconcile"
+    },
+    {
+      "n": 20,
+      "item": "General Ledger",
+      "result": "PASS",
+      "evidence": "50 ledger rows"
+    },
+    {
+      "n": 21,
+      "item": "Account Activity",
+      "result": "PASS",
+      "evidence": "50 activities, total=74"
+    },
+    {
+      "n": 22,
+      "item": "Trial Balance",
+      "result": "PASS",
+      "evidence": "19 rows, closing Dr=1508113.81 Cr=1508113.81 diff=0c, 0 mis-classified"
+    },
+    {
+      "n": 23,
+      "item": "Live Financial Statements",
+      "result": "PASS",
+      "evidence": "generated without a posting-readiness gate (8 sections)"
+    },
+    {
+      "n": 24,
+      "item": "Audit Trail",
+      "result": "PASS",
+      "evidence": "25 records on page 1 of 1627 total"
+    },
+    {
+      "n": 0,
+      "item": "Ledger integrity after suite",
+      "result": "PASS",
+      "evidence": "debits - credits = 0c"
+    }
+  ]
+}
