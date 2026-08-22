@@ -38,6 +38,7 @@ type TbRow = {
   hierarchy_l1: string;
   hierarchy_l2: string;
   hierarchy_l3: string;
+  classification_required?: boolean;
   normal_balance: string;
 };
 
@@ -99,6 +100,7 @@ const TrialBalance = () => {
   const handleExport = () => {
     downloadCSV(rows.map((r) => ({
       L1: r.hierarchy_l1, L2: r.hierarchy_l2, L3: r.hierarchy_l3,
+      ClassificationRequired: r.classification_required ? 'Yes' : 'No',
       AccountNumber: r.account_number, AccountName: r.account_name,
       OpeningDebit: r.opening_debit, OpeningCredit: r.opening_credit,
       PeriodDebit: r.period_debit, PeriodCredit: r.period_credit,
@@ -106,6 +108,11 @@ const TrialBalance = () => {
       NetMovement: r.net_movement,
     })), `trial-balance-hierarchical-${endDate}.csv`);
   };
+
+  const unclassifiedCount = useMemo(
+    () => rows.filter((r) => r.classification_required).length,
+    [rows],
+  );
 
   // Visual group subtotals only — presentation of displayed TB rows (not accounting authority).
   // Accounting totals (balanced / closing DR/CR) come from response.totals + CFA on the edge.
@@ -127,6 +134,19 @@ const TrialBalance = () => {
           <Button variant="outline" onClick={handleExport} disabled={!rows.length}><Download className="mr-2 h-4 w-4" /> Export</Button>
         </div>
       </div>
+
+      {unclassifiedCount > 0 && (
+        <div className="rounded-md border border-destructive/40 bg-destructive/5 px-4 py-3 text-sm flex flex-wrap items-center gap-3">
+          <span className="flex-1">
+            <strong>{unclassifiedCount}</strong> {unclassifiedCount === 1 ? 'account has' : 'accounts have'} no
+            classification, so {unclassifiedCount === 1 ? 'it groups' : 'they group'} under &ldquo;Classification
+            Required&rdquo; rather than under a current or non-current heading. Balances are unaffected.
+          </span>
+          <Button asChild size="sm" variant="outline">
+            <Link to="/chart-of-accounts?classification=required">Classify in Chart of Accounts</Link>
+          </Button>
+        </div>
+      )}
 
       <Card>
         <CardHeader className="pb-3">
@@ -197,13 +217,20 @@ const TrialBalance = () => {
                           </button>
                           {isOpen(l2Key) && Object.entries(l3map).map(([l3, accounts]) => {
                             const l3Key = `${l2Key}/${l3}`;
+                            // The classification appears exactly once. When an
+                            // account carries no statement line the edge returns
+                            // l3 === l2, and we render the accounts directly
+                            // rather than repeating the heading under itself.
+                            const isRedundantLevel = l3 === l2;
                             return (
                               <div key={l3Key} className="ml-4">
-                                <button type="button" onClick={() => toggle(l3Key)} className="w-full flex items-center gap-2 px-2 py-1 text-xs text-muted-foreground hover:bg-accent/40 rounded">
-                                  {isOpen(l3Key) ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
-                                  <span className="flex-1 text-left">{l3}</span>
-                                </button>
-                                {isOpen(l3Key) && accounts.map((r) => (
+                                {!isRedundantLevel && (
+                                  <button type="button" onClick={() => toggle(l3Key)} className="w-full flex items-center gap-2 px-2 py-1 text-xs text-muted-foreground hover:bg-accent/40 rounded">
+                                    {isOpen(l3Key) ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
+                                    <span className="flex-1 text-left">{l3}</span>
+                                  </button>
+                                )}
+                                {(isRedundantLevel || isOpen(l3Key)) && accounts.map((r) => (
                                   <div key={r.account_id}>
                                     <button
                                       type="button"
@@ -217,6 +244,9 @@ const TrialBalance = () => {
                                       <div>
                                         <span className="font-mono text-xs mr-2">{r.account_number}</span>
                                         <span className="font-medium">{r.account_name}</span>
+                                        {r.classification_required && (
+                                          <Badge variant="destructive" className="ml-2 text-[10px]">Classification required</Badge>
+                                        )}
                                       </div>
                                       <div className="text-right font-mono text-xs">{r.opening_debit ? formatCurrency(r.opening_debit) : ''}</div>
                                       <div className="text-right font-mono text-xs">{r.opening_credit ? formatCurrency(r.opening_credit) : ''}</div>

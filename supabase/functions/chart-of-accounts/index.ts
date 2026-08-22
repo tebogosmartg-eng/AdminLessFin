@@ -15,6 +15,10 @@ import {
   ACCOUNT_ROLES,
   SINGLETON_ACCOUNT_ROLES,
 } from '../_shared/chartOfAccounts/accountRoles.ts'
+import {
+  classificationError,
+  subclassificationError,
+} from '../_shared/chartOfAccounts/accountClassification.ts'
 
 
 const corsHeaders = ENTERPRISE_CORS_HEADERS
@@ -56,6 +60,36 @@ serve(withEnterprisePlatform('chart-of-accounts', 'tenant', async (req, _ctx) =>
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
     
+    /**
+     * Classification is authoritative accounting metadata, so it is enforced
+     * here as well as in the account form and by the database CHECK constraint.
+     * A type/classification pair that cannot present correctly (Liability +
+     * Fixed Asset, Expense + Current Assets, Liability with no current /
+     * non-current decision) is rejected before it reaches the table.
+     */
+    const assertClassification = (
+      next: Record<string, unknown>,
+      current?: { type?: string | null; category?: string | null } | null,
+    ) => {
+      const type = 'type' in next ? next.type : current?.type
+      const hasCategory = 'category' in next
+      const category = hasCategory ? next.category : current?.category
+
+      // A partial update that touches neither type nor classification leaves an
+      // already-unclassified legacy account as it is — the customer is prompted
+      // in the Chart of Accounts, not blocked from renaming the account.
+      if (!hasCategory && !('type' in next) && !current?.category) return
+
+      const categoryIssue = classificationError(type, category)
+      if (categoryIssue) throw new Error(categoryIssue)
+
+      const subIssue = subclassificationError(
+        category,
+        'subcategory' in next ? next.subcategory : undefined,
+      )
+      if (subIssue) throw new Error(subIssue)
+    }
+
     let data, error;
 
     switch (method) {
@@ -99,14 +133,17 @@ serve(withEnterprisePlatform('chart-of-accounts', 'tenant', async (req, _ctx) =>
         break;
       }
 
-      case 'POST':
+      case 'POST': {
         if (!isAdmin) throw new Error("Access Denied: Only Admins can create accounts.");
+        const accountData = body.accountData ?? {};
+        assertClassification(accountData, null);
         ({ data, error } = await supabaseAdmin
           .from('chart_of_accounts')
-          .insert({ ...body.accountData, company_id })
+          .insert({ ...accountData, company_id })
           .select()
           .single());
         break;
+      }
 
       case 'PUT': {
         if (!isAdmin) throw new Error("Access Denied: Only Admins can update accounts.");
@@ -116,7 +153,7 @@ serve(withEnterprisePlatform('chart-of-accounts', 'tenant', async (req, _ctx) =>
         // deactivation stay allowed. Gives a clean message instead of a raw 23xxx.
         const { data: current } = await supabaseAdmin
           .from('chart_of_accounts')
-          .select('system_account, type, account_role, control_account')
+          .select('system_account, type, account_role, control_account, category')
           .eq('id', body.accountId)
           .eq('company_id', company_id)
           .single();
@@ -137,6 +174,8 @@ serve(withEnterprisePlatform('chart-of-accounts', 'tenant', async (req, _ctx) =>
             }
           }
         }
+
+        assertClassification(body.accountData ?? {}, current);
 
         ({ data, error } = await supabaseAdmin
           .from('chart_of_accounts')

@@ -58,6 +58,8 @@ function mapSnapshot(row: RawReadinessRow): AccountingReadinessSnapshot {
       mappingsComplete: false,
       mandatoryControlAccounts: false,
       coaIntegrity: false,
+      accountsRequiringClassification: 0,
+      accountsRequiringClassificationNames: [],
       taxConfigurationExists: false,
       bankAccountOrSkipped: false,
       openingBalancesComplete: false,

@@ -138,6 +138,9 @@ export type AccountingReadinessSnapshot = AccountingReadinessRecord & {
     mappingsComplete: boolean;
     mandatoryControlAccounts: boolean;
     coaIntegrity: boolean;
+    /** Active accounts whose Chart of Accounts classification is missing or invalid. */
+    accountsRequiringClassification: number;
+    accountsRequiringClassificationNames: string[];
     taxConfigurationExists: boolean;
     bankAccountOrSkipped: boolean;
     openingBalancesComplete: boolean;

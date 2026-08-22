@@ -12,6 +12,10 @@ import {
   edgeFailure,
 } from '../_shared/enterpriseEdgePlatform.ts'
 import { loadCanonicalAggregation } from '../_shared/loadCanonicalAggregation.ts'
+import {
+  resolveAccountHierarchy,
+  hierarchySortKey,
+} from '../_shared/chartOfAccounts/accountClassification.ts'
 
 const corsHeaders = ENTERPRISE_CORS_HEADERS
 
@@ -514,7 +518,7 @@ serve(withEnterprisePlatform('accounting', 'tenant', async (req, _ctx) => {
           userSupabase.rpc('get_balances_as_of_date', { p_end_date: openingDate, p_company_id: company_id }),
           userSupabase.rpc('get_balances_as_of_date', { p_end_date: endDate, p_company_id: company_id }),
           supabaseAdmin.from('chart_of_accounts')
-            .select('id, account_number, name, type, normal_balance, control_account, is_active')
+            .select('id, account_number, name, type, normal_balance, control_account, is_active, category, subcategory')
             .eq('company_id', company_id)
             .order('account_number'),
         ]);
@@ -572,14 +576,19 @@ serve(withEnterprisePlatform('accounting', 'tenant', async (req, _ctx) => {
           const openSplit = split(openBal);
           const closeSplit = split(closeBal);
           const netMovement = closeBal - openBal;
+          const flatHierarchy = resolveAccountHierarchy(acc);
 
           return {
             account_id: acc.id,
             account_number: acc.account_number,
             account_name: acc.name,
             account_type: acc.type,
-            category: acc.type,
-            hierarchy: `${acc.type}`,
+            // Authoritative Chart of Accounts classification — never derived
+            // from the account name, code, number, balance, or activity.
+            category: acc.category ?? null,
+            subcategory: acc.subcategory ?? null,
+            classification_required: flatHierarchy.unclassified,
+            hierarchy: `${flatHierarchy.l1} / ${flatHierarchy.l2}`,
             normal_balance: normal,
             opening_debit: openSplit.debit,
             opening_credit: openSplit.credit,
@@ -1561,7 +1570,7 @@ serve(withEnterprisePlatform('accounting', 'tenant', async (req, _ctx) => {
           userSupabase.rpc('get_balances_as_of_date', { p_end_date: openingDate, p_company_id: company_id }),
           userSupabase.rpc('get_balances_as_of_date', { p_end_date: endDate, p_company_id: company_id }),
           supabaseAdmin.from('chart_of_accounts')
-            .select('id, account_number, name, type, normal_balance, control_account, is_active')
+            .select('id, account_number, name, type, normal_balance, control_account, is_active, category, subcategory')
             .eq('company_id', company_id)
             .order('account_number'),
         ]);
@@ -1587,35 +1596,14 @@ serve(withEnterprisePlatform('accounting', 'tenant', async (req, _ctx) => {
         const openingMap = Object.fromEntries((opening || []).map((a: any) => [a.id, Number(a.balance)]));
         const closingMap = Object.fromEntries((closing || []).map((a: any) => [a.id, Number(a.balance)]));
 
-        function classify(acc: any) {
-          const n = Number(acc.account_number) || 0;
-          const name = String(acc.name || '').toLowerCase();
-          const type = acc.type;
-          if (type === 'Asset') {
-            if (/cash|bank|petty/.test(name) || (n >= 1000 && n < 1200)) return { l1: 'Assets', l2: 'Current Assets', l3: 'Cash' };
-            if (/receivable|debtor|customer/.test(name) || (n >= 1200 && n < 1400)) return { l1: 'Assets', l2: 'Current Assets', l3: 'Receivables' };
-            if (/inventory|stock/.test(name) || (n >= 1400 && n < 1500)) return { l1: 'Assets', l2: 'Current Assets', l3: 'Inventory' };
-            if (/property|land|building/.test(name)) return { l1: 'Assets', l2: 'Non-current Assets', l3: 'Property' };
-            if (/equipment|vehicle|plant|furniture/.test(name)) return { l1: 'Assets', l2: 'Non-current Assets', l3: 'Equipment' };
-            if (/intangible|goodwill|patent|software/.test(name)) return { l1: 'Assets', l2: 'Non-current Assets', l3: 'Intangibles' };
-            if (n >= 1500) return { l1: 'Assets', l2: 'Non-current Assets', l3: 'Other Non-current' };
-            return { l1: 'Assets', l2: 'Current Assets', l3: 'Other Current' };
-          }
-          if (type === 'Liability') {
-            if (/long|non.?current|loan|mortgage|bond/.test(name) || n >= 2500) return { l1: 'Liabilities', l2: 'Non-current', l3: 'Non-current' };
-            return { l1: 'Liabilities', l2: 'Current', l3: 'Current' };
-          }
-          if (type === 'Equity') return { l1: 'Equity', l2: 'Equity', l3: 'Equity' };
-          if (type === 'Income') {
-            if (/other|interest|gain|sundry/.test(name)) return { l1: 'Income', l2: 'Other Income', l3: 'Other Income' };
-            return { l1: 'Income', l2: 'Operating Income', l3: 'Operating Income' };
-          }
-          // Expense
-          if (/salary|wage|payroll|employment|staff/.test(name)) return { l1: 'Expenses', l2: 'Employment Costs', l3: 'Employment Costs' };
-          if (/admin|office|rent|utility|insurance/.test(name)) return { l1: 'Expenses', l2: 'Administration', l3: 'Administration' };
-          if (/interest|finance|bank charge|fee/.test(name)) return { l1: 'Expenses', l2: 'Finance Costs', l3: 'Finance Costs' };
-          return { l1: 'Expenses', l2: 'Operating Expenses', l3: 'Operating Expenses' };
-        }
+        // Classification is read from the Chart of Accounts and nothing else.
+        // The previous implementation inferred the hierarchy from the account
+        // name and account number (e.g. any Liability matching /loan/ became
+        // "Non-current"), which disagreed with the Chart of Accounts and
+        // produced a duplicated "Non-current > Non-current" level. Both the
+        // inference and the duplication are gone: resolveAccountHierarchy reads
+        // type + category + subcategory, and returns l3 === l2 when the account
+        // carries no statement line, which consumers render as a single level.
 
         const rows = (accounts || []).map((acc: any) => {
           const openBal = openingMap[acc.id] ?? 0;
@@ -1627,7 +1615,7 @@ serve(withEnterprisePlatform('accounting', 'tenant', async (req, _ctx) => {
             : (bal >= 0 ? { debit: 0, credit: bal } : { debit: Math.abs(bal), credit: 0 });
           const openSplit = split(openBal);
           const closeSplit = split(closeBal);
-          const h = classify(acc);
+          const h = resolveAccountHierarchy(acc);
           return {
             account_id: acc.id,
             account_number: acc.account_number,
@@ -1646,9 +1634,23 @@ serve(withEnterprisePlatform('accounting', 'tenant', async (req, _ctx) => {
             hierarchy_l1: h.l1,
             hierarchy_l2: h.l2,
             hierarchy_l3: h.l3,
+            classification_required: h.unclassified,
+            category: acc.category ?? null,
+            subcategory: acc.subcategory ?? null,
+            hierarchy_sort: hierarchySortKey(acc),
           };
         }).filter((r: any) =>
           r.opening_debit || r.opening_credit || r.period_debit || r.period_credit || r.closing_debit || r.closing_credit
+        );
+
+        // Present classes in canonical statement order (Assets > Liabilities >
+        // Equity > Income > Expenses, current before non-current), then by
+        // statement line, then account number. Purely presentation — row values
+        // are untouched.
+        rows.sort((a: any, b: any) =>
+          (a.hierarchy_sort - b.hierarchy_sort) ||
+          String(a.hierarchy_l3).localeCompare(String(b.hierarchy_l3)) ||
+          (Number(a.account_number) - Number(b.account_number))
         );
 
         // Column sums of displayed rows = presentation only.

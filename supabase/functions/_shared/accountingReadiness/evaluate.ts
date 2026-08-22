@@ -60,6 +60,9 @@ export type ReadinessEvaluation = {
     mappingsComplete: boolean;
     mandatoryControlAccounts: boolean;
     coaIntegrity: boolean;
+    /** Active accounts whose Chart of Accounts classification is missing or invalid. */
+    accountsRequiringClassification: number;
+    accountsRequiringClassificationNames: string[];
     taxConfigurationExists: boolean;
     bankAccountOrSkipped: boolean;
     openingBalancesComplete: boolean;
@@ -181,6 +184,24 @@ function hasRole(accounts: CoaRow[], role: ControlAccountRole): boolean {
 // intentionally has no cross-file imports and edge functions bundle per-function.
 // Absence of this definition caused accounting-setup GET_STATUS/EVALUATE to 500
 // with "ReferenceError: normalBalanceFor is not defined".
+// Authoritative classification vocabulary per account type. Mirrors
+// _shared/chartOfAccounts/accountClassification.ts and the
+// chart_of_accounts_category_classification_check database constraint;
+// redefined locally because this module intentionally has no cross-file imports.
+const CLASSIFICATIONS_BY_TYPE: Record<string, string[]> = {
+  Asset: ['Current Assets', 'Non-Current Assets'],
+  Liability: ['Current Liabilities', 'Non-Current Liabilities'],
+  Equity: ['Equity'],
+  Income: ['Revenue', 'Other Income'],
+  Expense: ['Cost of Sales', 'Operating Expenses', 'Finance Costs', 'Taxation', 'Other Expenses'],
+};
+
+function accountNeedsClassification(account: CoaRow): boolean {
+  const allowed = CLASSIFICATIONS_BY_TYPE[String(account.type)] ?? [];
+  const category = typeof account.category === 'string' ? account.category.trim() : '';
+  return !category || !allowed.includes(category);
+}
+
 function normalBalanceFor(type: string): 'debit' | 'credit' {
   return type === 'Asset' || type === 'Expense' ? 'debit' : 'credit';
 }
@@ -294,6 +315,15 @@ export function evaluateAccountingReadiness(input: {
           ba.opening_balance == null,
       ));
 
+  // Reported so Accounting Setup can show exactly what is outstanding rather
+  // than asking a company with a valid chart to generate one. Deliberately NOT
+  // part of validationChecks: classification is presentation metadata, and an
+  // unclassified legacy account must not revoke a company's accounting
+  // readiness or block posting. It is surfaced as an item to attend to.
+  const accountsNeedingClassification = accounts.filter(
+    (a) => a.is_active !== false && accountNeedsClassification(a),
+  );
+
   const financialCalendarComplete = activeFinancialYear;
   const chartOfAccountsComplete =
     chartOfAccountsExists && mandatoryControlAccounts && coaIntegrity;
@@ -365,6 +395,10 @@ export function evaluateAccountingReadiness(input: {
       ...validationChecks,
       accountCount,
       mappingsComplete,
+      accountsRequiringClassification: accountsNeedingClassification.length,
+      accountsRequiringClassificationNames: accountsNeedingClassification
+        .map((a) => a.name)
+        .slice(0, 20),
       controlAccounts,
       missingControlAccounts,
       coaIntegrityErrors: integrity.errors,

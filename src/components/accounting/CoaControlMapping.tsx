@@ -28,6 +28,7 @@ import {
   SelectValue,
 } from '../ui/select';
 import { showError, showSuccess } from '../../utils/toast';
+import { countAccountsRequiringClassification } from '@/lib/accounting/accountClassification';
 
 type CoaControlMappingProps = {
   accounts: CoaRow[];
@@ -190,6 +191,8 @@ const CoaControlMapping = ({
     setPickingRole(null);
   };
 
+  const unclassifiedCount = countAccountsRequiringClassification(accounts);
+
   return (
     <div className="space-y-4">
       <Alert>
@@ -204,6 +207,23 @@ const CoaControlMapping = ({
             {' · '}
             Control accounts: {configuredCount} / {requiredCount} configured
             {attentionCount > 0 ? ` · ${attentionCount} still need attention` : ''}
+          </p>
+          <p className="text-sm">
+            Classification:{' '}
+            {unclassifiedCount === 0 ? (
+              <span>all accounts classified</span>
+            ) : (
+              <>
+                <span>
+                  {unclassifiedCount} account{unclassifiedCount === 1 ? '' : 's'} require
+                  {unclassifiedCount === 1 ? 's' : ''} classification
+                </span>
+                {' · '}
+                <Link className="underline" to="/chart-of-accounts?classification=required">
+                  Classify now
+                </Link>
+              </>
+            )}
           </p>
           <p className="text-xs text-muted-foreground">
             Existing accounts are not replaced. Clear matches are recognised automatically;

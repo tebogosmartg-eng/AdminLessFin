@@ -168,8 +168,14 @@ export function isTaxLedgerAccount(account: AccountRoleMetadata | null | undefin
   return !!role && VAT_ROLES.has(role);
 }
 
+// The Chart of Accounts classification is authoritative. Only an account the
+// customer has not classified yet falls back to role/subcategory metadata —
+// so an account explicitly classified Non-Current Assets is never also counted
+// as a current asset because of the statement line it carries.
 export function isCurrentAssetAccount(account: AccountRoleMetadata): boolean {
-  return account.category === 'Current Assets' || account.type === 'Asset' && (
+  if (account.category === 'Current Assets') return true;
+  if (account.category === 'Non-Current Assets') return false;
+  return account.type === 'Asset' && (
     account.subcategory === CASH_EQUIVALENT_SUBCATEGORY ||
     account.subcategory === 'Inventory' ||
     account.subcategory === 'Trade and Other Receivables' ||
@@ -180,7 +186,9 @@ export function isCurrentAssetAccount(account: AccountRoleMetadata): boolean {
 }
 
 export function isCurrentLiabilityAccount(account: AccountRoleMetadata): boolean {
-  return account.category === 'Current Liabilities' || (
+  if (account.category === 'Current Liabilities') return true;
+  if (account.category === 'Non-Current Liabilities') return false;
+  return (
     account.type === 'Liability' && (
       account.subcategory === 'Trade and Other Payables' ||
       account.subcategory === 'Statutory Payables' ||

@@ -32,12 +32,37 @@ import { Textarea } from './ui/textarea';
 import { showError, showSuccess } from '../utils/toast';
 import { Account } from '../pages/ChartOfAccounts';
 import { useDialogFormReset } from '../hooks/useDialogFormReset';
+import {
+  classificationError,
+  classificationsForType,
+  subclassificationError,
+  subclassificationsForClassification,
+} from '../lib/accounting/accountClassification';
 
-const accountSchema = z.object({
-  name: z.string().min(1, 'Account name is required.'),
-  type: z.enum(['Asset', 'Liability', 'Equity', 'Income', 'Expense']),
-  description: z.string().optional(),
-});
+const NO_STATEMENT_LINE = '__none__';
+
+// Classification is what the Trial Balance and the financial statements read.
+// It is mandatory, and only the classifications valid for the chosen type are
+// accepted — the same rules the chart-of-accounts edge function enforces.
+const accountSchema = z
+  .object({
+    name: z.string().min(1, 'Account name is required.'),
+    type: z.enum(['Asset', 'Liability', 'Equity', 'Income', 'Expense']),
+    category: z.string().min(1, 'Classification is required.'),
+    subcategory: z.string().optional(),
+    description: z.string().optional(),
+  })
+  .superRefine((values, ctx) => {
+    const categoryIssue = classificationError(values.type, values.category);
+    if (categoryIssue) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['category'], message: categoryIssue });
+      return;
+    }
+    const subIssue = subclassificationError(values.category, values.subcategory);
+    if (subIssue) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['subcategory'], message: subIssue });
+    }
+  });
 
 type AccountFormValues = z.infer<typeof accountSchema>;
 
@@ -56,6 +81,8 @@ const AccountForm = ({ isOpen, setIsOpen, account }: AccountFormProps) => {
     defaultValues: {
       name: '',
       type: 'Asset',
+      category: '',
+      subcategory: '',
       description: '',
     },
   });
@@ -65,20 +92,31 @@ const AccountForm = ({ isOpen, setIsOpen, account }: AccountFormProps) => {
       form.reset({
         name: account.name,
         type: account.type,
+        // An existing account with no classification opens blank, so the field
+        // is answered rather than silently defaulted on the customer's behalf.
+        category: account.category || '',
+        subcategory: account.subcategory || '',
         description: account.description || '',
       });
     } else {
       form.reset({
         name: '',
         type: 'Asset',
+        category: '',
+        subcategory: '',
         description: '',
       });
     }
   });
 
+  const selectedType = form.watch('type');
+  const selectedCategory = form.watch('category');
+  const classificationOptions = classificationsForType(selectedType);
+  const statementLineOptions = subclassificationsForClassification(selectedCategory);
+
   // This mutation creates or updates data by calling a secure Supabase Edge Function.
   const mutation = useMutation({
-    mutationFn: async (values: AccountFormValues) => {
+    mutationFn: async (values: AccountFormValues & { subcategory: string | null }) => {
       if (!activeCompany) throw new Error('No active company selected');
 
       const method = account ? 'PUT' : 'POST';
@@ -103,8 +141,24 @@ const AccountForm = ({ isOpen, setIsOpen, account }: AccountFormProps) => {
     },
   });
 
+  const handleTypeChange = (nextType: AccountFormValues['type']) => {
+    form.setValue('type', nextType, { shouldValidate: false });
+    // A classification belongs to exactly one type, so changing the type
+    // invalidates it. Clear rather than carry a now-impossible combination.
+    form.setValue('category', '', { shouldValidate: false });
+    form.setValue('subcategory', '', { shouldValidate: false });
+  };
+
+  const handleCategoryChange = (nextCategory: string) => {
+    form.setValue('category', nextCategory, { shouldValidate: true });
+    form.setValue('subcategory', '', { shouldValidate: false });
+  };
+
   const onSubmit = (values: AccountFormValues) => {
-    mutation.mutate(values);
+    mutation.mutate({
+      ...values,
+      subcategory: values.subcategory ? values.subcategory : null,
+    });
   };
 
   return (
@@ -135,8 +189,8 @@ const AccountForm = ({ isOpen, setIsOpen, account }: AccountFormProps) => {
                 <FormItem>
                   <FormLabel>Account Type</FormLabel>
                   <Select
-                    onValueChange={field.onChange}
-                    defaultValue={field.value}
+                    onValueChange={(v) => handleTypeChange(v as AccountFormValues['type'])}
+                    value={field.value}
                     disabled={isSystemAccount}
                   >
                     <FormControl>
@@ -161,6 +215,66 @@ const AccountForm = ({ isOpen, setIsOpen, account }: AccountFormProps) => {
                 </FormItem>
               )}
             />
+            <FormField
+              control={form.control}
+              name="category"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Classification</FormLabel>
+                  <Select onValueChange={handleCategoryChange} value={field.value}>
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select a classification" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {classificationOptions.map((option) => (
+                        <SelectItem key={option} value={option}>
+                          {option}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground">
+                    Determines where this account presents in the Trial Balance and the financial
+                    statements. Presentation only — it never changes a posted amount.
+                  </p>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            {statementLineOptions.length > 0 && (
+              <FormField
+                control={form.control}
+                name="subcategory"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Statement line (optional)</FormLabel>
+                    <Select
+                      onValueChange={(v) =>
+                        field.onChange(v === NO_STATEMENT_LINE ? '' : v)
+                      }
+                      value={field.value || NO_STATEMENT_LINE}
+                    >
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="No statement line" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value={NO_STATEMENT_LINE}>No statement line</SelectItem>
+                        {statementLineOptions.map((option) => (
+                          <SelectItem key={option} value={option}>
+                            {option}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            )}
             <FormField
               control={form.control}
               name="description"

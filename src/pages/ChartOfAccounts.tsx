@@ -19,7 +19,7 @@ import {
   TableRow,
 } from '../components/ui/table';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { PlusCircle, MoreHorizontal, Search } from 'lucide-react';
 import { showError, showSuccess } from '../utils/toast';
 import AccountForm from '../components/AccountForm';
@@ -34,6 +34,11 @@ import {
 import { formatCurrency } from '../lib/utils';
 import { useAuth } from '../contexts/AuthContext';
 import { accountsQuery } from '../lib/queries';
+import { Badge } from '../components/ui/badge';
+import {
+  CLASSIFICATION_REQUIRED_LABEL,
+  isClassificationRequired,
+} from '../lib/accounting/accountClassification';
 
 export type Account = {
   id: string;
@@ -58,6 +63,10 @@ const ChartOfAccounts = () => {
   const [inquiryAccountId, setInquiryAccountId] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterType, setFilterType] = useState('all');
+  // Trial Balance and Accounting Setup deep-link here with ?classification=required
+  // so the customer lands on exactly the accounts that need a decision.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const classificationFilter = searchParams.get('classification') === 'required' ? 'required' : 'all';
   const queryClient = useQueryClient();
   const { activeCompany } = useAuth();
 
@@ -74,9 +83,23 @@ const ChartOfAccounts = () => {
         account.name.toLowerCase().includes(lowerCaseSearch) ||
         String(account.account_number).includes(lowerCaseSearch);
       const matchesType = filterType === 'all' || account.type === filterType;
-      return matchesSearch && matchesType;
+      const matchesClassification =
+        classificationFilter === 'all' || isClassificationRequired(account);
+      return matchesSearch && matchesType && matchesClassification;
     });
-  }, [accounts, searchTerm, filterType]);
+  }, [accounts, searchTerm, filterType, classificationFilter]);
+
+  const unclassifiedCount = useMemo(
+    () => (accounts ?? []).filter((a) => a.is_active !== false && isClassificationRequired(a)).length,
+    [accounts],
+  );
+
+  const setClassificationFilter = (next: 'all' | 'required') => {
+    const params = new URLSearchParams(searchParams);
+    if (next === 'required') params.set('classification', 'required');
+    else params.delete('classification');
+    setSearchParams(params, { replace: true });
+  };
 
   // This mutation deletes data by calling a secure Supabase Edge Function.
   const deleteMutation = useMutation({
@@ -140,6 +163,25 @@ const ChartOfAccounts = () => {
           </Button>
         </CardHeader>
         <CardContent>
+          {unclassifiedCount > 0 && (
+            <div className="mb-4 rounded-md border border-destructive/40 bg-destructive/5 px-4 py-3 text-sm flex flex-wrap items-center gap-3">
+              <span className="flex-1">
+                <strong>{unclassifiedCount}</strong>{' '}
+                {unclassifiedCount === 1 ? 'account needs' : 'accounts need'} a classification before
+                {unclassifiedCount === 1 ? ' it groups' : ' they group'} correctly in the Trial Balance and
+                financial statements. Balances and history are unaffected.
+              </span>
+              <Button
+                size="sm"
+                variant={classificationFilter === 'required' ? 'default' : 'outline'}
+                onClick={() =>
+                  setClassificationFilter(classificationFilter === 'required' ? 'all' : 'required')
+                }
+              >
+                {classificationFilter === 'required' ? 'Show all accounts' : 'Show only these'}
+              </Button>
+            </div>
+          )}
           <div className="flex items-center gap-4 mb-4">
             <div className="relative flex-1">
               <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
@@ -171,6 +213,7 @@ const ChartOfAccounts = () => {
                 <TableHead className="w-[100px]">Number</TableHead>
                 <TableHead>Name</TableHead>
                 <TableHead>Type</TableHead>
+                <TableHead>Classification</TableHead>
                 <TableHead>Description</TableHead>
                 <TableHead className="text-right">Balance</TableHead>
                 <TableHead className="w-[50px]"></TableHead>
@@ -179,7 +222,7 @@ const ChartOfAccounts = () => {
             <TableBody>
               {isLoading ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center">Loading accounts...</TableCell>
+                  <TableCell colSpan={7} className="text-center">Loading accounts...</TableCell>
                 </TableRow>
               ) : filteredAccounts.length > 0 ? (
                 filteredAccounts.map((account) => (
@@ -187,6 +230,26 @@ const ChartOfAccounts = () => {
                     <TableCell>{account.account_number}</TableCell>
                     <TableCell className="font-medium">{account.name}</TableCell>
                     <TableCell>{account.type}</TableCell>
+                    <TableCell>
+                      {isClassificationRequired(account) ? (
+                        <button
+                          type="button"
+                          onClick={() => handleEdit(account)}
+                          className="text-left"
+                        >
+                          <Badge variant="destructive">{CLASSIFICATION_REQUIRED_LABEL}</Badge>
+                        </button>
+                      ) : (
+                        <span>
+                          {account.category}
+                          {account.subcategory ? (
+                            <span className="block text-xs text-muted-foreground">
+                              {account.subcategory}
+                            </span>
+                          ) : null}
+                        </span>
+                      )}
+                    </TableCell>
                     <TableCell>{account.description}</TableCell>
                     <TableCell className="text-right">{formatCurrency(account.balance)}</TableCell>
                     <TableCell>
@@ -229,7 +292,7 @@ const ChartOfAccounts = () => {
                 ))
               ) : (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center">No accounts found.</TableCell>
+                  <TableCell colSpan={7} className="text-center">No accounts found.</TableCell>
                 </TableRow>
               )}
             </TableBody>

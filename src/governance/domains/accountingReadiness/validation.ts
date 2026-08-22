@@ -10,6 +10,7 @@ import {
   type AccountType,
   type NormalBalance,
 } from '@/lib/chartOfAccounts/validation';
+import { classificationsForType } from '@/lib/accounting/accountClassification';
 
 export type CoaRow = {
   id: string;
@@ -49,6 +50,9 @@ export type ReadinessEvaluation = {
     mappingsComplete: boolean;
     mandatoryControlAccounts: boolean;
     coaIntegrity: boolean;
+    /** Active accounts whose Chart of Accounts classification is missing or invalid. */
+    accountsRequiringClassification: number;
+    accountsRequiringClassificationNames: string[];
     taxConfigurationExists: boolean;
     bankAccountOrSkipped: boolean;
     openingBalancesComplete: boolean;
@@ -138,6 +142,12 @@ function hasRole(accounts: CoaRow[], role: ControlAccountRole): boolean {
 }
 
 /** Structural integrity of the Chart of Accounts (not posting/GL redesign). */
+function accountNeedsClassification(account: CoaRow): boolean {
+  const allowed = classificationsForType(account.type);
+  const category = typeof account.category === 'string' ? account.category.trim() : '';
+  return !category || !allowed.includes(category);
+}
+
 export function evaluateCoaIntegrity(accounts: CoaRow[]): { pass: boolean; errors: string[] } {
   const errors: string[] = [];
   if (accounts.length === 0) {
@@ -250,6 +260,13 @@ export function evaluateAccountingReadiness(input: {
       ));
 
   // Derived step completion — validation engine is the authority
+  // Reported so Accounting Setup shows exactly what is outstanding. Deliberately
+  // NOT part of validationChecks — classification is presentation metadata and
+  // must not revoke a company's accounting readiness or block posting.
+  const accountsNeedingClassification = accounts.filter(
+    (a) => a.is_active !== false && accountNeedsClassification(a),
+  );
+
   const financialCalendarComplete = activeFinancialYear;
   const chartOfAccountsComplete =
     chartOfAccountsExists && mandatoryControlAccounts && coaIntegrity;
@@ -320,6 +337,10 @@ export function evaluateAccountingReadiness(input: {
       ...validationChecks,
       accountCount,
       mappingsComplete,
+      accountsRequiringClassification: accountsNeedingClassification.length,
+      accountsRequiringClassificationNames: accountsNeedingClassification
+        .map((a) => a.name)
+        .slice(0, 20),
       controlAccounts,
       missingControlAccounts,
       coaIntegrityErrors: integrity.errors,
