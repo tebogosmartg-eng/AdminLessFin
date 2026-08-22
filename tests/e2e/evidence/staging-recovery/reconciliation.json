@@ -1,0 +1,83 @@
+{
+  "company": {
+    "id": "3cbfd4eb-a095-43f3-837a-0b4f1e2c1752",
+    "name": "Spaceman",
+    "tax_id": null,
+    "address": "188 MANDELA VILLAGE",
+    "logo_url": "https://zaulhnpohrgqqodvzhxp.supabase.co/storage/v1/object/public/attachments/3cbfd4eb-a095-43f3-837a-0b4f1e2c1752/logo-1785228804345.png",
+    "owner_id": "3cbfd4eb-a095-43f3-837a-0b4f1e2c1752",
+    "created_at": "2025-11-06T04:26:35.470798+00:00",
+    "default_invoice_notes": "E2E QA terms 1785296801601 — payment due 30 days",
+    "user_role": "owner"
+  },
+  "account": {
+    "id": "589b9e2b-9acc-4b63-ba88-a9765ee7a90f",
+    "company_id": "3cbfd4eb-a095-43f3-837a-0b4f1e2c1752",
+    "name": "Bank",
+    "type": "Asset",
+    "description": "Payroll ",
+    "created_at": "2026-07-02T12:51:35.093918+00:00",
+    "account_number": 3001,
+    "is_active": true,
+    "allow_manual_posting": true,
+    "control_account": false,
+    "system_account": false,
+    "normal_balance": "debit",
+    "posting_blocked": false,
+    "requires_dimension": false,
+    "account_code": null,
+    "parent_account_id": null,
+    "category": "Current Assets",
+    "subcategory": "Cash and Cash Equivalents",
+    "financial_statement": "Statement of Financial Position",
+    "cash_flow_classification": null,
+    "presentation_order": null,
+    "tax_treatment": null,
+    "template_key": null,
+    "source": "legacy",
+    "account_role": null
+  },
+  "results": [
+    {
+      "step": "bank accounts offered",
+      "total": 16,
+      "cash_equivalent": 1,
+      "names": [
+        "Bank"
+      ]
+    },
+    {
+      "step": "15 reconciliation transactions",
+      "status": 200,
+      "rows": 35,
+      "rows_with_null_journal": 0,
+      "rows_after_statement_cutoff": 0,
+      "msg": ""
+    },
+    {
+      "step": "15 book balance",
+      "status": 200,
+      "balance": -341206.08,
+      "msg": ""
+    },
+    {
+      "step": "15 missing statement_end_date",
+      "status": 400,
+      "msg": "statement_end_date is required."
+    },
+    {
+      "step": "15 tenant isolation (foreign account_id)",
+      "other_company": "My's Company",
+      "status": 500,
+      "refused": true,
+      "rows_leaked": 0,
+      "msg": "Account not found in this company."
+    },
+    {
+      "step": "15 reconciliation arithmetic",
+      "book_balance": -341206.08,
+      "unreconciled_net": -341206.08,
+      "note": "statement balance - (book balance - uncleared) = difference; screen computes this from these inputs"
+    }
+  ]
+}

@@ -1,0 +1,53 @@
+{
+  "base_url": "https://adminless-fin.vercel.app",
+  "company": "Spaceman",
+  "steps": [
+    {
+      "step": "A incomplete submit reports why",
+      "shows_line_message": true,
+      "dialog_still_open": true,
+      "sent_request": false,
+      "screenshot": "C:\\Users\\TebogoM\\Desktop\\development projects\\SmartAccounting\\tests\\e2e\\evidence\\staging-recovery\\ui-bill-verify\\A-incomplete-submit.png"
+    },
+    {
+      "step": "C account selection stable (finding 6)",
+      "option_count": 30,
+      "chosen": "Fuel",
+      "value_after_3s_idle": "Fuel",
+      "value_retained": true,
+      "screenshot": "C:\\Users\\TebogoM\\Desktop\\development projects\\SmartAccounting\\tests\\e2e\\evidence\\staging-recovery\\ui-bill-verify\\C-account-stable.png"
+    },
+    {
+      "step": "B complete bill records",
+      "bills_calls": [
+        {
+          "fn": "bills",
+          "status": 200
+        },
+        {
+          "fn": "bills",
+          "status": 200
+        }
+      ],
+      "dialog_closed": true,
+      "success_toast": false,
+      "opaque_edge_message": false,
+      "screenshot": "C:\\Users\\TebogoM\\Desktop\\development projects\\SmartAccounting\\tests\\e2e\\evidence\\staging-recovery\\ui-bill-verify\\B-recorded.png"
+    },
+    {
+      "step": "ledger: AP moved and journal exists",
+      "ap_before": 1023000.79,
+      "ap_after": 1023322.34,
+      "delta": 321.55,
+      "expected_delta": 321.55,
+      "journal_entry_id": "8f1ec33f-4928-43fe-b759-45fff252c668",
+      "bill_status": "open"
+    },
+    {
+      "step": "cleanup: void restores AP",
+      "ap_after_void": 1023000.79,
+      "restored_to_opening": true
+    }
+  ],
+  "console_errors": []
+}

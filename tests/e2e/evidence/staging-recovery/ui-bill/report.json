@@ -1,0 +1,178 @@
+{
+  "base_url": "https://adminless-fin.vercel.app",
+  "company": "Spaceman",
+  "steps": [
+    {
+      "step": "bills list",
+      "url": "https://adminless-fin.vercel.app/bills",
+      "blocked_by_readiness": false,
+      "has_record_button": true,
+      "screenshot": "C:\\Users\\TebogoM\\Desktop\\development projects\\SmartAccounting\\tests\\e2e\\evidence\\staging-recovery\\ui-bill\\01-bills-list.png"
+    },
+    {
+      "step": "open dialog",
+      "dialogVisible": true,
+      "screenshot": "C:\\Users\\TebogoM\\Desktop\\development projects\\SmartAccounting\\tests\\e2e\\evidence\\staging-recovery\\ui-bill\\02-dialog.png"
+    },
+    {
+      "step": "idle stability (finding 6)",
+      "comboboxCount": 5,
+      "dialog_html_changed_while_idle": false,
+      "warns_missing_trade_payable": false,
+      "screenshot": "C:\\Users\\TebogoM\\Desktop\\development projects\\SmartAccounting\\tests\\e2e\\evidence\\staging-recovery\\ui-bill\\03-idle.png"
+    },
+    {
+      "step": "account selection (finding 6)",
+      "option_count": 1,
+      "value_after_select": "None",
+      "value_lost": false,
+      "screenshot": "C:\\Users\\TebogoM\\Desktop\\development projects\\SmartAccounting\\tests\\e2e\\evidence\\staging-recovery\\ui-bill\\04-account-selected.png"
+    },
+    {
+      "step": "submit",
+      "dialog_still_open": true,
+      "toast_error": false,
+      "edge_function_message": false,
+      "visible_validation": false,
+      "new_network": [],
+      "screenshot": "C:\\Users\\TebogoM\\Desktop\\development projects\\SmartAccounting\\tests\\e2e\\evidence\\staging-recovery\\ui-bill\\05-after-submit.png"
+    }
+  ],
+  "console_errors": [],
+  "page_errors": [],
+  "bills_calls": [
+    {
+      "status": 200,
+      "method": "GET",
+      "responseBody": [
+        {
+          "id": "ecf40967-a5cc-4872-9232-63470d8a8aa1",
+          "journal_entry_id": "b018104f-ed11-4346-b50e-9491965f0fbc",
+          "entry_date": "2026-01-15",
+          "due_date": "2026-02-15",
+          "description": "Bill E2E-BILL-1785391232978",
+          "status": "void",
+          "vendor_id": "21f199b7-cdca-451d-8b44-02fc8b5a9e7d",
+          "vendors": [
+            {
+              "name": "E2E QA Bill Supplier 1785391232978"
+            }
+          ],
+          "bill_number": "E2E-BILL-1785391232978",
+          "attachment_url": null,
+          "journal_entry_items": [
+            {
+              "type": "debit",
+              "amount": 100,
+              "project_id": null
+            },
+            {
+              "type": "credit",
+              "amount": 100,
+              "project_id": null
+            }
+          ]
+        },
+        {
+          "id": "1698dca1-a10a-4ce9-82e6-13fb8a27389c",
+          "journal_entry_id": "9e7e3446-8391-4f47-886b-5ddf62b84426",
+          "entry_date": "2026-01-15",
+          "due_date": "2026-02-15",
+          "description": "Bill E2E-BILL-1785392633158",
+          "status": "void",
+          "vendor_id": "cf04c1f6-447f-47ad-981d-16a61c8df11c",
+          "vendors": [
+            {
+              "name": "E2E QA Bill Supplier 1785392633158"
+            }
+          ],
+          "bill_number": "E2E-BILL-1785392633158",
+          "attachment_url": null,
+          "journal_entry_items": [
+            {
+              "type": "debit",
+              "amount": 100,
+              "project_id": null
+            },
+            {
+              "type": "credit",
+              "amount": 100,
+              "project_id": null
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "failed_calls": [],
+  "call_counts": [
+    [
+      "user-session.GET",
+      2
+    ],
+    [
+      "accounting.GET_FINANCIAL_YEARS",
+      2
+    ],
+    [
+      "accounting.GET_FINANCIAL_PERIODS",
+      2
+    ],
+    [
+      "customers.GET",
+      2
+    ],
+    [
+      "products.GET",
+      2
+    ],
+    [
+      "projects.GET",
+      2
+    ],
+    [
+      "vendors.GET",
+      2
+    ],
+    [
+      "chart-of-accounts.GET",
+      2
+    ],
+    [
+      "tax-rates.GET",
+      2
+    ],
+    [
+      "accounting-setup.GET_STATUS",
+      2
+    ],
+    [
+      "financial-statements.GET_COMPANY_MASTER_DATA",
+      2
+    ],
+    [
+      "dashboard-data.",
+      1
+    ],
+    [
+      "budgets.GET_ALL",
+      1
+    ],
+    [
+      "banking.GET_OUTSTANDING",
+      1
+    ],
+    [
+      "banking.GET_BANK_ACCOUNTS",
+      1
+    ],
+    [
+      "banking.GET_TRANSACTIONS",
+      1
+    ],
+    [
+      "bills.GET",
+      1
+    ]
+  ]
+}

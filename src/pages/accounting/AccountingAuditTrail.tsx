@@ -12,14 +12,34 @@ import { Skeleton } from '../../components/ui/skeleton';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '../../components/ui/dialog';
 
+// Every table the audit triggers cover. "all" previously meant only the six
+// accounting tables, so customer, supplier, invoice, bill, quote, product and
+// bank events were invisible and the trail appeared not to work.
 const TABLES = [
   'all',
+  // Ledger and accounting configuration
   'journal_entries',
   'journal_entry_items',
   'posting_requests',
   'chart_of_accounts',
   'financial_years',
   'accounting_periods',
+  // Business documents and master data
+  'customers',
+  'vendors',
+  'invoices',
+  'bills',
+  'quotes',
+  'quote_items',
+  'products',
+  'bank_transactions',
+  'bank_accounts',
+  'expense_claims',
+  'fixed_assets',
+  'inventory_transactions',
+  'tax_rates',
+  'projects',
+  'employees',
 ];
 
 const AccountingAuditTrail = () => {

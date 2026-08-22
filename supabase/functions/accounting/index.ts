@@ -161,32 +161,59 @@ serve(withEnterprisePlatform('accounting', 'tenant', async (req, _ctx) => {
           .order('name'));
         break;
 
-      case 'GET_RECONCILIATION_TRANSACTIONS':
+      case 'GET_RECONCILIATION_TRANSACTIONS': {
+        if (!body.account_id) throw new Error('account_id is required.');
+        if (!body.statement_end_date) throw new Error('statement_end_date is required.');
+
+        // Tenant isolation: this handler uses the service-role client, which
+        // bypasses RLS, and previously filtered by account_id alone. Confirm the
+        // account belongs to the requesting company before reading its ledger.
+        const { data: reconAccount, error: reconAccountError } = await supabaseAdmin
+          .from('chart_of_accounts')
+          .select('id')
+          .eq('id', body.account_id)
+          .eq('company_id', company_id)
+          .maybeSingle();
+        if (reconAccountError) throw reconAccountError;
+        if (!reconAccount) throw new Error('Account not found in this company.');
+
+        // `journal_entries!inner` is required. A non-inner embed applies
+        // .lte('journal_entries.entry_date', ...) to the EMBEDDED resource only:
+        // parent lines dated after the statement end date were still returned,
+        // with journal_entries: null. The reconciliation then both crashed on
+        // the null and, worse, would have reconciled against transactions
+        // outside the statement period.
         ({ data, error } = await supabaseAdmin
           .from('journal_entry_items')
           .select(`
             id,
             amount,
             type,
-            journal_entries (
+            journal_entries!inner (
               entry_date,
-              description
+              description,
+              company_id
             )
           `)
           .eq('account_id', body.account_id)
           .eq('reconciled', false)
+          .eq('journal_entries.company_id', company_id)
           .lte('journal_entries.entry_date', body.statement_end_date));
         break;
+      }
 
-      case 'GET_BOOK_BALANCE':
+      case 'GET_BOOK_BALANCE': {
+        if (!body.account_id) throw new Error('account_id is required.');
+        if (!body.statement_end_date) throw new Error('statement_end_date is required.');
         ({ data, error } = await userSupabase.rpc('get_balances_as_of_date', {
           p_end_date: body.statement_end_date,
           p_company_id: company_id,
         }));
         if (!error) {
-          data = (data as any[]).find(acc => acc.id === body.account_id);
+          data = (data as any[]).find(acc => acc.id === body.account_id) ?? null;
         }
         break;
+      }
 
       case 'FINISH_RECONCILIATION':
         ({ data, error } = await supabaseAdmin
@@ -1115,9 +1142,20 @@ serve(withEnterprisePlatform('accounting', 'tenant', async (req, _ctx) => {
       case 'GET_ACCOUNTING_AUDIT': {
         const { page, pageSize, offset } = clampPage(body.page, body.page_size);
         const tableName = body.table_name && body.table_name !== 'all' ? body.table_name : null;
+        // The audit trail must show what the business actually did, not only
+        // what the ledger did. Restricting the default view to the six
+        // accounting tables hid every customer, supplier, invoice, bill, quote,
+        // product and bank event — the trail looked broken because the events
+        // people looked for were filtered out.
         const accountingTables = [
+          // Ledger and accounting configuration
           'journal_entries', 'journal_entry_items', 'posting_requests',
           'chart_of_accounts', 'financial_years', 'accounting_periods',
+          // Business documents and master data
+          'customers', 'vendors', 'invoices', 'bills', 'quotes', 'quote_items',
+          'products', 'bank_transactions', 'bank_accounts', 'expense_claims',
+          'expense_claim_items', 'fixed_assets', 'inventory_transactions',
+          'tax_rates', 'projects', 'employees', 'companies', 'company_users',
         ];
         let q = supabaseAdmin
           .from('audit_logs')

@@ -1,0 +1,56 @@
+{
+  "company": {
+    "id": "3cbfd4eb-a095-43f3-837a-0b4f1e2c1752",
+    "name": "Spaceman",
+    "tax_id": null,
+    "address": "188 MANDELA VILLAGE",
+    "logo_url": "https://zaulhnpohrgqqodvzhxp.supabase.co/storage/v1/object/public/attachments/3cbfd4eb-a095-43f3-837a-0b4f1e2c1752/logo-1785228804345.png",
+    "owner_id": "3cbfd4eb-a095-43f3-837a-0b4f1e2c1752",
+    "created_at": "2025-11-06T04:26:35.470798+00:00",
+    "default_invoice_notes": "E2E QA terms 1785296801601 — payment due 30 days",
+    "user_role": "owner"
+  },
+  "bill_number": "SR-PAY-1787394650901",
+  "steps": [
+    {
+      "step": "10 bill recorded",
+      "ok": true,
+      "detail": "SR-PAY-1787394650901"
+    },
+    {
+      "step": "10 AP increased",
+      "ok": true,
+      "detail": "1021208.44 -> 1021665.22"
+    },
+    {
+      "step": "10 payment recorded",
+      "ok": true,
+      "detail": "ok"
+    },
+    {
+      "step": "10 AP reduced by payment",
+      "ok": true,
+      "detail": "1021665.22 -> 1021208.44 (expected 1021208.44)"
+    },
+    {
+      "step": "10 bank reduced by payment",
+      "ok": true,
+      "detail": "-3182.79 -> -3639.57 (expected -3639.5699999999997)"
+    },
+    {
+      "step": "10 bill marked paid",
+      "ok": true,
+      "detail": "status=paid"
+    },
+    {
+      "step": "10 paid bill off AP ageing",
+      "ok": true,
+      "detail": "cleared"
+    },
+    {
+      "step": "13 trial balance balanced",
+      "ok": true,
+      "detail": "balanced=true"
+    }
+  ]
+}

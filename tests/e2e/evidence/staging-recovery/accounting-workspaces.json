@@ -1,0 +1,80 @@
+{
+  "company": {
+    "id": "3cbfd4eb-a095-43f3-837a-0b4f1e2c1752",
+    "name": "Spaceman",
+    "tax_id": null,
+    "address": "188 MANDELA VILLAGE",
+    "logo_url": "https://zaulhnpohrgqqodvzhxp.supabase.co/storage/v1/object/public/attachments/3cbfd4eb-a095-43f3-837a-0b4f1e2c1752/logo-1785228804345.png",
+    "owner_id": "3cbfd4eb-a095-43f3-837a-0b4f1e2c1752",
+    "created_at": "2025-11-06T04:26:35.470798+00:00",
+    "default_invoice_notes": "E2E QA terms 1785296801601 — payment due 30 days",
+    "user_role": "owner"
+  },
+  "account_id": "4d946cf4-d114-492f-9429-1383596c9b24",
+  "results": [
+    {
+      "label": "19 General Ledger",
+      "method": "GET_ENTERPRISE_LEDGER",
+      "status": 500,
+      "ok": false,
+      "ambiguous": true,
+      "technicalMessage": "Could not embed because more than one relationship was found for 'journal_entries' and 'financial_years'"
+    },
+    {
+      "label": "20 Account Activity",
+      "method": "GET_ACCOUNT_ACTIVITY_WORKSPACE",
+      "status": 200,
+      "ok": true,
+      "ambiguous": false,
+      "technicalMessage": ""
+    },
+    {
+      "label": "Posting Requests",
+      "method": "GET_POSTING_REQUESTS",
+      "status": 200,
+      "ok": true,
+      "ambiguous": false,
+      "technicalMessage": ""
+    },
+    {
+      "label": "Traceability",
+      "method": "GET_TRACEABILITY",
+      "status": 200,
+      "ok": true,
+      "ambiguous": false,
+      "technicalMessage": ""
+    },
+    {
+      "label": "Financial Periods",
+      "method": "GET_FINANCIAL_PERIODS",
+      "status": 200,
+      "ok": true,
+      "ambiguous": false,
+      "technicalMessage": ""
+    },
+    {
+      "label": "Accounting Timeline",
+      "method": "GET_ACCOUNTING_TIMELINE",
+      "status": 200,
+      "ok": true,
+      "ambiguous": false,
+      "technicalMessage": ""
+    },
+    {
+      "label": "Trial Balance (control)",
+      "method": "GET_TRIAL_BALANCE",
+      "status": 200,
+      "ok": true,
+      "ambiguous": false,
+      "technicalMessage": ""
+    },
+    {
+      "label": "Account Inquiry (control)",
+      "method": "GET_ACCOUNT_INQUIRY",
+      "status": 200,
+      "ok": true,
+      "ambiguous": false,
+      "technicalMessage": ""
+    }
+  ]
+}

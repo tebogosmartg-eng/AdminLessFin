@@ -1,0 +1,245 @@
+[
+  {
+    "id": "26014bd5-f03f-44ae-93bd-64b5add2e09f",
+    "name": "My's Company",
+    "status": "READY",
+    "ready": false,
+    "errors": 1,
+    "firstErrors": [
+      "Required tax configuration is missing."
+    ],
+    "accounts": 9,
+    "vendors": 4,
+    "customers": 6,
+    "bills": 2,
+    "quotes": "ERR:Edge Function returned a non-2xx status code",
+    "products": 1
+  },
+  {
+    "id": "3cbfd4eb-a095-43f3-837a-0b4f1e2c1752",
+    "name": "Spaceman",
+    "status": "READY",
+    "ready": false,
+    "errors": 2,
+    "firstErrors": [
+      "Missing control accounts: retained_earnings, inventory, fixed_assets, payroll_clearing.",
+      "COA integrity: Missing foundational account type: Equity."
+    ],
+    "accounts": 34,
+    "vendors": 4,
+    "customers": 3,
+    "bills": 13,
+    "quotes": "ERR:Edge Function returned a non-2xx status code",
+    "products": 4
+  },
+  {
+    "id": "bae80005-212f-4fdd-8d39-758177845d2e",
+    "name": "CERT New Customer 2026-07-28T08:08:07.174Z",
+    "status": "READY",
+    "ready": false,
+    "errors": 2,
+    "firstErrors": [
+      "Missing control accounts: vat_control.",
+      "Required tax configuration is missing."
+    ],
+    "accounts": 6,
+    "vendors": 0,
+    "customers": 0,
+    "bills": 0,
+    "quotes": "ERR:Edge Function returned a non-2xx status code",
+    "products": 0
+  },
+  {
+    "id": "a9988c29-9766-4de8-84bb-8823a9d868d0",
+    "name": "CERT FY Fix 1785226265825",
+    "status": "READY",
+    "ready": false,
+    "errors": 2,
+    "firstErrors": [
+      "Missing control accounts: vat_control.",
+      "Required tax configuration is missing."
+    ],
+    "accounts": 6,
+    "vendors": 0,
+    "customers": 0,
+    "bills": 0,
+    "quotes": "ERR:Edge Function returned a non-2xx status code",
+    "products": 0
+  },
+  {
+    "id": "0837027f-347a-455e-914b-995b96b34397",
+    "name": "CERT TX 1785230285930",
+    "status": "IN_PROGRESS",
+    "ready": false,
+    "errors": 3,
+    "firstErrors": [
+      "Missing control accounts: vat_control, bank.",
+      "At least one bank account is required, or banking must be explicitly skipped.",
+      "Opening balances must be posted or intentionally confirmed as zero."
+    ],
+    "accounts": 6,
+    "vendors": 0,
+    "customers": 1,
+    "bills": 0,
+    "quotes": "ERR:Edge Function returned a non-2xx status code",
+    "products": 0
+  },
+  {
+    "id": "62de66bf-f962-481e-8236-a8d0777b056a",
+    "name": "CERT TX 1785230470207",
+    "status": "IN_PROGRESS",
+    "ready": false,
+    "errors": 3,
+    "firstErrors": [
+      "Missing control accounts: vat_control, bank.",
+      "At least one bank account is required, or banking must be explicitly skipped.",
+      "Opening balances must be posted or intentionally confirmed as zero."
+    ],
+    "accounts": 6,
+    "vendors": 0,
+    "customers": 1,
+    "bills": 0,
+    "quotes": "ERR:Edge Function returned a non-2xx status code",
+    "products": 0
+  },
+  {
+    "id": "be3855e9-d11c-48a8-8c39-10e12a0ff2df",
+    "name": "CERT TX 1785230675937",
+    "status": "READY",
+    "ready": true,
+    "errors": 0,
+    "firstErrors": [],
+    "accounts": 13,
+    "vendors": 7,
+    "customers": 9,
+    "bills": 4,
+    "quotes": "ERR:Edge Function returned a non-2xx status code",
+    "products": 1
+  },
+  {
+    "id": "14712eb7-01e0-4664-ae34-2cd52b2c795a",
+    "name": "CERT TX 1785230740094",
+    "status": "IN_PROGRESS",
+    "ready": false,
+    "errors": 3,
+    "firstErrors": [
+      "Missing control accounts: vat_control, bank.",
+      "At least one bank account is required, or banking must be explicitly skipped.",
+      "Opening balances must be posted or intentionally confirmed as zero."
+    ],
+    "accounts": 9,
+    "vendors": 0,
+    "customers": 1,
+    "bills": 0,
+    "quotes": "ERR:Edge Function returned a non-2xx status code",
+    "products": 1
+  },
+  {
+    "id": "b46f3ec6-82d5-4538-b000-4e192d54e7d1",
+    "name": "CERT COA 1785230862080",
+    "status": "NOT_STARTED",
+    "ready": false,
+    "errors": 5,
+    "firstErrors": [
+      "Active financial year is required.",
+      "Missing control accounts: vat_control, bank.",
+      "Required tax configuration is missing."
+    ],
+    "accounts": 6,
+    "vendors": 0,
+    "customers": 0,
+    "bills": 0,
+    "quotes": "ERR:Edge Function returned a non-2xx status code",
+    "products": 0
+  },
+  {
+    "id": "0a2ff5bb-3796-4467-b227-a6dd4306bcdb",
+    "name": "CERT COA 1785230945189",
+    "status": "NOT_STARTED",
+    "ready": false,
+    "errors": 5,
+    "firstErrors": [
+      "Active financial year is required.",
+      "COA integrity: Closing Stock: A Expense account normally carries a debit balance.",
+      "Required tax configuration is missing."
+    ],
+    "accounts": 80,
+    "vendors": 1,
+    "customers": 0,
+    "bills": 0,
+    "quotes": "ERR:Edge Function returned a non-2xx status code",
+    "products": 0
+  },
+  {
+    "id": "ed2f2a92-a8f4-4496-a6fe-51d68bf9ba03",
+    "name": "CERT TX 1785230987178",
+    "status": "IN_PROGRESS",
+    "ready": true,
+    "errors": 3,
+    "firstErrors": [
+      "COA integrity: Closing Stock: A Expense account normally carries a debit balance.",
+      "At least one bank account is required, or banking must be explicitly skipped.",
+      "Opening balances must be posted or intentionally confirmed as zero."
+    ],
+    "accounts": 81,
+    "vendors": 0,
+    "customers": 1,
+    "bills": 0,
+    "quotes": "ERR:Edge Function returned a non-2xx status code",
+    "products": 1
+  },
+  {
+    "id": "0b07df94-1868-4ed9-aaa2-6ac8b847234b",
+    "name": "CERT TX 1785231040107",
+    "status": "IN_PROGRESS",
+    "ready": true,
+    "errors": 3,
+    "firstErrors": [
+      "COA integrity: Closing Stock: A Expense account normally carries a debit balance.",
+      "At least one bank account is required, or banking must be explicitly skipped.",
+      "Opening balances must be posted or intentionally confirmed as zero."
+    ],
+    "accounts": 81,
+    "vendors": 0,
+    "customers": 1,
+    "bills": 0,
+    "quotes": "ERR:Edge Function returned a non-2xx status code",
+    "products": 1
+  },
+  {
+    "id": "063d0ae0-394a-4b22-b140-087d5979633b",
+    "name": "CERT TX 1785231635647",
+    "status": "IN_PROGRESS",
+    "ready": true,
+    "errors": 3,
+    "firstErrors": [
+      "COA integrity: Closing Stock: A Expense account normally carries a debit balance.",
+      "At least one bank account is required, or banking must be explicitly skipped.",
+      "Opening balances must be posted or intentionally confirmed as zero."
+    ],
+    "accounts": 81,
+    "vendors": 0,
+    "customers": 1,
+    "bills": 0,
+    "quotes": "ERR:Edge Function returned a non-2xx status code",
+    "products": 1
+  },
+  {
+    "id": "2f1aaf89-f52f-4f85-b13a-9b54594df26f",
+    "name": "CERT TX 1785231821168",
+    "status": "IN_PROGRESS",
+    "ready": true,
+    "errors": 3,
+    "firstErrors": [
+      "COA integrity: Closing Stock: A Expense account normally carries a debit balance.",
+      "At least one bank account is required, or banking must be explicitly skipped.",
+      "Opening balances must be posted or intentionally confirmed as zero."
+    ],
+    "accounts": 81,
+    "vendors": 0,
+    "customers": 1,
+    "bills": 0,
+    "quotes": "ERR:Edge Function returned a non-2xx status code",
+    "products": 1
+  }
+]

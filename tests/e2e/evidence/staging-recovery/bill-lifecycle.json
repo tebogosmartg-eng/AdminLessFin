@@ -1,0 +1,107 @@
+{
+  "company": {
+    "id": "3cbfd4eb-a095-43f3-837a-0b4f1e2c1752",
+    "name": "Spaceman",
+    "tax_id": null,
+    "address": "188 MANDELA VILLAGE",
+    "logo_url": "https://zaulhnpohrgqqodvzhxp.supabase.co/storage/v1/object/public/attachments/3cbfd4eb-a095-43f3-837a-0b4f1e2c1752/logo-1785228804345.png",
+    "owner_id": "3cbfd4eb-a095-43f3-837a-0b4f1e2c1752",
+    "created_at": "2025-11-06T04:26:35.470798+00:00",
+    "default_invoice_notes": "E2E QA terms 1785296801601 — payment due 30 days",
+    "user_role": "owner"
+  },
+  "vendor": {
+    "id": "10402e8b-fad9-4d4d-947e-2ceb64072f11",
+    "name": "DBG Vendor 1785244116190",
+    "contact_name": "",
+    "email": "",
+    "phone": "",
+    "address": "",
+    "tax_id": "",
+    "payment_terms": 30,
+    "company_id": "3cbfd4eb-a095-43f3-837a-0b4f1e2c1752",
+    "created_at": "2026-07-28T13:08:36.94992+00:00"
+  },
+  "ap": {
+    "id": "6b4d2c01-e9f4-4a5f-b306-c088af94e70a",
+    "account_number": 4001,
+    "name": "AP",
+    "type": "Liability",
+    "balance": 955345.28,
+    "account_role": "trade_payable",
+    "tax_treatment": null,
+    "control_account": false,
+    "system_account": false,
+    "account_code": null,
+    "category": "Current Liabilities",
+    "subcategory": null,
+    "is_active": true,
+    "description": ""
+  },
+  "expense": {
+    "id": "b5c3cac9-5fd3-4427-af0f-202fecc5ada1",
+    "account_number": 2000,
+    "name": "Fuel",
+    "type": "Expense",
+    "balance": 23132.08,
+    "account_role": null,
+    "tax_treatment": null,
+    "control_account": false,
+    "system_account": false,
+    "account_code": null,
+    "category": "Operating Expenses",
+    "subcategory": null,
+    "is_active": true,
+    "description": "Traveling cost"
+  },
+  "openingAp": 1021665.22,
+  "steps": [
+    {
+      "step": "8 direct bill create",
+      "status": 200,
+      "ok": true,
+      "detail": "ok"
+    },
+    {
+      "step": "8 AP increased by bill",
+      "status": 200,
+      "ok": true,
+      "detail": "AP 1021665.22 -> 1022899.78 (expected +1234.56)",
+      "ledger": {
+        "bill_id": "1072ba56-3a6d-4e9a-bc25-c4209e5b6319",
+        "journal_entry_id": "dda96792-5622-4122-878b-e9a8eb74bf09",
+        "status": "open"
+      }
+    },
+    {
+      "step": "11 bill create (for void)",
+      "status": 200,
+      "ok": true,
+      "detail": "ok"
+    },
+    {
+      "step": "11 bill void",
+      "status": 200,
+      "ok": true,
+      "detail": "ok"
+    },
+    {
+      "step": "11 AP restored after void",
+      "status": 200,
+      "ok": true,
+      "detail": "AP 1024134.34 -> 1022899.78 (expected 1022899.78)"
+    },
+    {
+      "step": "11 voided bill absent from AP ageing",
+      "status": 200,
+      "ok": true,
+      "detail": "not listed (correct)"
+    },
+    {
+      "step": "13 trial balance still balanced",
+      "status": 200,
+      "ok": true,
+      "detail": "balanced=true totals={\"opening_debit\":0,\"opening_credit\":0,\"period_debit\":3387006.59,\"period_credit\":3387006.5999999996,\"closing_debit\":1507009.62,\"closing_credit\":1507009.63}"
+    }
+  ]
+}

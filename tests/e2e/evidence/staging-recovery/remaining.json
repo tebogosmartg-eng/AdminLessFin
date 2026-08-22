@@ -1,0 +1,145 @@
+{
+  "company": {
+    "id": "3cbfd4eb-a095-43f3-837a-0b4f1e2c1752",
+    "name": "Spaceman",
+    "tax_id": null,
+    "address": "188 MANDELA VILLAGE",
+    "logo_url": "https://zaulhnpohrgqqodvzhxp.supabase.co/storage/v1/object/public/attachments/3cbfd4eb-a095-43f3-837a-0b4f1e2c1752/logo-1785228804345.png",
+    "owner_id": "3cbfd4eb-a095-43f3-837a-0b4f1e2c1752",
+    "created_at": "2025-11-06T04:26:35.470798+00:00",
+    "default_invoice_notes": "E2E QA terms 1785296801601 — payment due 30 days",
+    "user_role": "owner"
+  },
+  "out": [
+    {
+      "finding": "4 products",
+      "existing": 6,
+      "create_service": {
+        "label": "service",
+        "status": 200,
+        "ok": true,
+        "msg": ""
+      },
+      "create_inventory": {
+        "label": "inventory",
+        "status": 200,
+        "ok": true,
+        "msg": ""
+      }
+    },
+    {
+      "finding": "12/13 banking",
+      "edge_bank_accounts": 11,
+      "db_bank_accounts": "ERR column bank_accounts.is_active does not exist",
+      "db_bank_transactions": 12,
+      "edge_transactions_unscoped": 12,
+      "edge_transactions_per_account": {
+        "Spaceman Operating Account": 11,
+        "E2E QA Account 1785244776970 EDITED": 0,
+        "E2E QA Account 1785244832245 EDITED": 0,
+        "E2E QA Account 1785245497253 EDITED": 0,
+        "E2E QA Account 1785245780762 EDITED": 0,
+        "E2E QA Account 1785246905214 EDITED": 0,
+        "E2E QA Account 1785247104006 EDITED": 0,
+        "E2E QA Account 1785247972680 EDITED": 0,
+        "E2E QA Account 1785257847289 EDITED": 1,
+        "E2E QA Account 1785261864464 EDITED": 0,
+        "E2E QA Account 1785296801599 EDITED": 0
+      },
+      "unlinked_to_coa": null
+    },
+    {
+      "finding": "14 statement lines",
+      "edge_status": 200,
+      "edge_rows": 0,
+      "db_rows": 0
+    },
+    {
+      "finding": "15 reconciliation",
+      "bank_account": "Spaceman Operating Account",
+      "recon_status": 400,
+      "recon_rows": null,
+      "recon_msg": "account_id is required.",
+      "book_balance_status": 400,
+      "book_balance": "account_id is required."
+    },
+    {
+      "finding": "16 audit trail",
+      "edge_status": 200,
+      "edge_rows": 50,
+      "edge_row_keys": [
+        "id",
+        "company_id",
+        "table_name",
+        "record_id",
+        "operation",
+        "old_data",
+        "new_data",
+        "changed_by",
+        "created_at",
+        "profiles"
+      ],
+      "db_rows": 500,
+      "db_actions": [
+        "products:INSERT",
+        "journal_entries:INSERT",
+        "journal_entry_items:INSERT",
+        "bills:UPDATE",
+        "bills:INSERT",
+        "chart_of_accounts:UPDATE",
+        "invoices:INSERT",
+        "invoices:UPDATE",
+        "inventory_transactions:INSERT",
+        "products:UPDATE",
+        "payroll_runs:UPDATE",
+        "fixed_assets:UPDATE",
+        "payslips:UPDATE",
+        "payslips:INSERT",
+        "payroll_runs:INSERT",
+        "employees:EMPLOYEE_NUMBER_GENERATED",
+        "employees:INSERT",
+        "journal_entries:UPDATE",
+        "quote_items:INSERT",
+        "quotes:INSERT"
+      ],
+      "newest": "2026-08-22T10:18:34.90482+00:00"
+    },
+    {
+      "finding": "17/18 supplier statement",
+      "vendor": "DBG Vendor 1785244116190",
+      "details_status": 200,
+      "details_keys": [
+        "vendor",
+        "statement",
+        "opening_balance"
+      ],
+      "ap_rows": 0,
+      "ap_row_keys": [],
+      "has_ageing_buckets": false
+    },
+    {
+      "finding": "21 live reporting",
+      "trial_balance": {
+        "status": 200,
+        "balanced": true
+      },
+      "balance_sheet": {
+        "status": 200,
+        "keys": [
+          "accounts",
+          "dates",
+          "netIncome",
+          "totals"
+        ]
+      },
+      "income_statement": {
+        "status": 200,
+        "keys": [
+          "months",
+          "accounts",
+          "monthTotals"
+        ]
+      }
+    }
+  ]
+}
