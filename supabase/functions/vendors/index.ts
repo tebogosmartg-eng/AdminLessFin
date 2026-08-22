@@ -176,7 +176,110 @@ serve(withEnterprisePlatform('vendors', 'tenant', async (req, _ctx) => {
           };
         });
 
-        data = { vendor, statement, opening_balance };
+        // ── Age analysis ────────────────────────────────────────────────
+        // Buckets the vendor's OUTSTANDING bills by how far past their own due
+        // date they are, using the bill's actual due_date (itself derived from
+        // the vendor's payment terms at capture time) against the as-of date.
+        // Never derived from a display date, and void bills are excluded
+        // because a voided bill is not owed.
+        const asOf = date_to || new Date().toISOString().slice(0, 10);
+
+        const { data: openBills, error: openBillsError } = await supabaseAdmin
+          .from('bills')
+          .select('id, bill_number, bill_date, due_date, status, journal_entry_id')
+          .eq('company_id', company_id)
+          .eq('vendor_id', vendorId)
+          .not('status', 'in', '("void","paid")');
+        if (openBillsError) throw openBillsError;
+
+        // Outstanding per bill = the AP credit its own journal raised, less any
+        // AP debits posted against that same journal (allocations/credit notes).
+        const billJournalIds = (openBills || []).map((b: any) => b.journal_entry_id).filter(Boolean);
+        const apMovesByJournal: Record<string, number> = {};
+        if (billJournalIds.length) {
+          const { data: apMoves, error: apMovesError } = await supabaseAdmin
+            .from('journal_entry_items')
+            .select('journal_entry_id, account_id, type, amount')
+            .in('journal_entry_id', billJournalIds);
+          if (apMovesError) throw apMovesError;
+          for (const m of apMoves || []) {
+            if (!apAccountIds.has(m.account_id)) continue;
+            const signed = m.type === 'credit' ? Number(m.amount) : -Number(m.amount);
+            apMovesByJournal[m.journal_entry_id] = (apMovesByJournal[m.journal_entry_id] ?? 0) + signed;
+          }
+        }
+
+        const buckets = { current: 0, days_1_30: 0, days_31_60: 0, days_61_90: 0, days_120_plus: 0 };
+        const ageingBills: any[] = [];
+        const dayMs = 86400000;
+        for (const b of openBills || []) {
+          const outstanding = Math.round((apMovesByJournal[b.journal_entry_id] ?? 0) * 100) / 100;
+          if (outstanding <= 0) continue;
+          const due = b.due_date || b.bill_date;
+          const daysOverdue = due
+            ? Math.floor((Date.parse(`${asOf}T00:00:00Z`) - Date.parse(`${due}T00:00:00Z`)) / dayMs)
+            : 0;
+          let bucket: keyof typeof buckets;
+          if (daysOverdue <= 0) bucket = 'current';
+          else if (daysOverdue <= 30) bucket = 'days_1_30';
+          else if (daysOverdue <= 60) bucket = 'days_31_60';
+          else if (daysOverdue <= 90) bucket = 'days_61_90';
+          else bucket = 'days_120_plus';
+          buckets[bucket] += outstanding;
+          ageingBills.push({
+            bill_id: b.id,
+            bill_number: b.bill_number,
+            bill_date: b.bill_date,
+            due_date: b.due_date,
+            days_overdue: daysOverdue,
+            outstanding,
+            bucket,
+          });
+        }
+        // Reconcile the ageing to the AP control account. AP can legitimately
+        // carry movements that are not open bills (loan liabilities booked to
+        // the same account, direct journals, payments on account). Reporting
+        // the difference explicitly is honest; showing the ageing alone would
+        // imply the supplier owes only what the open bills total.
+        let apControlBalance = 0;
+        if (apAccountIds.size) {
+          const { data: apAll, error: apAllError } = await supabaseAdmin
+            .from('journal_entry_items')
+            .select('amount, type, account_id, journal_entries!inner (company_id, vendor_id, entry_date)')
+            .eq('journal_entries.company_id', company_id)
+            .eq('journal_entries.vendor_id', vendorId)
+            .lte('journal_entries.entry_date', asOf);
+          if (apAllError) throw apAllError;
+          for (const m of apAll || []) {
+            if (!apAccountIds.has((m as any).account_id)) continue;
+            apControlBalance += (m as any).type === 'credit' ? Number((m as any).amount) : -Number((m as any).amount);
+          }
+        }
+
+        const round2 = (n: number) => Math.round(n * 100) / 100;
+        const ageing = {
+          as_of: asOf,
+          current: round2(buckets.current),
+          days_1_30: round2(buckets.days_1_30),
+          days_31_60: round2(buckets.days_31_60),
+          days_61_90: round2(buckets.days_61_90),
+          days_120_plus: round2(buckets.days_120_plus),
+          total: round2(
+            buckets.current + buckets.days_1_30 + buckets.days_31_60 +
+            buckets.days_61_90 + buckets.days_120_plus,
+          ),
+          bills: ageingBills.sort((a, b) => b.days_overdue - a.days_overdue),
+          ap_control_balance: round2(apControlBalance),
+          // Control balance not represented by an open bill: payments on
+          // account, credit notes, loans or journals booked straight to AP.
+          unallocated: round2(
+            apControlBalance -
+              (buckets.current + buckets.days_1_30 + buckets.days_31_60 +
+               buckets.days_61_90 + buckets.days_120_plus),
+          ),
+        };
+
+        data = { vendor, statement, opening_balance, ageing };
         break;
       }
 

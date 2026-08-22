@@ -3,12 +3,13 @@ import { useParams, Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../integrations/supabase/client';
 import { useAuth } from '../contexts/AuthContext';
+import { downloadSupplierStatementPdf } from '../lib/statements/supplierStatementPdf';
 import { useReportingPeriod } from '../contexts/ReportingPeriodContext';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/table';
 import { Skeleton } from '../components/ui/skeleton';
-import { Download, Printer, ArrowLeft, Mail, Phone, MapPin, Send } from 'lucide-react';
+import { Download, FileText, Printer, ArrowLeft, Mail, Phone, MapPin, Send } from 'lucide-react';
 import { formatCurrency, downloadCSV } from '../lib/utils';
 import { format } from 'date-fns';
 import SendStatementDialog from '../components/SendStatementDialog';
@@ -69,6 +70,25 @@ const VendorDetail = () => {
   const totalBilled = statement.filter(t => t.type === 'bill').reduce((sum, t) => sum + t.amount, 0);
   const totalPaid = statement.filter(t => t.type === 'payment').reduce((sum, t) => sum + t.amount, 0);
 
+  const ageing = data?.ageing ?? null;
+
+  const handleDownloadPDF = () => {
+    downloadSupplierStatementPdf({
+      companyName: activeCompany?.name ?? 'Statement',
+      companyAddress: (activeCompany as { address?: string } | null)?.address ?? null,
+      vendorName: vendor?.name ?? 'Supplier',
+      vendorAddress: vendor?.address ?? null,
+      dateFrom,
+      dateTo,
+      openingBalance,
+      closingBalance: currentBalance,
+      totalBilled,
+      totalPaid,
+      lines: statement,
+      ageing,
+    });
+  };
+
   const handleDownloadCSV = () => {
     const csvData = [
       { Date: dateFrom, Description: 'Opening Balance', Reference: '', Type: '', Amount: '', Balance: openingBalance.toFixed(2) },
@@ -124,6 +144,46 @@ const VendorDetail = () => {
           </CardHeader>
         </Card>
 
+        {ageing && (
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle>Age Analysis</CardTitle>
+              <CardDescription>
+                Outstanding bills by days past their due date, as at{' '}
+                {ageing.as_of ? format(new Date(ageing.as_of), 'PPP') : '—'}.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-2 md:grid-cols-6 gap-3 text-sm">
+                {([
+                  ['Current', ageing.current],
+                  ['1-30 days', ageing.days_1_30],
+                  ['31-60 days', ageing.days_31_60],
+                  ['61-90 days', ageing.days_61_90],
+                  ['90+ days', ageing.days_120_plus],
+                ] as Array<[string, number]>).map(([label, value]) => (
+                  <div key={label} className="rounded-md border p-3">
+                    <div className="text-xs text-muted-foreground">{label}</div>
+                    <div className="font-semibold">{formatCurrency(value ?? 0)}</div>
+                  </div>
+                ))}
+                <div className="rounded-md border p-3 bg-muted/40">
+                  <div className="text-xs text-muted-foreground">Total</div>
+                  <div className="font-semibold">{formatCurrency(ageing.total ?? 0)}</div>
+                </div>
+              </div>
+              {Math.abs(Number(ageing.unallocated ?? 0)) >= 0.01 && (
+                <p className="mt-3 text-xs text-muted-foreground">
+                  The age analysis covers open bills ({formatCurrency(ageing.total ?? 0)}). The supplier
+                  control account balance is {formatCurrency(ageing.ap_control_balance ?? 0)}; the
+                  difference of {formatCurrency(ageing.unallocated ?? 0)} is payments on account, credit
+                  notes, or journals not allocated to a specific bill.
+                </p>
+              )}
+            </CardContent>
+          </Card>
+        )}
+
         <Card className="print:hidden">
           <CardHeader>
             <CardTitle>Period Overview</CardTitle>
@@ -162,6 +222,9 @@ const VendorDetail = () => {
               <ReportingPeriodPicker showLabel={false} />
               <Button variant="outline" onClick={() => setIsEmailOpen(true)} title="Email Statement">
                 <Send className="mr-2 h-4 w-4" /> Email
+              </Button>
+              <Button variant="outline" onClick={handleDownloadPDF} title="Download statement as PDF">
+                <FileText className="mr-2 h-4 w-4" /> PDF
               </Button>
               <Button variant="outline" size="icon" onClick={handleDownloadCSV} title="Download CSV">
                 <Download className="h-4 w-4" />
