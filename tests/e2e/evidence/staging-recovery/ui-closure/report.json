@@ -1,5 +1,5 @@
 {
-  "at": "2026-08-22T11:56:29.938Z",
+  "at": "2026-08-22T15:42:37.509Z",
   "company": "Spaceman",
   "login": {
     "landed": "/",
@@ -108,12 +108,28 @@
     }
   ],
   "errorUx": {
-    "toastText": "Function Error: An unexpected platform error occurred.",
+    "validation": {
+      "text": "Function Error: Some information is missing or invalid. Please review and try again.",
+      "opaque": false,
+      "placeholder": false,
+      "useful": true
+    },
+    "integration": {
+      "text": "Function Error: Email sending is not set up for this workspace yet, so the message was not sent.",
+      "opaque": false,
+      "placeholder": false,
+      "useful": true
+    },
+    "toastText": "Function Error: Email sending is not set up for this workspace yet, so the message was not sent.",
     "opaqueShown": false,
-    "realShown": false
+    "realShown": true
   },
   "consoleErrors": [],
   "failedCalls": [
+    {
+      "fn": "send-quote-email",
+      "status": 400
+    },
     {
       "fn": "send-quote-email",
       "status": 500

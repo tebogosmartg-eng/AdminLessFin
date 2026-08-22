@@ -125,43 +125,59 @@ async function main() {
   }
 
   // ---- C. Error UX proof ---------------------------------------------------
-  console.log(NL + '=== C. DELIBERATE BACKEND FAILURE THROUGH THE REAL UI ===');
-  let toastText = '';
-  if (quoteId) {
+  console.log(NL + '=== C. DELIBERATE BACKEND FAILURES THROUGH THE REAL UI ===');
+
+  /** Sends the quotation from the real dialog and returns the toast shown. */
+  const sendQuoteAndReadToast = async (recipient: string | null, shot: string) => {
     await page.goto(`${BASE_URL}/quotes/${quoteId}`, { waitUntil: 'domcontentloaded' });
     await page.waitForTimeout(3000);
     const sendBtn = page.getByRole('button', { name: /send/i }).first();
-    if (await sendBtn.count()) {
-      await sendBtn.click();
-      await page.waitForTimeout(1800);
+    if (!(await sendBtn.count())) return '(send control not found)';
+    await sendBtn.click();
+    await page.waitForTimeout(1800);
 
-      // A real recipient, so the send reaches the provider boundary and fails
-      // there rather than on a missing field.
-      const toField = page.locator('input[type="email"], input#to, input[name="to"]').first();
-      if (await toField.count()) { await toField.fill('closure@example.com'); }
+    const toField = page.locator('input[type="email"], input#to, input[name="to"]').first();
+    if (await toField.count()) await toField.fill(recipient ?? '');
 
-      await page.getByRole('button', { name: /^send/i }).last().click();
+    await page.getByRole('button', { name: /^send/i }).last().click();
 
-      // Poll for the toast rather than sleeping past it. Matching line by line
-      // avoids escaping newlines inside the pattern.
-      const wanted = /Function Error:|not configured|RESEND_API_KEY|non-2xx/i;
-      for (let i = 0; i < 50; i++) {
-        const body = await page.locator('body').innerText();
-        const hit = body.split(NL).map((l) => l.trim()).find((l) => wanted.test(l));
-        if (hit) { toastText = hit; break; }
-        await page.waitForTimeout(300);
-      }
-      if (!toastText) toastText = '(no message captured)';
-      await page.screenshot({ path: path.join(OUT, 'error-ux-quote-email.png'), fullPage: true });
-    } else {
-      toastText = '(send control not found)';
+    // Poll for the toast rather than sleeping past it. Matching line by line
+    // avoids escaping newlines inside the pattern.
+    const wanted = /Function Error:|non-2xx|not set up|required|configured/i;
+    let hit = '';
+    for (let i = 0; i < 50; i++) {
+      const body = await page.locator('body').innerText();
+      const found = body.split(NL).map((l) => l.trim()).find((l) => wanted.test(l));
+      if (found) { hit = found; break; }
+      await page.waitForTimeout(300);
     }
-  }
-  console.log(`  message shown to the user: "${toastText}"`);
-  const opaqueShown = OPAQUE.test(toastText);
-  const realShown = /not configured|RESEND_API_KEY/i.test(toastText);
-  console.log(`  opaque transport string shown: ${opaqueShown ? 'YES — STILL BROKEN' : 'no'}`);
-  console.log(`  server diagnosis shown:        ${realShown ? 'YES' : 'no'}`);
+    await page.screenshot({ path: path.join(OUT, shot), fullPage: true });
+    return hit || '(no message captured)';
+  };
+
+  // C1 — a ValidationError raised by the backend (no recipient supplied).
+  const toastValidation = quoteId ? await sendQuoteAndReadToast(null, 'error-ux-validation.png') : '';
+  // C2 — an IntegrationError raised by the backend (mail not configured).
+  const toastIntegration = quoteId ? await sendQuoteAndReadToast('closure@example.com', 'error-ux-integration.png') : '';
+
+  const judge = (label: string, text: string) => {
+    const opaque = OPAQUE.test(text);
+    // Useful means: not the transport string, not the unclassified placeholder,
+    // and long enough to actually say something.
+    const placeholder = /An unexpected platform error occurred/i.test(text);
+    const useful = !opaque && !placeholder && text.replace(/^Function Error:\s*/i, '').trim().length > 15;
+    console.log(`  ${label}`);
+    console.log(`     shown to the user: "${text}"`);
+    console.log(`     opaque transport string: ${opaque ? 'YES — STILL BROKEN' : 'no'}`);
+    console.log(`     unclassified placeholder: ${placeholder ? 'YES — STILL VAGUE' : 'no'}`);
+    console.log(`     actionable: ${useful ? 'YES' : 'NO'}`);
+    return { text, opaque, placeholder, useful };
+  };
+  const uxValidation = judge('C1 backend validation failure (no recipient)', toastValidation);
+  const uxIntegration = judge('C2 backend integration failure (mail not configured)', toastIntegration);
+  const toastText = toastIntegration;
+  const opaqueShown = uxValidation.opaque || uxIntegration.opaque;
+  const realShown = uxValidation.useful && uxIntegration.useful;
 
   await browser.close();
   if (quoteId) {
@@ -180,7 +196,7 @@ async function main() {
   fs.writeFileSync(path.join(OUT, 'report.json'), JSON.stringify({
     at: new Date().toISOString(), company: company.name,
     login: { landed, stillThere, afterReload },
-    sweep, errorUx: { toastText, opaqueShown, realShown },
+    sweep, errorUx: { validation: uxValidation, integration: uxIntegration, toastText, opaqueShown, realShown },
     consoleErrors: nonAuthErrors, failedCalls: failed,
   }, null, 2));
 }
