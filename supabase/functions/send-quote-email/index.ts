@@ -58,6 +58,7 @@ serve(withEnterprisePlatform('send-quote-email', 'tenant', async (req, _ctx) => 
         quote_number,
         quote_date,
         expiry_date,
+        terms,
         customers ( name, address ),
         quote_items (
           description,
@@ -136,6 +137,13 @@ serve(withEnterprisePlatform('send-quote-email', 'tenant', async (req, _ctx) => 
                 </tr>
               </tfoot>
             </table>
+            ${quote.terms ? `
+              <div style="margin-top: 24px; border-top: 1px solid #eee; padding-top: 12px;">
+                <h4 style="margin: 0 0 6px 0; font-size: 13px; font-weight: bold;">Terms &amp; Conditions</h4>
+                <p style="margin: 0; font-size: 11px; color: #666; white-space: pre-wrap;">${String(quote.terms)
+                  .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</p>
+              </div>
+            ` : ''}
             <p style="margin-top: 20px; font-size: 12px; color: #999; text-align: center;">
               This quote is valid until ${quote.expiry_date ? new Date(quote.expiry_date).toLocaleDateString() : 'further notice'}.
             </p>

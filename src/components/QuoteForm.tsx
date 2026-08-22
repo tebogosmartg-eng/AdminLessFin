@@ -39,6 +39,7 @@ const quoteSchema = z.object({
   expiry_date: z.string().optional(),
   customer_id: z.string().min(1, "Customer is required."),
   description: z.string().optional(),
+  terms: z.string().optional(),
   items: z.array(quoteItemSchema).min(1, "At least one line item is required."),
 });
 
@@ -67,6 +68,7 @@ const QuoteForm = ({ isOpen, setIsOpen, quoteId, duplicateFromId }: QuoteFormPro
       expiry_date: format(addDays(new Date(), 30), 'yyyy-MM-dd'),
       customer_id: '',
       description: '',
+      terms: '',
       items: [{ product_id: '', description: '', quantity: 1, unit_price: 0, income_account_id: '', tax_rate_id: '' }],
     },
   });
@@ -96,6 +98,7 @@ const QuoteForm = ({ isOpen, setIsOpen, quoteId, duplicateFromId }: QuoteFormPro
         expiry_date: isDuplicating ? format(addDays(new Date(), 30), 'yyyy-MM-dd') : (sourceQuote.expiry_date || ''),
         customer_id: sourceQuote.customer_id,
         description: sourceQuote.description || '',
+        terms: sourceQuote.terms || '',
         items: sourceQuote.quote_items.map((item: any) => ({
           ...item,
           tax_rate_id: item.tax_rate_id || '',
@@ -121,6 +124,32 @@ const QuoteForm = ({ isOpen, setIsOpen, quoteId, duplicateFromId }: QuoteFormPro
       form.setValue('quote_number', nextQuoteNumber);
     }
   }, [nextQuoteNumber, isEditing, form]);
+
+  // The company's standing quotation terms — the "template" wording. Copied
+  // into a NEW quote only, and only while the field is still untouched, so a
+  // quote already issued keeps the terms it was issued with even if the company
+  // default changes later.
+  const { data: companySettings } = useQuery({
+    queryKey: ['company_default_quote_terms', activeCompany?.id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('companies')
+        .select('default_quote_terms')
+        .eq('id', activeCompany!.id)
+        .maybeSingle();
+      if (error) throw error;
+      return data;
+    },
+    enabled: isOpen && !!activeCompany,
+  });
+
+  useEffect(() => {
+    if (!isOpen || isEditing) return;
+    const standing = companySettings?.default_quote_terms;
+    if (standing && !form.getValues('terms')) {
+      form.setValue('terms', standing);
+    }
+  }, [isOpen, isEditing, companySettings, form]);
 
   const { fields, append, remove } = useFieldArray({ control: form.control, name: "items" });
 
@@ -198,6 +227,23 @@ const QuoteForm = ({ isOpen, setIsOpen, quoteId, duplicateFromId }: QuoteFormPro
                   <FormItem><FormLabel>Expiry Date</FormLabel><FormControl><Input type="date" {...field} /></FormControl><FormMessage /></FormItem>
                 )} />
               </div>
+              <FormField control={form.control} name="terms" render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Terms &amp; Conditions</FormLabel>
+                  <FormControl>
+                    <Textarea
+                      rows={4}
+                      placeholder="e.g., Valid for 30 days. 50% deposit on acceptance. E&amp;OE."
+                      {...field}
+                    />
+                  </FormControl>
+                  <p className="text-xs text-muted-foreground">
+                    Printed on the quotation and included in the emailed copy. Prefilled from your
+                    company default; edit it here to change only this quotation.
+                  </p>
+                  <FormMessage />
+                </FormItem>
+              )} />
               <FormField control={form.control} name="description" render={({ field }) => (
                 <FormItem><FormLabel>Description / Memo (Optional)</FormLabel><FormControl><Textarea placeholder="e.g., Project proposal details" {...field} /></FormControl><FormMessage /></FormItem>
               )} />

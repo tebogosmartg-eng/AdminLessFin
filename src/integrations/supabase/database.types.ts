@@ -103,6 +103,473 @@ export type Database = {
           },
         ]
       }
+      accounting_policy_audit_log: {
+        Row: {
+          company_id: string
+          created_at: string
+          id: string
+          journal_entry_id: string | null
+          message: string | null
+          metadata: Json
+          module: string | null
+          policy_code: string
+          policy_name: string
+          posting_request_id: string | null
+          reason: string | null
+          result: string
+          severity: string | null
+          user_id: string | null
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          id?: string
+          journal_entry_id?: string | null
+          message?: string | null
+          metadata?: Json
+          module?: string | null
+          policy_code: string
+          policy_name: string
+          posting_request_id?: string | null
+          reason?: string | null
+          result: string
+          severity?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          id?: string
+          journal_entry_id?: string | null
+          message?: string | null
+          metadata?: Json
+          module?: string | null
+          policy_code?: string
+          policy_name?: string
+          posting_request_id?: string | null
+          reason?: string | null
+          result?: string
+          severity?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "accounting_policy_audit_log_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "accounting_policy_audit_log_journal_entry_id_fkey"
+            columns: ["journal_entry_id"]
+            isOneToOne: false
+            referencedRelation: "journal_entries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "accounting_policy_audit_log_posting_request_id_fkey"
+            columns: ["posting_request_id"]
+            isOneToOne: false
+            referencedRelation: "posting_requests"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      accounting_policy_definitions: {
+        Row: {
+          code: string
+          created_at: string
+          default_severity: string
+          description: string | null
+          domain: string
+          evaluation_hook: string
+          id: string
+          industry_template: string | null
+          is_mandatory: boolean
+          name: string
+          policy_type: string
+        }
+        Insert: {
+          code: string
+          created_at?: string
+          default_severity: string
+          description?: string | null
+          domain: string
+          evaluation_hook: string
+          id?: string
+          industry_template?: string | null
+          is_mandatory?: boolean
+          name: string
+          policy_type: string
+        }
+        Update: {
+          code?: string
+          created_at?: string
+          default_severity?: string
+          description?: string | null
+          domain?: string
+          evaluation_hook?: string
+          id?: string
+          industry_template?: string | null
+          is_mandatory?: boolean
+          name?: string
+          policy_type?: string
+        }
+        Relationships: []
+      }
+      accounting_policy_settings: {
+        Row: {
+          company_id: string
+          created_at: string
+          enabled: boolean
+          id: string
+          policy_id: string
+          severity_override: string | null
+          updated_at: string
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          enabled?: boolean
+          id?: string
+          policy_id: string
+          severity_override?: string | null
+          updated_at?: string
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          enabled?: boolean
+          id?: string
+          policy_id?: string
+          severity_override?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "accounting_policy_settings_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "accounting_policy_settings_policy_id_fkey"
+            columns: ["policy_id"]
+            isOneToOne: false
+            referencedRelation: "accounting_policy_definitions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      accounting_readiness: {
+        Row: {
+          accounting_ready: boolean
+          bank_accounts_complete: boolean
+          bank_accounts_skipped: boolean
+          chart_of_accounts_complete: boolean
+          company_id: string
+          created_at: string
+          current_step: string
+          financial_calendar_complete: boolean
+          fixed_assets_enabled: boolean
+          inventory_enabled: boolean
+          last_validated_at: string | null
+          locked_at: string | null
+          locked_by: string | null
+          opening_balances_complete: boolean
+          opening_balances_zero_intentional: boolean
+          payroll_enabled: boolean
+          status: string
+          tax_configuration_complete: boolean
+          updated_at: string
+          validation_complete: boolean
+        }
+        Insert: {
+          accounting_ready?: boolean
+          bank_accounts_complete?: boolean
+          bank_accounts_skipped?: boolean
+          chart_of_accounts_complete?: boolean
+          company_id: string
+          created_at?: string
+          current_step?: string
+          financial_calendar_complete?: boolean
+          fixed_assets_enabled?: boolean
+          inventory_enabled?: boolean
+          last_validated_at?: string | null
+          locked_at?: string | null
+          locked_by?: string | null
+          opening_balances_complete?: boolean
+          opening_balances_zero_intentional?: boolean
+          payroll_enabled?: boolean
+          status?: string
+          tax_configuration_complete?: boolean
+          updated_at?: string
+          validation_complete?: boolean
+        }
+        Update: {
+          accounting_ready?: boolean
+          bank_accounts_complete?: boolean
+          bank_accounts_skipped?: boolean
+          chart_of_accounts_complete?: boolean
+          company_id?: string
+          created_at?: string
+          current_step?: string
+          financial_calendar_complete?: boolean
+          fixed_assets_enabled?: boolean
+          inventory_enabled?: boolean
+          last_validated_at?: string | null
+          locked_at?: string | null
+          locked_by?: string | null
+          opening_balances_complete?: boolean
+          opening_balances_zero_intentional?: boolean
+          payroll_enabled?: boolean
+          status?: string
+          tax_configuration_complete?: boolean
+          updated_at?: string
+          validation_complete?: boolean
+        }
+        Relationships: [
+          {
+            foreignKeyName: "accounting_readiness_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: true
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      accounting_rule_definitions: {
+        Row: {
+          business_event: string
+          cloned_from_id: string | null
+          code: string
+          company_id: string | null
+          created_at: string
+          currency_behaviour: string
+          description: string | null
+          dimension_rules: Json
+          generation_hook: string
+          id: string
+          industry_template: string | null
+          is_mandatory: boolean
+          line_template: Json
+          module: string
+          name: string
+          narration_template: string | null
+          period_rules: Json
+          rule_type: string
+          trigger_event: string
+          updated_at: string
+          vat_treatment: string | null
+          version: number
+        }
+        Insert: {
+          business_event: string
+          cloned_from_id?: string | null
+          code: string
+          company_id?: string | null
+          created_at?: string
+          currency_behaviour?: string
+          description?: string | null
+          dimension_rules?: Json
+          generation_hook: string
+          id?: string
+          industry_template?: string | null
+          is_mandatory?: boolean
+          line_template?: Json
+          module: string
+          name: string
+          narration_template?: string | null
+          period_rules?: Json
+          rule_type: string
+          trigger_event?: string
+          updated_at?: string
+          vat_treatment?: string | null
+          version?: number
+        }
+        Update: {
+          business_event?: string
+          cloned_from_id?: string | null
+          code?: string
+          company_id?: string | null
+          created_at?: string
+          currency_behaviour?: string
+          description?: string | null
+          dimension_rules?: Json
+          generation_hook?: string
+          id?: string
+          industry_template?: string | null
+          is_mandatory?: boolean
+          line_template?: Json
+          module?: string
+          name?: string
+          narration_template?: string | null
+          period_rules?: Json
+          rule_type?: string
+          trigger_event?: string
+          updated_at?: string
+          vat_treatment?: string | null
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "accounting_rule_definitions_cloned_from_id_fkey"
+            columns: ["cloned_from_id"]
+            isOneToOne: false
+            referencedRelation: "accounting_rule_definitions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "accounting_rule_definitions_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      accounting_rule_executions: {
+        Row: {
+          business_event: string
+          company_id: string
+          created_at: string
+          generated_by: string | null
+          id: string
+          journal_entry_id: string | null
+          line_count: number | null
+          metadata: Json
+          module: string
+          narration: string | null
+          posting_request_id: string | null
+          result: string
+          rule_code: string
+          rule_id: string
+          rule_name: string
+          rule_version: number
+          total_credit: number | null
+          total_debit: number | null
+        }
+        Insert: {
+          business_event: string
+          company_id: string
+          created_at?: string
+          generated_by?: string | null
+          id?: string
+          journal_entry_id?: string | null
+          line_count?: number | null
+          metadata?: Json
+          module: string
+          narration?: string | null
+          posting_request_id?: string | null
+          result: string
+          rule_code: string
+          rule_id: string
+          rule_name: string
+          rule_version: number
+          total_credit?: number | null
+          total_debit?: number | null
+        }
+        Update: {
+          business_event?: string
+          company_id?: string
+          created_at?: string
+          generated_by?: string | null
+          id?: string
+          journal_entry_id?: string | null
+          line_count?: number | null
+          metadata?: Json
+          module?: string
+          narration?: string | null
+          posting_request_id?: string | null
+          result?: string
+          rule_code?: string
+          rule_id?: string
+          rule_name?: string
+          rule_version?: number
+          total_credit?: number | null
+          total_debit?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "accounting_rule_executions_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "accounting_rule_executions_journal_entry_id_fkey"
+            columns: ["journal_entry_id"]
+            isOneToOne: false
+            referencedRelation: "journal_entries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "accounting_rule_executions_posting_request_id_fkey"
+            columns: ["posting_request_id"]
+            isOneToOne: false
+            referencedRelation: "posting_requests"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "accounting_rule_executions_rule_id_fkey"
+            columns: ["rule_id"]
+            isOneToOne: false
+            referencedRelation: "accounting_rule_definitions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      accounting_rule_settings: {
+        Row: {
+          account_overrides: Json
+          company_id: string
+          created_at: string
+          enabled: boolean
+          id: string
+          rule_id: string
+          severity_override: string | null
+          updated_at: string
+        }
+        Insert: {
+          account_overrides?: Json
+          company_id: string
+          created_at?: string
+          enabled?: boolean
+          id?: string
+          rule_id: string
+          severity_override?: string | null
+          updated_at?: string
+        }
+        Update: {
+          account_overrides?: Json
+          company_id?: string
+          created_at?: string
+          enabled?: boolean
+          id?: string
+          rule_id?: string
+          severity_override?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "accounting_rule_settings_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "accounting_rule_settings_rule_id_fkey"
+            columns: ["rule_id"]
+            isOneToOne: false
+            referencedRelation: "accounting_rule_definitions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       asset_acquisitions: {
         Row: {
           accumulated_depreciation_account_id: string | null
@@ -1454,6 +1921,282 @@ export type Database = {
           },
         ]
       }
+      business_event_aggregates: {
+        Row: {
+          aggregate_key: string
+          company_id: string
+          last_sequence: number
+          updated_at: string
+        }
+        Insert: {
+          aggregate_key: string
+          company_id: string
+          last_sequence?: number
+          updated_at?: string
+        }
+        Update: {
+          aggregate_key?: string
+          company_id?: string
+          last_sequence?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "business_event_aggregates_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      business_event_dead_letter: {
+        Row: {
+          company_id: string
+          created_at: string
+          delivery_id: string | null
+          event_record_id: string
+          id: string
+          payload: Json
+          reason: string
+          replayed_at: string | null
+          subscriber_id: string
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          delivery_id?: string | null
+          event_record_id: string
+          id?: string
+          payload?: Json
+          reason: string
+          replayed_at?: string | null
+          subscriber_id: string
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          delivery_id?: string | null
+          event_record_id?: string
+          id?: string
+          payload?: Json
+          reason?: string
+          replayed_at?: string | null
+          subscriber_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "business_event_dead_letter_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "business_event_dead_letter_delivery_id_fkey"
+            columns: ["delivery_id"]
+            isOneToOne: false
+            referencedRelation: "business_event_deliveries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "business_event_dead_letter_event_record_id_fkey"
+            columns: ["event_record_id"]
+            isOneToOne: false
+            referencedRelation: "business_events"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      business_event_deliveries: {
+        Row: {
+          company_id: string
+          completed_at: string | null
+          correlation_id: string
+          created_at: string
+          duration_ms: number | null
+          error_message: string | null
+          event_record_id: string
+          id: string
+          result: Json
+          retry_count: number
+          started_at: string | null
+          status: string
+          subscriber_id: string
+        }
+        Insert: {
+          company_id: string
+          completed_at?: string | null
+          correlation_id: string
+          created_at?: string
+          duration_ms?: number | null
+          error_message?: string | null
+          event_record_id: string
+          id?: string
+          result?: Json
+          retry_count?: number
+          started_at?: string | null
+          status?: string
+          subscriber_id: string
+        }
+        Update: {
+          company_id?: string
+          completed_at?: string | null
+          correlation_id?: string
+          created_at?: string
+          duration_ms?: number | null
+          error_message?: string | null
+          event_record_id?: string
+          id?: string
+          result?: Json
+          retry_count?: number
+          started_at?: string | null
+          status?: string
+          subscriber_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "business_event_deliveries_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "business_event_deliveries_event_record_id_fkey"
+            columns: ["event_record_id"]
+            isOneToOne: false
+            referencedRelation: "business_events"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "business_event_deliveries_subscriber_id_fkey"
+            columns: ["subscriber_id"]
+            isOneToOne: false
+            referencedRelation: "business_event_subscribers"
+            referencedColumns: ["subscriber_id"]
+          },
+        ]
+      }
+      business_event_subscribers: {
+        Row: {
+          created_at: string
+          description: string | null
+          enabled: boolean
+          handles_accounting_impact: boolean | null
+          handles_event_types: string[]
+          handles_modules: string[]
+          name: string
+          priority: number
+          subscriber_id: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          enabled?: boolean
+          handles_accounting_impact?: boolean | null
+          handles_event_types?: string[]
+          handles_modules?: string[]
+          name: string
+          priority?: number
+          subscriber_id: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          enabled?: boolean
+          handles_accounting_impact?: boolean | null
+          handles_event_types?: string[]
+          handles_modules?: string[]
+          name?: string
+          priority?: number
+          subscriber_id?: string
+        }
+        Relationships: []
+      }
+      business_events: {
+        Row: {
+          accounting_impact: boolean
+          aggregate_key: string
+          business_event: string
+          company_id: string
+          completed_at: string | null
+          correlation_id: string
+          created_at: string
+          entity_id: string
+          entity_type: string
+          event_id: string
+          event_type: string
+          id: string
+          idempotency_key: string
+          metadata: Json
+          payload: Json
+          published_at: string
+          publisher_id: string | null
+          retry_count: number
+          sequence_number: number
+          source_module: string
+          status: string
+          version: number
+        }
+        Insert: {
+          accounting_impact?: boolean
+          aggregate_key: string
+          business_event: string
+          company_id: string
+          completed_at?: string | null
+          correlation_id: string
+          created_at?: string
+          entity_id: string
+          entity_type: string
+          event_id: string
+          event_type: string
+          id?: string
+          idempotency_key: string
+          metadata?: Json
+          payload?: Json
+          published_at?: string
+          publisher_id?: string | null
+          retry_count?: number
+          sequence_number: number
+          source_module: string
+          status?: string
+          version?: number
+        }
+        Update: {
+          accounting_impact?: boolean
+          aggregate_key?: string
+          business_event?: string
+          company_id?: string
+          completed_at?: string | null
+          correlation_id?: string
+          created_at?: string
+          entity_id?: string
+          entity_type?: string
+          event_id?: string
+          event_type?: string
+          id?: string
+          idempotency_key?: string
+          metadata?: Json
+          payload?: Json
+          published_at?: string
+          publisher_id?: string | null
+          retry_count?: number
+          sequence_number?: number
+          source_module?: string
+          status?: string
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "business_events_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       chart_of_accounts: {
         Row: {
           account_code: string | null
@@ -1544,6 +2287,13 @@ export type Database = {
             referencedRelation: "companies"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "chart_of_accounts_parent_account_id_fkey"
+            columns: ["parent_account_id"]
+            isOneToOne: false
+            referencedRelation: "chart_of_accounts"
+            referencedColumns: ["id"]
+          },
         ]
       }
       closed_financial_years: {
@@ -1593,6 +2343,7 @@ export type Database = {
           address: string | null
           created_at: string | null
           default_invoice_notes: string | null
+          default_quote_terms: string | null
           id: string
           logo_url: string | null
           name: string
@@ -1603,6 +2354,7 @@ export type Database = {
           address?: string | null
           created_at?: string | null
           default_invoice_notes?: string | null
+          default_quote_terms?: string | null
           id?: string
           logo_url?: string | null
           name: string
@@ -1613,6 +2365,7 @@ export type Database = {
           address?: string | null
           created_at?: string | null
           default_invoice_notes?: string | null
+          default_quote_terms?: string | null
           id?: string
           logo_url?: string | null
           name?: string
@@ -1664,6 +2417,38 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "company_employee_number_settings_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: true
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      company_materiality_settings: {
+        Row: {
+          absolute_threshold: number
+          company_id: string
+          percentage_threshold: number
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          absolute_threshold?: number
+          company_id: string
+          percentage_threshold?: number
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          absolute_threshold?: number
+          company_id?: string
+          percentage_threshold?: number
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "company_materiality_settings_company_id_fkey"
             columns: ["company_id"]
             isOneToOne: true
             referencedRelation: "companies"
@@ -5342,6 +6127,7 @@ export type Database = {
           company_id: string
           created_at: string
           end_date: string
+          financial_year_id: string | null
           id: string
           label: string
           opened_at: string | null
@@ -5357,6 +6143,7 @@ export type Database = {
           company_id: string
           created_at?: string
           end_date: string
+          financial_year_id?: string | null
           id?: string
           label: string
           opened_at?: string | null
@@ -5372,6 +6159,7 @@ export type Database = {
           company_id?: string
           created_at?: string
           end_date?: string
+          financial_year_id?: string | null
           id?: string
           label?: string
           opened_at?: string | null
@@ -5388,6 +6176,13 @@ export type Database = {
             columns: ["company_id"]
             isOneToOne: false
             referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "efs_reporting_periods_financial_year_id_fkey"
+            columns: ["financial_year_id"]
+            isOneToOne: false
+            referencedRelation: "financial_years"
             referencedColumns: ["id"]
           },
           {
@@ -10191,45 +10986,60 @@ export type Database = {
           accounting_period_id: string | null
           attachment_url: string | null
           bill_id: string | null
+          business_event: string | null
           company_id: string
           created_at: string | null
           customer_id: string | null
           description: string | null
           entry_date: string
           financial_year_id: string | null
+          generated_at: string | null
+          generated_by: string | null
           id: string
           invoice_id: string | null
           journal_number: string | null
+          rule_id: string | null
+          rule_version: number | null
           vendor_id: string | null
         }
         Insert: {
           accounting_period_id?: string | null
           attachment_url?: string | null
           bill_id?: string | null
+          business_event?: string | null
           company_id: string
           created_at?: string | null
           customer_id?: string | null
           description?: string | null
           entry_date: string
           financial_year_id?: string | null
+          generated_at?: string | null
+          generated_by?: string | null
           id?: string
           invoice_id?: string | null
           journal_number?: string | null
+          rule_id?: string | null
+          rule_version?: number | null
           vendor_id?: string | null
         }
         Update: {
           accounting_period_id?: string | null
           attachment_url?: string | null
           bill_id?: string | null
+          business_event?: string | null
           company_id?: string
           created_at?: string | null
           customer_id?: string | null
           description?: string | null
           entry_date?: string
           financial_year_id?: string | null
+          generated_at?: string | null
+          generated_by?: string | null
           id?: string
           invoice_id?: string | null
           journal_number?: string | null
+          rule_id?: string | null
+          rule_version?: number | null
           vendor_id?: string | null
         }
         Relationships: [
@@ -10273,6 +11083,13 @@ export type Database = {
             columns: ["invoice_id"]
             isOneToOne: false
             referencedRelation: "invoices"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "journal_entries_rule_id_fkey"
+            columns: ["rule_id"]
+            isOneToOne: false
+            referencedRelation: "accounting_rule_definitions"
             referencedColumns: ["id"]
           },
           {
@@ -10569,6 +11386,51 @@ export type Database = {
           },
         ]
       }
+      payroll_account_mappings: {
+        Row: {
+          account_id: string
+          account_role: string
+          company_id: string
+          created_at: string
+          id: string
+          is_active: boolean
+          updated_at: string
+        }
+        Insert: {
+          account_id: string
+          account_role: string
+          company_id: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          updated_at?: string
+        }
+        Update: {
+          account_id?: string
+          account_role?: string
+          company_id?: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payroll_account_mappings_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "chart_of_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payroll_account_mappings_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       payroll_audit_events: {
         Row: {
           company_id: string
@@ -10696,6 +11558,7 @@ export type Database = {
           pay_date: string
           pay_period_end: string
           pay_period_start: string
+          posting_request_id: string | null
           processed_at: string | null
           processed_by: string | null
           rule_config: Json
@@ -10712,6 +11575,7 @@ export type Database = {
           pay_date: string
           pay_period_end: string
           pay_period_start: string
+          posting_request_id?: string | null
           processed_at?: string | null
           processed_by?: string | null
           rule_config?: Json
@@ -10728,6 +11592,7 @@ export type Database = {
           pay_date?: string
           pay_period_end?: string
           pay_period_start?: string
+          posting_request_id?: string | null
           processed_at?: string | null
           processed_by?: string | null
           rule_config?: Json
@@ -10746,6 +11611,13 @@ export type Database = {
             columns: ["journal_entry_id"]
             isOneToOne: false
             referencedRelation: "journal_entries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payroll_runs_posting_request_id_fkey"
+            columns: ["posting_request_id"]
+            isOneToOne: false
+            referencedRelation: "posting_requests"
             referencedColumns: ["id"]
           },
         ]
@@ -10932,6 +11804,7 @@ export type Database = {
       posting_requests: {
         Row: {
           accounting_period_id: string | null
+          business_event: string | null
           committed_at: string | null
           company_id: string
           correlation_id: string | null
@@ -10943,6 +11816,8 @@ export type Database = {
           document_type: string | null
           exchange_rate: number
           financial_year_id: string | null
+          generated_at: string | null
+          generated_by: string | null
           id: string
           idempotency_key: string
           journal_entry_id: string | null
@@ -10951,12 +11826,15 @@ export type Database = {
           posting_engine_version: string
           reference: string | null
           reversal_of_id: string | null
+          rule_id: string | null
+          rule_version: number | null
           source: string | null
           status: string
           warnings: Json
         }
         Insert: {
           accounting_period_id?: string | null
+          business_event?: string | null
           committed_at?: string | null
           company_id: string
           correlation_id?: string | null
@@ -10968,6 +11846,8 @@ export type Database = {
           document_type?: string | null
           exchange_rate?: number
           financial_year_id?: string | null
+          generated_at?: string | null
+          generated_by?: string | null
           id?: string
           idempotency_key: string
           journal_entry_id?: string | null
@@ -10976,12 +11856,15 @@ export type Database = {
           posting_engine_version?: string
           reference?: string | null
           reversal_of_id?: string | null
+          rule_id?: string | null
+          rule_version?: number | null
           source?: string | null
           status?: string
           warnings?: Json
         }
         Update: {
           accounting_period_id?: string | null
+          business_event?: string | null
           committed_at?: string | null
           company_id?: string
           correlation_id?: string | null
@@ -10993,6 +11876,8 @@ export type Database = {
           document_type?: string | null
           exchange_rate?: number
           financial_year_id?: string | null
+          generated_at?: string | null
+          generated_by?: string | null
           id?: string
           idempotency_key?: string
           journal_entry_id?: string | null
@@ -11001,6 +11886,8 @@ export type Database = {
           posting_engine_version?: string
           reference?: string | null
           reversal_of_id?: string | null
+          rule_id?: string | null
+          rule_version?: number | null
           source?: string | null
           status?: string
           warnings?: Json
@@ -11039,6 +11926,63 @@ export type Database = {
             columns: ["reversal_of_id"]
             isOneToOne: false
             referencedRelation: "posting_requests"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "posting_requests_rule_id_fkey"
+            columns: ["rule_id"]
+            isOneToOne: false
+            referencedRelation: "accounting_rule_definitions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      product_analytics_events: {
+        Row: {
+          company_id: string | null
+          created_at: string
+          duration_ms: number | null
+          event_category: string
+          event_name: string
+          id: string
+          module: string | null
+          properties: Json
+          route: string | null
+          session_id: string | null
+          user_id: string | null
+        }
+        Insert: {
+          company_id?: string | null
+          created_at?: string
+          duration_ms?: number | null
+          event_category: string
+          event_name: string
+          id?: string
+          module?: string | null
+          properties?: Json
+          route?: string | null
+          session_id?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          company_id?: string | null
+          created_at?: string
+          duration_ms?: number | null
+          event_category?: string
+          event_name?: string
+          id?: string
+          module?: string | null
+          properties?: Json
+          route?: string | null
+          session_id?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "product_analytics_events_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
             referencedColumns: ["id"]
           },
         ]
@@ -11445,6 +12389,161 @@ export type Database = {
           },
         ]
       }
+      quick_expense_captures: {
+        Row: {
+          amount: number
+          attachment_url: string | null
+          bank_account_id: string | null
+          bank_transaction_id: string | null
+          category_id: string | null
+          company_id: string
+          created_at: string
+          created_by: string | null
+          description: string | null
+          expense_account_id: string
+          expense_date: string
+          id: string
+          journal_entry_id: string | null
+          payment_source_kind: string
+          posting_request_id: string | null
+          vendor_name: string | null
+        }
+        Insert: {
+          amount: number
+          attachment_url?: string | null
+          bank_account_id?: string | null
+          bank_transaction_id?: string | null
+          category_id?: string | null
+          company_id: string
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          expense_account_id: string
+          expense_date: string
+          id?: string
+          journal_entry_id?: string | null
+          payment_source_kind: string
+          posting_request_id?: string | null
+          vendor_name?: string | null
+        }
+        Update: {
+          amount?: number
+          attachment_url?: string | null
+          bank_account_id?: string | null
+          bank_transaction_id?: string | null
+          category_id?: string | null
+          company_id?: string
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          expense_account_id?: string
+          expense_date?: string
+          id?: string
+          journal_entry_id?: string | null
+          payment_source_kind?: string
+          posting_request_id?: string | null
+          vendor_name?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "quick_expense_captures_bank_account_id_fkey"
+            columns: ["bank_account_id"]
+            isOneToOne: false
+            referencedRelation: "bank_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "quick_expense_captures_bank_transaction_id_fkey"
+            columns: ["bank_transaction_id"]
+            isOneToOne: false
+            referencedRelation: "bank_transactions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "quick_expense_captures_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "quick_expense_categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "quick_expense_captures_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "quick_expense_captures_expense_account_id_fkey"
+            columns: ["expense_account_id"]
+            isOneToOne: false
+            referencedRelation: "chart_of_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "quick_expense_captures_journal_entry_id_fkey"
+            columns: ["journal_entry_id"]
+            isOneToOne: false
+            referencedRelation: "journal_entries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "quick_expense_captures_posting_request_id_fkey"
+            columns: ["posting_request_id"]
+            isOneToOne: false
+            referencedRelation: "posting_requests"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      quick_expense_categories: {
+        Row: {
+          company_id: string
+          created_at: string
+          expense_account_id: string
+          id: string
+          is_active: boolean
+          label: string
+          sort_order: number
+          updated_at: string
+        }
+        Insert: {
+          company_id: string
+          created_at?: string
+          expense_account_id: string
+          id?: string
+          is_active?: boolean
+          label: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Update: {
+          company_id?: string
+          created_at?: string
+          expense_account_id?: string
+          id?: string
+          is_active?: boolean
+          label?: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "quick_expense_categories_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "quick_expense_categories_expense_account_id_fkey"
+            columns: ["expense_account_id"]
+            isOneToOne: false
+            referencedRelation: "chart_of_accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       quote_items: {
         Row: {
           description: string
@@ -11518,6 +12617,7 @@ export type Database = {
           quote_date: string
           quote_number: string
           status: string
+          terms: string | null
         }
         Insert: {
           company_id: string
@@ -11529,6 +12629,7 @@ export type Database = {
           quote_date?: string
           quote_number: string
           status?: string
+          terms?: string | null
         }
         Update: {
           company_id?: string
@@ -11540,6 +12641,7 @@ export type Database = {
           quote_date?: string
           quote_number?: string
           status?: string
+          terms?: string | null
         }
         Relationships: [
           {
@@ -12255,6 +13357,99 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      accounting_policy_effective_severity: {
+        Args: {
+          p_default_severity: string
+          p_enabled: boolean
+          p_is_mandatory: boolean
+          p_severity_override: string
+        }
+        Returns: string
+      }
+      accounting_policy_evaluate_posting: {
+        Args: {
+          p_company_id: string
+          p_description?: string
+          p_lines: Json
+          p_mode?: string
+          p_module: string
+          p_override_codes?: Json
+          p_override_reason?: string
+          p_posting_request_id?: string
+          p_user_id?: string
+        }
+        Returns: Json
+      }
+      accounting_policy_log_result: {
+        Args: {
+          p_company_id: string
+          p_message: string
+          p_metadata?: Json
+          p_module: string
+          p_policy_code: string
+          p_policy_name: string
+          p_posting_request_id: string
+          p_reason: string
+          p_result: string
+          p_severity: string
+          p_user_id: string
+        }
+        Returns: undefined
+      }
+      accounting_rules_log_execution: {
+        Args: {
+          p_business_event: string
+          p_company_id: string
+          p_generated_by: string
+          p_journal_entry_id: string
+          p_line_count: number
+          p_metadata?: Json
+          p_module: string
+          p_narration: string
+          p_posting_request_id: string
+          p_result: string
+          p_rule_code: string
+          p_rule_id: string
+          p_rule_name: string
+          p_rule_version: number
+          p_total_credit: number
+          p_total_debit: number
+        }
+        Returns: string
+      }
+      accounting_rules_resolve: {
+        Args: { p_business_event: string; p_company_id: string }
+        Returns: {
+          business_event: string
+          cloned_from_id: string | null
+          code: string
+          company_id: string | null
+          created_at: string
+          currency_behaviour: string
+          description: string | null
+          dimension_rules: Json
+          generation_hook: string
+          id: string
+          industry_template: string | null
+          is_mandatory: boolean
+          line_template: Json
+          module: string
+          name: string
+          narration_template: string | null
+          period_rules: Json
+          rule_type: string
+          trigger_event: string
+          updated_at: string
+          vat_treatment: string | null
+          version: number
+        }
+        SetofOptions: {
+          from: "*"
+          to: "accounting_rule_definitions"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       acquire_fixed_asset_atomic: {
         Args: {
           p_actor_user_id?: string
@@ -12316,6 +13511,10 @@ export type Database = {
       assert_period_open: {
         Args: { p_company_id: string; p_date: string }
         Returns: undefined
+      }
+      business_event_next_sequence: {
+        Args: { p_aggregate_key: string; p_company_id: string }
+        Returns: number
       }
       close_financial_year: { Args: { p_end_date: string }; Returns: undefined }
       create_bank_account_atomic: {
@@ -12490,6 +13689,26 @@ export type Database = {
         Args: { p_user_id: string }
         Returns: undefined
       }
+      ensure_due_to_owner_account: {
+        Args: { p_company_id: string }
+        Returns: string
+      }
+      ensure_expense_account_by_name: {
+        Args: { p_company_id: string; p_name: string }
+        Returns: string
+      }
+      finalize_payroll_run_atomic: {
+        Args: {
+          p_actor_user_id?: string
+          p_bank_account_id?: string
+          p_company_id: string
+          p_liability_account_id?: string
+          p_require_approval?: boolean
+          p_run_id: string
+          p_wage_account_id?: string
+        }
+        Returns: Json
+      }
       format_employee_number: {
         Args: { p_padding: number; p_sequence: number; p_template: string }
         Returns: string
@@ -12519,6 +13738,69 @@ export type Database = {
       generate_payslips_for_run: {
         Args: { p_company_id: string; p_run_id: string }
         Returns: undefined
+      }
+      get_account_largest_journal: {
+        Args: {
+          p_account_id: string
+          p_company_id: string
+          p_end_date: string
+          p_start_date: string
+        }
+        Returns: {
+          description: string
+          entry_date: string
+          journal_entry_id: string
+          journal_number: string
+          total_amount: number
+        }[]
+      }
+      get_account_last_activity: {
+        Args: { p_company_id: string }
+        Returns: {
+          account_id: string
+          last_entry_date: string
+        }[]
+      }
+      get_account_movement_by_dimension: {
+        Args: {
+          p_account_id: string
+          p_company_id: string
+          p_dimension: string
+          p_end_date: string
+          p_start_date: string
+        }
+        Returns: {
+          amount: number
+          bucket_key: string
+          bucket_label: string
+          txn_count: number
+        }[]
+      }
+      get_account_movement_grouped: {
+        Args: { p_company_id: string; p_end_date: string; p_start_date: string }
+        Returns: {
+          account_id: string
+          credit_total: number
+          debit_total: number
+          net_movement: number
+          txn_count: number
+        }[]
+      }
+      get_account_movement_series: {
+        Args: {
+          p_account_id: string
+          p_company_id: string
+          p_end_date: string
+          p_granularity?: string
+          p_start_date: string
+        }
+        Returns: {
+          bucket_date: string
+          credit_total: number
+          debit_total: number
+          net_movement: number
+          txn_count: number
+        }[]
       }
       get_aged_payables: {
         Args: never
@@ -12602,7 +13884,7 @@ export type Database = {
         }[]
       }
       get_monthly_summary: {
-        Args: { p_months: number; p_company_id?: string }
+        Args: { p_company_id?: string; p_months: number }
         Returns: {
           month_start: string
           total_expenses: number
@@ -12643,7 +13925,11 @@ export type Database = {
         }[]
       }
       get_top_expenses: {
-        Args: { p_end_date: string; p_start_date: string; p_company_id?: string }
+        Args: {
+          p_company_id?: string
+          p_end_date: string
+          p_start_date: string
+        }
         Returns: {
           account_name: string
           total_amount: number
@@ -12707,6 +13993,18 @@ export type Database = {
           p_bank_account_id: string
           p_contra_account_id: string
           p_opening_balance_date?: string
+        }
+        Returns: Json
+      }
+      post_payroll_adjustment_atomic: {
+        Args: {
+          p_actor_user_id?: string
+          p_company_id: string
+          p_description: string
+          p_idempotency_key?: string
+          p_lines: Json
+          p_posting_date: string
+          p_run_id: string
         }
         Returns: Json
       }
@@ -12782,6 +14080,22 @@ export type Database = {
           journal_entry_id: string
           unit_cost: number
         }[]
+      }
+      record_bank_paid_quick_capture: {
+        Args: {
+          p_actor_user_id?: string
+          p_amount: number
+          p_attachment_url?: string
+          p_bank_account_id: string
+          p_bank_transaction_id: string
+          p_category_id?: string
+          p_company_id: string
+          p_description?: string
+          p_expense_account_id: string
+          p_expense_date: string
+          p_vendor_name?: string
+        }
+        Returns: Json
       }
       record_bank_transaction_atomic: {
         Args: {
@@ -12897,6 +14211,20 @@ export type Database = {
         }
         Returns: undefined
       }
+      record_owner_paid_expense_atomic: {
+        Args: {
+          p_actor_user_id?: string
+          p_amount: number
+          p_attachment_url?: string
+          p_category_id?: string
+          p_company_id: string
+          p_description?: string
+          p_expense_account_id: string
+          p_expense_date: string
+          p_vendor_name?: string
+        }
+        Returns: Json
+      }
       record_vendor_payment_on_account_atomic: {
         Args: {
           p_accounts_payable_id: string
@@ -12929,9 +14257,39 @@ export type Database = {
         Args: { p_company_id: string; p_user_id: string }
         Returns: Json
       }
+      resolve_payroll_control_account: {
+        Args: {
+          p_account_role: string
+          p_company_id: string
+          p_override_account_id?: string
+        }
+        Returns: string
+      }
+      reverse_payroll_run_atomic: {
+        Args: {
+          p_actor_user_id?: string
+          p_company_id: string
+          p_reason?: string
+          p_reopen?: boolean
+          p_run_id: string
+        }
+        Returns: Json
+      }
+      seed_quick_expense_categories: {
+        Args: { p_company_id: string }
+        Returns: Json
+      }
       set_default_bank_account: {
         Args: { p_bank_account_id: string; p_company_id: string }
         Returns: undefined
+      }
+      suggest_quick_expense_category: {
+        Args: {
+          p_company_id: string
+          p_description?: string
+          p_vendor_name?: string
+        }
+        Returns: Json
       }
       sync_employee_sequence_after_import: {
         Args: { p_company_id: string; p_employee_number: string }

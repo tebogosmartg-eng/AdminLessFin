@@ -86,6 +86,13 @@ const QuotePreview = ({ formData, customers, company, taxRates }) => {
               </TableRow>
             </TableFooter>
           </Table>
+
+          {formData?.terms ? (
+            <div className="mt-6 border-t pt-4">
+              <div className="text-sm font-semibold mb-1">Terms &amp; Conditions</div>
+              <p className="text-xs text-muted-foreground whitespace-pre-wrap">{formData.terms}</p>
+            </div>
+          ) : null}
         </CardContent>
       </Card>
     </div>

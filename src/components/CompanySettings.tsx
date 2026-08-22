@@ -24,6 +24,7 @@ import { companyService } from '@/governance/domains/company/service';
  */
 const companyOpsSchema = z.object({
   default_invoice_notes: z.string().optional(),
+  default_quote_terms: z.string().optional(),
 });
 type CompanyOpsValues = z.infer<typeof companyOpsSchema>;
 
@@ -35,13 +36,14 @@ const CompanySettings = () => {
 
   const form = useForm<CompanyOpsValues>({
     resolver: zodResolver(companyOpsSchema),
-    defaultValues: { default_invoice_notes: '' },
+    defaultValues: { default_invoice_notes: '', default_quote_terms: '' },
   });
 
   useEffect(() => {
     if (activeCompany) {
       form.reset({
         default_invoice_notes: activeCompany.default_invoice_notes || '',
+        default_quote_terms: (activeCompany as { default_quote_terms?: string }).default_quote_terms || '',
       });
       setPreviewUrl(activeCompany.logo_url || null);
     }
@@ -79,6 +81,7 @@ const CompanySettings = () => {
       // Identity fields are NOT written here — Enterprise Master Data owns them.
       const result = await companyService.updateCompanyProfile(activeCompany.id, {
         defaultInvoiceNotes: values.default_invoice_notes || null,
+        defaultQuoteTerms: values.default_quote_terms || null,
         logoUrl,
       });
       if (!result.success) throw new Error(result.error || 'Failed to update company information.');
@@ -200,6 +203,27 @@ const CompanySettings = () => {
                     <FormControl>
                       <Textarea placeholder="e.g. Bank Account: 123456. Payment due within 30 days." {...field} />
                     </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="default_quote_terms"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Default Quotation Terms &amp; Conditions</FormLabel>
+                    <FormControl>
+                      <Textarea
+                        rows={4}
+                        placeholder="e.g. Quotation valid for 30 days. 50% deposit on acceptance. E&amp;OE."
+                        {...field}
+                      />
+                    </FormControl>
+                    <p className="text-xs text-muted-foreground">
+                      Prefilled into every new quotation. Editing this never changes a quotation
+                      that has already been issued.
+                    </p>
                     <FormMessage />
                   </FormItem>
                 )}

@@ -35,6 +35,7 @@ type RawCompanyRow = {
   logo_url: string | null;
   tax_id: string | null;
   default_invoice_notes: string | null;
+  default_quote_terms: string | null;
 };
 
 export class CompanyService implements CompanyReadAPI, CompanyMutationAPI {
@@ -54,6 +55,7 @@ export class CompanyService implements CompanyReadAPI, CompanyMutationAPI {
       logoUrl: row.logo_url,
       taxId: row.tax_id,
       defaultInvoiceNotes: row.default_invoice_notes,
+      defaultQuoteTerms: row.default_quote_terms ?? null,
     };
   }
 
@@ -87,6 +89,9 @@ export class CompanyService implements CompanyReadAPI, CompanyMutationAPI {
     if ('name' in changes) companyData.name = changes.name;
     if ('address' in changes) companyData.address = changes.address ?? null;
     if ('taxId' in changes) companyData.tax_id = changes.taxId ?? null;
+    if ('defaultQuoteTerms' in changes) {
+      companyData.default_quote_terms = changes.defaultQuoteTerms ?? null;
+    }
     if ('defaultInvoiceNotes' in changes) {
       companyData.default_invoice_notes = changes.defaultInvoiceNotes ?? null;
     }

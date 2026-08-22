@@ -16,6 +16,8 @@ export interface CompanyDomainModel {
   logoUrl: string | null;
   taxId: string | null;
   defaultInvoiceNotes: string | null;
+  /** Standing quotation terms applied to new quotations. */
+  defaultQuoteTerms: string | null;
 }
 
 // Validation model
