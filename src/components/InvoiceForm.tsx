@@ -15,7 +15,7 @@ import { Textarea } from './ui/textarea';
 import { showError, showPlatformError, showSuccess } from '../utils/toast';
 import { AnalyticsEvents } from '@/lib/analytics/events';
 import { trackFirstUsageEvent } from '@/lib/analytics/productAnalytics';
-import { PlatformError, isPlatformErrorEnvelope } from '../lib/platform/platformError';
+import { resolveEdgeFunctionError } from '../lib/platform/edgeError';
 import { Account } from '../pages/ChartOfAccounts';
 import { Customer } from '../pages/Customers';
 import { Product } from '../pages/Products';
@@ -46,29 +46,6 @@ import {
   projectCreateConfig,
   taxRateCreateConfig,
 } from './cotf/entityCreateConfigs';
-
-/**
- * supabase.functions.invoke() always throws a FunctionsHttpError whose .message
- * is the fixed string "Edge Function returned a non-2xx status code" — the real
- * platform-error envelope (category, SQLSTATE, correlation id) only exists in
- * error.context (a Response). Unwrap it so downstream classification sees the
- * server's actual diagnosis instead of re-deriving "UnknownPlatformError" from
- * a message that was never informative to begin with.
- */
-async function resolveEdgeFunctionError(error: unknown): Promise<unknown> {
-  const context = (error as { context?: unknown } | null)?.context;
-  if (context && typeof (context as Response).json === 'function') {
-    try {
-      const body = await (context as Response).json();
-      if (isPlatformErrorEnvelope(body)) {
-        return new PlatformError(body);
-      }
-    } catch {
-      // Response body wasn't JSON (or already consumed) — fall through to the raw error.
-    }
-  }
-  return error;
-}
 
 const invoiceItemSchema = z.object({
   product_id: z.string().optional(),

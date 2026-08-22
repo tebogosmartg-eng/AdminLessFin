@@ -340,14 +340,19 @@ serve(withEnterprisePlatform('accounting', 'tenant', async (req, _ctx) => {
         const { page, pageSize, offset } = clampPage(body.page, body.page_size);
         const filters = body.filters || {};
 
-        // Fetch journal headers matching filters first for server-side filtering
+        // Fetch journal headers matching filters first for server-side filtering.
+        // financial_years is reachable from journal_entries by THREE foreign keys
+        // (journal_entries.financial_year_id, plus financial_years.opening_ and
+        // .closing_journal_entry_id from year-end close), so every embed must name
+        // the one it means. Without the hint PostgREST rejects the whole query
+        // with PGRST201 and the workspace 500s.
         let jeQuery = supabaseAdmin
           .from('journal_entries')
           .select(`
             id, entry_date, description, journal_number, company_id,
             financial_year_id, accounting_period_id, invoice_id, bill_id,
             vendor_id, customer_id, attachment_url, created_at,
-            financial_years ( id, year_code ),
+            financial_years!journal_entries_financial_year_id_fkey ( id, year_code ),
             accounting_periods ( id, period_number, status ),
             posting_requests!journal_entry_id (
               id, module, document_type, document_id, status, source,
@@ -758,7 +763,7 @@ serve(withEnterprisePlatform('accounting', 'tenant', async (req, _ctx) => {
 
         const jeId = journal_entry_id || pr?.journal_entry_id;
         if (jeId) {
-          const { data: je } = await supabaseAdmin
+          const { data: je, error: jeError } = await supabaseAdmin
             .from('journal_entries')
             .select(`
               *,
@@ -766,12 +771,14 @@ serve(withEnterprisePlatform('accounting', 'tenant', async (req, _ctx) => {
                 id, type, amount, dimensions, project_id, account_id,
                 chart_of_accounts!account_id ( id, account_number, name, type )
               ),
-              financial_years ( year_code ),
+              financial_years!journal_entries_financial_year_id_fkey ( year_code ),
               accounting_periods ( period_number, status )
             `)
             .eq('id', jeId)
             .eq('company_id', company_id)
             .maybeSingle();
+          // Surface the failure rather than reporting "no journal found".
+          if (jeError) throw jeError;
           journal = je;
         }
 
@@ -1178,8 +1185,12 @@ serve(withEnterprisePlatform('accounting', 'tenant', async (req, _ctx) => {
         const ytdOpen = bal(asOfYtdOpen);
         const monthOpen = bal(asOfMonthOpen);
 
-        // Journals in range touching this account
-        const { data: jeHeaders } = await supabaseAdmin
+        // Journals in range touching this account.
+        // The error is checked deliberately: discarding it here made a failed
+        // query indistinguishable from a genuinely inactive account — the
+        // workspace returned HTTP 200 with an empty list while the account
+        // header showed a large balance.
+        const { data: jeHeaders, error: jeHeadersError } = await supabaseAdmin
           .from('journal_entries')
           .select(`
             id, entry_date, description, journal_number, vendor_id, customer_id, attachment_url,
@@ -1187,13 +1198,14 @@ serve(withEnterprisePlatform('accounting', 'tenant', async (req, _ctx) => {
             vendors ( name ), customers ( name ),
             posting_requests!journal_entry_id ( id, module, document_type, document_id, status, source, created_by, reference, committed_at ),
             accounting_periods ( period_number ),
-            financial_years ( year_code )
+            financial_years!journal_entries_financial_year_id_fkey ( year_code )
           `)
           .eq('company_id', company_id)
           .gte('entry_date', startDate)
           .lte('entry_date', endDate)
           .order('entry_date', { ascending: true })
           .limit(8000);
+        if (jeHeadersError) throw jeHeadersError;
 
         const jeMap = Object.fromEntries((jeHeaders || []).map((j: any) => [j.id, j]));
         const jeIds = Object.keys(jeMap);

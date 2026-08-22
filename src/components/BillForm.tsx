@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -12,6 +12,7 @@ import { Input } from './ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Textarea } from './ui/textarea';
 import { showError, showSuccess } from '../utils/toast';
+import { edgeErrorMessage } from '../lib/platform/edgeError';
 import { AnalyticsEvents } from '@/lib/analytics/events';
 import { trackFirstUsageEvent } from '@/lib/analytics/productAnalytics';
 import { Vendor } from '../pages/Vendors';
@@ -112,9 +113,18 @@ const BillForm = ({ isOpen, setIsOpen, billId, duplicateFromId, initialData, onS
     enabled: !!activeCompany
   });
 
-  const expenseAccounts = accounts?.filter(a => a.type === 'Expense');
-  const assetAccounts = accounts?.filter(a => a.type === 'Asset');
-  const apAccounts = accounts?.filter(a => a.type === 'Liability');
+  // Memoised: these were recomputed on every render, so any effect that listed
+  // them as a dependency re-ran on every render. One such effect calls
+  // form.setValue('items', ...), which re-renders — a self-sustaining loop that
+  // overwrote the line-item account the moment the user picked one. That loop is
+  // the reported "account selection flickers".
+  const expenseAccounts = useMemo(() => accounts?.filter(a => a.type === 'Expense'), [accounts]);
+  const assetAccounts = useMemo(() => accounts?.filter(a => a.type === 'Asset'), [accounts]);
+  const apAccounts = useMemo(() => accounts?.filter(a => a.type === 'Liability'), [accounts]);
+  const lineAccountOptions = useMemo(
+    () => [...(expenseAccounts || []), ...(assetAccounts || [])],
+    [expenseAccounts, assetAccounts],
+  );
 
   const { fields, append, remove } = useFieldArray({ control: form.control, name: "items" });
   const { data: products } = useQuery<Product[]>({
@@ -144,9 +154,25 @@ const BillForm = ({ isOpen, setIsOpen, billId, duplicateFromId, initialData, onS
     if (controls.ap) form.setValue('accounts_payable_id', controls.ap.id);
   }, [isOpen, accounts, isEditing, isDuplicating, form]);
 
-  // Apply initial data (e.g. PO → Bill conversion)
+  // Apply initial data (e.g. PO → Bill conversion).
+  //
+  // Applied ONCE per dialog opening. Previously this ran on every render (its
+  // dependency list held arrays rebuilt each render) and each run called
+  // form.setValue('items', ...), wiping whatever line-item account the user had
+  // just chosen and re-triggering the render that ran it again.
+  const initialDataAppliedFor = useRef<string | null>(null);
   useEffect(() => {
-    if (!isOpen || isEditing || isDuplicating || !initialData) return;
+    if (!isOpen) {
+      initialDataAppliedFor.current = null;
+      return;
+    }
+    if (isEditing || isDuplicating || !initialData) return;
+    // Accounts are needed to resolve the fallback expense account; wait for them
+    // rather than applying twice.
+    if (!accounts) return;
+    const key = JSON.stringify(initialData);
+    if (initialDataAppliedFor.current === key) return;
+    initialDataAppliedFor.current = key;
 
     if (initialData.vendor_id) form.setValue('vendor_id', initialData.vendor_id);
     if (initialData.description) form.setValue('description', initialData.description);
@@ -169,7 +195,7 @@ const BillForm = ({ isOpen, setIsOpen, billId, duplicateFromId, initialData, onS
         }))
       );
     }
-  }, [isOpen, initialData, isEditing, isDuplicating, form, expenseAccounts, assetAccounts]);
+  }, [isOpen, initialData, isEditing, isDuplicating, form, accounts, expenseAccounts, assetAccounts]);
 
   const { data: sourceBill } = useQuery({
     queryKey: ['bill_duplicate', duplicateFromId, activeCompany?.id],
@@ -302,7 +328,11 @@ const BillForm = ({ isOpen, setIsOpen, billId, duplicateFromId, initialData, onS
         },
       });
 
-      if (error) throw error;
+      // supabase-js reports every non-2xx as "Edge Function returned a non-2xx
+      // status code". Replace it with the server's actual diagnosis (missing
+      // control account, closed period, rejected account) so the customer can
+      // act on it.
+      if (error) throw new Error(await edgeErrorMessage(error, 'The bill could not be recorded.'));
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['bills', activeCompany?.id] });
@@ -319,6 +349,20 @@ const BillForm = ({ isOpen, setIsOpen, billId, duplicateFromId, initialData, onS
   });
 
   const onSubmit = (values: BillFormValues) => mutation.mutate(values);
+
+  // react-hook-form calls this when validation blocks submit. Without it the
+  // Record Bill button appeared inert: no request, no message, dialog open.
+  const onInvalid = () => {
+    const itemErrors = form.formState.errors.items;
+    const firstLine = Array.isArray(itemErrors)
+      ? itemErrors.findIndex((e) => e)
+      : -1;
+    showError(
+      firstLine >= 0
+        ? `Line ${firstLine + 1} is incomplete — check the highlighted fields.`
+        : 'Some required details are missing — check the highlighted fields.',
+    );
+  };
 
   const watchedItems = form.watch('items');
   const hasTax = watchedItems.some(item => item.tax_rate_id && item.tax_rate_id !== 'none');
@@ -339,7 +383,7 @@ const BillForm = ({ isOpen, setIsOpen, billId, duplicateFromId, initialData, onS
             <Alert variant="destructive"><AlertDescription>Warning: You don't have a Trade Payables control account. Please assign account_role trade_payable in your Chart of Accounts (Type: Liability).</AlertDescription></Alert>
         )}
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+          <form onSubmit={form.handleSubmit(onSubmit, onInvalid)} className="space-y-4">
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <FormField control={form.control} name="vendor_id" render={({ field }) => (<FormItem><FormLabel>Vendor</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select vendor" /></SelectTrigger></FormControl><SelectContent>{vendors?.map(v => <SelectItem key={v.id} value={v.id}>{v.name}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem>)} />
               <FormField control={form.control} name="bill_number" render={({ field }) => (<FormItem><FormLabel>Bill #</FormLabel><FormControl><Input placeholder="Vendor Inv #" {...field} /></FormControl><FormMessage /></FormItem>)} />
@@ -398,12 +442,12 @@ const BillForm = ({ isOpen, setIsOpen, billId, duplicateFromId, initialData, onS
                 return (
                   <div key={field.id} className="grid grid-cols-12 gap-2 items-start border-b pb-4 md:border-none md:pb-0">
                     <FormField control={form.control} name={`items.${index}.product_id`} render={({ field }) => (<FormItem className="col-span-12 md:col-span-2"><Select onValueChange={(value) => { field.onChange(value); handleProductSelect(value, index); }} value={field.value || 'none'}><FormControl><SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger></FormControl><SelectContent><SelectItem value="none">None</SelectItem>{products?.map(p => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}</SelectContent></Select></FormItem>)} />
-                    <FormField control={form.control} name={`items.${index}.description`} render={({ field }) => (<FormItem className="col-span-12 md:col-span-2"><FormControl><Input placeholder="Description" {...field} /></FormControl></FormItem>)} />
-                    <FormField control={form.control} name={`items.${index}.quantity`} render={({ field }) => (<FormItem className="col-span-4 md:col-span-1"><FormControl><Input type="number" step="0.01" {...field} /></FormControl></FormItem>)} />
-                    <FormField control={form.control} name={`items.${index}.unit_cost`} render={({ field }) => (<FormItem className="col-span-4 md:col-span-1"><FormControl><Input type="number" step="0.01" {...field} /></FormControl></FormItem>)} />
+                    <FormField control={form.control} name={`items.${index}.description`} render={({ field }) => (<FormItem className="col-span-12 md:col-span-2"><FormControl><Input placeholder="Description" {...field} /></FormControl><FormMessage /></FormItem>)} />
+                    <FormField control={form.control} name={`items.${index}.quantity`} render={({ field }) => (<FormItem className="col-span-4 md:col-span-1"><FormControl><Input type="number" step="0.01" {...field} /></FormControl><FormMessage /></FormItem>)} />
+                    <FormField control={form.control} name={`items.${index}.unit_cost`} render={({ field }) => (<FormItem className="col-span-4 md:col-span-1"><FormControl><Input type="number" step="0.01" {...field} /></FormControl><FormMessage /></FormItem>)} />
                     <FormField control={form.control} name={`items.${index}.tax_rate_id`} render={({ field }) => (<FormItem className="col-span-4 md:col-span-1"><Select onValueChange={field.onChange} value={field.value || 'none'}><FormControl><SelectTrigger><SelectValue placeholder="-" /></SelectTrigger></FormControl><SelectContent><SelectItem value="none">None</SelectItem>{taxRates?.map(t => <SelectItem key={t.id} value={t.id}>{t.rate}%</SelectItem>)}</SelectContent></Select></FormItem>)} />
                     <div className="col-span-6 md:col-span-1 pt-2 text-right font-mono text-xs">{formatCurrency(lineTotal)}</div>
-                    <FormField control={form.control} name={`items.${index}.expense_account_id`} render={({ field }) => (<FormItem className="col-span-5 md:col-span-2"><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Account" /></SelectTrigger></FormControl><SelectContent>{[...(expenseAccounts || []), ...(assetAccounts || [])].map(acc => <SelectItem key={acc.id} value={acc.id}>{acc.name}</SelectItem>)}</SelectContent></Select></FormItem>)} />
+                    <FormField control={form.control} name={`items.${index}.expense_account_id`} render={({ field }) => (<FormItem className="col-span-5 md:col-span-2"><Select onValueChange={field.onChange} value={field.value || undefined}><FormControl><SelectTrigger><SelectValue placeholder="Account" /></SelectTrigger></FormControl><SelectContent>{lineAccountOptions.map(acc => <SelectItem key={acc.id} value={acc.id}>{acc.name}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem>)} />
                     <FormField control={form.control} name={`items.${index}.project_id`} render={({ field }) => (<FormItem className="col-span-12 md:col-span-2"><Select onValueChange={field.onChange} value={field.value || 'none'}><FormControl><SelectTrigger><SelectValue placeholder="-" /></SelectTrigger></FormControl><SelectContent><SelectItem value="none">None</SelectItem>{projects?.map(p => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}</SelectContent></Select></FormItem>)} />
                     <div className="col-span-1 pt-1 flex justify-end"><Button type="button" variant="ghost" size="icon" onClick={() => remove(index)} disabled={fields.length <= 1}><Trash2 className="h-4 w-4" /></Button></div>
                   </div>
