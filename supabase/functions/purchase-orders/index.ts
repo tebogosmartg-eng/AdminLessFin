@@ -10,6 +10,25 @@ import {
 
 const corsHeaders = ENTERPRISE_CORS_HEADERS
 
+/** Next PO-##### from existing numbers. Ignores non-standard refs (e.g. CLOSURE-PO-…). */
+async function allocateNextPoNumber(client, companyId) {
+  const { data: existingNums, error: listErr } = await client
+    .from('purchase_orders')
+    .select('po_number')
+    .eq('company_id', companyId);
+  if (listErr) throw listErr;
+  let maxSeq = 0n;
+  for (const row of existingNums ?? []) {
+    const match = /^PO-(\d+)$/i.exec(String(row.po_number ?? ''));
+    if (!match) continue;
+    try {
+      const n = BigInt(match[1]);
+      if (n > maxSeq) maxSeq = n;
+    } catch { /* ignore unparseable */ }
+  }
+  return `PO-${(maxSeq + 1n).toString().padStart(5, '0')}`;
+}
+
 serve(withEnterprisePlatform('purchase-orders', 'tenant', async (req, _ctx) => {
 
   try {
@@ -67,24 +86,15 @@ serve(withEnterprisePlatform('purchase-orders', 'tenant', async (req, _ctx) => {
         break;
 
       case 'GET_NEXT_NUMBER':
-        const { data: lastPO } = await supabaseAdmin
-          .from('purchase_orders')
-          .select('po_number')
-          .eq('company_id', company_id)
-          .order('created_at', { ascending: false })
-          .limit(1)
-          .single();
-        
-        let nextNum = 1;
-        if (lastPO && lastPO.po_number) {
-            const matches = lastPO.po_number.match(/PO-(\d+)/);
-            if (matches && matches[1]) nextNum = parseInt(matches[1]) + 1;
-        }
-        data = `PO-${String(nextNum).padStart(5, '0')}`;
+        data = await allocateNextPoNumber(supabaseAdmin, company_id);
+        error = null;
         break;
 
       case 'POST':
         const { items: postItems, ...postData } = body.poData;
+        if (!String(postData.po_number || '').trim()) {
+          postData.po_number = await allocateNextPoNumber(supabaseAdmin, company_id);
+        }
         const { data: newPO, error: postError } = await supabaseAdmin
           .from('purchase_orders')
           .insert({ ...postData, company_id })

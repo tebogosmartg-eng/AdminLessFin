@@ -72,7 +72,7 @@ const PurchaseOrderForm = ({ isOpen, setIsOpen, poId }: Props) => {
         body: { method: 'GET_NEXT_NUMBER', company_id: activeCompany!.id },
       });
       if (error) throw error;
-      return data;
+      return typeof data === 'string' ? data : '';
     },
     enabled: isOpen && !isEditing && !!activeCompany,
   });
@@ -90,12 +90,7 @@ const PurchaseOrderForm = ({ isOpen, setIsOpen, poId }: Props) => {
   });
 
   useEffect(() => {
-    if (nextPONumber && !isEditing) {
-      form.setValue('po_number', nextPONumber);
-    }
-  }, [nextPONumber, isEditing, form]);
-
-  useEffect(() => {
+    if (!isOpen) return;
     if (isEditing && existingPO) {
       form.reset({
         po_number: existingPO.po_number,
@@ -113,8 +108,10 @@ const PurchaseOrderForm = ({ isOpen, setIsOpen, poId }: Props) => {
       });
       setExistingAttachmentUrl(existingPO.attachment_url);
     } else if (!isEditing) {
+      // Do not depend on nextPONumber here — that would wipe vendor/lines when the
+      // number arrives. Seed from cache if present; the effect below fills it later.
       form.reset({
-        po_number: '',
+        po_number: nextPONumber || '',
         po_date: format(new Date(), 'yyyy-MM-dd'),
         delivery_date: format(addDays(new Date(), 14), 'yyyy-MM-dd'),
         vendor_id: '',
@@ -125,7 +122,14 @@ const PurchaseOrderForm = ({ isOpen, setIsOpen, poId }: Props) => {
     }
     setAttachmentFile(null);
     setRemoveAttachment(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- nextPONumber applied below
   }, [existingPO, isEditing, isOpen, form]);
+
+  useEffect(() => {
+    if (isOpen && !isEditing && nextPONumber) {
+      form.setValue('po_number', nextPONumber);
+    }
+  }, [nextPONumber, isEditing, isOpen, form]);
 
   const { fields, append, remove } = useFieldArray({ control: form.control, name: "items" });
 
@@ -176,6 +180,7 @@ const PurchaseOrderForm = ({ isOpen, setIsOpen, poId }: Props) => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['purchase_orders', activeCompany?.id] });
+      queryClient.invalidateQueries({ queryKey: ['next_po_number', activeCompany?.id] });
       if (poId) queryClient.invalidateQueries({ queryKey: ['po_detail', poId] });
       showSuccess(`Purchase Order ${isEditing ? 'updated' : 'created'}.`);
       setIsOpen(false);
@@ -195,7 +200,7 @@ const PurchaseOrderForm = ({ isOpen, setIsOpen, poId }: Props) => {
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <FormField control={form.control} name="po_number" render={({ field }) => (<FormItem><FormLabel>PO #</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>)} />
+              <FormField control={form.control} name="po_number" render={({ field }) => (<FormItem><FormLabel>PO #</FormLabel><FormControl><Input placeholder={isEditing ? undefined : 'Generating…'} {...field} /></FormControl><FormMessage /></FormItem>)} />
               <FormField control={form.control} name="vendor_id" render={({ field }) => (<FormItem><FormLabel>Vendor</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select vendor" /></SelectTrigger></FormControl><SelectContent>{vendors?.map(v => <SelectItem key={v.id} value={v.id}>{v.name}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem>)} />
               <FormField control={form.control} name="po_date" render={({ field }) => (<FormItem><FormLabel>Date</FormLabel><FormControl><Input type="date" {...field} /></FormControl><FormMessage /></FormItem>)} />
               <FormField control={form.control} name="delivery_date" render={({ field }) => (<FormItem><FormLabel>Delivery Due</FormLabel><FormControl><Input type="date" {...field} /></FormControl><FormMessage /></FormItem>)} />
