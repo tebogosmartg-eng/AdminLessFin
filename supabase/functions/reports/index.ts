@@ -14,6 +14,7 @@ import {
   buildCanonicalFinancialAggregation,
 } from '../_shared/accountingEngineTotals.ts'
 import { loadCanonicalAggregation } from '../_shared/loadCanonicalAggregation.ts'
+import { computeApAgeAnalysis } from '../_shared/apAgeing.ts'
 
 
 const corsHeaders = ENTERPRISE_CORS_HEADERS
@@ -324,7 +325,12 @@ serve(withEnterprisePlatform('reports', 'tenant', async (req, _ctx) => {
       cashFlowPromise,
       openingPromise,
       userSupabase.rpc('get_aged_receivables', { p_company_id: company_id }),
-      userSupabase.rpc('get_aged_payables', { p_company_id: company_id }),
+      // get_aged_payables does not exist in the database. The call always
+      // failed, the error was never checked, and the card rendered "No
+      // outstanding payables found" on every company. The age analysis is now
+      // computed from the same shared routine the Suppliers view uses, so the
+      // two cannot disagree.
+      computeApAgeAnalysis(supabaseAdmin, company_id, new Date().toISOString().slice(0, 10)),
     ]);
     if (balancesAsOfRes?.error) throw balancesAsOfRes.error;
     if (periodActivityRes?.error) throw periodActivityRes.error;
@@ -350,7 +356,21 @@ serve(withEnterprisePlatform('reports', 'tenant', async (req, _ctx) => {
       cashFlowData: cashFlowRes?.data,
       openingBalances: openingBalancesRes?.data,
       agedReceivables: agedReceivablesRes?.data,
-      agedPayables: agedPayablesRes?.data,
+      // Flattened to the shape the Reports card already renders, plus the
+      // reconciliation so the totals row can be stated honestly instead of "—".
+      agedPayables: (agedPayablesRes?.suppliers ?? []).map((v) => ({
+        vendor_id: v.vendor_id,
+        vendor_name: v.vendor_name,
+        current: v.buckets.current,
+        days_1_30: v.buckets.days_1_30,
+        days_31_60: v.buckets.days_31_60,
+        days_61_90: v.buckets.days_61_90,
+        days_90_plus: v.buckets.days_120_plus,
+        total_due: v.total,
+        ap_control_balance: v.ap_control_balance,
+      })),
+      agedPayablesReconciliation: agedPayablesRes?.reconciliation,
+      agedPayablesTotals: agedPayablesRes?.totals,
       statementTotals,
       canonicalAggregation: statementTotals,
     }), {

@@ -17,7 +17,8 @@ import { useReportingPeriod } from '../contexts/ReportingPeriodContext';
 // `queries.X(...)` call sites below are unchanged; only the import shape is.
 import {
   accountsQuery, assetCategoriesQuery, bankAccountsQuery, bankTransactionsQuery, bankTransfersQuery,
-  billsQuery, budgetsQuery, creditNotesQuery, customerBalancesQuery, customersQuery, employeesQuery,
+  billsQuery, budgetsQuery, creditNotesQuery, creditorsAgeAnalysisQuery, customerBalancesQuery,
+  customersQuery, employeesQuery,
   expenseClaimsQuery, fixedAssetsQuery, inventoryAnalyticsQuery, inventoryCycleCountsQuery,
   inventoryGoodsReceiptsQuery, inventoryMovementsQuery, inventoryRegisterQuery, inventoryTransfersQuery,
   inventoryValuationEdgeQuery, inventoryWarehousesQuery, invoicesQuery, loansQuery, payrollRunsQuery,
@@ -31,7 +32,8 @@ import { shouldShowFinancialCloseNav } from '../lib/financialClose/flags';
 
 const queries = {
   accountsQuery, assetCategoriesQuery, bankAccountsQuery, bankTransactionsQuery, bankTransfersQuery,
-  billsQuery, budgetsQuery, creditNotesQuery, customerBalancesQuery, customersQuery, employeesQuery,
+  billsQuery, budgetsQuery, creditNotesQuery, creditorsAgeAnalysisQuery, customerBalancesQuery,
+  customersQuery, employeesQuery,
   expenseClaimsQuery, fixedAssetsQuery, inventoryAnalyticsQuery, inventoryCycleCountsQuery,
   inventoryGoodsReceiptsQuery, inventoryMovementsQuery, inventoryRegisterQuery, inventoryTransfersQuery,
   inventoryValuationEdgeQuery, inventoryWarehousesQuery, invoicesQuery, loansQuery, payrollRunsQuery,
@@ -152,6 +154,7 @@ export const SidebarNav = ({ className, onNavigate }: SidebarNavProps) => {
     { to: '/recurring-bills', label: 'Recurring Bills', icon: Repeat, prefetch: () => prefetch(queries.recurringBillsQuery) },
     { to: '/pay-bills', label: 'Pay Bills', icon: Banknote, prefetch: () => prefetch(queries.vendorBalancesQuery) },
     { to: '/vendors', label: 'Suppliers', icon: Store, prefetch: () => prefetch(queries.vendorsQuery) },
+    { to: '/creditors-age-analysis', label: 'Creditors Age Analysis', icon: CalendarClock, prefetch: () => prefetch(queries.creditorsAgeAnalysisQuery) },
   ];
 
   const payrollLinks = [

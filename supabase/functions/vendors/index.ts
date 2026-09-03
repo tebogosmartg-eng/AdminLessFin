@@ -6,6 +6,7 @@ import {
   withEnterprisePlatform,
   edgeFailure,
 } from '../_shared/enterpriseEdgePlatform.ts'
+import { computeApAgeAnalysis } from '../_shared/apAgeing.ts'
 
 
 const corsHeaders = ENTERPRISE_CORS_HEADERS
@@ -67,6 +68,22 @@ serve(withEnterprisePlatform('vendors', 'tenant', async (req, _ctx) => {
           .order('name', { ascending: true }));
         break;
       
+      /**
+       * Creditors age analysis for EVERY supplier, as at a date, with the
+       * reconciliation to the control account that makes it auditable.
+       *
+       * The per-supplier statement (GET_DETAILS) and this share one
+       * implementation, so the two views cannot report different figures.
+       */
+      case 'GET_AGE_ANALYSIS': {
+        const asOf = body.as_of || new Date().toISOString().slice(0, 10);
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(asOf)) {
+          throw new Error('as_of must be a date in YYYY-MM-DD format.');
+        }
+        data = await computeApAgeAnalysis(supabaseAdmin, company_id, asOf);
+        break;
+      }
+
       case 'GET_DETAILS': {
         const { vendorId, date_from, date_to } = body;
 

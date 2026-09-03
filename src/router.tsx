@@ -59,6 +59,7 @@ const PayBills = lazy(() => import("./pages/PayBills"));
 const VendorCredits = lazy(() => import("./pages/VendorCredits"));
 const RecurringBills = lazy(() => import("./pages/RecurringBills"));
 const Vendors = lazy(() => import("./pages/Vendors"));
+const CreditorsAgeAnalysis = lazy(() => import("./pages/CreditorsAgeAnalysis"));
 const VendorDetail = lazy(() => import("./pages/VendorDetail"));
 
 const Products = lazy(() => import("./pages/Products"));
@@ -185,6 +186,7 @@ export const AppRouter = () => {
         <Route path="/vendor-credits" element={<VendorCredits />} />
         <Route path="/recurring-bills" element={<RecurringBills />} />
         <Route path="/vendors" element={<Vendors />} />
+        <Route path="/creditors-age-analysis" element={<CreditorsAgeAnalysis />} />
         <Route path="/vendors/:id" element={<VendorDetail />} />
 
         <Route path="/products" element={<Products />} />

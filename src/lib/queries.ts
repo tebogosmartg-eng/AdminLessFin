@@ -135,6 +135,23 @@ export const vendorsQuery = (companyId: string) => ({
   },
 });
 
+/**
+ * Creditors age analysis, as at a date. Shared by the page and by the sidebar
+ * prefetch so both ask for exactly the same thing.
+ */
+export const creditorsAgeAnalysisQuery = (companyId: string, asOf?: string) => {
+  const as_of = asOf ?? new Date().toISOString().slice(0, 10);
+  return {
+    queryKey: ['creditors_age_analysis', companyId, as_of],
+    queryFn: async () => {
+      const { data, error } = await supabase.functions.invoke('vendors', {
+        body: { method: 'GET_AGE_ANALYSIS', company_id: companyId, as_of },
+      });
+      return parseFunctionResult(data, error);
+    },
+  };
+};
+
 export const customersQuery = (companyId: string) => ({
   queryKey: ['customers', companyId],
   queryFn: async () => {
