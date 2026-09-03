@@ -141,8 +141,9 @@ serve(withEnterprisePlatform('send-payslip-email', 'tenant', async (req, _ctx) =
         .from('payroll_runs')
         .select('id, company_id, status')
         .eq('id', payrollRunId)
-        .single();
+        .maybeSingle();
       if (runError) throw runError;
+      if (!run) throw new Error('Payroll run not found.');
       if (run.status !== 'finalized' && run.status !== 'paid') throw new Error('Payroll run must be finalized before distributing payslips.');
 
       const { data: member } = await supabase
@@ -150,7 +151,7 @@ serve(withEnterprisePlatform('send-payslip-email', 'tenant', async (req, _ctx) =
         .select('role')
         .eq('user_id', user.id)
         .eq('company_id', run.company_id)
-        .single();
+        .maybeSingle();
       if (!member || !['owner', 'admin'].includes(member.role)) {
         throw new Error("Access Denied: Payroll requires Admin privileges.");
       }
@@ -206,7 +207,7 @@ serve(withEnterprisePlatform('send-payslip-email', 'tenant', async (req, _ctx) =
         payslip_items ( description, type, amount )
       `)
       .eq('id', payslipId)
-      .single();
+      .maybeSingle();
 
     if (fetchError) throw fetchError;
     if (!payslip) throw new Error("Payslip not found.");
@@ -217,7 +218,7 @@ serve(withEnterprisePlatform('send-payslip-email', 'tenant', async (req, _ctx) =
       .select('role')
       .eq('user_id', user.id)
       .eq('company_id', payslip.company_id)
-      .single();
+      .maybeSingle();
 
     if (memberError || !member || !['owner', 'admin'].includes(member.role)) {
       throw new Error("Access Denied: Payroll requires Admin privileges.");
