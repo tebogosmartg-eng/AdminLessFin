@@ -102,8 +102,8 @@ const JournalEntryDetail = ({ entryId, isOpen, setIsOpen }: JournalEntryDetailPr
 
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
-      <DialogContent className="sm:max-w-lg">
-        <DialogHeader>
+      <DialogContent className="sm:max-w-3xl flex flex-col max-h-[90vh]">
+        <DialogHeader className="flex-shrink-0">
           <DialogTitle>Journal Lines {entry?.journal_number ? `· ${entry.journal_number}` : ''}</DialogTitle>
           {entry && <DialogDescription>Details for entry on {new Date(entry.entry_date).toLocaleDateString()}</DialogDescription>}
         </DialogHeader>
@@ -113,7 +113,7 @@ const JournalEntryDetail = ({ entryId, isOpen, setIsOpen }: JournalEntryDetailPr
             <Skeleton className="h-20 w-full" />
           </div>
         ) : entry ? (
-          <div className="mt-4 space-y-4">
+          <div className="mt-4 space-y-4 overflow-y-auto flex-1 pr-1">
             {entry.posting_requests?.[0] && (
               <div className="rounded-md border p-3 text-sm grid grid-cols-2 gap-2 text-muted-foreground">
                 <span>Module: <span className="text-foreground">{entry.posting_requests[0].module}</span></span>

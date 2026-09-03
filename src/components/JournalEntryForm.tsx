@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useForm, useFieldArray } from 'react-hook-form';
+import { useForm, useFieldArray, type FieldErrors } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -41,6 +41,7 @@ import { Trash2, X, Sparkles, Loader2 } from 'lucide-react';
 import { formatCurrency } from '../lib/utils';
 import { accountsQuery, customersQuery, vendorsQuery } from '../lib/queries';
 import { useDialogFormReset } from '../hooks/useDialogFormReset';
+import { manuallyPostableAccounts } from '../lib/accounting/accountRoles';
 
 const journalEntryItemSchema = z.object({
   account_id: z.string().min(1, "Account is required."),
@@ -57,7 +58,9 @@ const journalEntrySchema = z.object({
 }).refine(data => {
   const debits = data.items.filter(i => i.type === 'debit').reduce((sum, i) => sum + i.amount, 0);
   const credits = data.items.filter(i => i.type === 'credit').reduce((sum, i) => sum + i.amount, 0);
-  return Math.abs(debits - credits) < 0.001;
+  const debitCents = Math.round(debits * 100);
+  const creditCents = Math.round(credits * 100);
+  return debitCents === creditCents;
 }, {
   message: "Total debits must equal total credits.",
   path: ["items"],
@@ -153,7 +156,8 @@ const JournalEntryForm = ({ isOpen, setIsOpen, entryId }: JournalEntryFormProps)
     name: "items",
   });
 
-  const { data: accounts } = useQuery<Account[]>({ ...accountsQuery(activeCompany!.id), enabled: !!activeCompany });
+  const { data: allAccounts } = useQuery<Account[]>({ ...accountsQuery(activeCompany!.id), enabled: !!activeCompany });
+  const accounts = manuallyPostableAccounts(allAccounts);
   const { data: vendors } = useQuery<Vendor[]>({ ...vendorsQuery(activeCompany!.id), enabled: !!activeCompany });
   const { data: customers } = useQuery<Customer[]>({ ...customersQuery(activeCompany!.id), enabled: !!activeCompany });
 
@@ -250,6 +254,28 @@ const JournalEntryForm = ({ isOpen, setIsOpen, entryId }: JournalEntryFormProps)
   });
 
   const onSubmit = (values: JournalEntryFormValues) => mutation.mutate(values);
+
+  /**
+   * react-hook-form silently does nothing when validation fails, so a user who
+   * misses a field sees no reaction to pressing Save at all. Report it, and
+   * move focus to the first problem so it is findable in a long form.
+   */
+  const onInvalid = (errors: FieldErrors<JournalEntryFormValues>) => {
+    const itemErrors = errors.items;
+    if (itemErrors?.message) {
+      showError(itemErrors.message);
+    } else if (Array.isArray(itemErrors)) {
+      const first = itemErrors.find(Boolean);
+      const detail =
+        first?.account_id?.message ?? first?.amount?.message ?? first?.type?.message;
+      showError(detail ? `This entry cannot be saved: ${detail}` : 'Every line needs an account and an amount greater than zero.');
+    } else {
+      const firstField = Object.values(errors).find((e) => (e as { message?: string })?.message) as
+        | { message?: string }
+        | undefined;
+      showError(firstField?.message ?? 'Some information is missing or invalid. Please review and try again.');
+    }
+  };
   const debits = form.watch('items').filter(i => i.type === 'debit').reduce((sum, i) => sum + Number(i.amount || 0), 0);
   const credits = form.watch('items').filter(i => i.type === 'credit').reduce((sum, i) => sum + Number(i.amount || 0), 0);
 
@@ -316,20 +342,31 @@ const JournalEntryForm = ({ isOpen, setIsOpen, entryId }: JournalEntryFormProps)
               {fields.map((field, index) => (
                 <div key={field.id} className="flex items-center gap-2">
                   <FormField control={form.control} name={`items.${index}.account_id`} render={({ field }) => (
-                    <FormItem className="flex-1"><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select Account" /></SelectTrigger></FormControl><SelectContent>{accounts?.map(acc => <SelectItem key={acc.id} value={acc.id}>{acc.account_number} - {acc.name}</SelectItem>)}</SelectContent></Select></FormItem>
+                    <FormItem className="flex-1"><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select Account" /></SelectTrigger></FormControl><SelectContent>{accounts?.map(acc => <SelectItem key={acc.id} value={acc.id}>{acc.account_number} - {acc.name}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem>
                   )} />
                   <FormField control={form.control} name={`items.${index}.type`} render={({ field }) => (
-                    <FormItem><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl><SelectContent><SelectItem value="debit">Debit</SelectItem><SelectItem value="credit">Credit</SelectItem></SelectContent></Select></FormItem>
+                    <FormItem><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl><SelectContent><SelectItem value="debit">Debit</SelectItem><SelectItem value="credit">Credit</SelectItem></SelectContent></Select><FormMessage /></FormItem>
                   )} />
                   <FormField control={form.control} name={`items.${index}.amount`} render={({ field }) => (
-                    <FormItem><FormControl><Input type="number" step="0.01" placeholder="Amount" {...field} /></FormControl></FormItem>
+                    <FormItem><FormControl><Input type="number" step="0.01" placeholder="Amount" {...field} /></FormControl><FormMessage /></FormItem>
                   )} />
                   <Button type="button" variant="ghost" size="icon" onClick={() => remove(index)} disabled={fields.length <= 2}><Trash2 className="h-4 w-4" /></Button>
                 </div>
               ))}
               <Button type="button" variant="outline" size="sm" onClick={() => append({ account_id: '', type: 'debit', amount: 0 })}>Add Line</Button>
             </div>
-            {form.formState.errors.items && <p className="text-sm font-medium text-destructive">{form.formState.errors.items.message}</p>}
+            {/* errors.items carries the whole-entry refine message ("debits must
+                equal credits"). When the failures are per line it is an ARRAY and
+                .message is undefined, so printing it alone rendered nothing and
+                Save looked like it did nothing at all. */}
+            {form.formState.errors.items?.message && (
+              <p className="text-sm font-medium text-destructive">{form.formState.errors.items.message}</p>
+            )}
+            {!form.formState.errors.items?.message && Array.isArray(form.formState.errors.items) && (
+              <p className="text-sm font-medium text-destructive">
+                Every line needs an account and an amount greater than zero.
+              </p>
+            )}
 
             <div className="flex justify-between font-mono text-sm pt-2 border-t">
               <span>Total Debits: {formatCurrency(debits)}</span>

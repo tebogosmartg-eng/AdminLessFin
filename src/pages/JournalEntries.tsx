@@ -207,7 +207,7 @@ const JournalEntries = () => {
               </Button>
             </div>
           </div>
-          <div className="flex items-center gap-2 pt-4 border-t -mx-6 px-6">
+          <div className="flex flex-wrap items-center gap-2 pt-4 border-t -mx-6 px-6">
             <Popover>
               <PopoverTrigger asChild>
                 <Button
