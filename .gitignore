@@ -35,6 +35,9 @@ tests/e2e/evidence/coa-classification-production/
 tests/e2e/evidence/staging-recovery/journal-entry/*.png
 tests/e2e/evidence/staging-recovery/dialogs/*.png
 tests/e2e/evidence/staging-recovery/ui-closure/*.png
+tests/e2e/evidence/staging-recovery/age-analysis/*.png
+tests/e2e/evidence/staging-recovery/age-analysis/*.pdf
+tests/e2e/evidence/staging-recovery/age-analysis/*.csv
 
 # Certification probes, lint dumps, and scratch output
 tmp/
