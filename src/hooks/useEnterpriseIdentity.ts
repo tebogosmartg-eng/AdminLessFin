@@ -28,12 +28,13 @@ export function useEnterpriseIdentity(companyId: string | undefined | null) {
   const companyProp = identity
     ? identityAsCompanyProp(identity)
     : companyId
-      ? { id: companyId, name: 'Your Company', address: '', tax_id: '' }
+      ? { id: companyId, name: 'Your Company', address: '', tax_id: '', email: '' }
       : null;
 
   return {
     identity,
     companyProp,
+    master: query.data ?? null,
     isLoading: query.isLoading,
     isError: query.isError,
     error: query.error,

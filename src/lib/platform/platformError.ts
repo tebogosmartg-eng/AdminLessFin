@@ -118,6 +118,18 @@ export function classifyFromMessage(message: string): FailureCategory {
   ) {
     return 'BusinessRuleError';
   }
+  // Mail delivery is an integration, not an unclassified server fault. Matched
+  // before the generic "required"/"invalid" rules so a missing Resend secret is
+  // not reported as a validation error or as UnknownPlatformError (HTTP 500).
+  if (
+    m.includes('email service is not configured') ||
+    m.includes('resend_api_key') ||
+    m.includes('resend_domain') ||
+    m.includes('failed to send email') ||
+    m.includes('domain is not verified')
+  ) {
+    return 'IntegrationError';
+  }
   if (m.includes('validation') || m.includes('invalid') || m.includes('required')) return 'ValidationError';
   if (m.includes('timeout') || m.includes('timed out')) return 'TimeoutError';
   if (m.includes('network') || m.includes('fetch failed')) return 'NetworkError';

@@ -31,6 +31,7 @@ const InvoicePreview = ({ formData, customers, company, taxRates }) => {
             <CompanyLogo src={company?.logo_url} className="mb-2" />
             <CardTitle className="text-base">{company?.name || 'Your Company'}</CardTitle>
             <p className="text-sm text-muted-foreground whitespace-pre-wrap">{company?.address || 'Your Company Address'}</p>
+            {company?.email && <p className="text-sm text-muted-foreground">{company.email}</p>}
             {company?.tax_id && <p className="text-sm text-muted-foreground">Tax ID: {company.tax_id}</p>}
           </div>
           <div className="text-right">

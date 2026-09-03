@@ -1,16 +1,18 @@
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { useMutation } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { supabase } from '../integrations/supabase/client';
 import { useAuth } from '../contexts/AuthContext';
 import { useEnterpriseIdentity } from '../hooks/useEnterpriseIdentity';
+import { getCompanyMasterData, upsertCompanyMasterDataModule } from '@/lib/financialStatements/masterData';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from './ui/card';
 import { Button } from './ui/button';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from './ui/form';
 import { Input } from './ui/input';
 import { Textarea } from './ui/textarea';
+import { Label } from './ui/label';
 import { showError, showSuccess } from '../utils/toast';
 import { useEffect, useState } from 'react';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from './ui/alert-dialog';
@@ -18,9 +20,11 @@ import { AlertCircle, Upload, X, Database } from 'lucide-react';
 import { companyService } from '@/governance/domains/company/service';
 
 /**
- * G3.6C — Company tab no longer edits enterprise identity (name/address/tax).
- * Those live exclusively in Settings → Master Data. This surface keeps only
- * operational branding (logo) and invoice notes.
+ * G3.6C — Company tab no longer edits legal identity (name/address/tax).
+ * Those live exclusively in Settings → Master Data. This surface keeps
+ * operational branding (logo), invoice notes, and the company email used as
+ * the outbound Reply-To / From on purchase orders, invoices, quotes, statements
+ * and payslips (stored on the Address Repository master-data module).
  */
 const companyOpsSchema = z.object({
   default_invoice_notes: z.string().optional(),
@@ -30,9 +34,11 @@ type CompanyOpsValues = z.infer<typeof companyOpsSchema>;
 
 const CompanySettings = () => {
   const { user, activeCompany, refreshProfile } = useAuth();
-  const { identity } = useEnterpriseIdentity(activeCompany?.id);
+  const { identity, master } = useEnterpriseIdentity(activeCompany?.id);
+  const queryClient = useQueryClient();
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [companyEmail, setCompanyEmail] = useState('');
 
   const form = useForm<CompanyOpsValues>({
     resolver: zodResolver(companyOpsSchema),
@@ -49,6 +55,10 @@ const CompanySettings = () => {
     }
   }, [activeCompany, form]);
 
+  useEffect(() => {
+    setCompanyEmail(identity?.email || master?.addresses?.email || '');
+  }, [identity?.email, master?.addresses?.email]);
+
   const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
@@ -56,6 +66,27 @@ const CompanySettings = () => {
       setPreviewUrl(URL.createObjectURL(file));
     }
   };
+
+  const saveEmailMutation = useMutation({
+    mutationFn: async () => {
+      if (!activeCompany) throw new Error('No active company');
+      const trimmed = companyEmail.trim();
+      if (trimmed && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)) {
+        throw new Error('Enter a valid company email address.');
+      }
+      // Always load the latest addresses module so we merge, never wipe.
+      const current = await getCompanyMasterData(activeCompany.id);
+      await upsertCompanyMasterDataModule(activeCompany.id, 'addresses', {
+        ...(current.addresses || {}),
+        email: trimmed || null,
+      });
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['efs_company_master_data', activeCompany?.id] });
+      showSuccess('Company email saved. Outbound mail will use this address.');
+    },
+    onError: (error: Error) => showError(error.message),
+  });
 
   const updateMutation = useMutation({
     mutationFn: async (values: CompanyOpsValues) => {
@@ -143,12 +174,50 @@ const CompanySettings = () => {
               <dt className="text-muted-foreground">Registration number</dt>
               <dd className="font-medium">{identity?.registrationNumber || 'Not configured'}</dd>
             </div>
+            <div>
+              <dt className="text-muted-foreground">Company email</dt>
+              <dd className="font-medium">{identity?.email || 'Not configured'}</dd>
+            </div>
           </dl>
           <Button asChild variant="outline" size="sm">
             <Link to="/settings?tab=master-data&module=company_profile">
               <Database className="mr-2 h-4 w-4" />
               Manage in Master Data
             </Link>
+          </Button>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Company email</CardTitle>
+          <CardDescription>
+            Purchase orders, invoices, quotes, statements and payslips are sent from this address.
+            Replies from customers and vendors come back here.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4 max-w-md">
+          <div className="space-y-2">
+            <Label htmlFor="company-email">Email address</Label>
+            <Input
+              id="company-email"
+              type="email"
+              autoComplete="email"
+              placeholder="e.g. accounts@yourcompany.co.za"
+              value={companyEmail}
+              onChange={(e) => setCompanyEmail(e.target.value)}
+            />
+            <p className="text-xs text-muted-foreground">
+              Same value as Master Data → Address Repository. Set it once; every outbound
+              message uses it.
+            </p>
+          </div>
+          <Button
+            type="button"
+            onClick={() => saveEmailMutation.mutate()}
+            disabled={saveEmailMutation.isPending || !activeCompany}
+          >
+            {saveEmailMutation.isPending ? 'Saving...' : 'Save company email'}
           </Button>
         </CardContent>
       </Card>

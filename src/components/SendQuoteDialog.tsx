@@ -77,7 +77,10 @@ const SendQuoteDialog = ({ isOpen, setIsOpen, quote }: SendQuoteDialogProps) => 
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>Send Quote {quote.quote_number}</DialogTitle>
-          <DialogDescription>This will send an email to your customer.</DialogDescription>
+          <DialogDescription>
+            This will send an email to your customer
+            {identity?.email ? ` from ${identity.email}.` : '. Set a company email under Settings → Company so replies come back to you.'}
+          </DialogDescription>
         </DialogHeader>
         <div className="space-y-4 py-4">
           <div className="space-y-2">

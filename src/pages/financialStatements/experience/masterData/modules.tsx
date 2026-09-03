@@ -135,7 +135,11 @@ export function AddressRepositoryModule({
       <Field label="Postal Address" value={draft.postal_address || ''} onChange={(v) => setDraft((p) => ({ ...p, postal_address: v }))} multiline />
       <Field label="Physical Address" value={draft.physical_address || ''} onChange={(v) => setDraft((p) => ({ ...p, physical_address: v }))} multiline />
       <Field label="Website" value={draft.website || ''} onChange={(v) => setDraft((p) => ({ ...p, website: v }))} />
-      <Field label="Email" value={draft.email || ''} onChange={(v) => setDraft((p) => ({ ...p, email: v }))} />
+      <Field label="Company email" value={draft.email || ''} onChange={(v) => setDraft((p) => ({ ...p, email: v }))} type="email" />
+      <p className="text-xs text-muted-foreground -mt-2">
+        Purchase orders, invoices, quotes, statements and payslips are sent from this address.
+        Replies from customers and vendors come back here.
+      </p>
       <Field label="Telephone" value={draft.telephone || ''} onChange={(v) => setDraft((p) => ({ ...p, telephone: v }))} />
     </MasterDataModuleShell>
   );

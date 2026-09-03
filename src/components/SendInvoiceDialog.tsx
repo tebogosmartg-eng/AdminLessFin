@@ -77,7 +77,10 @@ const SendInvoiceDialog = ({ isOpen, setIsOpen, invoice }: SendInvoiceDialogProp
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>Send Invoice {invoice.invoice_number}</DialogTitle>
-          <DialogDescription>This will send an email to your customer.</DialogDescription>
+          <DialogDescription>
+            This will send an email to your customer
+            {identity?.email ? ` from ${identity.email}.` : '. Set a company email under Settings → Company so replies come back to you.'}
+          </DialogDescription>
         </DialogHeader>
         <div className="space-y-4 py-4">
           <div className="space-y-2">

@@ -7,12 +7,15 @@ import {
   edgeFailure,
 } from '../_shared/enterpriseEdgePlatform.ts'
 import { resolveEnterpriseIdentityEdge } from '../_shared/enterpriseIdentity.ts'
+import {
+  relatedOne,
+  sendOutboundEmail,
+  outboundEmailFailure,
+} from '../_shared/outboundEmail.ts'
 
 
 const corsHeaders = ENTERPRISE_CORS_HEADERS
 
-const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY');
-const RESEND_DOMAIN = Deno.env.get('RESEND_DOMAIN');
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -128,8 +131,11 @@ serve(withEnterprisePlatform('send-invoice-email', 'tenant', async (req, _ctx) =
     }
 
     const identity = await resolveEnterpriseIdentityEdge(supabaseAdmin, invoice.company_id);
-
-    const lineItems = invoice.journal_entries[0].journal_entry_items.filter((item: any) => item.type === 'credit');
+    const customer = relatedOne(invoice.customers);
+    const journalEntries = Array.isArray(invoice.journal_entries) ? invoice.journal_entries : [];
+    const firstEntry = journalEntries[0];
+    const journalItems = Array.isArray(firstEntry?.journal_entry_items) ? firstEntry.journal_entry_items : [];
+    const lineItems = journalItems.filter((item: any) => item.type === 'credit');
     const totalAmount = lineItems.reduce((sum: number, item: any) => sum + item.amount, 0);
 
     const htmlBody = `
@@ -140,6 +146,7 @@ serve(withEnterprisePlatform('send-invoice-email', 'tenant', async (req, _ctx) =
               <div>
                 <h1 style="font-size: 24px; font-weight: bold; margin: 0;">${identity.name}</h1>
                 <p style="margin: 0; color: #666;">${identity.address}</p>
+                ${identity.email ? `<p style="margin: 0; color: #666;">${identity.email}</p>` : ''}
               </div>
               <div style="text-align: right;">
                 <h2 style="font-size: 28px; font-weight: bold; margin: 0;">INVOICE</h2>
@@ -149,8 +156,8 @@ serve(withEnterprisePlatform('send-invoice-email', 'tenant', async (req, _ctx) =
             <div style="display: flex; justify-content: space-between; padding: 20px 0;">
               <div>
                 <h3 style="margin: 0 0 5px 0; font-weight: bold;">Bill To:</h3>
-                <p style="margin: 0;">${invoice.customers.name}</p>
-                <p style="margin: 0; color: #666;">${invoice.customers.address || ''}</p>
+                <p style="margin: 0;">${customer?.name || 'Customer'}</p>
+                <p style="margin: 0; color: #666;">${customer?.address || ''}</p>
               </div>
               <div style="text-align: right;">
                 <p style="margin: 0;"><strong style="font-weight: bold;">Invoice Date:</strong> ${new Date(invoice.invoice_date).toLocaleDateString()}</p>
@@ -188,37 +195,13 @@ serve(withEnterprisePlatform('send-invoice-email', 'tenant', async (req, _ctx) =
       </html>
     `;
 
-    // Configuration is checked immediately before the send, not on entry.
-    // Checking it first made a missing secret mask every real problem
-    // behind it - a bad recipient or an unknown quote reported itself as
-    // "email service is not configured".
-    if (!RESEND_API_KEY || !RESEND_DOMAIN) {
-      throw new Error(
-        'Email service is not configured. Set the RESEND_API_KEY and RESEND_DOMAIN ' +
-        'secrets on the Supabase project to enable sending.'
-      );
-    }
-
-    const resendResponse = await fetch('https://api.resend.com/emails', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${RESEND_API_KEY}`,
-      },
-      body: JSON.stringify({
-        from: `invoices@${RESEND_DOMAIN}`,
-        to: to,
-        subject: subject,
-        html: htmlBody,
-      }),
+    const sent = await sendOutboundEmail({
+      identity,
+      mailbox: 'invoices',
+      to,
+      subject,
+      html: htmlBody,
     });
-
-    const resendBody = await resendResponse.json().catch(() => ({}));
-    if (!resendResponse.ok) {
-      throw new Error(
-        `Failed to send email: ${(resendBody as { message?: string }).message || 'Unknown error'}`
-      );
-    }
 
     logAudit({
       action: 'send_invoice_email',
@@ -231,7 +214,7 @@ serve(withEnterprisePlatform('send-invoice-email', 'tenant', async (req, _ctx) =
 
     return new Response(JSON.stringify({
       message: "Email sent successfully.",
-      providerMessageId: (resendBody as { id?: string }).id ?? null,
+      providerMessageId: sent.providerMessageId,
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 200,
@@ -252,23 +235,9 @@ serve(withEnterprisePlatform('send-invoice-email', 'tenant', async (req, _ctx) =
         reason: error?.message ?? 'Unknown error',
       });
     }
-    // A missing mail configuration is a known, actionable condition, not an
-    // unclassified server fault. Left to the default classifier it becomes
-    // UnknownPlatformError, whose business message ("An unexpected platform
-    // error occurred.") tells the customer nothing and hides the one sentence
-    // that would let an administrator fix it.
-    const raw = error instanceof Error ? error.message : String(error);
-    if (raw.includes('RESEND_API_KEY') || raw.includes('RESEND_DOMAIN')) {
-      return edgeFailure(_ctx, error, {
-        category: 'IntegrationError',
-        code: 'EMAIL_NOT_CONFIGURED',
-        businessMessage:
-          'Email sending is not set up for this workspace yet, so the message was not sent.',
-        recoverySuggestion:
-          'Ask your administrator to set the RESEND_API_KEY and RESEND_DOMAIN secrets on the Supabase project.',
-        retryable: false,
-      });
+    if (error instanceof HttpError) {
+      return edgeFailure(_ctx, error, {}, error.status);
     }
-    return edgeFailure(_ctx, error, {}, error instanceof HttpError ? error.status : undefined);
+    return outboundEmailFailure(_ctx, error);
   }
 }))

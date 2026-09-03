@@ -13,7 +13,7 @@ function str(v) {
 /**
  * @param {import('https://esm.sh/@supabase/supabase-js@2.45.0').SupabaseClient} client
  * @param {string} companyId
- * @returns {Promise<{ name: string, address: string, taxId: string }>}
+ * @returns {Promise<{ name: string, address: string, taxId: string, email: string }>}
  */
 export async function resolveEnterpriseIdentityEdge(client, companyId) {
   const { data: master, error } = await client
@@ -49,5 +49,7 @@ export async function resolveEnterpriseIdentityEdge(client, companyId) {
       str(tax.income_tax_number) ||
       str(tax.vat_number) ||
       '',
+    /** Company email — Reply-To (and From when the domain is verified). */
+    email: str(addresses.email),
   };
 }

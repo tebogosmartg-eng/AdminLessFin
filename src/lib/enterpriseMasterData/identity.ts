@@ -16,6 +16,8 @@ export type EnterpriseIdentity = {
   address: string;
   /** Primary tax identifier (income tax, else VAT). */
   taxId: string;
+  /** Company email used as Reply-To / From on outbound mail. */
+  email: string;
   registrationNumber: string | null;
   vatNumber: string | null;
 };
@@ -58,6 +60,7 @@ export function identityFromMaster(
     tradingName: str(profile.trading_name) || null,
     address,
     taxId,
+    email: str(addresses.email),
     registrationNumber: str(profile.registration_number) || null,
     vatNumber: str(tax.vat_number) || null,
   };
@@ -75,6 +78,7 @@ export function identityAsCompanyProp(identity: EnterpriseIdentity): {
   name: string;
   address: string;
   tax_id: string;
+  email: string;
   logo_url?: string | null;
 } {
   return {
@@ -82,5 +86,6 @@ export function identityAsCompanyProp(identity: EnterpriseIdentity): {
     name: identity.name || 'Your Company',
     address: identity.address || '',
     tax_id: identity.taxId || '',
+    email: identity.email || '',
   };
 }

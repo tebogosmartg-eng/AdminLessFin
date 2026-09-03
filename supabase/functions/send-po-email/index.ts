@@ -4,15 +4,16 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0'
 import {
   ENTERPRISE_CORS_HEADERS,
   withEnterprisePlatform,
-  edgeFailure,
 } from '../_shared/enterpriseEdgePlatform.ts'
 import { resolveEnterpriseIdentityEdge } from '../_shared/enterpriseIdentity.ts'
+import {
+  relatedOne,
+  sendOutboundEmail,
+  outboundEmailFailure,
+} from '../_shared/outboundEmail.ts'
 
 
 const corsHeaders = ENTERPRISE_CORS_HEADERS
-
-const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY');
-const RESEND_DOMAIN = Deno.env.get('RESEND_DOMAIN');
 
 const formatCurrency = (amount: number) => {
   return new Intl.NumberFormat('en-ZA', {
@@ -81,7 +82,9 @@ serve(withEnterprisePlatform('send-po-email', 'tenant', async (req, _ctx) => {
     if (!po) throw new Error("Purchase Order not found.");
 
     const identity = await resolveEnterpriseIdentityEdge(supabaseAdmin, po.company_id);
-    const totalAmount = po.purchase_order_items.reduce((sum: number, item: any) => sum + (item.quantity * item.unit_cost), 0);
+    const vendor = relatedOne(po.vendors);
+    const items = Array.isArray(po.purchase_order_items) ? po.purchase_order_items : [];
+    const totalAmount = items.reduce((sum: number, item: any) => sum + (item.quantity * item.unit_cost), 0);
 
     const htmlBody = `
       <html>
@@ -91,6 +94,7 @@ serve(withEnterprisePlatform('send-po-email', 'tenant', async (req, _ctx) => {
               <div>
                 <h1 style="font-size: 24px; font-weight: bold; margin: 0;">${identity.name}</h1>
                 <p style="margin: 0; color: #666;">${identity.address}</p>
+                ${identity.email ? `<p style="margin: 0; color: #666;">${identity.email}</p>` : ''}
               </div>
               <div style="text-align: right;">
                 <h2 style="font-size: 28px; font-weight: bold; margin: 0;">PURCHASE ORDER</h2>
@@ -100,8 +104,8 @@ serve(withEnterprisePlatform('send-po-email', 'tenant', async (req, _ctx) => {
             <div style="display: flex; justify-content: space-between; padding: 20px 0;">
               <div>
                 <h3 style="margin: 0 0 5px 0; font-weight: bold;">Vendor:</h3>
-                <p style="margin: 0;">${po.vendors.name}</p>
-                <p style="margin: 0; color: #666;">${po.vendors.address || ''}</p>
+                <p style="margin: 0;">${vendor?.name || 'Vendor'}</p>
+                <p style="margin: 0; color: #666;">${vendor?.address || ''}</p>
               </div>
               <div style="text-align: right;">
                 <p style="margin: 0;"><strong style="font-weight: bold;">Date:</strong> ${new Date(po.po_date).toLocaleDateString()}</p>
@@ -119,7 +123,7 @@ serve(withEnterprisePlatform('send-po-email', 'tenant', async (req, _ctx) => {
                 </tr>
               </thead>
               <tbody>
-                ${po.purchase_order_items.map((item: any) => `
+                ${items.map((item: any) => `
                   <tr>
                     <td style="padding: 10px; border: 1px solid #eee;">${item.description}</td>
                     <td style="padding: 10px; border: 1px solid #eee; text-align: center;">${item.quantity}</td>
@@ -140,64 +144,23 @@ serve(withEnterprisePlatform('send-po-email', 'tenant', async (req, _ctx) => {
       </html>
     `;
 
-    // Configuration is checked immediately before the send, not on entry.
-    // Checking it first made a missing secret mask every real problem
-    // behind it - a bad recipient or an unknown quote reported itself as
-    // "email service is not configured".
-    if (!RESEND_API_KEY || !RESEND_DOMAIN) {
-      throw new Error(
-        'Email service is not configured. Set the RESEND_API_KEY and RESEND_DOMAIN ' +
-        'secrets on the Supabase project to enable sending.'
-      );
-    }
-
-    const resendResponse = await fetch('https://api.resend.com/emails', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${RESEND_API_KEY}`,
-      },
-      body: JSON.stringify({
-        from: `purchasing@${RESEND_DOMAIN}`,
-        to: to,
-        subject: subject,
-        html: htmlBody,
-      }),
+    const sent = await sendOutboundEmail({
+      identity,
+      mailbox: 'purchasing',
+      to,
+      subject,
+      html: htmlBody,
     });
-
-    const resendBody = await resendResponse.json().catch(() => ({}));
-    if (!resendResponse.ok) {
-      throw new Error(
-        `Failed to send email: ${(resendBody as { message?: string }).message || 'Unknown error'}`
-      );
-    }
 
     return new Response(JSON.stringify({
       message: "PO sent successfully.",
-      providerMessageId: (resendBody as { id?: string }).id ?? null,
+      providerMessageId: sent.providerMessageId,
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 200,
     });
 
   } catch (error) {
-    // A missing mail configuration is a known, actionable condition, not an
-    // unclassified server fault. Left to the default classifier it becomes
-    // UnknownPlatformError, whose business message ("An unexpected platform
-    // error occurred.") tells the customer nothing and hides the one sentence
-    // that would let an administrator fix it.
-    const raw = error instanceof Error ? error.message : String(error);
-    if (raw.includes('RESEND_API_KEY') || raw.includes('RESEND_DOMAIN')) {
-      return edgeFailure(_ctx, error, {
-        category: 'IntegrationError',
-        code: 'EMAIL_NOT_CONFIGURED',
-        businessMessage:
-          'Email sending is not set up for this workspace yet, so the message was not sent.',
-        recoverySuggestion:
-          'Ask your administrator to set the RESEND_API_KEY and RESEND_DOMAIN secrets on the Supabase project.',
-        retryable: false,
-      });
-    }
-    return edgeFailure(_ctx, error);
+    return outboundEmailFailure(_ctx, error);
   }
 }))

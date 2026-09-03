@@ -78,7 +78,10 @@ const SendPODialog = ({ isOpen, setIsOpen, po }: SendPODialogProps) => {
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>Send PO {po.po_number}</DialogTitle>
-          <DialogDescription>This will send an email to your vendor.</DialogDescription>
+          <DialogDescription>
+            This will send an email to your vendor
+            {identity?.email ? ` from ${identity.email}.` : '. Set a company email under Settings → Company so replies come back to you.'}
+          </DialogDescription>
         </DialogHeader>
         <div className="space-y-4 py-4">
           <div className="space-y-2">

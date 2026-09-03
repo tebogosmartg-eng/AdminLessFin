@@ -4,15 +4,15 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0'
 import {
   ENTERPRISE_CORS_HEADERS,
   withEnterprisePlatform,
-  edgeFailure,
 } from '../_shared/enterpriseEdgePlatform.ts'
 import { resolveEnterpriseIdentityEdge } from '../_shared/enterpriseIdentity.ts'
+import {
+  sendOutboundEmail,
+  outboundEmailFailure,
+} from '../_shared/outboundEmail.ts'
 
 
 const corsHeaders = ENTERPRISE_CORS_HEADERS
-
-const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY');
-const RESEND_DOMAIN = Deno.env.get('RESEND_DOMAIN');
 
 const formatCurrency = (amount: number) => {
   return new Intl.NumberFormat('en-ZA', {
@@ -102,24 +102,13 @@ async function sendPayslipEmail(payslip, supabaseAdmin) {
   const identity = await resolveEnterpriseIdentityEdge(supabaseAdmin, payslip.company_id);
   const htmlBody = buildPayslipHtml(payslip, identity.name);
 
-  const resendResponse = await fetch('https://api.resend.com/emails', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${RESEND_API_KEY}`,
-    },
-    body: JSON.stringify({
-      from: `payroll@${RESEND_DOMAIN}`,
-      to: payslip.employees.email,
-      subject: `Payslip: ${new Date(payslip.payroll_runs.pay_date).toLocaleDateString()}`,
-      html: htmlBody,
-    }),
+  await sendOutboundEmail({
+    identity,
+    mailbox: 'payroll',
+    to: payslip.employees.email,
+    subject: `Payslip: ${new Date(payslip.payroll_runs.pay_date).toLocaleDateString()}`,
+    html: htmlBody,
   });
-
-  if (!resendResponse.ok) {
-    const errorBody = await resendResponse.json();
-    throw new Error(errorBody.message || 'Failed to send email');
-  }
 
   await supabaseAdmin
     .from('payslips')
@@ -130,10 +119,6 @@ async function sendPayslipEmail(payslip, supabaseAdmin) {
 serve(withEnterprisePlatform('send-payslip-email', 'tenant', async (req, _ctx) => {
 
   try {
-    if (!RESEND_API_KEY || !RESEND_DOMAIN) {
-      throw new Error("Email service not configured.");
-    }
-
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_ANON_KEY') ?? '',
@@ -255,6 +240,6 @@ serve(withEnterprisePlatform('send-payslip-email', 'tenant', async (req, _ctx) =
     });
 
   } catch (error) {
-    return edgeFailure(_ctx, error);
+    return outboundEmailFailure(_ctx, error);
   }
 }))

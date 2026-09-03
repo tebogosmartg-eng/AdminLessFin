@@ -102,7 +102,7 @@ export const MASTER_DATA_MODULE_LABELS: Record<
   },
   addresses: {
     title: 'Address Repository',
-    description: 'Registered office, business, postal and contact addresses',
+    description: 'Registered office, business, postal, contact details, and company email',
   },
   tax_registrations: {
     title: 'Tax Configuration',

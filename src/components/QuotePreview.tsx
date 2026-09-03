@@ -31,6 +31,7 @@ const QuotePreview = ({ formData, customers, company, taxRates }) => {
             <CompanyLogo src={company?.logo_url} className="mb-2" />
             <CardTitle className="text-base">{company?.name || 'Your Company'}</CardTitle>
             <p className="text-sm text-muted-foreground">{company?.address || 'Your Company Address'}</p>
+            {company?.email && <p className="text-sm text-muted-foreground">{company.email}</p>}
           </div>
           <div className="text-right">
             <p className="text-3xl font-bold tracking-tight">QUOTE</p>
