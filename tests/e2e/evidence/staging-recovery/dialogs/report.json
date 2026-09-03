@@ -1,0 +1,118 @@
+{
+  "at": "2026-09-03T15:59:36.888Z",
+  "viewport": {
+    "width": 1280,
+    "height": 720
+  },
+  "rows": [
+    {
+      "name": "journal-entry",
+      "opened": true,
+      "height": 648,
+      "y": 36,
+      "onScreen": true,
+      "overflowY": "auto",
+      "needsScroll": true,
+      "canScroll": true,
+      "selectOpens": true,
+      "ok": true
+    },
+    {
+      "name": "invoice",
+      "opened": true,
+      "height": 648,
+      "y": 36,
+      "onScreen": true,
+      "overflowY": "auto",
+      "needsScroll": true,
+      "canScroll": true,
+      "selectOpens": true,
+      "ok": true
+    },
+    {
+      "name": "bill",
+      "opened": true,
+      "height": 612,
+      "y": 54,
+      "onScreen": true,
+      "overflowY": "auto",
+      "needsScroll": true,
+      "canScroll": true,
+      "selectOpens": true,
+      "ok": true
+    },
+    {
+      "name": "customer",
+      "opened": true,
+      "height": 630,
+      "y": 45,
+      "onScreen": true,
+      "overflowY": "auto",
+      "needsScroll": false,
+      "canScroll": true,
+      "selectOpens": true,
+      "ok": true
+    },
+    {
+      "name": "vendor",
+      "opened": true,
+      "height": 630,
+      "y": 45,
+      "onScreen": true,
+      "overflowY": "auto",
+      "needsScroll": false,
+      "canScroll": true,
+      "selectOpens": true,
+      "ok": true
+    },
+    {
+      "name": "product",
+      "opened": true,
+      "height": 648,
+      "y": 36,
+      "onScreen": true,
+      "overflowY": "auto",
+      "needsScroll": true,
+      "canScroll": true,
+      "selectOpens": true,
+      "ok": true
+    },
+    {
+      "name": "account",
+      "opened": true,
+      "height": 572,
+      "y": 74,
+      "onScreen": true,
+      "overflowY": "auto",
+      "needsScroll": false,
+      "canScroll": true,
+      "selectOpens": true,
+      "ok": true
+    },
+    {
+      "name": "quote",
+      "opened": true,
+      "height": 648,
+      "y": 36,
+      "onScreen": true,
+      "overflowY": "auto",
+      "needsScroll": true,
+      "canScroll": true,
+      "selectOpens": true,
+      "ok": true
+    },
+    {
+      "name": "bank-account",
+      "opened": true,
+      "height": 648,
+      "y": 36,
+      "onScreen": true,
+      "overflowY": "auto",
+      "needsScroll": true,
+      "canScroll": true,
+      "selectOpens": true,
+      "ok": true
+    }
+  ],
+  "errors": []
+}
