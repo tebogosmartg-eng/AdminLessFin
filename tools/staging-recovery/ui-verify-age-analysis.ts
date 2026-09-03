@@ -20,13 +20,17 @@ async function main() {
   await api.functions.invoke('settings', { body: { method: 'SWITCH_COMPANY', target_company_id: company.id } });
 
   const asOf = new Date().toISOString().slice(0, 10);
-  const apiRes = await invoke(api, 'vendors', { method: 'GET_AGE_ANALYSIS', company_id: company.id, as_of: asOf });
+  const SIDE = (process.env.AGE_SIDE === 'receivable' ? 'receivable' : 'payable') as 'payable' | 'receivable';
+  const FN = SIDE === 'payable' ? 'vendors' : 'customers';
+  const ROUTE = SIDE === 'payable' ? '/creditors-age-analysis' : '/debtors-age-analysis';
+  const HEADING = SIDE === 'payable' ? 'Creditors Age Analysis' : 'Debtors Age Analysis';
+  const apiRes = await invoke(api, FN, { method: 'GET_AGE_ANALYSIS', company_id: company.id, as_of: asOf });
   const expected = apiRes.body as {
-    suppliers: Array<{ vendor_name: string }>;
-    totals: { total: number; ap_control_balance: number };
-    reconciliation: { general_ledger_ap_balance: number; variance: number; reconciles: boolean };
+    parties: Array<{ party_name: string }>;
+    totals: { total: number; control_balance: number };
+    reconciliation: { general_ledger_control_balance: number; variance: number; reconciles: boolean };
   };
-  console.log(`API: ${expected.suppliers.length} suppliers, aged ${expected.totals.total}, GL ${expected.reconciliation.general_ledger_ap_balance}, variance ${expected.reconciliation.variance}`);
+  console.log(`API (${SIDE}): ${expected.parties.length} parties, aged ${expected.totals.total}, GL ${expected.reconciliation.general_ledger_control_balance}, variance ${expected.reconciliation.variance}`);
 
   const browser = await chromium.launch();
   const ctx = await browser.newContext({ viewport: { width: 1500, height: 950 }, acceptDownloads: true });
@@ -47,23 +51,26 @@ async function main() {
   await page.waitForURL((u) => !u.pathname.startsWith('/auth'), { timeout: 60_000 });
 
   console.log(NL + '=== NAVIGATE FROM THE SIDEBAR ===');
-  await page.goto(`${BASE_URL}/creditors-age-analysis`, { waitUntil: 'domcontentloaded' });
+  await page.goto(`${BASE_URL}${ROUTE}`, { waitUntil: 'domcontentloaded' });
   await page.waitForLoadState('networkidle').catch(() => undefined);
   await page.waitForTimeout(3000);
   const text = await page.locator('body').innerText();
-  await page.screenshot({ path: path.join(OUT, 'page.png'), fullPage: true });
+  await page.screenshot({ path: path.join(OUT, `${SIDE}.png`), fullPage: true });
 
-  console.log(`  heading rendered      : ${/Creditors Age Analysis/i.test(text)}`);
+  console.log(`  heading rendered      : ${text.includes(HEADING)}`);
   console.log(`  error boundary        : ${/something went wrong|unexpected error/i.test(text)}`);
   console.log(`  reconciliation on page: ${/Reconciliation to the general ledger/i.test(text)}`);
-  console.log(`  states it reconciles  : ${/reconciles to the creditors control account/i.test(text)}`);
+  console.log(`  states it reconciles  : ${/reconciles to the (creditors|debtors) control account/i.test(text)}`);
 
-  for (const s of expected.suppliers) {
-    console.log(`  supplier listed "${s.vendor_name}": ${text.includes(s.vendor_name)}`);
+  for (const s of expected.parties) {
+    console.log(`  party listed "${s.party_name}": ${text.includes(s.party_name)}`);
   }
-  const money = (n: number) => new Intl.NumberFormat('en-ZA', { minimumFractionDigits: 2 }).format(n);
-  console.log(`  GL balance ${money(expected.reconciliation.general_ledger_ap_balance)} shown: ` +
-    `${text.replace(/ /g, ' ').includes(money(expected.reconciliation.general_ledger_ap_balance))}`);
+  // The page renders through formatCurrency, so compare against that same form
+  // and normalise the non-breaking spaces the formatter emits.
+  const shown = new Intl.NumberFormat('en-ZA', { style: 'currency', currency: 'ZAR' })
+    .format(expected.reconciliation.general_ledger_control_balance);
+  const norm = (x: string) => x.replace(/\s+/g, ' ');
+  console.log(`  GL balance "${shown}" shown: ${norm(text).includes(norm(shown))}`);
 
   console.log(NL + '=== EXPORTS ===');
   for (const [label, name] of [['CSV', /^CSV$/i], ['PDF', /PDF for auditors/i]] as const) {
@@ -86,10 +93,10 @@ async function main() {
   await page.waitForTimeout(3500);
   const rtext = await page.locator('body').innerText();
   await page.screenshot({ path: path.join(OUT, 'reports.png'), fullPage: true });
-  console.log(`  card present          : ${/Aged Payables Summary/i.test(rtext)}`);
-  console.log(`  still says "no payables": ${/No outstanding payables found/i.test(rtext)}`);
-  for (const s of expected.suppliers) {
-    console.log(`  supplier "${s.vendor_name}" on card: ${rtext.includes(s.vendor_name)}`);
+  console.log(`  payables card rows shown  : ${!/No outstanding payables found/i.test(rtext)}`);
+  console.log(`  receivables card rows shown: ${!/No outstanding receivables found/i.test(rtext)}`);
+  for (const s of expected.parties) {
+    console.log(`  party "${s.party_name}" on a card: ${rtext.includes(s.party_name)}`);
   }
 
   console.log(NL + `console errors: ${errors.filter((e) => !/favicon|Failed to load resource/i.test(e)).length}`);
