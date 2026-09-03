@@ -18,7 +18,7 @@ import { useReportingPeriod } from '../contexts/ReportingPeriodContext';
 import {
   accountsQuery, assetCategoriesQuery, bankAccountsQuery, bankTransactionsQuery, bankTransfersQuery,
   billsQuery, budgetsQuery, creditNotesQuery, creditorsAgeAnalysisQuery, customerBalancesQuery,
-  customersQuery, employeesQuery,
+  customersQuery, debtorsAgeAnalysisQuery, employeesQuery,
   expenseClaimsQuery, fixedAssetsQuery, inventoryAnalyticsQuery, inventoryCycleCountsQuery,
   inventoryGoodsReceiptsQuery, inventoryMovementsQuery, inventoryRegisterQuery, inventoryTransfersQuery,
   inventoryValuationEdgeQuery, inventoryWarehousesQuery, invoicesQuery, loansQuery, payrollRunsQuery,
@@ -33,7 +33,7 @@ import { shouldShowFinancialCloseNav } from '../lib/financialClose/flags';
 const queries = {
   accountsQuery, assetCategoriesQuery, bankAccountsQuery, bankTransactionsQuery, bankTransfersQuery,
   billsQuery, budgetsQuery, creditNotesQuery, creditorsAgeAnalysisQuery, customerBalancesQuery,
-  customersQuery, employeesQuery,
+  customersQuery, debtorsAgeAnalysisQuery, employeesQuery,
   expenseClaimsQuery, fixedAssetsQuery, inventoryAnalyticsQuery, inventoryCycleCountsQuery,
   inventoryGoodsReceiptsQuery, inventoryMovementsQuery, inventoryRegisterQuery, inventoryTransfersQuery,
   inventoryValuationEdgeQuery, inventoryWarehousesQuery, invoicesQuery, loansQuery, payrollRunsQuery,
@@ -143,6 +143,7 @@ export const SidebarNav = ({ className, onNavigate }: SidebarNavProps) => {
     { to: '/recurring-invoices', label: 'Recurring Invoices', icon: Repeat, prefetch: () => prefetch(queries.recurringInvoicesQuery) },
     { to: '/receive-payments', label: 'Receive Payments', icon: HandCoins, prefetch: () => prefetch(queries.customerBalancesQuery) },
     { to: '/customers', label: 'Customers', icon: Users, prefetch: () => prefetch(queries.customersQuery) },
+    { to: '/debtors-age-analysis', label: 'Debtors Age Analysis', icon: CalendarClock, prefetch: () => prefetch(queries.debtorsAgeAnalysisQuery) },
     { to: '/products', label: 'Products & Services', icon: Package, prefetch: () => prefetch(queries.productsQuery) },
   ];
 

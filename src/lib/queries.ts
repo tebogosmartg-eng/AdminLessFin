@@ -152,6 +152,20 @@ export const creditorsAgeAnalysisQuery = (companyId: string, asOf?: string) => {
   };
 };
 
+/** Debtors age analysis, as at a date. Mirrors the creditors query. */
+export const debtorsAgeAnalysisQuery = (companyId: string, asOf?: string) => {
+  const as_of = asOf ?? new Date().toISOString().slice(0, 10);
+  return {
+    queryKey: ['debtors_age_analysis', companyId, as_of],
+    queryFn: async () => {
+      const { data, error } = await supabase.functions.invoke('customers', {
+        body: { method: 'GET_AGE_ANALYSIS', company_id: companyId, as_of },
+      });
+      return parseFunctionResult(data, error);
+    },
+  };
+};
+
 export const customersQuery = (companyId: string) => ({
   queryKey: ['customers', companyId],
   queryFn: async () => {

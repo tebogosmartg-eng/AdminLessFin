@@ -14,7 +14,7 @@ import {
   buildCanonicalFinancialAggregation,
 } from '../_shared/accountingEngineTotals.ts'
 import { loadCanonicalAggregation } from '../_shared/loadCanonicalAggregation.ts'
-import { computeApAgeAnalysis } from '../_shared/apAgeing.ts'
+import { computeApAgeAnalysis, computeArAgeAnalysis } from '../_shared/controlAccountAgeing.ts'
 
 
 const corsHeaders = ENTERPRISE_CORS_HEADERS
@@ -324,7 +324,9 @@ serve(withEnterprisePlatform('reports', 'tenant', async (req, _ctx) => {
       periodPromise,
       cashFlowPromise,
       openingPromise,
-      userSupabase.rpc('get_aged_receivables', { p_company_id: company_id }),
+      // get_aged_receivables does not exist either, and its error was equally
+      // unchecked, so the debtors card was empty on every company too.
+      computeArAgeAnalysis(supabaseAdmin, company_id, new Date().toISOString().slice(0, 10)),
       // get_aged_payables does not exist in the database. The call always
       // failed, the error was never checked, and the card rendered "No
       // outstanding payables found" on every company. The age analysis is now
@@ -355,22 +357,34 @@ serve(withEnterprisePlatform('reports', 'tenant', async (req, _ctx) => {
       periodActivity: periodActivityRes?.data,
       cashFlowData: cashFlowRes?.data,
       openingBalances: openingBalancesRes?.data,
-      agedReceivables: agedReceivablesRes?.data,
-      // Flattened to the shape the Reports card already renders, plus the
-      // reconciliation so the totals row can be stated honestly instead of "—".
-      agedPayables: (agedPayablesRes?.suppliers ?? []).map((v) => ({
-        vendor_id: v.vendor_id,
-        vendor_name: v.vendor_name,
+      agedReceivables: (agedReceivablesRes?.parties ?? []).map((v) => ({
+        customer_id: v.party_id,
+        customer_name: v.party_name,
         current: v.buckets.current,
         days_1_30: v.buckets.days_1_30,
         days_31_60: v.buckets.days_31_60,
         days_61_90: v.buckets.days_61_90,
         days_90_plus: v.buckets.days_120_plus,
         total_due: v.total,
-        ap_control_balance: v.ap_control_balance,
+        control_balance: v.control_balance,
+      })),
+      // Flattened to the shape the Reports card already renders, plus the
+      // reconciliation so the totals row can be stated honestly instead of "—".
+      agedPayables: (agedPayablesRes?.parties ?? []).map((v) => ({
+        vendor_id: v.party_id,
+        vendor_name: v.party_name,
+        current: v.buckets.current,
+        days_1_30: v.buckets.days_1_30,
+        days_31_60: v.buckets.days_31_60,
+        days_61_90: v.buckets.days_61_90,
+        days_90_plus: v.buckets.days_120_plus,
+        total_due: v.total,
+        control_balance: v.control_balance,
       })),
       agedPayablesReconciliation: agedPayablesRes?.reconciliation,
       agedPayablesTotals: agedPayablesRes?.totals,
+      agedReceivablesReconciliation: agedReceivablesRes?.reconciliation,
+      agedReceivablesTotals: agedReceivablesRes?.totals,
       statementTotals,
       canonicalAggregation: statementTotals,
     }), {

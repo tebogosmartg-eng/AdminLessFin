@@ -6,9 +6,12 @@ import {
   withEnterprisePlatform,
   edgeFailure,
 } from '../_shared/enterpriseEdgePlatform.ts'
+import { computeArAgeAnalysis } from '../_shared/controlAccountAgeing.ts'
 
 
 const corsHeaders = ENTERPRISE_CORS_HEADERS
+
+const DATE_ONLY = /^\d{4}-\d{2}-\d{2}$/;
 
 serve(withEnterprisePlatform('customers', 'tenant', async (req, _ctx) => {
 
@@ -49,6 +52,21 @@ serve(withEnterprisePlatform('customers', 'tenant', async (req, _ctx) => {
     let data, error;
 
     switch (method) {
+      /**
+       * Debtors age analysis for EVERY customer, as at a date, with the
+       * reconciliation to the control account that makes it auditable.
+       * Shares one implementation with the creditors analysis, so the two
+       * sides of the ledger cannot age by different rules.
+       */
+      case 'GET_AGE_ANALYSIS': {
+        const asOf = body.as_of || new Date().toISOString().slice(0, 10);
+        if (!DATE_ONLY.test(asOf)) {
+          throw new Error('as_of must be a date in YYYY-MM-DD format.');
+        }
+        data = await computeArAgeAnalysis(supabaseAdmin, company_id, asOf);
+        break;
+      }
+
       case 'GET':
         ({ data, error } = await supabaseAdmin
           .from('customers')

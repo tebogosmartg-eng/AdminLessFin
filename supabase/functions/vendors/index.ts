@@ -6,7 +6,7 @@ import {
   withEnterprisePlatform,
   edgeFailure,
 } from '../_shared/enterpriseEdgePlatform.ts'
-import { computeApAgeAnalysis } from '../_shared/apAgeing.ts'
+import { computeApAgeAnalysis } from '../_shared/controlAccountAgeing.ts'
 
 
 const corsHeaders = ENTERPRISE_CORS_HEADERS

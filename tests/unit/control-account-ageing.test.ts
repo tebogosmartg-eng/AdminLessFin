@@ -8,7 +8,7 @@ import {
   daysOverdue,
   emptyBuckets,
   round2,
-} from '../../supabase/functions/_shared/apAgeing.ts';
+} from '../../supabase/functions/_shared/controlAccountAgeing.ts';
 
 describe('creditors ageing — bucket boundaries', () => {
   it('treats a bill that is not yet due as current, including on its due date', () => {
@@ -73,7 +73,7 @@ describe('creditors ageing — arithmetic', () => {
 
 describe('creditors ageing — the reconciliation is not optional', () => {
   const SOURCE = fs.readFileSync(
-    path.join(process.cwd(), 'supabase/functions/_shared/apAgeing.ts'),
+    path.join(process.cwd(), 'supabase/functions/_shared/controlAccountAgeing.ts'),
     'utf-8',
   );
 
@@ -81,15 +81,27 @@ describe('creditors ageing — the reconciliation is not optional', () => {
     // An age analysis ages OPEN BILLS. The control account can also hold
     // payments on account, credit notes and direct journals. Presenting the
     // aged total as the creditors balance would be wrong by construction.
-    expect(SOURCE).toContain('unallocated_to_suppliers');
-    expect(SOURCE).toContain('unattributed_to_any_supplier');
-    expect(SOURCE).toContain('general_ledger_ap_balance');
+    expect(SOURCE).toContain('unallocated_to_parties');
+    expect(SOURCE).toContain('unattributed_to_any_party');
+    expect(SOURCE).toContain('general_ledger_control_balance');
     expect(SOURCE).toContain('variance');
   });
 
   it('identifies the control account by role, never by display name', () => {
-    expect(SOURCE).toContain("account_role', 'trade_payable'");
-    expect(SOURCE).not.toMatch(/name.*ilike.*payable/i);
+    expect(SOURCE).toContain("accountRole: 'trade_payable'");
+    expect(SOURCE).toContain("accountRole: 'trade_receivable'");
+    expect(SOURCE).toContain("'account_role', spec.accountRole");
+    expect(SOURCE).not.toMatch(/name.*ilike.*(payable|receivable)/i);
+  });
+
+  it('ages both sides from one algorithm, so they cannot drift apart', () => {
+    // Creditors and debtors differ only in the account role, which entry side
+    // increases the balance, and which document and party tables to read.
+    expect(SOURCE).toMatch(/computeControlAgeAnalysis/);
+    expect(SOURCE).toMatch(/computeApAgeAnalysis[\s\S]{0,120}'payable'/);
+    expect(SOURCE).toMatch(/computeArAgeAnalysis[\s\S]{0,120}'receivable'/);
+    expect(SOURCE).toContain("increasesOn: 'credit'");
+    expect(SOURCE).toContain("increasesOn: 'debit'");
   });
 
   it('excludes voided and paid bills from the analysis', () => {
