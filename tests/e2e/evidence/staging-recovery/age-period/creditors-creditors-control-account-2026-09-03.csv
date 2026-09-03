@@ -1,0 +1,93 @@
+﻿Date,Journal,Supplier,Reference,Description,Debit,Credit,Balance
+2026-03-01,,,,Opening balance brought forward,,,3111
+2026-07-01,JE-000016,kudzanai,,Loan received from kudzanai,,1000000,1003111
+2026-07-02,,kudzanai,,Payment for Bill 0212112,11,,1003100
+2026-07-12,,,,Expense Claim EXP-00001 - Tebogo Matlala,,100,1003200
+2026-07-13,,,,Reimbursement for Claim EXP-00001 - Tebogo Matlala,100,,1003100
+2026-07-22,,,,Cert receipt,,500,1003600
+2026-07-22,,,,GRN GRN-MRW0VAZQ: EIM Cert Widget CERT-INV-54461,,55,1003655
+2026-07-22,JE-000002,,,Reversal of JE-000001: Phase 3D live certification cleanup,6869.47,,996785.53
+2026-07-22,JE-000002,,,Reversal of JE-000001: Phase 3D live certification cleanup,731.72,,996053.81
+2026-07-22,JE-000004,,,Reversal of JE-000003: Phase 3D adjustment cleanup,1,,996052.81
+2026-07-22,JE-000006,,,Reversal of JE-000005: Phase 3D live certification cleanup,6869.47,,989183.34
+2026-07-22,JE-000006,,,Reversal of JE-000005: Phase 3D live certification cleanup,731.72,,988451.62
+2026-07-22,JE-000008,,,Reversal of JE-000007: Phase 3D adjustment cleanup,1,,988450.62
+2026-07-28,JE-000023,,,Business ops certification — inventory receive 1785238827376,,200,988650.62
+2026-07-28,JE-000026,,,Business ops certification — inventory receive 1785238876888,,200,988850.62
+2026-07-28,JE-000029,kudzanai,CERT-P-1785238907868,Business ops certification — purchasing,,661.25,989511.87
+2026-07-28,JE-000030,,,Business ops certification — inventory receive 1785238907868,,200,989711.87
+2026-07-28,JE-000053,kudzanai,CERT-P-1785257840533,Business ops certification — purchasing,,661.25,990373.12
+2026-07-28,JE-000054,,,Business ops certification — inventory receive 1785257840533,,200,990573.12
+2026-07-28,JE-000086,kudzanai,CERT-P-1785333767209,Business ops certification — purchasing,,661.25,991234.37
+2026-07-28,JE-000087,,,Business ops certification — inventory receive 1785333767209,,200,991434.37
+2026-07-28,JE-000090,kudzanai,CERT-P-1785334310486,Business ops certification — purchasing,,661.25,992095.62
+2026-07-28,JE-000091,,,Business ops certification — inventory receive 1785334310486,,200,992295.62
+2026-07-28,JE-000093,kudzanai,CERT-P-1785334349941,Business ops certification — purchasing,,661.25,992956.87
+2026-07-28,JE-000094,,,Business ops certification — inventory receive 1785334349941,,200,993156.87
+2026-08-01,JE-000017,kudzanai,,Loan payment #1 to kudzanai,37811.59,,955345.28
+2026-08-01,JE-000128,kudzanai,,"Reversal of JE-000017 - defective entry (debits <> credits by -0.01). Loan instalment #1 posted with principal 37 811,59 instead of the correct balancing figure 37 811,60 (instalment 46 144,93 less interest 8 333,33), leaving the entry out of balance by R0,01. Reversed in full and re-recorded correctly; JE-000017 is retained unaltered.",,37811.59,993156.87
+2026-08-01,JE-000129,kudzanai,,"Loan payment #1 to kudzanai - corrected re-record of JE-000017 (principal 37 811,60 = instalment 46 144,93 less interest 8 333,33)",37811.6,,955345.27
+2026-08-22,JE-000101,DBG Vendor 1785244116190,SR-DIRECT-1787392215773,Staging recovery — direct bill,,1234.56,956579.83
+2026-08-22,JE-000102,DBG Vendor 1785244116190,SR-VOID-1787392215773,Staging recovery — bill to void,,1234.56,957814.39
+2026-08-22,JE-000103,DBG Vendor 1785244116190,,Reversal of JE-000102: Bill voided,1234.56,,956579.83
+2026-08-22,JE-000104,DBG Vendor 1785244116190,SR-M-1787392338636-yknme,Staging recovery — payload matrix,,101.01,956680.84
+2026-08-22,JE-000105,DBG Vendor 1785244116190,,Staging recovery — payload matrix,,101.01,956781.85
+2026-08-22,JE-000106,DBG Vendor 1785244116190,,Staging recovery — payload matrix,,101.01,956882.86
+2026-08-22,JE-000107,DBG Vendor 1785244116190,SR-M-1787392338636-t3i2q,Bill SR-M-1787392338636-t3i2q,,101.01,956983.87
+2026-08-22,JE-000108,DBG Vendor 1785244116190,SR-M-1787392338636-vplt9,Staging recovery — payload matrix,,101.01,957084.88
+2026-08-22,JE-000109,DBG Vendor 1785244116190,,Reversal of JE-000104: Bill voided,101.01,,956983.87
+2026-08-22,JE-000110,DBG Vendor 1785244116190,,Reversal of JE-000105: Bill voided,101.01,,956882.86
+2026-08-22,JE-000111,DBG Vendor 1785244116190,,Reversal of JE-000106: Bill voided,101.01,,956781.85
+2026-08-22,JE-000112,DBG Vendor 1785244116190,,Reversal of JE-000108: Bill voided,101.01,,956680.84
+2026-08-22,JE-000113,DBG Vendor 1785244116190,SR-COGS-1787392387419-oblm,Staging recovery — COGS path,,55.55,956736.39
+2026-08-22,JE-000114,DBG Vendor 1785244116190,,Reversal of JE-000113: Bill voided,55.55,,956680.84
+2026-08-22,JE-000115,DBG Vendor 1785244116190,SR-UI-1787393259687,Bill SR-UI-1787393259687,,321.55,957002.39
+2026-08-22,JE-000116,DBG Vendor 1785244116190,,Reversal of JE-000115: Bill voided,321.55,,956680.84
+2026-08-22,JE-000117,DBG Vendor 1785244116190,SR-PAY-1787393340117,Staging recovery — payment test,,456.78,957137.62
+2026-08-22,JE-000118,DBG Vendor 1785244116190,,Payment for Bill SR-PAY-1787393340117,456.78,,956680.84
+2026-08-22,JE-000119,DBG Vendor 1785244116190,,Reversal of JE-000107: Bill voided,101.01,,956579.83
+2026-08-22,JE-000120,DBG Vendor 1785244116190,,Reversal of JE-000101: Bill voided,1234.56,,955345.27
+2026-08-22,JE-000121,DBG Vendor 1785244116190,,Reversal of JE-000117: Bill voided,456.78,,954888.49
+2026-08-22,JE-000122,DBG Vendor 1785244116190,SR-PAY-1787394650901,Staging recovery — payment test,,456.78,955345.27
+2026-08-22,JE-000123,DBG Vendor 1785244116190,,Payment for Bill SR-PAY-1787394650901,456.78,,954888.49
+2026-08-22,JE-000124,DBG Vendor 1785244116190,,Reversal of JE-000122: Bill voided,456.78,,954431.71
+2026-08-22,JE-000126,kudzanai,,Reversal of JE-000086: Bill voided,661.25,,953770.46
+2026-08-22,JE-000127,DBG Vendor 1785244116190,,Payment for Bill E2E-BILL-1785246392955,100,,953670.46
+2026-08-22,JE-000130,,,Closure direct bill,,500,954170.46
+2026-08-22,JE-000131,,,Closure bill from PO,,500,954670.46
+2026-08-22,JE-000132,,,Reversal of JE-000131: Bill voided,500,,954170.46
+2026-08-22,JE-000133,,,Void isolation test,,750,954920.46
+2026-08-22,JE-000134,,,Reversal of JE-000133: Bill voided,750,,954170.46
+2026-08-22,JE-000135,,,Void isolation test,,750,954920.46
+2026-08-22,JE-000136,,,Reversal of JE-000135: Bill voided,750,,954170.46
+2026-08-22,JE-000137,,,Closure direct bill,,500,954670.46
+2026-08-22,JE-000138,,,Closure bill from PO,,500,955170.46
+2026-08-22,JE-000139,,,Reversal of JE-000138: Bill voided,500,,954670.46
+2026-08-22,JE-000140,,,Closure direct bill,,500,955170.46
+2026-08-22,JE-000141,,,Closure bill from PO,,500,955670.46
+2026-08-22,JE-000142,,,Payment for Bill CLOSURE-BILL-1787399285445,100,,955570.46
+2026-08-22,JE-000143,,,Reversal of JE-000141: Bill voided,500,,955070.46
+2026-08-22,JE-000145,,,Closure direct bill,,500,955570.46
+2026-08-22,JE-000146,,,Closure bill from PO,,500,956070.46
+2026-08-22,JE-000147,,,Payment for Bill CLOSURE-BILL-1787399330173,100,,955970.46
+2026-08-22,JE-000148,,,Reversal of JE-000146: Bill voided,500,,955470.46
+2026-08-31,,,,Payroll for period 2026-08-01 to 2026-08-31,,200,955670.46
+2026-08-31,,,,Payroll for period 2026-08-01 to 2026-08-31,,100,955770.46
+2026-08-31,JE-000001,,,Payroll for period 2026-08-01 to 2026-08-31,,6869.47,962639.93
+2026-08-31,JE-000001,,,Payroll for period 2026-08-01 to 2026-08-31,,731.72,963371.65
+2026-08-31,JE-000003,,,Phase 3D certification adjustment (wash),,1,963372.65
+2026-08-31,JE-000005,,,Payroll for period 2026-08-01 to 2026-08-31,,6869.47,970242.12
+2026-08-31,JE-000005,,,Payroll for period 2026-08-01 to 2026-08-31,,731.72,970973.84
+2026-08-31,JE-000007,,,Phase 3D certification adjustment (wash),,1,970974.84
+2026-09-03,JE-000156,,,"Reclassification: loan from kudzanai out of the trade control accounts. The loan liability was posted to 4001 AP (creditors control) and instalment 1 was paid out of 3000 AR (debtors control). A control account must hold only the sub-ledger it controls, so the borrowing is moved to its own liability account and the repayment to the bank account it was actually paid from. No original journal is altered.",962188.4,,8786.44
+2026-09-03,JE-000157,,,Reversal of JE-000156: re-posted as two entries so the creditors leg carries the supplier it belongs to.,,962188.4,970974.84
+2026-09-03,JE-000158,kudzanai,,"Reclassification A: loan from kudzanai out of the creditors control account. The loan liability was posted to 4001 AP, which is the creditors control account and must hold only trade creditors. Moved to 4100 Loans from Related Parties. Attributed to the lender so the supplier sub-ledger clears with the control account.",962188.4,,8786.44
+2026-09-03,,,,Closing balance,2024955.01,2030630.45,8786.44
+
+,,,,Control account: 4001 AP,,,
+,,,2026-03-01 to 2026-09-03,Period covered,,,
+,,,,Control account closing balance per this ledger,,,8786.44
+,,,,Control account balance per the age analysis,,,8786.44
+,,,,Difference,,,0
+,,,,"Of that balance, open bills aged in the analysis",,,2645
+,,,,Not represented by an open document,,,6141.44

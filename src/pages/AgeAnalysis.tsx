@@ -1,15 +1,20 @@
 import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
+import { format } from 'date-fns';
 import { useAuth } from '../contexts/AuthContext';
+import { useReportingPeriod } from '../contexts/ReportingPeriodContext';
+import ReportingPeriodPicker from '../components/ReportingPeriodPicker';
+import { parseIsoDateSafe } from '../lib/reportingPeriod/presets';
+import {
+  asAtForPeriod, isCappedToToday, isoDay, ledgerStartForPeriod,
+} from '../lib/reportingPeriod/asAt';
 import { useEnterpriseIdentity } from '../hooks/useEnterpriseIdentity';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/card';
 import {
   Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, TableRow,
 } from '../components/ui/table';
 import { Button } from '../components/ui/button';
-import { Input } from '../components/ui/input';
-import { Label } from '../components/ui/label';
 import { Skeleton } from '../components/ui/skeleton';
 import { Alert, AlertDescription, AlertTitle } from '../components/ui/alert';
 import { BookOpen, Download, FileText, Loader2, ShieldCheck, TriangleAlert } from 'lucide-react';
@@ -67,7 +72,10 @@ type ControlLedger = {
   };
 };
 
-const today = () => new Date().toISOString().slice(0, 10);
+const longDate = (iso: string | null) => {
+  const parsed = parseIsoDateSafe(iso);
+  return parsed ? format(parsed, 'd MMM yyyy') : '';
+};
 
 /**
  * One page for both sides of the ledger. Creditors and debtors age by exactly
@@ -81,13 +89,25 @@ const AgeAnalysis = ({ side }: { side: AgeAnalysisSide }) => {
   useDocumentTitle(heading);
   const { activeCompany } = useAuth();
   const { identity } = useEnterpriseIdentity(activeCompany?.id);
-  const [asOf, setAsOf] = useState(today());
+  const { dateFrom, dateTo, isReady } = useReportingPeriod();
+
+  /**
+   * An age analysis is a point-in-time report, so it takes the reporting
+   * period's closing date - which is what makes this control mean the same
+   * thing here that it means on every other report. See asAt.ts for why that
+   * date is capped at today.
+   */
+  const todayIso = isoDay(new Date());
+  const periodEnd = dateTo;
+  const asOf = asAtForPeriod(periodEnd, todayIso);
+  const cappedToToday = isCappedToToday(periodEnd, todayIso);
+  const ledgerFrom = ledgerStartForPeriod(dateFrom, asOf);
 
   const { data, isLoading, isError, error } = useQuery<AgeAnalysisData>({
     ...(side === 'payable'
       ? creditorsAgeAnalysisQuery(activeCompany?.id ?? '', asOf)
       : debtorsAgeAnalysisQuery(activeCompany?.id ?? '', asOf)),
-    enabled: !!activeCompany && !!asOf,
+    enabled: !!activeCompany && isReady && !!asOf,
   });
 
   const rows = useMemo(() => data?.parties ?? [], [data]);
@@ -102,7 +122,17 @@ const AgeAnalysis = ({ side }: { side: AgeAnalysisSide }) => {
   const fetchLedger = async (): Promise<ControlLedger> => {
     const { data: result, error: err } = await supabase.functions.invoke(
       side === 'payable' ? 'vendors' : 'customers',
-      { body: { method: 'GET_CONTROL_LEDGER', company_id: activeCompany!.id, as_of: asOf } },
+      {
+        body: {
+          method: 'GET_CONTROL_LEDGER',
+          company_id: activeCompany!.id,
+          as_of: asOf,
+          // The reporting period, so the ledger opens with a brought-forward
+          // balance and shows the period's movement, rather than every entry
+          // since inception.
+          date_from: ledgerFrom,
+        },
+      },
     );
     if (err) throw new Error(await edgeErrorMessage(err, 'The control account ledger could not be prepared.'));
     return result as ControlLedger;
@@ -161,7 +191,12 @@ const AgeAnalysis = ({ side }: { side: AgeAnalysisSide }) => {
       const l = await fetchLedger();
       const accounts = l.control_accounts.map((a) => `${a.account_number} ${a.name}`).join(' / ');
       const body: Array<Record<string, unknown>> = [
-        { Date: '', Journal: '', [w.party]: '', Reference: '', Description: 'Opening balance', Debit: '', Credit: '', Balance: l.opening_balance },
+        {
+          Date: ledgerFrom ?? '',
+          Journal: '', [w.party]: '', Reference: '',
+          Description: ledgerFrom ? 'Opening balance brought forward' : 'Opening balance (inception)',
+          Debit: '', Credit: '', Balance: l.opening_balance,
+        },
         ...l.rows.map((r) => ({
           Date: r.entry_date,
           Journal: r.journal_number ?? '',
@@ -172,9 +207,10 @@ const AgeAnalysis = ({ side }: { side: AgeAnalysisSide }) => {
           Credit: r.credit || '',
           Balance: r.balance,
         })),
-        { Date: '', Journal: '', [w.party]: '', Reference: '', Description: 'Closing balance', Debit: l.total_debit, Credit: l.total_credit, Balance: l.closing_balance },
+        { Date: asOf, Journal: '', [w.party]: '', Reference: '', Description: 'Closing balance', Debit: l.total_debit, Credit: l.total_credit, Balance: l.closing_balance },
         {},
         { Description: `Control account: ${accounts}` },
+        { Description: 'Period covered', Reference: ledgerFrom ? `${ledgerFrom} to ${asOf}` : `Inception to ${asOf}` },
         { Description: 'Control account closing balance per this ledger', Balance: l.tie.ledger_closing_balance },
         { Description: 'Control account balance per the age analysis', Balance: l.tie.age_analysis_control_balance },
         { Description: 'Difference', Balance: l.tie.ledger_closing_balance - l.tie.age_analysis_control_balance },
@@ -198,7 +234,7 @@ const AgeAnalysis = ({ side }: { side: AgeAnalysisSide }) => {
         companyName: identity?.name || activeCompany?.name || 'Company',
         companyAddress: identity?.address ?? null,
         asOf,
-        dateFrom: null,
+        dateFrom: ledgerFrom,
         controlAccounts: l.control_accounts,
         openingBalance: l.opening_balance,
         rows: l.rows,
@@ -222,20 +258,21 @@ const AgeAnalysis = ({ side }: { side: AgeAnalysisSide }) => {
           <div>
             <CardTitle>{heading}</CardTitle>
             <CardDescription>
-              Every {w.party.toLowerCase()} with an outstanding balance, aged as at a date and
+              Every {w.party.toLowerCase()} with an outstanding balance, aged as at{' '}
+              <span className="font-medium text-foreground">{longDate(asOf)}</span> and
               reconciled to the control account in the general ledger.
             </CardDescription>
           </div>
           <div className="flex flex-wrap items-end gap-2">
-            <div className="grid gap-1">
-              <Label htmlFor="as-of" className="text-xs">As at</Label>
-              <Input
-                id="as-of"
-                type="date"
-                value={asOf}
-                onChange={(e) => setAsOf(e.target.value)}
-                className="w-[170px]"
-              />
+            <div className="flex flex-col items-stretch gap-1 sm:items-end">
+              <ReportingPeriodPicker showLabel={false} />
+              {/* Said plainly, because a period that closes in the future would
+                  otherwise look as though the picker had been ignored. */}
+              {cappedToToday && (
+                <span className="text-xs text-muted-foreground">
+                  Aged as at today; the period runs to {longDate(periodEnd)}.
+                </span>
+              )}
             </div>
             <Button variant="outline" onClick={handleCsv} disabled={!data}>
               <Download className="mr-2 h-4 w-4" /> CSV
@@ -291,7 +328,7 @@ const AgeAnalysis = ({ side }: { side: AgeAnalysisSide }) => {
                   {rows.length === 0 && (
                     <TableRow>
                       <TableCell colSpan={9} className="text-center text-muted-foreground py-6">
-                        No {w.party.toLowerCase()} has a balance or an open document as at {data.as_of}.
+                        No {w.party.toLowerCase()} has a balance or an open document as at {longDate(data.as_of)}.
                       </TableCell>
                     </TableRow>
                   )}

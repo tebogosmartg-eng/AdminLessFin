@@ -88,6 +88,18 @@ export async function computeControlAccountLedger(
   side: AgeingSide,
   dateFrom?: string | null,
 ): Promise<ControlLedger> {
+  // A ledger cannot open after it closes. The opening balance would sweep in
+  // transactions the closing balance never sees, so the closing balance would
+  // stop agreeing with the age analysis - the one thing this report exists to
+  // demonstrate. Refused outright rather than returned with ties: false,
+  // because a ledger that does not tie is not a document worth handing anyone.
+  if (dateFrom && dateFrom > asOf) {
+    throw new Error(
+      `The period start (${dateFrom}) is after the as-at date (${asOf}). ` +
+      'A control account ledger must open on or before the date it is drawn up to.',
+    );
+  }
+
   const spec = AGEING_SIDES[side];
   const signOf = (type: string) => (type === spec.increasesOn ? 1 : -1);
   const docField = side === 'payable' ? 'bill_id' : 'invoice_id';
