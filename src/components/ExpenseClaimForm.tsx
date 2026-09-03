@@ -72,7 +72,7 @@ const ExpenseClaimForm = ({ isOpen, setIsOpen, claimId }: Props) => {
         body: { method: 'GET_NEXT_NUMBER', company_id: activeCompany!.id },
       });
       if (error) throw error;
-      return data;
+      return typeof data === 'string' ? data : '';
     },
     enabled: isOpen && !isEditing && !!activeCompany,
   });
@@ -90,12 +90,7 @@ const ExpenseClaimForm = ({ isOpen, setIsOpen, claimId }: Props) => {
   });
 
   useEffect(() => {
-    if (nextNumber && !isEditing) {
-      form.setValue('claim_number', nextNumber);
-    }
-  }, [nextNumber, isEditing, form]);
-
-  useEffect(() => {
+    if (!isOpen) return;
     if (isEditing && existingClaim) {
       form.reset({
         employee_id: existingClaim.employee_id,
@@ -111,12 +106,26 @@ const ExpenseClaimForm = ({ isOpen, setIsOpen, claimId }: Props) => {
         })),
       });
       setExistingAttachmentUrl(existingClaim.attachment_url);
-    } else {
+    } else if (!isEditing) {
+      form.reset({
+        claim_number: nextNumber || '',
+        submission_date: format(new Date(), 'yyyy-MM-dd'),
+        employee_id: '',
+        description: '',
+        items: [{ expense_date: format(new Date(), 'yyyy-MM-dd'), description: '', amount: 0, expense_account_id: '', project_id: '' }],
+      });
       setExistingAttachmentUrl(null);
     }
     setAttachmentFile(null);
     setRemoveAttachment(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- nextNumber applied below
   }, [existingClaim, isEditing, isOpen, form]);
+
+  useEffect(() => {
+    if (isOpen && !isEditing && nextNumber) {
+      form.setValue('claim_number', nextNumber);
+    }
+  }, [nextNumber, isEditing, isOpen, form]);
 
   const { fields, append, remove } = useFieldArray({ control: form.control, name: "items" });
 
@@ -202,6 +211,7 @@ const ExpenseClaimForm = ({ isOpen, setIsOpen, claimId }: Props) => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['expense_claims'] });
+      queryClient.invalidateQueries({ queryKey: ['next_claim_number', activeCompany?.id] });
       showSuccess(`Expense Claim ${isEditing ? 'updated' : 'created'} successfully.`);
       setIsOpen(false);
     },
@@ -236,7 +246,7 @@ const ExpenseClaimForm = ({ isOpen, setIsOpen, claimId }: Props) => {
                   <FormMessage />
                 </FormItem>
               )} />
-              <FormField control={form.control} name="claim_number" render={({ field }) => (<FormItem><FormLabel>Claim #</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>)} />
+              <FormField control={form.control} name="claim_number" render={({ field }) => (<FormItem><FormLabel>Claim #</FormLabel><FormControl><Input placeholder={isEditing ? undefined : 'Generating…'} {...field} /></FormControl><FormMessage /></FormItem>)} />
               <FormField control={form.control} name="submission_date" render={({ field }) => (<FormItem><FormLabel>Date</FormLabel><FormControl><Input type="date" {...field} /></FormControl><FormMessage /></FormItem>)} />
             </div>
             <FormField control={form.control} name="description" render={({ field }) => (<FormItem><FormLabel>Memo</FormLabel><FormControl><Input placeholder="e.g. Travel to Client Site" {...field} /></FormControl><FormMessage /></FormItem>)} />

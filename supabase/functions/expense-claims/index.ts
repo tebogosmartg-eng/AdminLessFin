@@ -11,6 +11,25 @@ import {
 
 const corsHeaders = ENTERPRISE_CORS_HEADERS
 
+/** Next EXP-##### from existing claim numbers. Ignores non-standard refs. */
+async function allocateNextClaimNumber(client, companyId) {
+  const { data: existingNums, error: listErr } = await client
+    .from('expense_claims')
+    .select('claim_number')
+    .eq('company_id', companyId);
+  if (listErr) throw listErr;
+  let maxSeq = 0n;
+  for (const row of existingNums ?? []) {
+    const match = /^EXP-(\d+)$/i.exec(String(row.claim_number ?? ''));
+    if (!match) continue;
+    try {
+      const n = BigInt(match[1]);
+      if (n > maxSeq) maxSeq = n;
+    } catch { /* ignore unparseable */ }
+  }
+  return `EXP-${(maxSeq + 1n).toString().padStart(5, '0')}`;
+}
+
 serve(withEnterprisePlatform('expense-claims', 'tenant', async (req, _ctx) => {
 
   try {
@@ -73,25 +92,16 @@ serve(withEnterprisePlatform('expense-claims', 'tenant', async (req, _ctx) => {
         break;
 
       case 'GET_NEXT_NUMBER':
-        const { data: lastClaim } = await supabaseAdmin
-          .from('expense_claims')
-          .select('claim_number')
-          .eq('company_id', company_id)
-          .order('created_at', { ascending: false })
-          .limit(1)
-          .single();
-        
-        let nextNum = 1;
-        if (lastClaim && lastClaim.claim_number) {
-            const matches = lastClaim.claim_number.match(/EXP-(\d+)/);
-            if (matches && matches[1]) nextNum = parseInt(matches[1]) + 1;
-        }
-        data = `EXP-${String(nextNum).padStart(5, '0')}`;
+        data = await allocateNextClaimNumber(supabaseAdmin, company_id);
+        error = null;
         break;
 
       case 'POST':
         requireAdmin();
         const { items: postItems, ...postData } = body.claimData;
+        if (!String(postData.claim_number || '').trim()) {
+          postData.claim_number = await allocateNextClaimNumber(supabaseAdmin, company_id);
+        }
         const totalAmount = postItems.reduce((sum: number, item: any) => sum + item.amount, 0);
 
         const { data: newClaim, error: postError } = await supabaseAdmin
