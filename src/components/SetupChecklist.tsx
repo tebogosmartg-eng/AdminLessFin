@@ -25,7 +25,7 @@ const SetupChecklist = ({ status }: SetupChecklistProps) => {
 
   const steps = [
     { label: 'Upload company logo', done: status.hasLogo, link: '/settings', detail: 'Optional — appears on invoices and reports.' },
-    { label: 'Set company address', done: status.hasAddress, link: '/settings', detail: 'Used on invoices and financial statements.' },
+    { label: 'Set company address', done: status.hasAddress, link: '/settings?tab=master-data&module=addresses', detail: 'Used on invoices and financial statements.' },
     { label: 'Add your first customer', done: status.hasCustomer, link: '/customers', detail: 'Required before you can issue an invoice.' },
     { label: 'Add your first supplier', done: status.hasVendor, link: '/vendors', detail: 'Required before you can record a supplier bill.' },
     {

@@ -10,6 +10,7 @@ import {
 import {
   buildStatementTotals,
 } from '../_shared/accountingEngineTotals.ts'
+import { resolveEnterpriseIdentityEdge } from '../_shared/enterpriseIdentity.ts'
 
 
 const corsHeaders = ENTERPRISE_CORS_HEADERS
@@ -117,7 +118,12 @@ serve(withEnterprisePlatform('dashboard-data', 'tenant', async (req, _ctx) => {
         // so the stubs are removed too.
     }
 
-    const results = await Promise.all(promises);
+    // Identity address lives in efs_company_master_data (G3.6C), not companies.address.
+    // Resolved in parallel so the positional results[] mapping is unchanged.
+    const [results, identity] = await Promise.all([
+      Promise.all(promises),
+      resolveEnterpriseIdentityEdge(supabaseAdmin, company_id),
+    ]);
 
     // Map base results
     const arBalancesRes = results[0];
@@ -215,6 +221,13 @@ serve(withEnterprisePlatform('dashboard-data', 'tenant', async (req, _ctx) => {
       };
     }
 
+    const hasLogo = !!companyRes.data?.logo_url;
+    // Master Data is the identity source; companies.address is a legacy fallback only.
+    const hasAddress = !!identity.address || !!companyRes.data?.address;
+    const hasCustomer = (customersCheck.data?.length || 0) > 0;
+    const hasVendor = (vendorsCheck.data?.length || 0) > 0;
+    const hasTransaction = (entriesCheck.data?.length || 0) > 0;
+
     const responseData = {
       role: member.role, // Pass role back to UI for rendering logic
       // Raw as-of GL balance rows. NOT a total — consumed only for per-account
@@ -244,12 +257,12 @@ serve(withEnterprisePlatform('dashboard-data', 'tenant', async (req, _ctx) => {
       },
       recentActivity: recentActivityRes.data || [],
       setupStatus: {
-          hasLogo: !!companyRes.data?.logo_url,
-          hasAddress: !!companyRes.data?.address,
-          hasCustomer: (customersCheck.data?.length || 0) > 0,
-          hasVendor: (vendorsCheck.data?.length || 0) > 0,
-          hasTransaction: (entriesCheck.data?.length || 0) > 0,
-          isComplete: !!companyRes.data?.logo_url && !!companyRes.data?.address && (customersCheck.data?.length || 0) > 0 && (vendorsCheck.data?.length || 0) > 0 && (entriesCheck.data?.length || 0) > 0
+          hasLogo,
+          hasAddress,
+          hasCustomer,
+          hasVendor,
+          hasTransaction,
+          isComplete: hasLogo && hasAddress && hasCustomer && hasVendor && hasTransaction,
       },
       payrollKpis,
     };
