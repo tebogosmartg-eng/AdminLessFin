@@ -73,10 +73,15 @@ async function main() {
   console.log(`  GL balance "${shown}" shown: ${norm(text).includes(norm(shown))}`);
 
   console.log(NL + '=== EXPORTS ===');
-  for (const [label, name] of [['CSV', /^CSV$/i], ['PDF', /PDF for auditors/i]] as const) {
+  for (const [label, name] of [
+    ['age CSV', /^CSV$/i],
+    ['age PDF', /PDF for auditors/i],
+    ['ledger CSV', /Control account CSV/i],
+    ['ledger PDF', /Control account PDF/i],
+  ] as const) {
     try {
       const [download] = await Promise.all([
-        page.waitForEvent('download', { timeout: 20000 }),
+        page.waitForEvent('download', { timeout: 45000 }),
         page.getByRole('button', { name }).first().click(),
       ]);
       const file = path.join(OUT, download.suggestedFilename());
