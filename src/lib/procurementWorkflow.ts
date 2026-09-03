@@ -14,7 +14,7 @@ export type ProcurementStageId =
   | 'history';
 
 export type PurchaseOrderWorkflowState = {
-  status: 'draft' | 'sent' | 'billed' | 'closed' | string;
+  status: 'draft' | 'sent' | 'billed' | 'closed' | 'cancelled' | string;
 };
 
 export function resolvePurchaseOrderLifecycleStage(po: PurchaseOrderWorkflowState): ProcurementStageId {
@@ -26,6 +26,7 @@ export function resolvePurchaseOrderLifecycleStage(po: PurchaseOrderWorkflowStat
     case 'billed':
       return 'bill';
     case 'closed':
+    case 'cancelled':
       return 'history';
     default:
       return 'purchase_order';
@@ -52,6 +53,8 @@ export function purchaseOrderNextAction(po: PurchaseOrderWorkflowState): Procure
         route: '/pay-bills',
         action: 'payment',
       };
+    case 'cancelled':
+      return null;
     default:
       return null;
   }

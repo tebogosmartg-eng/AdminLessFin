@@ -6,8 +6,9 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../co
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from '../components/ui/table';
 import { Skeleton } from '../components/ui/skeleton';
 import { Button } from '../components/ui/button';
-import { Printer, FileCheck, Send, Paperclip, MessageSquare } from 'lucide-react';
+import { Printer, FileCheck, Send, Paperclip, MessageSquare, Ban } from 'lucide-react';
 import { Badge } from '../components/ui/badge';
+import { Alert, AlertDescription, AlertTitle } from '../components/ui/alert';
 import { showError, showSuccess } from '../utils/toast';
 import { useAuth } from '../contexts/AuthContext';
 import { useEnterpriseIdentity } from '../hooks/useEnterpriseIdentity';
@@ -42,6 +43,22 @@ const PurchaseOrderDetail = () => {
     enabled: !!id && !!activeCompany,
   });
 
+  const cancelMutation = useMutation({
+    mutationFn: async () => {
+      if (!activeCompany) throw new Error("No active company");
+      const { error } = await supabase.functions.invoke('purchase-orders', {
+        body: { method: 'CANCEL', company_id: activeCompany.id, poId: id },
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['po_detail', id] });
+      queryClient.invalidateQueries({ queryKey: ['purchase_orders'] });
+      showSuccess('Purchase order cancelled.');
+    },
+    onError: (error: any) => showError(error.message),
+  });
+
   const updateStatusMutation = useMutation({
     mutationFn: async (status: string) => {
       if (!activeCompany) throw new Error("No active company");
@@ -52,6 +69,7 @@ const PurchaseOrderDetail = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['po_detail', id] });
+      queryClient.invalidateQueries({ queryKey: ['purchase_orders'] });
       showSuccess('PO status updated.');
     },
     onError: (error: any) => showError(error.message),
@@ -98,6 +116,15 @@ const PurchaseOrderDetail = () => {
             />
           )}
         </div>
+        {po.status === 'cancelled' && (
+          <Alert variant="destructive" className="mb-6 print:hidden">
+            <Ban className="h-4 w-4" />
+            <AlertTitle>Cancelled</AlertTitle>
+            <AlertDescription>
+              This purchase order has been cancelled. It remains on record and cannot be deleted.
+            </AlertDescription>
+          </Alert>
+        )}
         <div className="flex justify-between items-start mb-6 print:hidden">
           <div>
             <h1 className="text-3xl font-bold">Purchase Order {po.po_number}</h1>
@@ -116,16 +143,28 @@ const PurchaseOrderDetail = () => {
                 <Send className="mr-2 h-4 w-4" /> Email PO
               </Button>
             )}
-            {po.status !== 'billed' && po.status !== 'closed' && (
+            {po.status !== 'billed' && po.status !== 'closed' && po.status !== 'cancelled' && (
               <Button onClick={() => setIsBillFormOpen(true)}>
                 <FileCheck className="mr-2 h-4 w-4" /> Convert to Bill
+              </Button>
+            )}
+            {(po.status === 'draft' || po.status === 'sent') && (
+              <Button
+                variant="destructive"
+                onClick={() => {
+                  if (!window.confirm(`Cancel purchase order ${po.po_number}? It will remain on record and cannot be deleted.`)) return;
+                  cancelMutation.mutate();
+                }}
+                disabled={cancelMutation.isPending}
+              >
+                <Ban className="mr-2 h-4 w-4" /> Cancel PO
               </Button>
             )}
             <Button onClick={() => window.print()} variant="outline"><Printer className="mr-2 h-4 w-4" /> Print</Button>
           </div>
         </div>
         
-        <Card className="print:shadow-none print:border-none">
+        <Card className={`print:shadow-none print:border-none ${po.status === 'cancelled' ? 'opacity-50' : ''}`}>
           <CardHeader className="grid grid-cols-2 gap-4">
             <div>
               <h2 className="text-2xl font-bold tracking-tight mb-1">{identity?.name || 'Your Company'}</h2>

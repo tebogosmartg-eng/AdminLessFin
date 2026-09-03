@@ -112,7 +112,19 @@ serve(withEnterprisePlatform('purchase-orders', 'tenant', async (req, _ctx) => {
         data = newPO;
         break;
 
-      case 'PUT':
+      case 'PUT': {
+        const { data: existingPo, error: existingErr } = await supabaseAdmin
+          .from('purchase_orders')
+          .select('status')
+          .eq('id', body.poId)
+          .eq('company_id', company_id)
+          .maybeSingle();
+        if (existingErr) throw existingErr;
+        if (!existingPo) throw new Error('Purchase order not found.');
+        if (existingPo.status === 'cancelled') {
+          throw new Error('A cancelled purchase order cannot be edited.');
+        }
+
         const { items: putItems, ...putData } = body.poData;
         const { error: putError } = await supabaseAdmin
           .from('purchase_orders')
@@ -121,24 +133,54 @@ serve(withEnterprisePlatform('purchase-orders', 'tenant', async (req, _ctx) => {
           .eq('company_id', company_id);
         if (putError) throw putError;
 
-        await supabaseAdmin.from('purchase_order_items').delete().eq('purchase_order_id', body.poId);
-        const putItemsToInsert = putItems.map(item => ({ 
-          ...item, 
-          purchase_order_id: body.poId,
-          project_id: item.project_id || null
-        }));
-        const { error: putItemsError } = await supabaseAdmin.from('purchase_order_items').insert(putItemsToInsert);
-        if (putItemsError) throw putItemsError;
+        // Status-only updates (convert to bill) must not wipe line items.
+        if (Array.isArray(putItems)) {
+          await supabaseAdmin.from('purchase_order_items').delete().eq('purchase_order_id', body.poId);
+          const putItemsToInsert = putItems.map(item => ({
+            ...item,
+            purchase_order_id: body.poId,
+            project_id: item.project_id || null
+          }));
+          const { error: putItemsError } = await supabaseAdmin.from('purchase_order_items').insert(putItemsToInsert);
+          if (putItemsError) throw putItemsError;
+        }
         data = { id: body.poId };
         break;
+      }
+
+      case 'CANCEL': {
+        const { data: current, error: currentErr } = await supabaseAdmin
+          .from('purchase_orders')
+          .select('id, status')
+          .eq('id', body.poId)
+          .eq('company_id', company_id)
+          .maybeSingle();
+        if (currentErr) throw currentErr;
+        if (!current) throw new Error('Purchase order not found.');
+        if (current.status === 'cancelled') {
+          data = { id: current.id, status: 'cancelled' };
+          break;
+        }
+        if (current.status === 'billed' || current.status === 'closed') {
+          throw new Error('A billed or closed purchase order cannot be cancelled.');
+        }
+        if (current.status !== 'draft' && current.status !== 'sent') {
+          throw new Error('Only draft or sent purchase orders can be cancelled.');
+        }
+        const { data: cancelled, error: cancelErr } = await supabaseAdmin
+          .from('purchase_orders')
+          .update({ status: 'cancelled' })
+          .eq('id', body.poId)
+          .eq('company_id', company_id)
+          .select('id, status')
+          .single();
+        if (cancelErr) throw cancelErr;
+        data = cancelled;
+        break;
+      }
 
       case 'DELETE':
-        ({ data, error } = await supabaseAdmin
-          .from('purchase_orders')
-          .delete()
-          .eq('id', body.poId)
-          .eq('company_id', company_id));
-        break;
+        throw new Error('Purchase orders cannot be deleted. Cancel the purchase order instead.');
 
       default:
         throw new Error(`Unsupported method: ${method}`);

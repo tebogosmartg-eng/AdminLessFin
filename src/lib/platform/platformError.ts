@@ -111,7 +111,10 @@ export function classifyFromMessage(message: string): FailureCategory {
     m.includes('insufficient stock') ||
     m.includes('insufficient fifo') ||
     m.includes('does not balance') ||
-    m.includes('closed financial year')
+    m.includes('closed financial year') ||
+    m.includes('cannot be deleted') ||
+    m.includes('cannot be cancelled') ||
+    m.includes('cannot be edited')
   ) {
     return 'BusinessRuleError';
   }

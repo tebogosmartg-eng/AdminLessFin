@@ -31,16 +31,16 @@ const PurchaseOrders = () => {
     enabled: !!activeCompany,
   });
 
-  const deleteMutation = useMutation({
+  const cancelMutation = useMutation({
     mutationFn: async (id: string) => {
       const { error } = await supabase.functions.invoke('purchase-orders', {
-        body: { method: 'DELETE', company_id: activeCompany!.id, poId: id },
+        body: { method: 'CANCEL', company_id: activeCompany!.id, poId: id },
       });
       if (error) throw error;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['purchase_orders'] });
-      showSuccess('PO deleted.');
+      showSuccess('Purchase order cancelled.');
     },
     onError: (e: any) => showError(e.message),
   });
@@ -104,8 +104,21 @@ const PurchaseOrders = () => {
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
                           <DropdownMenuItem onClick={() => navigate(`/purchase-orders/${po.id}`)}>View Details</DropdownMenuItem>
-                          <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleEdit(po.id); }}>Edit</DropdownMenuItem>
-                          <DropdownMenuItem onClick={(e) => { e.stopPropagation(); deleteMutation.mutate(po.id); }} className="text-red-600">Delete</DropdownMenuItem>
+                          {(po.status === 'draft' || po.status === 'sent') && (
+                            <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleEdit(po.id); }}>Edit</DropdownMenuItem>
+                          )}
+                          {(po.status === 'draft' || po.status === 'sent') && (
+                            <DropdownMenuItem
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (!window.confirm(`Cancel purchase order ${po.po_number}? It will remain on record and cannot be deleted.`)) return;
+                                cancelMutation.mutate(po.id);
+                              }}
+                              className="text-red-600"
+                            >
+                              Cancel
+                            </DropdownMenuItem>
+                          )}
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </TableCell>
