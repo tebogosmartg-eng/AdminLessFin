@@ -223,8 +223,17 @@ const JournalEntryForm = ({ isOpen, setIsOpen, entryId }: JournalEntryFormProps)
         ...(isEditing && { entryId: entryId }),
       };
 
-      const { error } = await supabase.functions.invoke('journal-entries', { body });
-      if (error) throw error;
+      const { data: fnData, error } = await supabase.functions.invoke('journal-entries', { body });
+      if (error) {
+        // Extract the business-level message from the platform error envelope when
+        // the edge function returns a non-2xx response (FunctionsHttpError wraps the
+        // raw HTTP body but carries only a generic .message on its own object).
+        const businessMessage: string =
+          (fnData as Record<string, unknown> | null)?.businessMessage as string ||
+          (fnData as Record<string, unknown> | null)?.error as string ||
+          error.message;
+        throw new Error(businessMessage);
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['journal_entries'] });
@@ -246,8 +255,8 @@ const JournalEntryForm = ({ isOpen, setIsOpen, entryId }: JournalEntryFormProps)
 
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
-      <DialogContent className="sm:max-w-3xl">
-        <DialogHeader>
+      <DialogContent className="sm:max-w-3xl flex flex-col max-h-[90vh]">
+        <DialogHeader className="flex-shrink-0">
           <DialogTitle>{isEditing ? 'Edit Journal Entry' : 'New Journal Entry'}</DialogTitle>
           <DialogDescription>Record a financial transaction. Ensure debits equal credits.</DialogDescription>
         </DialogHeader>
@@ -274,7 +283,8 @@ const JournalEntryForm = ({ isOpen, setIsOpen, entryId }: JournalEntryFormProps)
         )}
 
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+          <form onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col min-h-0 flex-1">
+          <div className="overflow-y-auto flex-1 space-y-4 pr-1">
             <div className="grid grid-cols-2 gap-4">
               <FormField control={form.control} name="entry_date" render={({ field }) => (
                 <FormItem><FormLabel>Date</FormLabel><FormControl><Input type="date" {...field} /></FormControl><FormMessage /></FormItem>
@@ -354,7 +364,8 @@ const JournalEntryForm = ({ isOpen, setIsOpen, entryId }: JournalEntryFormProps)
               </FormControl>
             </FormItem>
 
-            <DialogFooter>
+            </div>
+            <DialogFooter className="flex-shrink-0 pt-4 border-t mt-2">
               <Button type="button" variant="outline" onClick={() => setIsOpen(false)}>Cancel</Button>
               <Button type="submit" disabled={mutation.isPending}>{mutation.isPending ? 'Saving...' : (isEditing ? 'Update Entry' : 'Save Entry')}</Button>
             </DialogFooter>
