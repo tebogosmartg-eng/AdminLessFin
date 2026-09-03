@@ -55,6 +55,8 @@ export type Account = {
   category?: string | null;
   subcategory?: string | null;
   is_active?: boolean | null;
+  allow_manual_posting?: boolean | null;
+  posting_blocked?: boolean | null;
 };
 
 const ChartOfAccounts = () => {

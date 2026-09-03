@@ -7,6 +7,7 @@ import {
   isCashEquivalentAccount,
   resolveControlAccounts,
   roleForTemplateCode,
+  manuallyPostableAccounts,
 } from '../../src/lib/accounting/accountRoles';
 
 describe('accountRoles vocabulary expansion', () => {
@@ -66,5 +67,62 @@ describe('accountRoles vocabulary expansion', () => {
     expect(resolved.bank?.id).toBe('bank');
     expect(resolved.retainedEarnings?.id).toBe('re');
     expect(resolved.currentYearEarnings?.id).toBe('cye');
+  });
+});
+
+describe('manuallyPostableAccounts honours the database posting flags', () => {
+  const account = (over: Record<string, unknown> = {}) => ({
+    id: over.id as string ?? 'acc-1',
+    name: 'Office Costs',
+    type: 'Expense',
+    account_role: null,
+    is_active: true,
+    ...over,
+  });
+
+  it('offers an ordinary active account', () => {
+    expect(manuallyPostableAccounts([account()])).toHaveLength(1);
+  });
+
+  it('withholds an account the database blocks from posting', () => {
+    expect(manuallyPostableAccounts([account({ posting_blocked: true })])).toHaveLength(0);
+  });
+
+  it('withholds an account that disallows manual posting', () => {
+    expect(manuallyPostableAccounts([account({ allow_manual_posting: false })])).toHaveLength(0);
+  });
+
+  it('still offers an account when the flags are absent, so a caller that does not select those columns is unaffected', () => {
+    const withoutFlags = account();
+    expect('posting_blocked' in withoutFlags).toBe(false);
+    expect('allow_manual_posting' in withoutFlags).toBe(false);
+    expect(manuallyPostableAccounts([withoutFlags])).toHaveLength(1);
+  });
+
+  it('treats the permissive values as permissive', () => {
+    expect(
+      manuallyPostableAccounts([account({ posting_blocked: false, allow_manual_posting: true })]),
+    ).toHaveLength(1);
+  });
+
+  it('still withholds inactive accounts', () => {
+    expect(manuallyPostableAccounts([account({ is_active: false })])).toHaveLength(0);
+  });
+
+  it('still withholds module-restricted roles regardless of the flags', () => {
+    const restricted = manuallyPostableAccounts([
+      account({ account_role: 'accumulated_depreciation', allow_manual_posting: true }),
+    ]);
+    expect(restricted).toHaveLength(0);
+  });
+
+  it('filters a mixed list down to exactly the postable accounts', () => {
+    const list = [
+      account({ id: 'ok' }),
+      account({ id: 'blocked', posting_blocked: true }),
+      account({ id: 'no-manual', allow_manual_posting: false }),
+      account({ id: 'inactive', is_active: false }),
+    ];
+    expect(manuallyPostableAccounts(list).map((a) => a.id)).toEqual(['ok']);
   });
 });

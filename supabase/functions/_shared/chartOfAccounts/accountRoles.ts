@@ -57,6 +57,14 @@ export type AccountRoleMetadata = {
   control_account?: boolean | null;
   system_account?: boolean | null;
   is_active?: boolean | null;
+  /**
+   * Explicit posting permissions held on chart_of_accounts. Both are optional
+   * because not every caller selects them; absent means "no opinion", never
+   * "blocked", so an account is only withheld when the database actually says
+   * so.
+   */
+  allow_manual_posting?: boolean | null;
+  posting_blocked?: boolean | null;
 };
 
 const CODE_TO_ROLE: Record<string, AccountRole> = {
@@ -281,10 +289,25 @@ export function restrictedToModule(account: AccountRoleMetadata): string | null 
   return null;
 }
 
+/**
+ * Whether the database explicitly forbids posting a manual document here.
+ *
+ * `posting_blocked` and `allow_manual_posting` are the authoritative flags for
+ * this on chart_of_accounts — the same ones the accounting health and policy
+ * engines already enforce server-side. Only an explicit false/true withholds an
+ * account; an undefined flag (a caller that did not select the column) leaves
+ * the account available exactly as before.
+ */
+function postingExplicitlyForbidden(account: AccountRoleMetadata): boolean {
+  return account.posting_blocked === true || account.allow_manual_posting === false;
+}
+
 /** Accounts a manually-entered document (Bill, Invoice, Journal) may post to. */
 export function manuallyPostableAccounts<T extends AccountRoleMetadata>(
   accounts: T[] | undefined | null,
 ): T[] {
   if (!accounts?.length) return [];
-  return accounts.filter((a) => isActive(a) && !restrictedToModule(a));
+  return accounts.filter(
+    (a) => isActive(a) && !restrictedToModule(a) && !postingExplicitlyForbidden(a),
+  );
 }

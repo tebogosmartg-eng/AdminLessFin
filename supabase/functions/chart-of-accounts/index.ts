@@ -108,7 +108,7 @@ serve(withEnterprisePlatform('chart-of-accounts', 'tenant', async (req, _ctx) =>
           data.sort((a, b) => a.account_number - b.account_number);
           const { data: metaRows, error: metaError } = await supabaseAdmin
             .from('chart_of_accounts')
-            .select('id, account_role, tax_treatment, control_account, system_account, account_code, category, subcategory, is_active, description')
+            .select('id, account_role, tax_treatment, control_account, system_account, account_code, category, subcategory, is_active, description, allow_manual_posting, posting_blocked')
             .eq('company_id', company_id);
           if (metaError) throw metaError;
           const metaById = new Map((metaRows ?? []).map((m) => [m.id, m]));
@@ -126,6 +126,11 @@ serve(withEnterprisePlatform('chart-of-accounts', 'tenant', async (req, _ctx) =>
                   subcategory: meta.subcategory ?? null,
                   is_active: meta.is_active ?? true,
                   description: meta.description ?? row.description ?? null,
+                  // Posting permissions, so the client can withhold accounts the
+                  // database forbids manual documents from using (see
+                  // manuallyPostableAccounts). Defaults match the column defaults.
+                  allow_manual_posting: meta.allow_manual_posting ?? true,
+                  posting_blocked: meta.posting_blocked ?? false,
                 }
               : row;
           });
