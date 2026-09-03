@@ -127,6 +127,19 @@ serve(withEnterprisePlatform('accounting', 'tenant', async (req, _ctx) => {
 
     switch (method) {
       case 'GET_LEDGER_ENTRIES': {
+        // The account id comes from the caller, so it is scoped to the caller's
+        // company before it is used. Without this the handler would return any
+        // company's ledger to anyone who could guess an account id.
+        if (!body.account_id) throw new Error('account_id is required.');
+        const { data: ledgerAccount, error: ledgerAccountError } = await supabaseAdmin
+          .from('chart_of_accounts')
+          .select('id')
+          .eq('id', body.account_id)
+          .eq('company_id', company_id)
+          .maybeSingle();
+        if (ledgerAccountError) throw ledgerAccountError;
+        if (!ledgerAccount) throw new Error('Account not found in this company.');
+
         let query = supabaseAdmin
           .from('journal_entry_items')
           .select(`
@@ -134,11 +147,13 @@ serve(withEnterprisePlatform('accounting', 'tenant', async (req, _ctx) => {
             type,
             journal_entries!inner (
               id,
+              company_id,
               entry_date,
               description
             )
           `)
           .eq('account_id', body.account_id)
+          .eq('journal_entries.company_id', company_id)
           .order('entry_date', { foreignTable: 'journal_entries', ascending: true });
 
         if (body.start_date) {

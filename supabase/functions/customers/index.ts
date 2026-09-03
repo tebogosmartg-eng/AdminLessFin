@@ -7,9 +7,12 @@ import {
   edgeFailure,
 } from '../_shared/enterpriseEdgePlatform.ts'
 import { computeArAgeAnalysis } from '../_shared/controlAccountAgeing.ts'
+import { computeControlAccountLedger } from '../_shared/controlAccountLedger.ts'
 
 
 const corsHeaders = ENTERPRISE_CORS_HEADERS
+
+const DATE_ONLY_LEDGER = /^\d{4}-\d{2}-\d{2}$/;
 
 const DATE_ONLY = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -58,6 +61,23 @@ serve(withEnterprisePlatform('customers', 'tenant', async (req, _ctx) => {
        * Shares one implementation with the creditors analysis, so the two
        * sides of the ledger cannot age by different rules.
        */
+      /**
+       * The control account as a general ledger, tied to the age analysis.
+       * Optional date_from gives an opening balance and a period movement;
+       * without it the ledger runs from inception.
+       */
+      case 'GET_CONTROL_LEDGER': {
+        const asOf = body.as_of || new Date().toISOString().slice(0, 10);
+        if (!DATE_ONLY_LEDGER.test(asOf)) {
+          throw new Error('as_of must be a date in YYYY-MM-DD format.');
+        }
+        if (body.date_from && !DATE_ONLY_LEDGER.test(body.date_from)) {
+          throw new Error('date_from must be a date in YYYY-MM-DD format.');
+        }
+        data = await computeControlAccountLedger(supabaseAdmin, company_id, asOf, 'receivable', body.date_from ?? null);
+        break;
+      }
+
       case 'GET_AGE_ANALYSIS': {
         const asOf = body.as_of || new Date().toISOString().slice(0, 10);
         if (!DATE_ONLY.test(asOf)) {

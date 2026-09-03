@@ -182,3 +182,155 @@ export function downloadAgeAnalysisPdf(input: AgeAnalysisInput) {
   const doc = buildAgeAnalysisPdf(input);
   doc.save(`${SIDE_WORDING[input.side].fileStem}_${input.asOf}.pdf`);
 }
+
+/* ------------------------------------------------------------------------- */
+/* Control account ledger                                                     */
+/* ------------------------------------------------------------------------- */
+
+export type ControlLedgerRow = {
+  entry_date: string;
+  journal_number: string | null;
+  description: string | null;
+  party_name: string | null;
+  document: string | null;
+  debit: number;
+  credit: number;
+  balance: number;
+};
+
+export type ControlLedgerInput = {
+  side: AgeAnalysisSide;
+  companyName: string;
+  companyAddress?: string | null;
+  asOf: string;
+  dateFrom?: string | null;
+  controlAccounts: Array<{ account_number: number; name: string }>;
+  openingBalance: number;
+  rows: ControlLedgerRow[];
+  totalDebit: number;
+  totalCredit: number;
+  closingBalance: number;
+  truncated: boolean;
+  tie: {
+    ledger_closing_balance: number;
+    age_analysis_control_balance: number;
+    age_analysis_total: number;
+    not_open_documents: number;
+    ties: boolean;
+  };
+};
+
+/**
+ * The control account ledger, ending in the tie to the age analysis.
+ *
+ * The tie is on the same page as the detail on purpose: the question an auditor
+ * asks of this document is not "what moved" but "does this agree with the age
+ * analysis", and that answer should not require a second document.
+ */
+export function buildControlLedgerPdf(input: ControlLedgerInput): jsPDF {
+  const w = SIDE_WORDING[input.side];
+  const doc = new jsPDF({ unit: 'pt', format: 'a4', orientation: 'landscape' });
+  const margin = 36;
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const accounts = input.controlAccounts.map((a) => `${a.account_number} ${a.name}`).join(', ');
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(15);
+  doc.text(input.companyName || w.title, margin, margin);
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(9);
+  if (input.companyAddress) doc.text(String(input.companyAddress), margin, margin + 14);
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(13);
+  doc.text(
+    input.side === 'payable' ? 'CREDITORS CONTROL ACCOUNT' : 'DEBTORS CONTROL ACCOUNT',
+    pageWidth - margin, margin, { align: 'right' },
+  );
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(9);
+  doc.text(accounts || 'No control account mapped', pageWidth - margin, margin + 14, { align: 'right' });
+  doc.text(
+    input.dateFrom ? `${day(input.dateFrom)} to ${day(input.asOf)}` : `To ${day(input.asOf)}`,
+    pageWidth - margin, margin + 26, { align: 'right' },
+  );
+
+  autoTable(doc, {
+    startY: margin + 44,
+    head: [['Date', 'Journal', w.party, 'Reference', 'Description', 'Debit', 'Credit', 'Balance']],
+    body: [
+      ['', '', '', '', input.dateFrom ? 'Opening balance' : 'Opening balance (inception)', '', '', money(input.openingBalance)],
+      ...input.rows.map((r) => [
+        day(r.entry_date),
+        r.journal_number ?? '',
+        r.party_name ?? '',
+        r.document ?? '',
+        (r.description ?? '').slice(0, 70),
+        r.debit ? money(r.debit) : '',
+        r.credit ? money(r.credit) : '',
+        money(r.balance),
+      ]),
+    ],
+    foot: [['', '', '', '', 'Closing balance', money(input.totalDebit), money(input.totalCredit), money(input.closingBalance)]],
+    styles: { fontSize: 7, cellPadding: 3 },
+    columnStyles: {
+      4: { cellWidth: 220 },
+      5: { halign: 'right' }, 6: { halign: 'right' }, 7: { halign: 'right' },
+    },
+    headStyles: { fillColor: [240, 240, 240], textColor: 20, fontStyle: 'bold' },
+    footStyles: { fillColor: [240, 240, 240], textColor: 20, fontStyle: 'bold' },
+    margin: { left: margin, right: margin },
+  });
+
+  const afterTable = (doc as unknown as { lastAutoTable?: { finalY: number } }).lastAutoTable?.finalY ?? margin;
+  const t = input.tie;
+  autoTable(doc, {
+    startY: afterTable + 18,
+    head: [['Agreement with the age analysis', 'Amount']],
+    body: [
+      ['Control account closing balance per this ledger', money(t.ledger_closing_balance)],
+      ['Control account balance per the age analysis', money(t.age_analysis_control_balance)],
+      ['Difference', money(t.ledger_closing_balance - t.age_analysis_control_balance)],
+      [`Of that balance, open ${w.document} aged in the analysis`, money(t.age_analysis_total)],
+      ['Not represented by an open document (payments on account, credit notes, journals)', money(t.not_open_documents)],
+    ],
+    styles: { fontSize: 8, cellPadding: 4 },
+    columnStyles: { 0: { cellWidth: 460 }, 1: { halign: 'right' } },
+    headStyles: { fillColor: [240, 240, 240], textColor: 20, fontStyle: 'bold' },
+    margin: { left: margin, right: margin },
+    didParseCell: (data) => {
+      if (data.section === 'body' && data.row.index <= 2) data.cell.styles.fontStyle = 'bold';
+    },
+  });
+
+  const afterTie = (doc as unknown as { lastAutoTable?: { finalY: number } }).lastAutoTable?.finalY ?? afterTable;
+  doc.setFontSize(8);
+  doc.setFont('helvetica', t.ties ? 'normal' : 'bold');
+  doc.text(
+    t.ties
+      ? 'This ledger agrees with the age analysis prepared as at the same date.'
+      : 'THIS LEDGER DOES NOT AGREE WITH THE AGE ANALYSIS. Investigate before submitting.',
+    margin, afterTie + 16, { maxWidth: pageWidth - margin * 2 },
+  );
+  if (input.truncated) {
+    doc.setFont('helvetica', 'bold');
+    doc.text(
+      'This ledger was truncated at 20 000 lines and is therefore incomplete.',
+      margin, afterTie + 30, { maxWidth: pageWidth - margin * 2 },
+    );
+  }
+
+  const pages = doc.getNumberOfPages();
+  for (let i = 1; i <= pages; i++) {
+    doc.setPage(i);
+    doc.setFontSize(7);
+    doc.text(`Page ${i} of ${pages}`, pageWidth - margin, doc.internal.pageSize.getHeight() - 16, { align: 'right' });
+  }
+  return doc;
+}
+
+export function downloadControlLedgerPdf(input: ControlLedgerInput) {
+  const doc = buildControlLedgerPdf(input);
+  const stem = input.side === 'payable' ? 'Creditors_Control_Account' : 'Debtors_Control_Account';
+  doc.save(`${stem}_${input.asOf}.pdf`);
+}

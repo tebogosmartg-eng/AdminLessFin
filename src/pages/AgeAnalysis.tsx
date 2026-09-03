@@ -12,12 +12,17 @@ import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Skeleton } from '../components/ui/skeleton';
 import { Alert, AlertDescription, AlertTitle } from '../components/ui/alert';
-import { Download, FileText, ShieldCheck, TriangleAlert } from 'lucide-react';
+import { BookOpen, Download, FileText, Loader2, ShieldCheck, TriangleAlert } from 'lucide-react';
 import { formatCurrency, downloadCSV } from '../lib/utils';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
 import { showError } from '../utils/toast';
 import { creditorsAgeAnalysisQuery, debtorsAgeAnalysisQuery } from '../lib/queries';
-import { downloadAgeAnalysisPdf, SIDE_WORDING, type AgeAnalysisSide } from '../lib/statements/ageAnalysisPdf';
+import {
+  downloadAgeAnalysisPdf, downloadControlLedgerPdf, SIDE_WORDING,
+  type AgeAnalysisSide, type ControlLedgerRow,
+} from '../lib/statements/ageAnalysisPdf';
+import { supabase } from '../integrations/supabase/client';
+import { edgeErrorMessage } from '../lib/platform/edgeError';
 
 type Buckets = {
   current: number; days_1_30: number; days_31_60: number; days_61_90: number; days_120_plus: number;
@@ -45,6 +50,23 @@ const BUCKETS: Array<{ key: keyof Buckets; label: string }> = [
   { key: 'days_120_plus', label: '90+ days' },
 ];
 
+type ControlLedger = {
+  control_accounts: Array<{ account_number: number; name: string }>;
+  opening_balance: number;
+  rows: ControlLedgerRow[];
+  total_debit: number;
+  total_credit: number;
+  closing_balance: number;
+  truncated: boolean;
+  tie: {
+    ledger_closing_balance: number;
+    age_analysis_control_balance: number;
+    age_analysis_total: number;
+    not_open_documents: number;
+    ties: boolean;
+  };
+};
+
 const today = () => new Date().toISOString().slice(0, 10);
 
 /**
@@ -69,6 +91,22 @@ const AgeAnalysis = ({ side }: { side: AgeAnalysisSide }) => {
   });
 
   const rows = useMemo(() => data?.parties ?? [], [data]);
+  const [ledgerBusy, setLedgerBusy] = useState<'csv' | 'pdf' | null>(null);
+
+  /**
+   * The control account ledger is fetched only when asked for. It is the full
+   * transaction detail behind the control balance and can be thousands of
+   * lines, so loading it with the page would make the summary slow for the many
+   * people who never download it.
+   */
+  const fetchLedger = async (): Promise<ControlLedger> => {
+    const { data: result, error: err } = await supabase.functions.invoke(
+      side === 'payable' ? 'vendors' : 'customers',
+      { body: { method: 'GET_CONTROL_LEDGER', company_id: activeCompany!.id, as_of: asOf } },
+    );
+    if (err) throw new Error(await edgeErrorMessage(err, 'The control account ledger could not be prepared.'));
+    return result as ControlLedger;
+  };
   const t = data?.totals;
   const rec = data?.reconciliation;
 
@@ -117,6 +155,66 @@ const AgeAnalysis = ({ side }: { side: AgeAnalysisSide }) => {
     }
   };
 
+  const handleLedgerCsv = async () => {
+    setLedgerBusy('csv');
+    try {
+      const l = await fetchLedger();
+      const accounts = l.control_accounts.map((a) => `${a.account_number} ${a.name}`).join(' / ');
+      const body: Array<Record<string, unknown>> = [
+        { Date: '', Journal: '', [w.party]: '', Reference: '', Description: 'Opening balance', Debit: '', Credit: '', Balance: l.opening_balance },
+        ...l.rows.map((r) => ({
+          Date: r.entry_date,
+          Journal: r.journal_number ?? '',
+          [w.party]: r.party_name ?? '',
+          Reference: r.document ?? '',
+          Description: r.description ?? '',
+          Debit: r.debit || '',
+          Credit: r.credit || '',
+          Balance: r.balance,
+        })),
+        { Date: '', Journal: '', [w.party]: '', Reference: '', Description: 'Closing balance', Debit: l.total_debit, Credit: l.total_credit, Balance: l.closing_balance },
+        {},
+        { Description: `Control account: ${accounts}` },
+        { Description: 'Control account closing balance per this ledger', Balance: l.tie.ledger_closing_balance },
+        { Description: 'Control account balance per the age analysis', Balance: l.tie.age_analysis_control_balance },
+        { Description: 'Difference', Balance: l.tie.ledger_closing_balance - l.tie.age_analysis_control_balance },
+        { Description: `Of that balance, open ${w.document} aged in the analysis`, Balance: l.tie.age_analysis_total },
+        { Description: 'Not represented by an open document', Balance: l.tie.not_open_documents },
+      ];
+      downloadCSV(body, `${side === 'payable' ? 'creditors' : 'debtors'}-control-account-${asOf}.csv`);
+    } catch (e) {
+      showError(e instanceof Error ? e.message : 'The control account ledger could not be prepared.');
+    } finally {
+      setLedgerBusy(null);
+    }
+  };
+
+  const handleLedgerPdf = async () => {
+    setLedgerBusy('pdf');
+    try {
+      const l = await fetchLedger();
+      downloadControlLedgerPdf({
+        side,
+        companyName: identity?.name || activeCompany?.name || 'Company',
+        companyAddress: identity?.address ?? null,
+        asOf,
+        dateFrom: null,
+        controlAccounts: l.control_accounts,
+        openingBalance: l.opening_balance,
+        rows: l.rows,
+        totalDebit: l.total_debit,
+        totalCredit: l.total_credit,
+        closingBalance: l.closing_balance,
+        truncated: l.truncated,
+        tie: l.tie,
+      });
+    } catch (e) {
+      showError(e instanceof Error ? e.message : 'The control account ledger could not be prepared.');
+    } finally {
+      setLedgerBusy(null);
+    }
+  };
+
   return (
     <Card>
       <CardHeader>
@@ -144,6 +242,20 @@ const AgeAnalysis = ({ side }: { side: AgeAnalysisSide }) => {
             </Button>
             <Button onClick={handlePdf} disabled={!data}>
               <FileText className="mr-2 h-4 w-4" /> PDF for auditors
+            </Button>
+            {/* The control account behind these figures, for the auditor who
+                asks to see that the age analysis agrees with the ledger. */}
+            <Button variant="outline" onClick={handleLedgerCsv} disabled={!data || ledgerBusy !== null}>
+              {ledgerBusy === 'csv'
+                ? <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                : <BookOpen className="mr-2 h-4 w-4" />}
+              Control account CSV
+            </Button>
+            <Button variant="outline" onClick={handleLedgerPdf} disabled={!data || ledgerBusy !== null}>
+              {ledgerBusy === 'pdf'
+                ? <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                : <BookOpen className="mr-2 h-4 w-4" />}
+              Control account PDF
             </Button>
           </div>
         </div>
