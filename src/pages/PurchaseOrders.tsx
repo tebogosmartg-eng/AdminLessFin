@@ -1,16 +1,18 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../integrations/supabase/client';
 import { Button } from '../components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/table';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/card';
-import { PlusCircle, MoreHorizontal, ShoppingBag } from 'lucide-react';
+import { PlusCircle, MoreHorizontal, ShoppingBag, Search } from 'lucide-react';
 import { EmptyState } from '../components/EmptyState';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
 import { Skeleton } from '../components/ui/skeleton';
 import { statusBadgeVariant } from '../lib/utils';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "../components/ui/dropdown-menu";
 import { Badge } from '../components/ui/badge';
+import { Input } from '../components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { useAuth } from '../contexts/AuthContext';
 import { purchaseOrdersQuery } from '../lib/queries';
 import PurchaseOrderForm from '../components/PurchaseOrderForm';
@@ -22,6 +24,8 @@ const PurchaseOrders = () => {
   useDocumentTitle('Purchase Orders');
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [selectedId, setSelectedId] = useState<string | undefined>(undefined);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
   const { activeCompany } = useAuth();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
@@ -55,6 +59,18 @@ const PurchaseOrders = () => {
     setIsFormOpen(true);
   };
 
+  const filteredPos = useMemo(() => {
+    return (pos ?? []).filter((po) => {
+      const q = searchTerm.trim().toLowerCase();
+      const matchesSearch =
+        !q ||
+        String(po.po_number ?? '').toLowerCase().includes(q) ||
+        String(po.vendors?.name ?? '').toLowerCase().includes(q);
+      const matchesStatus = statusFilter === 'all' || po.status === statusFilter;
+      return matchesSearch && matchesStatus;
+    });
+  }, [pos, searchTerm, statusFilter]);
+
   return (
     <>
       <Card>
@@ -68,6 +84,31 @@ const PurchaseOrders = () => {
               <PlusCircle className="mr-2 h-4 w-4" />
               New Purchase Order
             </Button>
+          </div>
+          <div className="flex flex-wrap gap-4 pt-4">
+            <div className="relative w-full md:w-64">
+              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Input
+                type="search"
+                placeholder="Search PO # or vendor..."
+                className="pl-8"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+            </div>
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger className="w-[160px]" aria-label="Filter by status">
+                <SelectValue placeholder="Status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Statuses</SelectItem>
+                <SelectItem value="draft">Draft</SelectItem>
+                <SelectItem value="sent">Sent</SelectItem>
+                <SelectItem value="billed">Billed</SelectItem>
+                <SelectItem value="closed">Closed</SelectItem>
+                <SelectItem value="cancelled">Cancelled</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
         </CardHeader>
         <CardContent>
@@ -90,7 +131,8 @@ const PurchaseOrders = () => {
                   </TableRow>
                 ))
               ) : pos && pos.length > 0 ? (
-                pos.map((po) => (
+                filteredPos.length > 0 ? (
+                filteredPos.map((po) => (
                   <TableRow key={po.id} className="cursor-pointer" onClick={() => navigate(`/purchase-orders/${po.id}`)}>
                     <TableCell className="font-medium">{po.po_number}</TableCell>
                     <TableCell>{po.vendors?.name}</TableCell>
@@ -124,6 +166,17 @@ const PurchaseOrders = () => {
                     </TableCell>
                   </TableRow>
                 ))
+                ) : (
+                <TableRow>
+                  <TableCell colSpan={6} className="p-0">
+                    <EmptyState
+                      icon={ShoppingBag}
+                      title="No purchase orders match your filters"
+                      description="Try adjusting your search or status filter."
+                    />
+                  </TableCell>
+                </TableRow>
+                )
               ) : (
                 <TableRow>
                   <TableCell colSpan={6} className="p-0">
