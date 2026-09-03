@@ -56,6 +56,10 @@ const journalEntrySchema = z.object({
   customer_id: z.string().optional(),
   items: z.array(journalEntryItemSchema).min(2, "At least two accounts are required."),
 }).refine(data => {
+  // Compared in whole cents and required to be EXACTLY equal, matching what the
+  // posting engine enforces (posting_engine_submit rejects any difference at
+  // all). A float tolerance here would let the form accept an entry the server
+  // then refuses, which reads to the user as "it just will not save".
   const debits = data.items.filter(i => i.type === 'debit').reduce((sum, i) => sum + i.amount, 0);
   const credits = data.items.filter(i => i.type === 'credit').reduce((sum, i) => sum + i.amount, 0);
   const debitCents = Math.round(debits * 100);

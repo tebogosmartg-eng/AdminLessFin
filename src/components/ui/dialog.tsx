@@ -36,7 +36,16 @@ const DialogContent = React.forwardRef<
     <DialogPrimitive.Content
       ref={ref}
       className={cn(
-      "fixed left-[50%] top-[50%] z-50 grid w-full max-w-lg translate-x-[-50%] translate-y-[-50%] gap-4 border bg-background p-5 shadow-lg duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%] sm:rounded-xl sm:p-6",
+      // max-h/overflow are DEFAULTS, not fixed behaviour. The dialog is centred
+      // with translate(-50%, -50%), so a dialog taller than the viewport hangs
+      // off BOTH edges: its header is clipped above the top of the screen and
+      // its footer — the Save button — below the bottom, with no way to scroll
+      // to either. Measured on the Journal Entry dialog at a 1440x900 viewport:
+      // 917px tall, top at -8.5px, overflow-y: visible, max-height: none.
+      // Eleven dialogs had already worked around this individually; the other
+      // sixty-four had not. cn() is tailwind-merge, so any dialog that sets its
+      // own max-h/overflow still overrides these.
+      "fixed left-[50%] top-[50%] z-50 grid max-h-[90vh] w-full max-w-lg translate-x-[-50%] translate-y-[-50%] gap-4 overflow-y-auto border bg-background p-5 shadow-lg duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%] sm:rounded-xl sm:p-6",
         className,
       )}
       {...props}
