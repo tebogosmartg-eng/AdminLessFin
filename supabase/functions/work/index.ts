@@ -211,15 +211,22 @@ serve(withEnterprisePlatform('work', 'tenant', async (req, _ctx) => {
         // Optional GL / AR reads via legacy project_id (Accounting remains SoT)
         let gl = { revenue: 0, costs: 0, cashReceived: 0, outstanding: 0 };
         if (project.project_id) {
-          const { data: jei } = await admin
+          // A journal line is stored as { amount, type }, and its account lives in
+          // chart_of_accounts. The previous select named a "debit"/"credit" pair
+          // and an "accounts" table, none of which exist, so this read always
+          // failed -- and because the error was dropped, the project reported
+          // revenue and costs of zero rather than an error.
+          const { data: jei, error: jeiError } = await admin
             .from("journal_entry_items")
-            .select("debit, credit, accounts(type), journal_entries!inner(company_id)")
+            .select("amount, type, chart_of_accounts ( type ), journal_entries!inner(company_id)")
             .eq("project_id", project.project_id)
             .eq("journal_entries.company_id", company_id);
+          if (jeiError) throw jeiError;
           for (const row of jei || []) {
-            const type = row.accounts?.type;
-            const debit = Number(row.debit || 0);
-            const credit = Number(row.credit || 0);
+            const account = Array.isArray(row.chart_of_accounts) ? row.chart_of_accounts[0] : row.chart_of_accounts;
+            const type = account?.type;
+            const debit = row.type === "debit" ? Number(row.amount || 0) : 0;
+            const credit = row.type === "credit" ? Number(row.amount || 0) : 0;
             if (type === "Income") gl.revenue += credit - debit;
             if (type === "Expense" || type === "Cost of Goods Sold") gl.costs += debit - credit;
           }

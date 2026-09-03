@@ -16,6 +16,18 @@ const DATE_ONLY_LEDGER = /^\d{4}-\d{2}-\d{2}$/;
 
 const DATE_ONLY = /^\d{4}-\d{2}-\d{2}$/;
 
+/**
+ * journal_entries has TWO relationships to invoices: the journal's own
+ * invoice_id, and the invoice's journal_entry_id. An embed must name the one
+ * it means or PostgREST refuses the whole query. Statement rows quote the
+ * invoice the journal is FOR, which is the forward invoice_id -- the same
+ * column the row already returns, so the reference and the number agree.
+ */
+function invoiceNumberFromRelation(invoices: { invoice_number?: string } | { invoice_number?: string }[] | null | undefined) {
+  if (!invoices) return undefined;
+  return Array.isArray(invoices) ? invoices[0]?.invoice_number : invoices.invoice_number;
+}
+
 serve(withEnterprisePlatform('customers', 'tenant', async (req, _ctx) => {
 
   try {
@@ -152,7 +164,7 @@ serve(withEnterprisePlatform('customers', 'tenant', async (req, _ctx) => {
             entry_date,
             description,
             invoice_id,
-            invoices ( invoice_number ),
+            invoices!invoice_id ( invoice_number ),
             journal_entry_items (
               amount,
               type,
@@ -205,7 +217,7 @@ serve(withEnterprisePlatform('customers', 'tenant', async (req, _ctx) => {
             date: t.entry_date,
             description: t.description,
             invoice_id: t.invoice_id,
-            invoice_number: t.invoices?.invoice_number,
+            invoice_number: invoiceNumberFromRelation(t.invoices),
             type,
             amount,
           };

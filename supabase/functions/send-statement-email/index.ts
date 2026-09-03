@@ -9,6 +9,7 @@ import { resolveEnterpriseIdentityEdge } from '../_shared/enterpriseIdentity.ts'
 import {
   sendOutboundEmail,
   outboundEmailFailure,
+  relatedOne,
 } from '../_shared/outboundEmail.ts'
 
 
@@ -92,13 +93,15 @@ serve(withEnterprisePlatform('send-statement-email', 'tenant', async (req, _ctx)
 
     // OPENING BALANCE
     let opening_balance = 0;
-    const { data: openingMoves } = await supabaseAdmin
+    const { data: openingMoves, error: openingError } = await supabaseAdmin
         .from('journal_entry_items')
         .select('amount, type, account_id')
         .eq('journal_entries.company_id', company_id)
         .eq(type === 'customer' ? 'journal_entries.customer_id' : 'journal_entries.vendor_id', entityId)
         .lt('journal_entries.entry_date', date_from)
         .select(`amount, type, account_id, journal_entries!inner(entry_date)`);
+    // Unchecked, a failure here silently emails an opening balance of zero.
+    if (openingError) throw openingError;
     
     openingMoves?.forEach(item => {
         const isPositive = type === 'customer' ? item.type === 'debit' : item.type === 'credit';
@@ -106,14 +109,18 @@ serve(withEnterprisePlatform('send-statement-email', 'tenant', async (req, _ctx)
     });
 
     // TRANSACTIONS
-    const { data: transactions } = await supabaseAdmin
+    const { data: transactions, error: transactionsError } = await supabaseAdmin
         .from('journal_entries')
-        .select(`id, entry_date, description, invoices(invoice_number), bills(bill_number), journal_entry_items(amount, type, account_id)`)
+        // Both embeds name their foreign key: journal_entries reaches invoices and
+        // bills by two routes each, so an unqualified embed is rejected outright.
+        .select(`id, entry_date, description, invoices!invoice_id(invoice_number), bills!bill_id(bill_number), journal_entry_items(amount, type, account_id)`)
         .eq('company_id', company_id)
         .eq(type === 'customer' ? 'customer_id' : 'vendor_id', entityId)
         .gte('entry_date', date_from)
         .lte('entry_date', date_to)
         .order('entry_date', { ascending: true });
+    // Unchecked, a failure here silently emails a statement with no transactions.
+    if (transactionsError) throw transactionsError;
 
     let runningBalance = opening_balance;
     const statementRows = transactions?.map(t => {
@@ -142,7 +149,7 @@ serve(withEnterprisePlatform('send-statement-email', 'tenant', async (req, _ctx)
         return {
             date: t.entry_date,
             description: t.description,
-            ref: t.invoices?.invoice_number || t.bills?.[0]?.bill_number || '-',
+            ref: relatedOne(t.invoices)?.invoice_number || relatedOne(t.bills)?.bill_number || '-',
             type: rowType,
             amount,
             balance: runningBalance

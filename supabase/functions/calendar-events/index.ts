@@ -45,13 +45,13 @@ serve(withEnterprisePlatform('calendar-events', 'tenant', async (req, _ctx) => {
 
     const [invoices, bills, payrollRuns, recurringInvoices, recurringBills] = await Promise.all([
       supabaseAdmin.from('invoices')
-        .select('id, invoice_number, due_date, status, customers(name), journal_entries(journal_entry_items(amount, type))')
+        .select('id, invoice_number, due_date, status, customers(name), journal_entries!journal_entry_id(journal_entry_items(amount, type))')
         .eq('company_id', company_id)
         .gte('due_date', start_date)
         .lte('due_date', end_date),
       
       supabaseAdmin.from('bills')
-        .select('id, bill_number, due_date, status, vendors(name), journal_entries(journal_entry_items(amount, type))')
+        .select('id, bill_number, due_date, status, vendors(name), journal_entries!journal_entry_id(journal_entry_items(amount, type))')
         .eq('company_id', company_id)
         .gte('due_date', start_date)
         .lte('due_date', end_date),
@@ -77,9 +77,22 @@ serve(withEnterprisePlatform('calendar-events', 'tenant', async (req, _ctx) => {
         .lte('next_run_date', end_date),
     ]);
 
+    // Every one of these reads returns { data, error }. Left unchecked, a broken
+    // query renders as a calendar with nothing on it, which looks like a quiet
+    // month rather than a failure.
+    for (const [label, result] of [
+      ['invoices', invoices],
+      ['bills', bills],
+      ['payroll runs', payrollRuns],
+      ['recurring invoices', recurringInvoices],
+      ['recurring bills', recurringBills],
+    ]) {
+      if (result.error) throw new Error(`Could not read ${label} for the calendar: ${result.error.message}`);
+    }
+
     const events = [
       ...(invoices.data || []).map(i => {
-        const total = i.journal_entries?.journal_entry_items.filter((item: any) => item.type === 'debit').reduce((sum: number, item: any) => sum + item.amount, 0) || 0;
+        const total = i.journal_entries?.journal_entry_items?.filter((item: any) => item.type === 'debit').reduce((sum: number, item: any) => sum + item.amount, 0) || 0;
         return {
           id: i.id,
           title: `Inv #${i.invoice_number}`,
@@ -91,7 +104,7 @@ serve(withEnterprisePlatform('calendar-events', 'tenant', async (req, _ctx) => {
         };
       }),
       ...(bills.data || []).map(b => {
-        const total = b.journal_entries?.journal_entry_items.filter((item: any) => item.type === 'credit').reduce((sum: number, item: any) => sum + item.amount, 0) || 0;
+        const total = b.journal_entries?.journal_entry_items?.filter((item: any) => item.type === 'credit').reduce((sum: number, item: any) => sum + item.amount, 0) || 0;
         return {
           id: b.id,
           title: `Bill ${b.bill_number || ''}`,

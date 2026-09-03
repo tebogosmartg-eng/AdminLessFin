@@ -94,6 +94,9 @@ serve(withEnterprisePlatform('send-invoice-email', 'tenant', async (req, _ctx) =
       recipient: to,
     });
 
+    // journal_entries is reached by a named foreign key: invoices and
+    // journal_entries reference each other both ways, and this is the
+    // invoice's own posting journal.
     const { data: invoice, error: invoiceError } = await supabaseAdmin
       .from('invoices')
       .select(`
@@ -103,7 +106,7 @@ serve(withEnterprisePlatform('send-invoice-email', 'tenant', async (req, _ctx) =
         invoice_date,
         due_date,
         customers ( name, address ),
-        journal_entries (
+        journal_entries!journal_entry_id (
           journal_entry_items (
             amount,
             type,
@@ -132,9 +135,10 @@ serve(withEnterprisePlatform('send-invoice-email', 'tenant', async (req, _ctx) =
 
     const identity = await resolveEnterpriseIdentityEdge(supabaseAdmin, invoice.company_id);
     const customer = relatedOne(invoice.customers);
-    const journalEntries = Array.isArray(invoice.journal_entries) ? invoice.journal_entries : [];
-    const firstEntry = journalEntries[0];
-    const journalItems = Array.isArray(firstEntry?.journal_entry_items) ? firstEntry.journal_entry_items : [];
+    // journal_entry_id is a to-one relationship, so this comes back as an object.
+    // Indexing it as an array yields undefined and empties the invoice.
+    const primaryEntry = relatedOne(invoice.journal_entries);
+    const journalItems = Array.isArray(primaryEntry?.journal_entry_items) ? primaryEntry.journal_entry_items : [];
     const lineItems = journalItems.filter((item: any) => item.type === 'credit');
     const totalAmount = lineItems.reduce((sum: number, item: any) => sum + item.amount, 0);
 
