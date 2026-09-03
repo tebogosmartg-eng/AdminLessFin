@@ -259,12 +259,35 @@ const JournalEntryForm = ({ isOpen, setIsOpen, entryId }: JournalEntryFormProps)
 
   const onSubmit = (values: JournalEntryFormValues) => mutation.mutate(values);
 
+  /** Live totals, read at call time so the handlers below stay in step. */
+  const readTotals = () => {
+    const items = form.getValues('items') ?? [];
+    const dr = items.filter((i) => i.type === 'debit').reduce((sum, i) => sum + Number(i.amount || 0), 0);
+    const cr = items.filter((i) => i.type === 'credit').reduce((sum, i) => sum + Number(i.amount || 0), 0);
+    return { dr, cr, diffCents: Math.round(dr * 100) - Math.round(cr * 100) };
+  };
+  const balanceBlocksSave = () => readTotals().diffCents !== 0;
+  const buildBalanceMessage = () => {
+    const { dr, cr, diffCents } = readTotals();
+    return `This journal entry does not balance. Debits ${formatCurrency(dr)} versus credits `
+      + `${formatCurrency(cr)} — ${formatCurrency(Math.abs(diffCents) / 100)} `
+      + `${diffCents > 0 ? 'more debit than credit' : 'more credit than debit'}. `
+      + 'Debits must equal credits before the entry can be saved.';
+  };
+
   /**
    * react-hook-form silently does nothing when validation fails, so a user who
    * misses a field sees no reaction to pressing Save at all. Report it, and
    * move focus to the first problem so it is findable in a long form.
    */
   const onInvalid = (errors: FieldErrors<JournalEntryFormValues>) => {
+    // Checked first and from the live totals: an out-of-balance entry is the
+    // most common reason a save is refused, and it is the one react-hook-form
+    // files somewhere this handler cannot reliably read.
+    if (balanceBlocksSave()) {
+      showError(buildBalanceMessage());
+      return;
+    }
     const itemErrors = errors.items;
     if (itemErrors?.message) {
       showError(itemErrors.message);
@@ -282,6 +305,21 @@ const JournalEntryForm = ({ isOpen, setIsOpen, entryId }: JournalEntryFormProps)
   };
   const debits = form.watch('items').filter(i => i.type === 'debit').reduce((sum, i) => sum + Number(i.amount || 0), 0);
   const credits = form.watch('items').filter(i => i.type === 'credit').reduce((sum, i) => sum + Number(i.amount || 0), 0);
+
+  // The balance state is derived from the live totals rather than read out of
+  // react-hook-form's error tree. The schema reports the imbalance at path
+  // ["items"], but `items` is a useFieldArray, and react-hook-form re-files an
+  // array-level error under that array — so neither errors.items.message nor an
+  // array branch reliably held it, and the entry failed to save in complete
+  // silence. These two numbers are already on screen; they cannot disagree with
+  // what the user sees.
+  const differenceCents = Math.round(debits * 100) - Math.round(credits * 100);
+  const isOutOfBalance = differenceCents !== 0;
+  const hasAnyAmount = Math.round(debits * 100) !== 0 || Math.round(credits * 100) !== 0;
+  const balanceMessage = `This journal entry does not balance. Debits ${formatCurrency(debits)} `
+    + `versus credits ${formatCurrency(credits)} — `
+    + `${formatCurrency(Math.abs(differenceCents) / 100)} ${differenceCents > 0 ? 'more debit than credit' : 'more credit than debit'}. `
+    + 'Debits must equal credits before the entry can be saved.';
 
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
@@ -313,7 +351,10 @@ const JournalEntryForm = ({ isOpen, setIsOpen, entryId }: JournalEntryFormProps)
         )}
 
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col min-h-0 flex-1">
+          {/* onInvalid is REQUIRED, not optional decoration: react-hook-form
+              aborts a failed submit silently, so without it pressing Save on an
+              unbalanced or incomplete entry produces no reaction at all. */}
+          <form onSubmit={form.handleSubmit(onSubmit, onInvalid)} className="flex flex-col min-h-0 flex-1">
           <div className="overflow-y-auto flex-1 space-y-4 pr-1">
             <div className="grid grid-cols-2 gap-4">
               <FormField control={form.control} name="entry_date" render={({ field }) => (
@@ -376,6 +417,13 @@ const JournalEntryForm = ({ isOpen, setIsOpen, entryId }: JournalEntryFormProps)
               <span>Total Debits: {formatCurrency(debits)}</span>
               <span>Total Credits: {formatCurrency(credits)}</span>
             </div>
+            {/* Visible while typing, not only on submit, so the imbalance is
+                obvious before the user reaches for Save. */}
+            {isOutOfBalance && hasAnyAmount && (
+              <p role="alert" className="text-sm font-medium text-destructive">
+                {balanceMessage}
+              </p>
+            )}
 
             <FormItem>
               <FormLabel>Attachment (Optional)</FormLabel>
