@@ -1,0 +1,102 @@
+﻿Date,Journal,Customer,Reference,Description,Debit,Credit,Balance
+2026-03-01,,,,Opening balance brought forward,,,1319550
+2026-03-01,,,,Disposal of asset: EAM-DISPOSE-PROBE-1784719502990,,1000,1318550
+2026-03-01,,,,Disposal of asset: EAM-CERT-1784719540256,,25000,1293550
+2026-03-01,JE-000019,,,Disposal of asset: EAM-CERT-1785232976705,,25000,1268550
+2026-07-02,,,,Payment for Bill 0212112,,11,1268539
+2026-07-22,,,,Cert receipt,500,,1269039
+2026-07-22,,,,Cert issue,,150,1268889
+2026-07-22,,,,Inventory adjustment: EIM Cert Widget CERT-INV-54461 (-1) — Cert count adj,,50,1268839
+2026-07-22,,,,GRN GRN-MRW0VAZQ: EIM Cert Widget CERT-INV-54461,55,,1268894
+2026-07-28,JE-000022,Itumeleng,CERT-S-1785238827376,Business ops certification — sales,1150,,1270044
+2026-07-28,JE-000025,Itumeleng,CERT-S-1785238876888,Business ops certification — sales,,51,1269993
+2026-07-28,JE-000025,Itumeleng,CERT-S-1785238876888,Business ops certification — sales,1322.5,,1271315.5
+2026-07-28,JE-000028,Itumeleng,CERT-S-1785238907868,Business ops certification — sales,1322.5,,1272638
+2026-07-28,JE-000052,Itumeleng,CERT-S-1785257840533,Business ops certification — sales,1322.5,,1273960.5
+2026-07-28,JE-000085,Itumeleng,CERT-S-1785333767209,Business ops certification — sales,,67.33,1273893.17
+2026-07-28,JE-000085,Itumeleng,CERT-S-1785333767209,Business ops certification — sales,1322.5,,1275215.67
+2026-07-28,JE-000089,Itumeleng,CERT-S-1785334310486,Business ops certification — sales,1322.5,,1276538.17
+2026-07-28,JE-000092,Itumeleng,CERT-S-1785334349941,Business ops certification — sales,1322.5,,1277860.67
+2026-07-29,JE-000071,Itumeleng,P0INV828988,P0 full 1785297828988,150,,1278010.67
+2026-07-29,JE-000072,Itumeleng,SILENT092748,Invoice SILENT092748,100,,1278110.67
+2026-07-29,JE-000074,Itumeleng,REGA152916,Regression REGA 1785298152916,175,,1278285.67
+2026-07-29,JE-000075,Itumeleng,REGB154022,Regression REGB 1785298154022,175,,1278460.67
+2026-07-29,JE-000076,Itumeleng,REGC153830,Regression REGC 1785298153830,175,,1278635.67
+2026-07-29,JE-000077,Itumeleng,SILENT178354,Invoice SILENT178354,100,,1278735.67
+2026-07-29,JE-000078,Meat and Veg,INV-000011,Invoice INV-000011,115000,,1393735.67
+2026-07-29,JE-000080,Itumeleng,SILENT915408,Invoice SILENT915408,100,,1393835.67
+2026-07-29,JE-000082,Kudzanai,INV-0000122,Invoice INV-0000122,20000,,1413835.67
+2026-07-29,JE-000083,Itumeleng,,Payment for Invoice E2EINV801600,,100,1413735.67
+2026-07-29,JE-000084,Meat and Veg,,Payment for Invoice INV-000011,,115000,1298735.67
+2026-07-30,,,,Monthly depreciation for EAM-FORENSICS-1784707919521 (AST-2026-F919521),,416.67,1298319
+2026-07-30,,,,Monthly depreciation for EAM-FORENSICS-1784707919521 (AST-2026-F919521),,416.67,1297902.33
+2026-07-30,,,,Monthly depreciation for CERT-PROBE-3cbfd4eb (AST-2026-T108923c),,416.67,1297485.66
+2026-07-30,,,,Monthly depreciation for EAM-FORENSICS-1784708135367 (AST-2026-F135367),,416.67,1297068.99
+2026-07-30,,,,Monthly depreciation for EAM-FORENSICS-1784708135367 (AST-2026-F135367),,416.67,1296652.32
+2026-07-30,,,,Monthly depreciation for Office furniture (AST-2026-000003),,41666.67,1254985.65
+2026-07-30,,,,Monthly depreciation for EAM-CERT-1784709615629 (AST-2026-618003),,416.67,1254568.98
+2026-07-30,,,,Monthly depreciation for EAM-CERT-1784709676996 (AST-2026-678365),,416.67,1254152.31
+2026-07-30,,,,Monthly depreciation for E2E QA Asset 1785245360024 (AST-2026-000004),,83.33,1254068.98
+2026-07-30,,,,Monthly depreciation for E2E QA Asset 1785245497254 (AST-2026-000005),,83.33,1253985.65
+2026-07-30,,,,Monthly depreciation for E2E QA Asset 1785245780763 (AST-2026-000006),,83.33,1253902.32
+2026-07-30,,,,Monthly depreciation for E2E QA Asset 1785247225278 (AST-2026-000007),,83.33,1253818.99
+2026-07-30,,,,Monthly depreciation for E2E QA Asset 1785257847293 (AST-2026-000009),,83.33,1253735.66
+2026-07-30,,,,Monthly depreciation for E2E QA Asset 1785247972682 (AST-2026-000008),,83.33,1253652.33
+2026-07-30,,,,Monthly depreciation for E2E QA Asset 1785261864466 (AST-2026-000010),,83.33,1253569
+2026-07-30,,,,Monthly depreciation for E2E QA Asset 1785296801601 (AST-2026-000011),,83.33,1253485.67
+2026-07-30,JE-000096,Kudzanai,,Payment for Invoice INV-0000122,,20000,1233485.67
+2026-07-31,JE-000098,,,Disposal of asset: PROBE-3cbfd4eb,,1000,1232485.67
+2026-07-31,JE-000099,,,Disposal of asset: raw probe good,,100,1232385.67
+2026-08-01,,,,Monthly depreciation for EAM-CERT-1784709676996 (AST-2026-678365),,416.67,1231969
+2026-08-01,,,,Monthly depreciation for E2E QA Asset 1785245360024 (AST-2026-000004),,83.33,1231885.67
+2026-08-01,,,,Monthly depreciation for EAM-FORENSICS-1784707919521 (AST-2026-F919521),,416.67,1231469
+2026-08-01,,,,Monthly depreciation for CERT-PROBE-3cbfd4eb (AST-2026-T108923c),,416.67,1231052.33
+2026-08-01,,,,Monthly depreciation for EAM-FORENSICS-1784708135367 (AST-2026-F135367),,416.67,1230635.66
+2026-08-01,,,,Monthly depreciation for EAM-FORENSICS-1784708135367 (AST-2026-F135367),,416.67,1230218.99
+2026-08-01,,,,Monthly depreciation for Office furniture (AST-2026-000003),,41666.67,1188552.32
+2026-08-01,,,,Monthly depreciation for E2E QA Asset 1785245497254 (AST-2026-000005),,83.33,1188468.99
+2026-08-01,,,,Monthly depreciation for E2E QA Asset 1785245780763 (AST-2026-000006),,83.33,1188385.66
+2026-08-01,,,,Monthly depreciation for E2E QA Asset 1785247225278 (AST-2026-000007),,83.33,1188302.33
+2026-08-01,,,,Monthly depreciation for E2E QA Asset 1785257847293 (AST-2026-000009),,83.33,1188219
+2026-08-01,,,,Monthly depreciation for E2E QA Asset 1785247972682 (AST-2026-000008),,83.33,1188135.67
+2026-08-01,,,,Monthly depreciation for E2E QA Asset 1785261864466 (AST-2026-000010),,83.33,1188052.34
+2026-08-01,,,,Monthly depreciation for E2E QA Asset 1785296801601 (AST-2026-000011),,83.33,1187969.01
+2026-08-01,,,,Monthly depreciation for EAM-FORENSICS-1784707919521 (AST-2026-F919521),,416.67,1187552.34
+2026-08-01,,,,Monthly depreciation for EAM-CERT-1784709615629 (AST-2026-618003),,416.67,1187135.67
+2026-08-01,JE-000017,,,Loan payment #1 to kudzanai,,46144.93,1140990.74
+2026-08-01,JE-000128,,,"Reversal of JE-000017 - defective entry (debits <> credits by -0.01). Loan instalment #1 posted with principal 37 811,59 instead of the correct balancing figure 37 811,60 (instalment 46 144,93 less interest 8 333,33), leaving the entry out of balance by R0,01. Reversed in full and re-recorded correctly; JE-000017 is retained unaltered.",46144.93,,1187135.67
+2026-08-01,JE-000129,,,"Loan payment #1 to kudzanai - corrected re-record of JE-000017 (principal 37 811,60 = instalment 46 144,93 less interest 8 333,33)",,46144.93,1140990.74
+2026-08-20,JE-000100,Kudzanai,INV-000012,Invoice INV-000012,,76.67,1140914.07
+2026-08-20,JE-000100,Kudzanai,INV-000012,Invoice INV-000012,150,,1141064.07
+2026-08-22,,Itumeleng,SR-INV-1787394712193,Reversal of Invoice SR-INV-1787394712193,,99.99,1140964.08
+2026-08-22,,,,Reversal of Invoice CLOSURE-INV-1787399330173,,1000,1139964.08
+2026-08-22,JE-000125,Itumeleng,SR-INV-1787394712193,Staging recovery invoice probe,99.99,,1140064.07
+2026-08-22,JE-000144,,,Closure suite invoice,1000,,1141064.07
+2026-09-01,,,,Monthly depreciation for EAM-CERT-1784709676996 (AST-2026-678365),,416.67,1140647.4
+2026-09-01,,,,Monthly depreciation for E2E QA Asset 1785245360024 (AST-2026-000004),,83.33,1140564.07
+2026-09-01,,,,Monthly depreciation for EAM-FORENSICS-1784707919521 (AST-2026-F919521),,416.67,1140147.4
+2026-09-01,,,,Monthly depreciation for CERT-PROBE-3cbfd4eb (AST-2026-T108923c),,416.67,1139730.73
+2026-09-01,,,,Monthly depreciation for EAM-FORENSICS-1784708135367 (AST-2026-F135367),,416.67,1139314.06
+2026-09-01,,,,Monthly depreciation for EAM-FORENSICS-1784708135367 (AST-2026-F135367),,416.67,1138897.39
+2026-09-01,,,,Monthly depreciation for Office furniture (AST-2026-000003),,41666.67,1097230.72
+2026-09-01,,,,Monthly depreciation for E2E QA Asset 1785245497254 (AST-2026-000005),,83.33,1097147.39
+2026-09-01,,,,Monthly depreciation for E2E QA Asset 1785245780763 (AST-2026-000006),,83.33,1097064.06
+2026-09-01,,,,Monthly depreciation for E2E QA Asset 1785247225278 (AST-2026-000007),,83.33,1096980.73
+2026-09-01,,,,Monthly depreciation for E2E QA Asset 1785257847293 (AST-2026-000009),,83.33,1096897.4
+2026-09-01,,,,Monthly depreciation for E2E QA Asset 1785247972682 (AST-2026-000008),,83.33,1096814.07
+2026-09-01,,,,Monthly depreciation for E2E QA Asset 1785261864466 (AST-2026-000010),,83.33,1096730.74
+2026-09-01,,,,Monthly depreciation for E2E QA Asset 1785296801601 (AST-2026-000011),,83.33,1096647.41
+2026-09-01,,,,Monthly depreciation for EAM-FORENSICS-1784707919521 (AST-2026-F919521),,416.67,1096230.74
+2026-09-01,,,,Monthly depreciation for EAM-CERT-1784709615629 (AST-2026-618003),,416.67,1095814.07
+2026-09-03,JE-000156,,,"Reclassification: loan from kudzanai out of the trade control accounts. The loan liability was posted to 4001 AP (creditors control) and instalment 1 was paid out of 3000 AR (debtors control). A control account must hold only the sub-ledger it controls, so the borrowing is moved to its own liability account and the repayment to the bank account it was actually paid from. No original journal is altered.",46144.93,,1141959
+2026-09-03,JE-000157,,,Reversal of JE-000156: re-posted as two entries so the creditors leg carries the supplier it belongs to.,,46144.93,1095814.07
+2026-09-03,JE-000159,,,"Reclassification B: loan instalment 1 was paid out of 3000 AR, the debtors control account, instead of the bank account it actually left. Moved to 3001 Bank. This is a banking correction and belongs to no customer.",46144.93,,1141959
+2026-09-04,,,,Closing balance,285299.78,462890.78,1141959
+
+,,,,Control account: 3000 AR,,,
+,,,2026-03-01 to 2026-09-04,Period covered,,,
+,,,,Control account closing balance per this ledger,,,1141959
+,,,,Control account balance per the age analysis,,,1141959
+,,,,Difference,,,0
+,,,,"Of that balance, open invoices aged in the analysis",,,146015
+,,,,Not represented by an open document,,,995944

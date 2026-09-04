@@ -80,9 +80,11 @@ async function main() {
     ['ledger PDF', /Control account PDF/i],
   ] as const) {
     try {
+      // The exports live behind one Export menu now, not four header buttons.
+      await page.getByRole('button', { name: /Export|Preparing/i }).first().click();
       const [download] = await Promise.all([
         page.waitForEvent('download', { timeout: 45000 }),
-        page.getByRole('button', { name }).first().click(),
+        page.getByRole('menuitem', { name }).first().click(),
       ]);
       const file = path.join(OUT, download.suggestedFilename());
       await download.saveAs(file);

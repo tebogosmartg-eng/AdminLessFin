@@ -15,9 +15,13 @@ import {
   Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, TableRow,
 } from '../components/ui/table';
 import { Button } from '../components/ui/button';
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel,
+  DropdownMenuSeparator, DropdownMenuTrigger,
+} from '../components/ui/dropdown-menu';
 import { Skeleton } from '../components/ui/skeleton';
 import { Alert, AlertDescription, AlertTitle } from '../components/ui/alert';
-import { BookOpen, Download, FileText, Loader2, ShieldCheck, TriangleAlert } from 'lucide-react';
+import { BookOpen, ChevronDown, Download, FileText, Loader2, ShieldCheck, TriangleAlert } from 'lucide-react';
 import { formatCurrency, downloadCSV } from '../lib/utils';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
 import { showError } from '../utils/toast';
@@ -255,7 +259,9 @@ const AgeAnalysis = ({ side }: { side: AgeAnalysisSide }) => {
     <Card>
       <CardHeader>
         <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
-          <div>
+          {/* min-w-0 lets the description wrap instead of squeezing the controls
+              onto a second row. */}
+          <div className="min-w-0">
             <CardTitle>{heading}</CardTitle>
             <CardDescription>
               Every {w.party.toLowerCase()} with an outstanding balance, aged as at{' '}
@@ -263,37 +269,48 @@ const AgeAnalysis = ({ side }: { side: AgeAnalysisSide }) => {
               reconciled to the control account in the general ledger.
             </CardDescription>
           </div>
-          <div className="flex flex-wrap items-end gap-2">
-            <div className="flex flex-col items-stretch gap-1 sm:items-end">
+          <div className="flex flex-col gap-1 md:shrink-0 md:items-end">
+            <div className="flex flex-wrap items-center gap-2 md:justify-end">
               <ReportingPeriodPicker showLabel={false} />
-              {/* Said plainly, because a period that closes in the future would
-                  otherwise look as though the picker had been ignored. */}
-              {cappedToToday && (
-                <span className="text-xs text-muted-foreground">
-                  Aged as at today; the period runs to {longDate(periodEnd)}.
-                </span>
-              )}
+              {/* Four export buttons crowded the header onto two rows. They are
+                  one menu now, still grouped so the two documents stay distinct:
+                  the age analysis, and the control account behind it that an
+                  auditor asks for to see the two agree. */}
+              <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" disabled={!data || ledgerBusy !== null}>
+                  {ledgerBusy !== null
+                    ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Preparing…</>
+                    : <><Download className="mr-2 h-4 w-4" /> Export</>}
+                  <ChevronDown className="ml-2 h-4 w-4 opacity-60" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-64">
+                <DropdownMenuLabel>Age analysis</DropdownMenuLabel>
+                <DropdownMenuItem onSelect={handleCsv}>
+                  <Download className="mr-2 h-4 w-4" /> CSV
+                </DropdownMenuItem>
+                <DropdownMenuItem onSelect={handlePdf}>
+                  <FileText className="mr-2 h-4 w-4" /> PDF for auditors
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuLabel>Control account (general ledger)</DropdownMenuLabel>
+                <DropdownMenuItem onSelect={handleLedgerCsv}>
+                  <BookOpen className="mr-2 h-4 w-4" /> Control account CSV
+                </DropdownMenuItem>
+                <DropdownMenuItem onSelect={handleLedgerPdf}>
+                  <BookOpen className="mr-2 h-4 w-4" /> Control account PDF
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+              </DropdownMenu>
             </div>
-            <Button variant="outline" onClick={handleCsv} disabled={!data}>
-              <Download className="mr-2 h-4 w-4" /> CSV
-            </Button>
-            <Button onClick={handlePdf} disabled={!data}>
-              <FileText className="mr-2 h-4 w-4" /> PDF for auditors
-            </Button>
-            {/* The control account behind these figures, for the auditor who
-                asks to see that the age analysis agrees with the ledger. */}
-            <Button variant="outline" onClick={handleLedgerCsv} disabled={!data || ledgerBusy !== null}>
-              {ledgerBusy === 'csv'
-                ? <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                : <BookOpen className="mr-2 h-4 w-4" />}
-              Control account CSV
-            </Button>
-            <Button variant="outline" onClick={handleLedgerPdf} disabled={!data || ledgerBusy !== null}>
-              {ledgerBusy === 'pdf'
-                ? <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                : <BookOpen className="mr-2 h-4 w-4" />}
-              Control account PDF
-            </Button>
+            {/* Said plainly, because a period that closes in the future would
+                otherwise look as though the picker had been ignored. */}
+            {cappedToToday && (
+              <span className="text-xs text-muted-foreground">
+                Aged as at today; the period runs to {longDate(periodEnd)}.
+              </span>
+            )}
           </div>
         </div>
       </CardHeader>

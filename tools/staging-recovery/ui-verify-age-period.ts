@@ -106,14 +106,33 @@ async function main() {
     }
     check('no preset ages the report into the future', futureDated === null, futureDated ?? 'all on or before today');
 
+    console.log('  --- the header is one Export menu, not four buttons ---');
+    const loose = await page.getByRole('button', {
+      name: /^(CSV|PDF for auditors|Control account CSV|Control account PDF)$/i,
+    }).count();
+    check('the four export buttons are no longer loose in the header', loose === 0, 'found ' + loose);
+    check('a single Export control replaces them',
+      await page.getByRole('button', { name: /Export|Preparing/i }).count() === 1);
+    await page.getByRole('button', { name: /Export|Preparing/i }).first().click();
+    await page.waitForTimeout(600);
+    for (const item of ['CSV', 'PDF for auditors', 'Control account CSV', 'Control account PDF']) {
+      check('menu offers ' + item,
+        await page.getByRole('menuitem', { name: new RegExp('^' + item + '$', 'i') }).count() === 1);
+    }
+    // Captured with the menu open, which is the thing being checked.
+    await page.screenshot({ path: path.join(OUT, side + '-export-menu.png'), fullPage: true });
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(400);
+
     console.log('  --- exports follow the period ---');
     await trigger.click();
     await page.getByRole('option', { name: 'Current Financial Year' }).click();
     await page.waitForTimeout(4000);
     try {
+      await page.getByRole('button', { name: /Export|Preparing/i }).first().click();
       const [dl] = await Promise.all([
         page.waitForEvent('download', { timeout: 60000 }),
-        page.getByRole('button', { name: /Control account CSV/i }).first().click(),
+        page.getByRole('menuitem', { name: /Control account CSV/i }).first().click(),
       ]);
       const file = path.join(OUT, side + '-' + dl.suggestedFilename());
       await dl.saveAs(file);
