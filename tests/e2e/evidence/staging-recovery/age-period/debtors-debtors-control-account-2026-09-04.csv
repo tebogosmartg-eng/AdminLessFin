@@ -91,12 +91,14 @@
 2026-09-03,JE-000156,,,"Reclassification: loan from kudzanai out of the trade control accounts. The loan liability was posted to 4001 AP (creditors control) and instalment 1 was paid out of 3000 AR (debtors control). A control account must hold only the sub-ledger it controls, so the borrowing is moved to its own liability account and the repayment to the bank account it was actually paid from. No original journal is altered.",46144.93,,1141959
 2026-09-03,JE-000157,,,Reversal of JE-000156: re-posted as two entries so the creditors leg carries the supplier it belongs to.,,46144.93,1095814.07
 2026-09-03,JE-000159,,,"Reclassification B: loan instalment 1 was paid out of 3000 AR, the debtors control account, instead of the bank account it actually left. Moved to 3001 Bank. This is a banking correction and belongs to no customer.",46144.93,,1141959
-2026-09-04,,,,Closing balance,285299.78,462890.78,1141959
+2026-09-04,JE-000160,Kudzanai,,Payment for Invoice INV-0000122,,20000,1121959
+2026-09-04,JE-000161,Itumeleng,,Payment from Itumeleng,,10841.67,1111117.33
+2026-09-04,,,,Closing balance,285299.78,493732.45,1111117.33
 
 ,,,,Control account: 3000 AR,,,
 ,,,2026-03-01 to 2026-09-04,Period covered,,,
-,,,,Control account closing balance per this ledger,,,1141959
-,,,,Control account balance per the age analysis,,,1141959
+,,,,Control account closing balance per this ledger,,,1111117.33
+,,,,Control account balance per the age analysis,,,1111117.33
 ,,,,Difference,,,0
 ,,,,"Of that balance, open invoices aged in the analysis",,,146015
-,,,,Not represented by an open document,,,995944
+,,,,Not represented by an open document,,,965102.33

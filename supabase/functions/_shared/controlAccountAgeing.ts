@@ -256,6 +256,36 @@ export async function computeControlAgeAnalysis(
     }
   }
 
+  // 3b. What receipts have settled against each document.
+  //
+  // The outstanding figure above comes from the document's OWN journal, and a
+  // receipt is a separate journal — so without this a part-paid invoice ages at
+  // its full value, and one settled by a payment on account ages for ever.
+  // Only receipts dated on or before the reporting date count: an age analysis
+  // as at a past date must not be credited with money received after it.
+  //
+  // Receivables only. There is no allocation table on the payables side yet, so
+  // bills keep their existing behaviour exactly.
+  const allocatedByDocument: Record<string, number> = {};
+  if (side === 'receivable') {
+    const docIds = (openDocs ?? []).map((d: { id: string }) => d.id);
+    for (let i = 0; i < docIds.length; i += 200) {
+      const chunk = docIds.slice(i, i + 200);
+      const rows = await readAll<{ invoice_id: string; amount: number }>((from, to) =>
+        db.from('invoice_payment_allocations')
+          .select('invoice_id, amount, journal_entries!inner ( company_id, entry_date )')
+          .in('invoice_id', chunk)
+          .eq('company_id', companyId)
+          .eq('journal_entries.company_id', companyId)
+          .lte('journal_entries.entry_date', asOf)
+          .range(from, to),
+      );
+      for (const a of rows) {
+        allocatedByDocument[a.invoice_id] = (allocatedByDocument[a.invoice_id] ?? 0) + Number(a.amount);
+      }
+    }
+  }
+
   // 4. Every control-account movement up to the reporting date.
   const movements = await readAll<{
     amount: number;
@@ -293,7 +323,10 @@ export async function computeControlAgeAnalysis(
     const partyId = doc[spec.partyField];
     const journalId = doc.journal_entry_id;
     if (!partyId || !journalId) continue;
-    const outstanding = round2(outstandingByJournal[journalId] ?? 0);
+    const raised = outstandingByJournal[journalId] ?? 0;
+    const settled = allocatedByDocument[doc.id as string] ?? 0;
+    const outstanding = round2(raised - settled);
+    // Fully settled, or settled past its value: nothing left to age.
     if (outstanding <= 0) continue;
     const days = daysOverdue(asOf, doc.due_date || doc[spec.documentDateField]);
     const key = bucketForDaysOverdue(days);

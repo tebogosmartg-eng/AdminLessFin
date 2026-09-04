@@ -30,7 +30,7 @@ type InvoiceDetailData = {
   invoice_number: string;
   invoice_date: string;
   due_date: string;
-  status: 'draft' | 'sent' | 'paid' | 'void';
+  status: 'draft' | 'sent' | 'partially_paid' | 'paid' | 'void';
   customers: {
     name: string;
     address: string | null;
@@ -186,15 +186,16 @@ const InvoiceDetail = () => {
                 <Send className="mr-2 h-4 w-4" /> Send Invoice
               </Button>
             )}
+            {(invoice.status === 'sent' || invoice.status === 'partially_paid') && (
+              <Button onClick={() => setIsPaymentFormOpen(true)}>
+                <HandCoins className="mr-2 h-4 w-4" />
+                {invoice.status === 'partially_paid' ? 'Receive Balance' : 'Receive Payment'}
+              </Button>
+            )}
             {invoice.status === 'sent' && (
-              <>
-                <Button onClick={() => setIsPaymentFormOpen(true)}>
-                  <HandCoins className="mr-2 h-4 w-4" /> Receive Payment
-                </Button>
-                <Button variant="destructive" onClick={() => voidMutation.mutate()} disabled={voidMutation.isPending}>
-                  <Ban className="mr-2 h-4 w-4" /> Void
-                </Button>
-              </>
+              <Button variant="destructive" onClick={() => voidMutation.mutate()} disabled={voidMutation.isPending}>
+                <Ban className="mr-2 h-4 w-4" /> Void
+              </Button>
             )}
             <Button onClick={() => window.print()} variant="outline"><Printer className="mr-2 h-4 w-4" /> Print</Button>
           </div>

@@ -12,9 +12,15 @@ const corsHeaders = ENTERPRISE_CORS_HEADERS
 type PaymentMethod =
   | 'GET_AR_BALANCES'
   | 'GET_AP_BALANCES'
+  | 'GET_CUSTOMER_OPEN_INVOICES'
+  | 'GET_INVOICE_SETTLEMENT'
+  | 'RECORD_CUSTOMER_RECEIPT'
   | 'RECORD_CUSTOMER_PAYMENT'
   | 'RECORD_VENDOR_PAYMENT'
   | 'RECORD_INVOICE_PAYMENT';
+
+/** One invoice a receipt may be applied to. */
+type ReceiptAllocation = { invoice_id: string; amount: number };
 
 type CustomerPaymentData = {
   payment_date: string;
@@ -44,6 +50,11 @@ type PaymentsRequestBody = {
   asset_account_id?: string;
   ar_account_id?: string;
   amount?: number;
+  deposit_account_id?: string;
+  accounts_receivable_id?: string;
+  allocations?: ReceiptAllocation[];
+  description?: string;
+  idempotency_key?: string;
 };
 
 function isPaymentsRequestBody(value: unknown): value is PaymentsRequestBody {
@@ -136,6 +147,107 @@ serve(withEnterprisePlatform('payments', 'tenant', async (req, _ctx) => {
         break;
       }
 
+      /**
+       * The customer's unpaid invoices, with what is actually left on each.
+       * The receipt dialog needs this to let a clerk say what the money
+       * settles; outstanding comes from the same allocation table the posting
+       * writes, so the screen and the books cannot disagree.
+       */
+      case 'GET_CUSTOMER_OPEN_INVOICES': {
+        if (!body.customerId) throw new Error("customerId is required.");
+        const { data: invoices, error: invErr } = await supabaseAdmin
+          .from('invoices')
+          .select('id, invoice_number, invoice_date, due_date, status')
+          .eq('company_id', company_id)
+          .eq('customer_id', body.customerId)
+          // invoice_status has no 'cancelled' label; naming one here is an
+          // error from PostgREST, not an empty filter.
+          .not('status', 'in', '("void","draft","paid")')
+          // Same order the engine allocates in, invoice_number included. Two
+          // invoices raised on one day would otherwise be listed in one order
+          // and settled in another, so the screen's oldest-first preview would
+          // not be what actually happens.
+          .order('invoice_date', { ascending: true })
+          .order('invoice_number', { ascending: true });
+        if (invErr) throw invErr;
+
+        const rows = [];
+        for (const inv of invoices ?? []) {
+          const [{ data: gross }, { data: allocated }] = await Promise.all([
+            supabaseAdmin.rpc('invoice_gross_amount', { p_invoice_id: inv.id }),
+            supabaseAdmin.rpc('invoice_allocated_amount', { p_invoice_id: inv.id }),
+          ]);
+          const outstanding = Math.round((Number(gross ?? 0) - Number(allocated ?? 0)) * 100) / 100;
+          if (outstanding <= 0) continue;
+          rows.push({ ...inv, gross: Number(gross ?? 0), allocated: Number(allocated ?? 0), outstanding });
+        }
+        data = rows;
+        break;
+      }
+
+      /**
+       * What one invoice is worth, what has been settled against it, and what
+       * is therefore left. The per-invoice payment dialog defaults to the
+       * outstanding figure: defaulting to the invoice TOTAL would over-pay any
+       * invoice that has already had something against it, which the engine now
+       * refuses outright.
+       */
+      case 'GET_INVOICE_SETTLEMENT': {
+        if (!body.invoice_id) throw new Error("invoice_id is required.");
+        const { data: inv, error: invErr } = await supabaseAdmin
+          .from('invoices')
+          .select('id, invoice_number, status')
+          .eq('id', body.invoice_id)
+          .eq('company_id', company_id)
+          .maybeSingle();
+        if (invErr) throw invErr;
+        if (!inv) throw new Error("Invoice not found in this company.");
+        const [{ data: gross }, { data: allocated }] = await Promise.all([
+          supabaseAdmin.rpc('invoice_gross_amount', { p_invoice_id: inv.id }),
+          supabaseAdmin.rpc('invoice_allocated_amount', { p_invoice_id: inv.id }),
+        ]);
+        data = {
+          ...inv,
+          gross: Number(gross ?? 0),
+          allocated: Number(allocated ?? 0),
+          outstanding: Math.round((Number(gross ?? 0) - Number(allocated ?? 0)) * 100) / 100,
+        };
+        break;
+      }
+
+      /**
+       * Receive money from a customer and say which invoices it settles.
+       *
+       * Everything below the authorisation check happens inside one RPC and one
+       * transaction: the journal, the allocations and the resulting invoice
+       * statuses. Sending an idempotency_key makes a retry safe -- and a replay
+       * is reported as such rather than as a second success, because telling a
+       * user their payment was recorded twice when it was banked once is the
+       * one outcome worse than an error.
+       */
+      case 'RECORD_CUSTOMER_RECEIPT': {
+        if (!body.customerId) throw new Error("customerId is required.");
+        if (typeof body.amount !== 'number') throw new Error("amount is required.");
+        if (!body.payment_date) throw new Error("payment_date is required.");
+        if (!body.deposit_account_id) throw new Error("deposit_account_id is required.");
+        if (body.allocations !== undefined && !Array.isArray(body.allocations)) {
+          throw new Error("allocations must be a list of { invoice_id, amount }.");
+        }
+        ({ data, error } = await supabaseAdmin.rpc('record_customer_receipt_atomic', {
+          p_company_id: company_id,
+          p_customer_id: body.customerId,
+          p_payment_date: body.payment_date,
+          p_deposit_account_id: body.deposit_account_id,
+          p_amount: body.amount,
+          p_allocations: body.allocations ?? null,
+          p_description: body.description ?? null,
+          p_idempotency_key: body.idempotency_key ?? null,
+          p_actor_user_id: user.id,
+          p_accounts_receivable_id: body.accounts_receivable_id ?? null,
+        }));
+        break;
+      }
+
       case 'RECORD_CUSTOMER_PAYMENT': {
         // General Payment on Account (not linked to specific invoice)
         const { customerId, paymentData } = body;
@@ -187,6 +299,18 @@ serve(withEnterprisePlatform('payments', 'tenant', async (req, _ctx) => {
 
       case 'RECORD_INVOICE_PAYMENT': {
         if (!body.invoice_id) throw new Error("invoice_id is required.");
+        // The membership check above proves the caller may act for company_id.
+        // It says nothing about this invoice, and the RPC takes its company
+        // from the invoice itself -- so without this, a member of one company
+        // could pay an invoice belonging to another.
+        const { data: owned, error: ownErr } = await supabaseAdmin
+          .from('invoices')
+          .select('id')
+          .eq('id', body.invoice_id)
+          .eq('company_id', company_id)
+          .maybeSingle();
+        if (ownErr) throw ownErr;
+        if (!owned) throw new Error("Invoice not found in this company.");
         if (!body.payment_date) throw new Error("payment_date is required.");
         if (!body.asset_account_id) throw new Error("asset_account_id is required.");
         if (!body.ar_account_id) throw new Error("ar_account_id is required.");

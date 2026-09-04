@@ -31,7 +31,7 @@ export type StatusBadgeVariant =
 export function statusBadgeVariant(status?: string | null): StatusBadgeVariant {
   const s = (status ?? "").toLowerCase().trim();
   if (["paid", "accepted", "active", "approved", "completed", "reconciled", "received", "closed", "billed"].includes(s)) return "success";
-  if (["sent", "partial", "open", "pending", "submitted", "processing", "unpaid", "awaiting"].includes(s)) return "warning";
+  if (["sent", "partial", "partially_paid", "open", "pending", "submitted", "processing", "unpaid", "awaiting"].includes(s)) return "warning";
   if (["draft"].includes(s)) return "outline";
   if (["void", "voided", "declined", "rejected", "cancelled", "canceled", "overdue", "failed", "expired"].includes(s)) return "destructive";
   return "secondary";

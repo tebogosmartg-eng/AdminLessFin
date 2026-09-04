@@ -43,10 +43,19 @@ const ReceivePayments = () => {
     setSelectedPayment({
       customerId: customer.customer_id,
       customerName: customer.customer_name,
-      amountDue: customer.balance,
+      // A customer in credit owes nothing, so there is nothing to pre-fill.
+      // Passing their negative balance straight through put a negative into the
+      // amount box, which the form then refused to save.
+      amountDue: Math.max(Number(customer.balance) || 0, 0),
     });
     setIsFormOpen(true);
   };
+
+  // The screen says "customers with outstanding balances", so it should show
+  // those. Customers who are square, or in credit, are reported separately
+  // rather than listed as though they owed money.
+  const owing = (customers ?? []).filter((c) => Number(c.balance) > 0.005);
+  const inCredit = (customers ?? []).filter((c) => Number(c.balance) < -0.005);
 
   return (
     <>
@@ -69,8 +78,8 @@ const ReceivePayments = () => {
                 <TableRow>
                   <TableCell colSpan={3} className="text-center">Loading outstanding invoices...</TableCell>
                 </TableRow>
-              ) : customers && customers.length > 0 ? (
-                customers.map((customer) => (
+              ) : owing.length > 0 ? (
+                owing.map((customer) => (
                   <TableRow key={customer.customer_id}>
                     <TableCell className="font-medium">{customer.customer_name}</TableCell>
                     <TableCell className="text-right font-mono">{formatCurrency(customer.balance)}</TableCell>
@@ -86,6 +95,24 @@ const ReceivePayments = () => {
               )}
             </TableBody>
           </Table>
+
+          {inCredit.length > 0 && (
+            <div className="mt-4 rounded-md border bg-muted/30 p-3 text-sm">
+              <p className="font-medium">In credit</p>
+              <p className="mb-2 text-muted-foreground">
+                These customers have paid more than they have been invoiced. The credit sits on their
+                account until it is applied to an invoice.
+              </p>
+              <ul className="space-y-1">
+                {inCredit.map((c) => (
+                  <li key={c.customer_id} className="flex justify-between gap-4">
+                    <span>{c.customer_name}</span>
+                    <span className="font-mono">{formatCurrency(Math.abs(Number(c.balance)))} credit</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
         </CardContent>
       </Card>
       {selectedPayment && (

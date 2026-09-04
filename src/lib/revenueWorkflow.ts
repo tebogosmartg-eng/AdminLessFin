@@ -19,7 +19,7 @@ export type QuoteWorkflowState = {
 };
 
 export type InvoiceWorkflowState = {
-  status: 'draft' | 'sent' | 'paid' | 'void' | string;
+  status: 'draft' | 'sent' | 'partially_paid' | 'paid' | 'void' | string;
 };
 
 export function resolveQuoteLifecycleStage(quote: QuoteWorkflowState): RevenueStageId {
@@ -41,7 +41,9 @@ export function resolveInvoiceLifecycleStage(invoice: InvoiceWorkflowState): Rev
   switch (invoice.status) {
     case 'draft':
       return 'invoice';
+    // Part-paid is still collections: there is money still to come in.
     case 'sent':
+    case 'partially_paid':
       return 'collections';
     case 'paid':
       return 'receipt';
@@ -80,6 +82,13 @@ export function invoiceNextAction(invoice: InvoiceWorkflowState): LifecycleNextA
       return {
         label: 'Receive payment',
         description: 'Record the customer payment when received.',
+        route: '/receive-payments',
+        action: 'payment',
+      };
+    case 'partially_paid':
+      return {
+        label: 'Receive the balance',
+        description: 'Part of this invoice has been paid. Record the rest when it arrives.',
         route: '/receive-payments',
         action: 'payment',
       };

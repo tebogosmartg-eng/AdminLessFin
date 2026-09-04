@@ -36,7 +36,7 @@ export type Invoice = {
   invoice_number: string;
   invoice_date: string;
   due_date: string;
-  status: 'draft' | 'sent' | 'paid' | 'void';
+  status: 'draft' | 'sent' | 'partially_paid' | 'paid' | 'void';
   customers: { name: string } | null;
   // The invoices→journal_entries embed is a to-one FK, so PostgREST returns a
   // single object. Array-tolerant here purely as a defensive contract.
@@ -199,7 +199,7 @@ const Invoices = () => {
                 <SelectItem value="all">All Statuses</SelectItem>
                 <SelectItem value="draft">Draft</SelectItem>
                 <SelectItem value="sent">Sent</SelectItem>
-                <SelectItem value="partial">Partial</SelectItem>
+                <SelectItem value="partially_paid">Partially paid</SelectItem>
                 <SelectItem value="paid">Paid</SelectItem>
                 <SelectItem value="void">Void</SelectItem>
               </SelectContent>

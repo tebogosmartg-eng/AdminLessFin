@@ -14,6 +14,7 @@ import { Account } from '../pages/ChartOfAccounts';
 import { format } from 'date-fns';
 import { formatCurrency } from '../lib/utils';
 import { accountsQuery } from '../lib/queries';
+import { edgeErrorMessage } from '../lib/platform/edgeError';
 import { useAuth } from '../contexts/AuthContext';
 import {
   findAccountByRole,
@@ -50,6 +51,24 @@ const InvoicePaymentForm = ({ isOpen, setIsOpen, invoice }: InvoicePaymentFormPr
   });
 
   const { data: accounts } = useQuery<Account[]>({ ...accountsQuery(activeCompany!.id), enabled: !!activeCompany });
+
+  /**
+   * What is actually left on this invoice. The dialog used to offer the full
+   * invoice total, which over-pays anything already part-settled -- and the
+   * engine now refuses that rather than silently recording it.
+   */
+  const { data: settlement } = useQuery<{ outstanding: number; allocated: number; gross: number }>({
+    queryKey: ['invoice_settlement', activeCompany?.id, invoice.id],
+    queryFn: async () => {
+      const { data, error } = await supabase.functions.invoke('payments', {
+        body: { method: 'GET_INVOICE_SETTLEMENT', company_id: activeCompany!.id, invoice_id: invoice.id },
+      });
+      if (error) throw new Error(await edgeErrorMessage(error, 'The invoice balance could not be read.'));
+      return data as { outstanding: number; allocated: number; gross: number };
+    },
+    enabled: !!activeCompany && isOpen,
+  });
+  const outstanding = settlement?.outstanding ?? invoice.totalAmount;
   const assetAccounts = accounts?.filter(a => a.type === 'Asset');
   const arAccounts = assetAccounts?.filter((a) => !!findAccountByRole([a], 'trade_receivable'));
   const cashAccounts = findCashEquivalentAccounts(assetAccounts).length
@@ -58,13 +77,13 @@ const InvoicePaymentForm = ({ isOpen, setIsOpen, invoice }: InvoicePaymentFormPr
 
   useEffect(() => {
     if (isOpen) {
-      form.setValue('amount', invoice.totalAmount);
+      form.setValue('amount', outstanding);
       const controls = resolveControlAccounts(accounts);
       if (controls.ar) {
         form.setValue('ar_account_id', controls.ar.id);
       }
     }
-  }, [isOpen, invoice, accounts, form]);
+  }, [isOpen, invoice, accounts, form, outstanding]);
 
   const mutation = useMutation({
     mutationFn: async (values: PaymentFormValues) => {
@@ -103,7 +122,10 @@ const InvoicePaymentForm = ({ isOpen, setIsOpen, invoice }: InvoicePaymentFormPr
         <DialogHeader>
           <DialogTitle>Receive Payment</DialogTitle>
           <DialogDescription>
-            Invoice Total: {formatCurrency(invoice.totalAmount)}
+            Invoice total {formatCurrency(invoice.totalAmount)}
+            {settlement && settlement.allocated > 0
+              ? ` · ${formatCurrency(settlement.allocated)} already received · ${formatCurrency(outstanding)} outstanding`
+              : ''}
           </DialogDescription>
         </DialogHeader>
         <Form {...form}>
