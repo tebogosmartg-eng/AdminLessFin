@@ -111,6 +111,114 @@ serve(withEnterprisePlatform('invoices', 'tenant', async (req, _ctx) => {
           .single());
         break;
 
+      /**
+       * Everything the printed invoice needs, in one round trip.
+       *
+       * The document draws on six different places -- the invoice, the customer,
+       * the journal, company identity, the bank account to be paid into, and
+       * how much of the invoice has already been settled. Fetching those from
+       * the browser would be six edge calls at roughly half a second each
+       * before a single page could be drawn, so they are gathered here and
+       * returned as one payload.
+       *
+       * Every read is checked. A statement that silently omits the banking
+       * details is worse than one that fails, because the customer pays
+       * nothing and nobody finds out why.
+       */
+      case 'GET_DOCUMENT': {
+        if (!body.invoiceId) throw new Error('invoiceId is required.');
+
+        const { data: invoice, error: invoiceError } = await supabaseAdmin
+          .from('invoices')
+          .select(`
+            id,
+            invoice_number,
+            invoice_date,
+            due_date,
+            status,
+            notes,
+            customers ( id, name, contact_name, address, email, phone, tax_id, payment_terms ),
+            journal_entries!journal_entry_id (
+              id,
+              journal_number,
+              description,
+              journal_entry_items (
+                id,
+                amount,
+                type,
+                description,
+                quantity,
+                unit_price,
+                account_id,
+                chart_of_accounts ( id, name, account_number, type, account_role, tax_treatment ),
+                journal_entry_item_tax_rates (
+                  tax_rates ( id, name, rate )
+                )
+              )
+            )
+          `)
+          .eq('id', body.invoiceId)
+          .eq('company_id', company_id)
+          .maybeSingle();
+        if (invoiceError) throw invoiceError;
+        if (!invoice) throw new Error('Invoice not found in this company.');
+
+        const [companyRes, masterRes, bankRes, grossRes, allocatedRes] = await Promise.all([
+          supabaseAdmin
+            .from('companies')
+            .select('id, name, logo_url, address, tax_id, default_invoice_notes')
+            .eq('id', company_id)
+            .maybeSingle(),
+          supabaseAdmin
+            .from('efs_company_master_data')
+            .select('company_profile, addresses, tax_registrations')
+            .eq('company_id', company_id)
+            .maybeSingle(),
+          // The company's default account is the one customers are asked to pay
+          // into. A company with no default has not nominated one, and the
+          // document says so rather than inventing a choice between the rest.
+          supabaseAdmin
+            .from('bank_accounts')
+            .select('name, bank_name, account_number, branch_code, account_type, currency, status')
+            .eq('company_id', company_id)
+            .eq('is_default', true)
+            .maybeSingle(),
+          supabaseAdmin.rpc('invoice_gross_amount', { p_invoice_id: invoice.id }),
+          supabaseAdmin.rpc('invoice_allocated_amount', { p_invoice_id: invoice.id }),
+        ]);
+
+        for (const [label, res] of [
+          ['company', companyRes],
+          ['company master data', masterRes],
+          ['banking details', bankRes],
+          ['invoice total', grossRes],
+          ['amount received', allocatedRes],
+        ] as Array<[string, { error: unknown }]>) {
+          if (res.error) {
+            throw new Error(
+              `Could not read the ${label} for this invoice: ${(res.error as { message?: string }).message ?? res.error}`,
+            );
+          }
+        }
+
+        const gross = Number(grossRes.data ?? 0);
+        const allocated = Number(allocatedRes.data ?? 0);
+
+        data = {
+          invoice,
+          company: companyRes.data ?? null,
+          master: masterRes.data ?? null,
+          // A closed or inactive account must not be printed as "pay us here".
+          banking: bankRes.data && bankRes.data.status === 'active' ? bankRes.data : null,
+          settlement: {
+            gross,
+            allocated,
+            outstanding: Math.round((gross - allocated) * 100) / 100,
+          },
+        };
+        break;
+      }
+
       case 'CREATE_WITH_TIMESHEETS':
         const { invoiceData, timesheetIds } = body;
         const { p_items, notes, ...rpcParams } = invoiceData;

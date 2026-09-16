@@ -11,7 +11,7 @@ import {
   TableRow,
 } from '../components/ui/table';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/card';
-import { PlusCircle, MoreHorizontal, Search, X } from 'lucide-react';
+import { PlusCircle, MoreHorizontal, Search, X, Download } from 'lucide-react';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "../components/ui/dropdown-menu";
 import { showError, showSuccess } from '../utils/toast';
 import { Badge } from '../components/ui/badge';
@@ -21,6 +21,8 @@ import { formatCurrency, statusBadgeVariant } from '../lib/utils';
 import { useAuth } from '../contexts/AuthContext';
 import { invoicesQuery, customersQuery } from '../lib/queries';
 import { invoiceTotal } from '../lib/invoiceJournal';
+import { buildInvoiceDocument, type RawInvoiceDocument } from '../lib/invoices/invoiceDocument';
+import { downloadInvoicePdf } from '../lib/invoices/invoicePdf';
 import { Input } from '../components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { Customer } from './Customers';
@@ -127,6 +129,8 @@ const Invoices = () => {
     },
   });
 
+  const [pdfBusyId, setPdfBusyId] = useState<string | null>(null);
+
   const handleEdit = (id: string) => {
     setSelectedInvoiceId(id);
     setDuplicateFromId(undefined);
@@ -143,6 +147,28 @@ const Invoices = () => {
     setSelectedInvoiceId(undefined);
     setDuplicateFromId(id);
     setIsFormOpen(true);
+  };
+
+  /**
+   * The PDF is built from the full document payload, which the list does not
+   * hold -- the list only knows enough to draw a row. Fetching it per download
+   * keeps the list's own load to one call, and this is a deliberate action on
+   * one invoice rather than something that happens for all of them at once.
+   */
+  const handleDownloadPdf = async (id: string) => {
+    if (!activeCompany) return;
+    setPdfBusyId(id);
+    try {
+      const { data, error } = await supabase.functions.invoke('invoices', {
+        body: { method: 'GET_DOCUMENT', company_id: activeCompany.id, invoiceId: id },
+      });
+      if (error) throw error;
+      await downloadInvoicePdf(buildInvoiceDocument(data as RawInvoiceDocument));
+    } catch (error: any) {
+      showError(error?.message || 'The invoice PDF could not be produced.');
+    } finally {
+      setPdfBusyId(null);
+    }
   };
 
   const getTotal = (invoice: Invoice) => invoiceTotal(invoice.journal_entries);
@@ -274,6 +300,10 @@ const Invoices = () => {
                           <DropdownMenuItem onClick={() => navigate(`/invoices/${invoice.id}`)}>View</DropdownMenuItem>
                           <DropdownMenuItem onClick={() => handleEdit(invoice.id)}>Edit</DropdownMenuItem>
                           <DropdownMenuItem onClick={() => handleDuplicate(invoice.id)}>Duplicate</DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleDownloadPdf(invoice.id)} disabled={pdfBusyId !== null}>
+                            <Download className="mr-2 h-4 w-4" />
+                            {pdfBusyId === invoice.id ? 'Preparing…' : 'Download PDF'}
+                          </DropdownMenuItem>
                           <DropdownMenuItem onClick={() => updateStatusMutation.mutate({ id: invoice.id, status: 'sent' })}>Mark as Sent</DropdownMenuItem>
                           <DropdownMenuItem onClick={() => updateStatusMutation.mutate({ id: invoice.id, status: 'paid' })}>Mark as Paid</DropdownMenuItem>
                           <DropdownMenuItem onClick={() => updateStatusMutation.mutate({ id: invoice.id, status: 'void' })} className="text-red-600">Void</DropdownMenuItem>

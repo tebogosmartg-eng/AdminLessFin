@@ -3,27 +3,31 @@ import { useParams, Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/card';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from '../components/ui/table';
 import { Skeleton } from '../components/ui/skeleton';
 import { Button } from '../components/ui/button';
-import { Printer, Send, HandCoins, Ban, MessageSquare } from 'lucide-react';
+import { Printer, Send, HandCoins, Ban, MessageSquare, Download, Loader2, FileText } from 'lucide-react';
 import { Badge } from '../components/ui/badge';
 import { showError, showSuccess } from '../utils/toast';
 import InvoicePaymentForm from '../components/InvoicePaymentForm';
 import { useAuth } from '../contexts/AuthContext';
-import { useEnterpriseIdentity } from '../hooks/useEnterpriseIdentity';
 import SendInvoiceDialog from '../components/SendInvoiceDialog';
-import { formatCurrency } from '../lib/utils';
 import JournalEntryDetail from '../components/JournalEntryDetail';
 import { Alert, AlertDescription, AlertTitle } from '../components/ui/alert';
-import { CompanyLogo } from '../components/brand';
 import BusinessLifecycleStepper from '../components/BusinessLifecycleStepper';
 import LifecycleNextAction from '../components/LifecycleNextAction';
 import LifecycleContextBadge from '../components/boe/LifecycleContextBadge';
 import { buildChatUrl } from '../lib/boe/contextualChat';
 import { resolveInvoiceLifecycleStage, invoiceNextAction } from '../lib/revenueWorkflow';
-import { isTaxLedgerAccount } from '../lib/accounting/accountRoles';
 import { invoiceJournalItems } from '../lib/invoiceJournal';
+import InvoiceDocumentView from '../components/invoices/InvoiceDocumentView';
+import { useInvoiceDocument } from '../hooks/useInvoiceDocument';
+import { downloadInvoicePdf, openInvoicePdf } from '../lib/invoices/invoicePdf';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '../components/ui/dropdown-menu';
 
 type InvoiceDetailData = {
   id: string;
@@ -56,7 +60,6 @@ type InvoiceDetailData = {
 const InvoiceDetail = () => {
   const { id } = useParams();
   const { activeCompany } = useAuth();
-  const { identity } = useEnterpriseIdentity(activeCompany?.id);
   const queryClient = useQueryClient();
   const [isPaymentFormOpen, setIsPaymentFormOpen] = useState(false);
   const [isSendDialogOpen, setIsSendDialogOpen] = useState(false);
@@ -118,12 +121,35 @@ const InvoiceDetail = () => {
     onError: (error: any) => showError(error.message),
   });
 
+  const { data: invoiceDocument, isLoading: isLoadingInvoiceDocument, isError: invoiceDocumentFailed } =
+    useInvoiceDocument(activeCompany?.id, id);
+
+  const [exporting, setExporting] = useState<'download' | 'print' | null>(null);
+
+  /**
+   * Both export routes render the same PDF. Printing opens it in the browser's
+   * own viewer rather than printing the page, because the page carries the
+   * app's chrome and the customer's copy must not.
+   */
+  const runExport = async (mode: 'download' | 'print') => {
+    if (!invoiceDocument) return;
+    setExporting(mode);
+    try {
+      if (mode === 'download') await downloadInvoicePdf(invoiceDocument);
+      else await openInvoicePdf(invoiceDocument);
+    } catch (error: any) {
+      showError(error?.message || 'The invoice PDF could not be produced.');
+    } finally {
+      setExporting(null);
+    }
+  };
+
+  // The totals below drive the payment dialog, not the document. The document's
+  // own total comes from the receivable per the ledger, which is the figure the
+  // allocation engine settles against.
   const jeItems = invoiceJournalItems<any>(invoice?.journal_entries);
-  const lineItems = jeItems.filter(item => item.type === 'credit' && !isTaxLedgerAccount(item.chart_of_accounts));
-  const taxItems = jeItems.filter(item => item.type === 'credit' && isTaxLedgerAccount(item.chart_of_accounts));
-  const totalAmount = jeItems.filter(item => item.type === 'debit').reduce((sum, item) => sum + item.amount, 0);
-  const subtotal = lineItems.reduce((sum, item) => sum + item.amount, 0);
-  const totalTax = taxItems.reduce((sum, item) => sum + item.amount, 0);
+  const totalAmount = invoiceDocument?.total
+    ?? jeItems.filter(item => item.type === 'debit').reduce((sum, item) => sum + item.amount, 0);
 
   if (isLoading) {
     return <div className="space-y-4"><Skeleton className="h-96 w-full" /></div>;
@@ -197,68 +223,42 @@ const InvoiceDetail = () => {
                 <Ban className="mr-2 h-4 w-4" /> Void
               </Button>
             )}
-            <Button onClick={() => window.print()} variant="outline"><Printer className="mr-2 h-4 w-4" /> Print</Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" disabled={!invoiceDocument || exporting !== null}>
+                  {exporting !== null ? (
+                    <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Preparing…</>
+                  ) : (
+                    <><FileText className="mr-2 h-4 w-4" /> Invoice PDF</>
+                  )}
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onSelect={() => runExport('download')}>
+                  <Download className="mr-2 h-4 w-4" /> Download
+                </DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => runExport('print')}>
+                  <Printer className="mr-2 h-4 w-4" /> Print
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </div>
-        <Card className={`print:shadow-none print:border-none ${invoice.status === 'void' ? 'opacity-50' : ''}`}>
-          <CardHeader className="grid grid-cols-2 gap-4">
-            <div>
-              <CompanyLogo src={activeCompany?.logo_url} className="mb-2" />
-              <CardTitle className="text-base">{identity?.name || 'Your Company'}</CardTitle>
-              <p className="text-sm text-muted-foreground whitespace-pre-wrap">{identity?.address || 'Your Company Address'}</p>
-            </div>
-            <div className="text-right">
-              <p className="text-3xl font-bold tracking-tight">INVOICE</p>
-              <p className="text-sm text-muted-foreground"># {invoice.invoice_number}</p>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-2 gap-4 mb-8">
-              <div>
-                <h3 className="font-semibold mb-1">Bill To:</h3>
-                <p>{invoice.customers?.name}</p>
-                <p className="whitespace-pre-wrap">{invoice.customers?.address}</p>
-                <p>{invoice.customers?.email}</p>
-              </div>
-              <div className="text-right">
-                <p><span className="font-semibold">Invoice Date:</span> {new Date(invoice.invoice_date).toLocaleDateString()}</p>
-                <p><span className="font-semibold">Due Date:</span> {new Date(invoice.due_date).toLocaleDateString()}</p>
-              </div>
-            </div>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Description</TableHead>
-                  <TableHead className="text-right">Amount</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {lineItems.map((item, index) => (
-                  <TableRow key={index}>
-                    <TableCell>{item.chart_of_accounts?.name || 'Service/Product'}</TableCell>
-                    <TableCell className="text-right font-mono">{formatCurrency(item.amount)}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-              <TableFooter>
-                <TableRow>
-                  <TableCell className="text-right">Subtotal</TableCell>
-                  <TableCell className="text-right font-mono">{formatCurrency(subtotal)}</TableCell>
-                </TableRow>
-                {totalTax > 0 && (
-                  <TableRow>
-                    <TableCell className="text-right">Tax</TableCell>
-                    <TableCell className="text-right font-mono">{formatCurrency(totalTax)}</TableCell>
-                  </TableRow>
-                )}
-                <TableRow className="text-lg font-bold bg-gray-50 dark:bg-gray-800">
-                  <TableCell>Total</TableCell>
-                  <TableCell className="text-right font-mono">{formatCurrency(totalAmount)}</TableCell>
-                </TableRow>
-              </TableFooter>
-            </Table>
-          </CardContent>
-        </Card>
+        {isLoadingInvoiceDocument ? (
+          <Skeleton className="h-[40rem] w-full" />
+        ) : invoiceDocument ? (
+          <InvoiceDocumentView model={invoiceDocument} />
+        ) : (
+          <Alert variant="destructive" className="print:hidden">
+            <Ban className="h-4 w-4" />
+            <AlertTitle>The invoice document could not be assembled</AlertTitle>
+            <AlertDescription>
+              {invoiceDocumentFailed
+                ? "Reload the page to try again. If it keeps failing, the invoice may be missing its journal entry."
+                : "No document was returned for this invoice."}
+            </AlertDescription>
+          </Alert>
+        )}
 
         <Card className="mt-6 print:hidden">
           <CardHeader>
