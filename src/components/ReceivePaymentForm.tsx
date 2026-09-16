@@ -184,6 +184,9 @@ const ReceivePaymentForm = ({ isOpen, setIsOpen, customerId, customerName, amoun
       queryClient.invalidateQueries({ queryKey: ['customer_ar_balances'] });
       queryClient.invalidateQueries({ queryKey: ['customer_open_invoices'] });
       queryClient.invalidateQueries({ queryKey: ['invoices'] });
+      // A receipt can settle any invoice in the list, so every printable
+      // document is now potentially out of date, not just one.
+      queryClient.invalidateQueries({ queryKey: ['invoice_document'] });
       queryClient.invalidateQueries({ queryKey: ['journal_entries', activeCompany?.id] });
 
       // Reporting a replay as a fresh success would tell someone their payment

@@ -104,6 +104,10 @@ const InvoicePaymentForm = ({ isOpen, setIsOpen, invoice }: InvoicePaymentFormPr
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['invoices'] });
       queryClient.invalidateQueries({ queryKey: ['invoice_detail', invoice.id] });
+      // The printable document carries what has been received and what is
+      // still due, so a receipt must refresh it or the next PDF understates
+      // the payment.
+      queryClient.invalidateQueries({ queryKey: ['invoice_document'] });
       queryClient.invalidateQueries({ queryKey: ['journal_entries'] });
       showSuccess('Payment recorded successfully.');
       setIsOpen(false);

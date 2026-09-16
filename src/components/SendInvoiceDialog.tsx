@@ -61,6 +61,8 @@ const SendInvoiceDialog = ({ isOpen, setIsOpen, invoice }: SendInvoiceDialogProp
       if (error) throw error;
       
       queryClient.invalidateQueries({ queryKey: ['invoice_detail', invoice.id] });
+      // Sending moves a draft to sent, which the document prints as its status.
+      queryClient.invalidateQueries({ queryKey: ['invoice_document'] });
       queryClient.invalidateQueries({ queryKey: ['invoices'] });
       showSuccess('Invoice sent successfully and marked as sent.');
       setIsOpen(false);

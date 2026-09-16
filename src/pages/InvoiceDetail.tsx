@@ -116,6 +116,8 @@ const InvoiceDetail = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['invoice_detail', id] });
       queryClient.invalidateQueries({ queryKey: ['invoices'] });
+      // Voiding changes what the document says and stamps it VOID.
+      queryClient.invalidateQueries({ queryKey: ['invoice_document'] });
       showSuccess('Invoice voided successfully.');
     },
     onError: (error: any) => showError(error.message),
