@@ -59,6 +59,19 @@ async function main() {
   });
 
   await page.goto(BASE_URL + '/auth', { waitUntil: 'domcontentloaded' });
+  // Repeated automated requests trip Vercel's bot mitigation, which serves a
+  // JavaScript checkpoint in place of the app. It clears itself in a real
+  // browser engine, so wait it out rather than reading it as a site failure.
+  for (let i = 0; i < 12 && /Security Checkpoint/i.test(await page.title()); i++) {
+    await page.waitForTimeout(5000);
+    if (!/Security Checkpoint/i.test(await page.title())) break;
+    await page.goto(BASE_URL + '/auth', { waitUntil: 'domcontentloaded' });
+  }
+  if (/Security Checkpoint/i.test(await page.title())) {
+    console.log('Vercel is challenging this client; cannot verify through a headless browser right now.');
+    await browser.close();
+    process.exit(2);
+  }
   await page.locator('input[type="email"]').first().fill(env.email);
   await page.locator('input[type="password"]').first().fill(env.password);
   await page.getByRole('button', { name: /sign in/i }).first().click();
