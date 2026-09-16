@@ -124,6 +124,8 @@ export type InvoiceDocumentModel = {
   statusLabel: string;
   isVoid: boolean;
   isPaid: boolean;
+  /** True only when money has actually settled the invoice in full. */
+  settled: boolean;
   isOverdue: boolean;
   company: {
     name: string;
@@ -244,13 +246,26 @@ export function buildInvoiceDocument(raw: RawInvoiceDocument): InvoiceDocumentMo
   const taxTotal = round2(taxLines.reduce((t, l) => t + l.amount, 0));
 
   // `gross` is the debit to the receivables control account -- what the ledger
-  // says is owed. Only when the server did not supply it does the document
-  // fall back to adding the lines up itself.
+  // says is owed. It comes back as zero when the invoice's debit did not land
+  // on a control account at all, which happens when the chart has the account
+  // mistyped; the document then falls back to adding its own lines up.
+  //
+  // `outstanding` is derived from that same gross, so it has to fall with it.
+  // Trusting the server's zero outstanding beside a locally computed total is
+  // what made an unpaid draft print PAID IN FULL.
   const gross = raw.settlement?.gross;
-  const total = gross == null || num(gross) === 0 ? round2(subtotal + taxTotal) : round2(num(gross));
+  const grossIsUsable = gross != null && num(gross) !== 0;
+  const total = grossIsUsable ? round2(num(gross)) : round2(subtotal + taxTotal);
   const amountPaid = round2(num(raw.settlement?.allocated));
   const amountDue =
-    raw.settlement?.outstanding != null ? round2(num(raw.settlement.outstanding)) : round2(total - amountPaid);
+    grossIsUsable && raw.settlement?.outstanding != null
+      ? round2(num(raw.settlement.outstanding))
+      : round2(total - amountPaid);
+
+  const status = str(invoice.status);
+  // "Paid in full" is a claim about money received, so it needs money to have
+  // been received. An invoice worth nothing, or one merely drafted, is not paid.
+  const settled = status === 'paid' || (total > 0 && amountPaid > 0 && amountDue <= 0);
 
   const profile = raw.master?.company_profile ?? {};
   const addresses = raw.master?.addresses ?? {};
@@ -271,7 +286,6 @@ export function buildInvoiceDocument(raw: RawInvoiceDocument): InvoiceDocumentMo
       }
     : null;
 
-  const status = str(invoice.status);
   const dueDate = str(invoice.due_date);
 
   const companyName =
@@ -317,6 +331,7 @@ export function buildInvoiceDocument(raw: RawInvoiceDocument): InvoiceDocumentMo
     statusLabel: STATUS_LABELS[status] ?? status,
     isVoid: status === 'void',
     isPaid: status === 'paid',
+    settled,
     isOverdue: status !== 'paid' && status !== 'void' && status !== 'draft' && amountDue > 0,
     company: {
       name: companyName,

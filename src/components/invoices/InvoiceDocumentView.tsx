@@ -65,7 +65,7 @@ export default function InvoiceDocumentView({
   model: InvoiceDocumentModel;
   today?: string;
 }) {
-  const settled = model.isPaid || model.amountDue <= 0;
+  const settled = model.settled;
   const overdueBy = model.isOverdue
     ? daysOverdue(model.dueDate, today ?? new Date().toISOString().slice(0, 10))
     : null;

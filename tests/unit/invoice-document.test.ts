@@ -197,6 +197,48 @@ describe('which credits are invoice lines', () => {
     expect(doc.total).toBe(1000);
     expect(doc.amountDue).toBe(1000);
   });
+
+  it('does not trust a zero outstanding beside a total it had to work out itself', () => {
+    // A real case: the invoice debits an account mis-typed as an Asset rather
+    // than the receivables control account, so the server reports gross 0 and,
+    // derived from it, outstanding 0. Taking that outstanding at face value
+    // printed PAID IN FULL on an invoice nobody had paid.
+    const doc = buildInvoiceDocument(raw({ settlement: { gross: 0, allocated: 0, outstanding: 0 } }));
+    expect(doc.total).toBe(1000);
+    expect(doc.amountDue).toBe(1000);
+    expect(doc.settled).toBe(false);
+  });
+});
+
+describe('when the document may say "paid in full"', () => {
+  it('not on a draft that has had no money against it', () => {
+    const input = raw({ settlement: { gross: 0, allocated: 0, outstanding: 0 } });
+    input.invoice.status = 'draft';
+    expect(buildInvoiceDocument(input).settled).toBe(false);
+  });
+
+  it('not on an invoice worth nothing', () => {
+    const input = raw({ settlement: { gross: 0, allocated: 0, outstanding: 0 } });
+    const items = input.invoice.journal_entries as { journal_entry_items: Array<Record<string, unknown>> };
+    items.journal_entry_items[0].amount = 0;
+    expect(buildInvoiceDocument(input).settled).toBe(false);
+  });
+
+  it('yes when money settled it', () => {
+    const doc = buildInvoiceDocument(raw({ settlement: { gross: 1000, allocated: 1000, outstanding: 0 } }));
+    expect(doc.settled).toBe(true);
+  });
+
+  it('yes when the ledger says it is paid, whatever the allocations show', () => {
+    const input = raw({ settlement: { gross: 1000, allocated: 0, outstanding: 1000 } });
+    input.invoice.status = 'paid';
+    expect(buildInvoiceDocument(input).settled).toBe(true);
+  });
+
+  it('not while part of it is still outstanding', () => {
+    const doc = buildInvoiceDocument(raw({ settlement: { gross: 1000, allocated: 400, outstanding: 600 } }));
+    expect(doc.settled).toBe(false);
+  });
 });
 
 describe('what is still owed', () => {

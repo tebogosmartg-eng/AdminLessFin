@@ -316,7 +316,7 @@ export async function buildInvoicePdf(
 
   // The number the reader is looking for, given the most visual weight on the
   // page after the brand itself.
-  const duePanelPaid = model.isPaid || model.amountDue <= 0;
+  const duePanelPaid = model.settled;
   setFill(doc, duePanelPaid ? BRAND : BRAND_BRIGHT);
   doc.roundedRect(rightColX, panelTop, colWidth, panelHeight, 5, 5, 'F');
 
