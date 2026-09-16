@@ -26,6 +26,19 @@
  * the journal and the settlement figures from the allocation engine.
  */
 import { isTaxLedgerAccount, type AccountRoleMetadata } from '@/lib/accounting/accountRoles';
+import {
+  asNumber,
+  asText,
+  bankingFromAccount,
+  companyFromMaster,
+  daysBetween,
+  letterheadLines,
+  partyLines,
+  relatedOne,
+  round2,
+  type DocumentBanking,
+  type DocumentCompany,
+} from '@/lib/documents/paperTheme';
 
 export type RawAccount = AccountRoleMetadata & { name?: string | null };
 
@@ -102,18 +115,8 @@ export type InvoiceDocumentTaxLine = {
   amount: number;
 };
 
-export type InvoiceDocumentBanking = {
-  accountName: string;
-  bankName: string | null;
-  accountNumber: string | null;
-  branchCode: string | null;
-  accountType: string | null;
-  currency: string | null;
-  /** What the customer should quote on the transfer so the receipt can be matched. */
-  reference: string;
-  /** True when the account exists but nobody has captured the number to pay into. */
-  incomplete: boolean;
-};
+/** @deprecated Use DocumentBanking; kept as a name existing imports resolve. */
+export type InvoiceDocumentBanking = DocumentBanking;
 
 export type InvoiceDocumentModel = {
   invoiceId: string;
@@ -169,20 +172,9 @@ export type InvoiceDocumentModel = {
   linesReconcile: boolean;
 };
 
-const num = (v: unknown): number => {
-  const n = Number(v);
-  return Number.isFinite(n) ? n : 0;
-};
-
-const str = (v: unknown): string => (v == null ? '' : String(v).trim());
-
-const round2 = (n: number): number => Math.round(n * 100) / 100;
-
-/** PostgREST returns a to-one embed as an object and a to-many as an array. */
-function one<T>(value: T | T[] | null | undefined): T | undefined {
-  if (!value) return undefined;
-  return Array.isArray(value) ? value[0] : value;
-}
+const num = asNumber;
+const str = asText;
+const one = relatedOne;
 
 const STATUS_LABELS: Record<string, string> = {
   draft: 'Draft',

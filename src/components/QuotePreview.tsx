@@ -3,25 +3,21 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFoo
 import { formatCurrency } from '../lib/utils';
 import { format } from 'date-fns';
 import { CompanyLogo } from './brand';
+import { quoteTotals } from '../lib/quotes/quoteDocument';
 
 const QuotePreview = ({ formData, customers, company, taxRates }) => {
   const customer = customers?.find(c => c.id === formData.customer_id);
   
+  // Rounding per line, through the same function the saved quotation and the
+  // quotes list use. This preview was the only view that showed VAT at all,
+  // and it still rounded differently from the invoice the quote becomes, so a
+  // cent could move between drafting and billing.
   const lineItems = formData.items?.map(item => {
-    const subtotal = (item.quantity || 0) * (item.unit_price || 0);
-    const taxRate = taxRates?.find(t => t.id === item.tax_rate_id);
-    const taxAmount = taxRate ? subtotal * (taxRate.rate / 100) : 0;
-    return {
-      ...item,
-      subtotal,
-      taxAmount,
-      total: subtotal + taxAmount,
-    };
+    const line = quoteTotals([item], taxRates);
+    return { ...item, subtotal: line.subtotal, taxAmount: line.taxTotal, total: line.total };
   }) || [];
 
-  const subtotal = lineItems.reduce((sum, item) => sum + item.subtotal, 0);
-  const totalTax = lineItems.reduce((sum, item) => sum + item.taxAmount, 0);
-  const totalAmount = subtotal + totalTax;
+  const { subtotal, taxTotal: totalTax, total: totalAmount } = quoteTotals(formData.items, taxRates);
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 bg-background">

@@ -2,29 +2,33 @@ import { useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../integrations/supabase/client';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/card';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from '../components/ui/table';
 import { Skeleton } from '../components/ui/skeleton';
 import { Button } from '../components/ui/button';
-import { Printer, Send, Check, X, FileSignature } from 'lucide-react';
+import { Printer, Send, Check, X, FileSignature, Download, Loader2, FileText } from 'lucide-react';
 import { Badge } from '../components/ui/badge';
 import { showError, showSuccess } from '../utils/toast';
 import { useAuth } from '../contexts/AuthContext';
-import { useEnterpriseIdentity } from '../hooks/useEnterpriseIdentity';
-import { formatCurrency } from '../lib/utils';
 import CreateInvoiceFromQuoteDialog from '../components/CreateInvoiceFromQuoteDialog';
 import SendQuoteDialog from '../components/SendQuoteDialog';
-import { CompanyLogo } from '../components/brand';
 import BusinessLifecycleStepper from '../components/BusinessLifecycleStepper';
 import LifecycleNextAction from '../components/LifecycleNextAction';
 import LifecycleContextBadge from '../components/boe/LifecycleContextBadge';
 import { buildChatUrl } from '../lib/boe/contextualChat';
 import { resolveQuoteLifecycleStage, quoteNextAction } from '../lib/revenueWorkflow';
+import QuoteDocumentView from '../components/quotes/QuoteDocumentView';
+import { useQuoteDocument } from '../hooks/useQuoteDocument';
+import { downloadQuotePdf, openQuotePdf } from '../lib/quotes/quotePdf';
+import { Alert, AlertDescription, AlertTitle } from '../components/ui/alert';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '../components/ui/dropdown-menu';
 
 const QuoteDetail = () => {
   const { id } = useParams();
   const { activeCompany } = useAuth();
-  const { identity } = useEnterpriseIdentity(activeCompany?.id);
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const [isCreateInvoiceOpen, setIsCreateInvoiceOpen] = useState(false);
@@ -54,13 +58,35 @@ const QuoteDetail = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['quote_detail', id] });
       queryClient.invalidateQueries({ queryKey: ['quotes', activeCompany?.id] });
+      // Accepting or declining changes what the document says and stamps it.
+      queryClient.invalidateQueries({ queryKey: ['quote_document'] });
       showSuccess('Quote status updated.');
     },
     onError: (error: any) => showError(error.message),
   });
 
-  const lineItems = quote?.quote_items || [];
-  const totalAmount = lineItems.reduce((sum, item) => sum + (item.quantity * item.unit_price), 0);
+  const { data: quoteDocument, isLoading: isLoadingQuoteDocument, isError: quoteDocumentFailed } =
+    useQuoteDocument(activeCompany?.id, id);
+
+  const [exporting, setExporting] = useState<'download' | 'print' | null>(null);
+
+  /**
+   * Both export routes render the same PDF. Printing opens it in the browser's
+   * own viewer rather than printing the page, because the page carries the
+   * app's chrome and the customer's copy must not.
+   */
+  const runExport = async (mode: 'download' | 'print') => {
+    if (!quoteDocument) return;
+    setExporting(mode);
+    try {
+      if (mode === 'download') await downloadQuotePdf(quoteDocument);
+      else await openQuotePdf(quoteDocument);
+    } catch (error: any) {
+      showError(error?.message || 'The quotation PDF could not be produced.');
+    } finally {
+      setExporting(null);
+    }
+  };
 
   if (isLoading) {
     return <div className="space-y-4"><Skeleton className="h-96 w-full" /></div>;
@@ -120,62 +146,42 @@ const QuoteDetail = () => {
                 <FileSignature className="mr-2 h-4 w-4" /> Create Invoice
               </Button>
             )}
-            <Button onClick={() => window.print()} variant="outline"><Printer className="mr-2 h-4 w-4" /> Print</Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" disabled={!quoteDocument || exporting !== null}>
+                  {exporting !== null ? (
+                    <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Preparing…</>
+                  ) : (
+                    <><FileText className="mr-2 h-4 w-4" /> Quotation PDF</>
+                  )}
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onSelect={() => runExport('download')}>
+                  <Download className="mr-2 h-4 w-4" /> Download
+                </DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => runExport('print')}>
+                  <Printer className="mr-2 h-4 w-4" /> Print
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </div>
-        <Card className="print:shadow-none print:border-none">
-          <CardHeader className="grid grid-cols-2 gap-4">
-            <div>
-              <CompanyLogo src={activeCompany?.logo_url} className="mb-2" />
-              <CardTitle className="text-base">{identity?.name || 'Your Company'}</CardTitle>
-              <p className="text-sm text-muted-foreground">{identity?.address || 'Your Company Address'}</p>
-            </div>
-            <div className="text-right">
-              <p className="text-3xl font-bold tracking-tight">QUOTE</p>
-              <p className="text-sm text-muted-foreground"># {quote.quote_number}</p>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-2 gap-4 mb-8">
-              <div>
-                <h3 className="font-semibold mb-1">To:</h3>
-                <p>{quote.customers?.name}</p>
-                <p>{quote.customers?.address}</p>
-                <p>{quote.customers?.email}</p>
-              </div>
-              <div className="text-right">
-                <p><span className="font-semibold">Quote Date:</span> {new Date(quote.quote_date).toLocaleDateString()}</p>
-                <p><span className="font-semibold">Expiry Date:</span> {quote.expiry_date ? new Date(quote.expiry_date).toLocaleDateString() : 'N/A'}</p>
-              </div>
-            </div>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Description</TableHead>
-                  <TableHead className="text-center">Qty</TableHead>
-                  <TableHead className="text-right">Unit Price</TableHead>
-                  <TableHead className="text-right">Total</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {lineItems.map((item, index) => (
-                  <TableRow key={index}>
-                    <TableCell>{item.description}</TableCell>
-                    <TableCell className="text-center">{item.quantity}</TableCell>
-                    <TableCell className="text-right font-mono">{formatCurrency(item.unit_price)}</TableCell>
-                    <TableCell className="text-right font-mono">{formatCurrency(item.quantity * item.unit_price)}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-              <TableFooter>
-                <TableRow className="text-lg font-bold bg-muted/50">
-                  <TableCell colSpan={3}>Total</TableCell>
-                  <TableCell className="text-right font-mono">{formatCurrency(totalAmount)}</TableCell>
-                </TableRow>
-              </TableFooter>
-            </Table>
-          </CardContent>
-        </Card>
+        {isLoadingQuoteDocument ? (
+          <Skeleton className="h-[40rem] w-full" />
+        ) : quoteDocument ? (
+          <QuoteDocumentView model={quoteDocument} />
+        ) : (
+          <Alert variant="destructive" className="print:hidden">
+            <X className="h-4 w-4" />
+            <AlertTitle>The quotation document could not be assembled</AlertTitle>
+            <AlertDescription>
+              {quoteDocumentFailed
+                ? 'Reload the page to try again.'
+                : 'No document was returned for this quotation.'}
+            </AlertDescription>
+          </Alert>
+        )}
       </div>
       <CreateInvoiceFromQuoteDialog
         isOpen={isCreateInvoiceOpen}

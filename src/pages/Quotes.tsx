@@ -11,7 +11,7 @@ import {
   TableRow,
 } from '../components/ui/table';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/card';
-import { PlusCircle, MoreHorizontal, Quote as QuoteIcon, Search } from 'lucide-react';
+import { PlusCircle, MoreHorizontal, Quote as QuoteIcon, Search, Download } from 'lucide-react';
 import { EmptyState } from '../components/EmptyState';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
 import { useSortableData } from '../hooks/useSortableData';
@@ -24,6 +24,9 @@ import { useNavigate } from 'react-router-dom';
 import QuoteForm from '../components/QuoteForm';
 import { formatCurrency, statusBadgeVariant } from '../lib/utils';
 import { useAuth } from '../contexts/AuthContext';
+import { quoteTotals } from '../lib/quotes/quoteDocument';
+import { fetchQuoteDocument } from '../hooks/useQuoteDocument';
+import { downloadQuotePdf } from '../lib/quotes/quotePdf';
 import { quotesQuery } from '../lib/queries';
 import { Input } from '../components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
@@ -38,6 +41,8 @@ export type Quote = {
   quote_items?: {
     quantity: number;
     unit_price: number;
+    tax_rate_id?: string | null;
+    tax_rates?: { id?: string; name?: string | null; rate?: number | null } | null;
   }[] | null;
 };
 
@@ -48,6 +53,7 @@ const Quotes = () => {
   const [duplicateFromId, setDuplicateFromId] = useState<string | undefined>(undefined);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
+  const [pdfBusyId, setPdfBusyId] = useState<string | null>(null);
   const { activeCompany } = useAuth();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
@@ -90,8 +96,26 @@ const Quotes = () => {
     setIsFormOpen(true);
   };
 
-  const getTotal = (quote: Quote) => {
-    return (quote.quote_items ?? []).reduce((sum, item) => sum + (item.quantity * item.unit_price), 0);
+  // VAT included. Listing quotes at their pre-tax subtotal while the document
+  // and the resulting invoice both carry tax is how one quote came to have
+  // three different values.
+  const getTotal = (quote: Quote) => quoteTotals(quote.quote_items).total;
+
+  /**
+   * The PDF is built from the full document payload, which the list does not
+   * hold -- the list only knows enough to draw a row. Fetching it per download
+   * keeps the list's own load to one call.
+   */
+  const handleDownloadPdf = async (quoteId: string) => {
+    if (!activeCompany) return;
+    setPdfBusyId(quoteId);
+    try {
+      await downloadQuotePdf(await fetchQuoteDocument(activeCompany.id, quoteId));
+    } catch (error: any) {
+      showError(error?.message || 'The quotation PDF could not be produced.');
+    } finally {
+      setPdfBusyId(null);
+    }
   };
 
   const { items: sortedQuotes, sort, requestSort } = useSortableData(quotes ?? [], (q, key) => {
@@ -194,6 +218,10 @@ const Quotes = () => {
                           <DropdownMenuItem onClick={() => navigate(`/quotes/${quote.id}`)}>View</DropdownMenuItem>
                           <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleEdit(quote.id); }}>Edit</DropdownMenuItem>
                           <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleDuplicate(quote.id); }}>Duplicate</DropdownMenuItem>
+                          <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleDownloadPdf(quote.id); }} disabled={pdfBusyId !== null}>
+                            <Download className="mr-2 h-4 w-4" />
+                            {pdfBusyId === quote.id ? 'Preparing…' : 'Download PDF'}
+                          </DropdownMenuItem>
                           <DropdownMenuItem onClick={(e) => { e.stopPropagation(); deleteMutation.mutate(quote.id); }} className="text-red-600">Delete</DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>

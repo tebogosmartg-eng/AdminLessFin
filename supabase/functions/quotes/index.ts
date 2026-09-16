@@ -58,7 +58,10 @@ serve(withEnterprisePlatform('quotes', 'tenant', async (req, _ctx) => {
       case 'GET_ALL':
         ({ data, error } = await supabaseAdmin
           .from('quotes')
-          .select('*, customers ( name ), quote_items(quantity, unit_price)')
+          // The rate is embedded, not just its id: a list that cannot resolve
+          // the rate cannot show VAT, which is how the quote total came to
+          // disagree with the invoice raised from it.
+          .select('*, customers ( name ), quote_items(quantity, unit_price, tax_rate_id, tax_rates(id, name, rate))')
           .eq('company_id', company_id)
           .order('quote_date', { ascending: false }));
         break;
@@ -66,11 +69,113 @@ serve(withEnterprisePlatform('quotes', 'tenant', async (req, _ctx) => {
       case 'GET_ONE':
         ({ data, error } = await supabaseAdmin
           .from('quotes')
-          .select('*, customers ( name, address, email ), quote_items(*, products(name))')
+          .select('*, customers ( name, address, email ), quote_items(*, products(name), tax_rates(id, name, rate))')
           .eq('id', body.quoteId)
           .eq('company_id', company_id)
           .single());
         break;
+
+      /**
+       * Everything the printed quotation needs, in one round trip.
+       *
+       * The document draws on five places -- the quote, its lines, the customer,
+       * company identity, and the bank account a deposit would be paid into --
+       * plus the company's tax rates, because a line stores only the id of the
+       * rate it was quoted at and a document that cannot resolve the rate
+       * cannot show the VAT. Fetching these from the browser would be five edge
+       * calls at roughly half a second each before a page could be drawn.
+       *
+       * Every read is checked. A quotation that silently drops its tax is how a
+       * customer comes to accept one price and be invoiced another.
+       */
+      case 'GET_DOCUMENT': {
+        if (!body.quoteId) throw new Error('quoteId is required.');
+
+        const { data: quote, error: quoteError } = await supabaseAdmin
+          .from('quotes')
+          .select(`
+            id,
+            quote_number,
+            quote_date,
+            expiry_date,
+            status,
+            description,
+            terms,
+            customers ( id, name, contact_name, address, email, phone, tax_id ),
+            quote_items (
+              id,
+              description,
+              quantity,
+              unit_price,
+              tax_rate_id,
+              products ( name )
+            )
+          `)
+          .eq('id', body.quoteId)
+          .eq('company_id', company_id)
+          .maybeSingle();
+        if (quoteError) throw quoteError;
+        if (!quote) throw new Error('Quote not found in this company.');
+
+        const [companyRes, masterRes, bankRes, ratesRes, invoiceRes] = await Promise.all([
+          supabaseAdmin
+            .from('companies')
+            .select('id, name, logo_url, address, tax_id, default_quote_terms')
+            .eq('id', company_id)
+            .maybeSingle(),
+          supabaseAdmin
+            .from('efs_company_master_data')
+            .select('company_profile, addresses, tax_registrations')
+            .eq('company_id', company_id)
+            .maybeSingle(),
+          // The company's default account is the one a deposit would be paid
+          // into. A company with no default has not nominated one, and the
+          // document says so rather than inventing a choice between the rest.
+          supabaseAdmin
+            .from('bank_accounts')
+            .select('name, bank_name, account_number, branch_code, account_type, currency, status')
+            .eq('company_id', company_id)
+            .eq('is_default', true)
+            .maybeSingle(),
+          supabaseAdmin
+            .from('tax_rates')
+            .select('id, name, rate')
+            .eq('company_id', company_id),
+          // Whether this quote has already become an invoice, so the document
+          // can say so instead of reading as a live offer.
+          supabaseAdmin
+            .from('invoices')
+            .select('id, invoice_number, status')
+            .eq('company_id', company_id)
+            .eq('quote_id', body.quoteId)
+            .order('invoice_date', { ascending: true }),
+        ]);
+
+        for (const [label, res] of [
+          ['company', companyRes],
+          ['company master data', masterRes],
+          ['banking details', bankRes],
+          ['tax rates', ratesRes],
+          ['linked invoices', invoiceRes],
+        ] as Array<[string, { error: unknown }]>) {
+          if (res.error) {
+            throw new Error(
+              `Could not read the ${label} for this quotation: ${(res.error as { message?: string }).message ?? res.error}`,
+            );
+          }
+        }
+
+        data = {
+          quote,
+          company: companyRes.data ?? null,
+          master: masterRes.data ?? null,
+          // A closed or inactive account must not be printed as "pay us here".
+          banking: bankRes.data && bankRes.data.status === 'active' ? bankRes.data : null,
+          taxRates: ratesRes.data ?? [],
+          invoices: invoiceRes.data ?? [],
+        };
+        break;
+      }
 
       case 'POST':
         const { items: postItems, ...postQuoteData } = body.quoteData;

@@ -1,21 +1,14 @@
 /**
- * The invoice as the customer will see it, on screen.
+ * The quotation as the customer will see it, on screen.
  *
- * Built from the same document model as the PDF so the two cannot drift: what
- * is reviewed here is what gets sent.
- *
- * It does NOT follow the app's light/dark theme, which is deliberate. This is a
- * preview of a piece of paper, and the paper is white with the AdminLess
- * emerald on it whatever the reviewer has their screen set to. Rendering it in
- * dark mode would show the operator a document their customer will never
- * receive. The palette below is therefore fixed, and is the same one
- * invoicePdf.ts draws with -- both derive from the emerald design tokens in
- * globals.css.
+ * Built from the same document model as the PDF so the two cannot drift, and
+ * fixed to the paper palette for the same reason the invoice is: this previews
+ * a piece of paper, not the app.
  */
 import { CompanyLogo } from '@/components/brand';
 import { PAPER, day, money, qty, bankingUnavailableMessage } from '@/lib/documents/paperTheme';
-import { daysOverdue, type InvoiceDocumentModel } from '@/lib/invoices/invoiceDocument';
-import { AlertTriangle, Landmark } from 'lucide-react';
+import { validityWording, type QuoteDocumentModel } from '@/lib/quotes/quoteDocument';
+import { Landmark } from 'lucide-react';
 
 function Row({ label, value, bold }: { label: string; value: string; bold?: boolean }) {
   return (
@@ -28,18 +21,9 @@ function Row({ label, value, bold }: { label: string; value: string; bold?: bool
   );
 }
 
-export default function InvoiceDocumentView({
-  model,
-  today,
-}: {
-  model: InvoiceDocumentModel;
-  today?: string;
-}) {
-  const settled = model.settled;
-  const overdueBy = model.isOverdue
-    ? daysOverdue(model.dueDate, today ?? new Date().toISOString().slice(0, 10))
-    : null;
-  const showUnits = model.lines.some((l) => l.quantity != null);
+export default function QuoteDocumentView({ model }: { model: QuoteDocumentModel }) {
+  const showTax = model.taxLines.length > 0;
+  const lapsed = model.isExpired || model.isDeclined;
   const identity = [
     model.company.name,
     model.company.registrationNumber ? `Reg. no. ${model.company.registrationNumber}` : '',
@@ -51,7 +35,7 @@ export default function InvoiceDocumentView({
   return (
     <article
       className={`overflow-hidden rounded-xl shadow-sm ring-1 print:rounded-none print:shadow-none ${
-        model.isVoid ? 'opacity-60' : ''
+        lapsed ? 'opacity-70' : ''
       }`}
       style={{
         background: PAPER.paper,
@@ -75,7 +59,7 @@ export default function InvoiceDocumentView({
           <CompanyLogo src={model.company.logoUrl} className="h-16 w-auto max-w-[200px]" />
         </div>
         <div className="text-right">
-          <p className="text-3xl font-bold tracking-tight">INVOICE</p>
+          <p className="text-3xl font-bold tracking-tight">QUOTATION</p>
           <p className="text-sm opacity-90">{model.number}</p>
         </div>
       </header>
@@ -85,21 +69,18 @@ export default function InvoiceDocumentView({
           <div className="min-w-0">
             <p className="text-base font-semibold">{model.company.name}</p>
             <div className="mt-1 space-y-0.5 text-sm" style={{ color: PAPER.muted }}>
-              {model.fromLines.map((line, i) => (
+              {model.letterheadLines.map((line, i) => (
                 <p key={i}>{line}</p>
               ))}
             </div>
           </div>
           <dl className="space-y-1.5 text-sm">
-            <Row label="Invoice date" value={day(model.invoiceDate)} />
-            <Row label="Due date" value={day(model.dueDate)} />
-            {model.customer.paymentTerms != null && (
-              <Row label="Payment terms" value={`${model.customer.paymentTerms} days`} />
-            )}
+            <Row label="Quotation date" value={day(model.quoteDate)} />
+            <Row label="Valid until" value={model.expiryDate ? day(model.expiryDate) : 'No expiry'} />
             <Row label="Status" value={model.statusLabel} />
-            {overdueBy != null && overdueBy > 0 && (
+            {model.isExpired && (
               <p className="text-right text-sm font-bold" style={{ color: PAPER.alarm }}>
-                {overdueBy} day{overdueBy === 1 ? '' : 's'} overdue
+                {model.isDraft ? 'The expiry date has already passed' : 'These prices are no longer held'}
               </p>
             )}
           </dl>
@@ -111,61 +92,56 @@ export default function InvoiceDocumentView({
             style={{ background: PAPER.tint, border: `1px solid ${PAPER.hairline}` }}
           >
             <h2 className="text-xs font-bold uppercase tracking-wider" style={{ color: PAPER.brand }}>
-              Bill to
+              Prepared for
             </h2>
             <p className="mt-2 text-base font-semibold">{model.customer.name}</p>
             <div className="mt-1 space-y-0.5 text-sm" style={{ color: PAPER.muted }}>
-              {model.billToLines.length === 0 ? (
+              {model.customerLines.length === 0 ? (
                 <p>No address or contact details are on file for this customer.</p>
               ) : (
-                model.billToLines.map((line, i) => <p key={i}>{line}</p>)
+                model.customerLines.map((line, i) => <p key={i}>{line}</p>)
               )}
             </div>
           </section>
 
           <section
             className="rounded-lg p-5"
-            style={{ background: settled ? PAPER.brand : PAPER.brandBright, color: PAPER.paper }}
+            style={{ background: lapsed ? PAPER.muted : PAPER.brandBright, color: PAPER.paper }}
           >
-            <h2 className="text-xs font-bold uppercase tracking-wider">
-              {settled ? 'Paid in full' : 'Amount due'}
-            </h2>
-            <p className="mt-2 text-3xl font-bold tabular-nums">
-              {money(settled ? model.total : model.amountDue)}
-            </p>
-            {settled ? (
-              <p className="mt-2 text-sm opacity-90">No payment is due on this invoice.</p>
-            ) : (
-              <div className="mt-2 space-y-0.5 text-sm opacity-90">
-                <p>Due {day(model.dueDate)}</p>
-                {model.amountPaid > 0 && (
-                  <p>
-                    {money(model.amountPaid)} of {money(model.total)} already received
-                  </p>
-                )}
-              </div>
-            )}
+            <h2 className="text-xs font-bold uppercase tracking-wider">Quotation total</h2>
+            <p className="mt-2 text-3xl font-bold tabular-nums">{money(model.total)}</p>
+            <p className="mt-2 text-sm opacity-90">{validityWording(model)}</p>
           </section>
         </div>
 
+        {model.scope && (
+          <section>
+            <h2 className="text-xs font-bold uppercase tracking-wider" style={{ color: PAPER.muted }}>
+              Scope
+            </h2>
+            <p className="mt-2 whitespace-pre-wrap text-sm">{model.scope}</p>
+          </section>
+        )}
+
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[26rem] border-collapse text-sm">
+          <table className="w-full min-w-[28rem] border-collapse text-sm">
             <thead>
               <tr
                 className="text-left text-xs uppercase tracking-wider"
                 style={{ background: PAPER.brand, color: PAPER.paper }}
               >
                 <th className="px-4 py-3 font-bold">Description</th>
-                {showUnits && <th className="px-4 py-3 text-right font-bold">Qty</th>}
-                {showUnits && <th className="px-4 py-3 text-right font-bold">Unit price</th>}
+                <th className="px-4 py-3 text-right font-bold">Qty</th>
+                <th className="px-4 py-3 text-right font-bold">Unit price</th>
+                {showTax && <th className="px-4 py-3 text-right font-bold">VAT</th>}
                 <th className="px-4 py-3 text-right font-bold">Amount</th>
               </tr>
             </thead>
             <tbody>
               {model.lines.length === 0 && (
                 <tr style={{ borderBottom: `1px solid ${PAPER.hairline}` }}>
-                  <td className="px-4 py-3" colSpan={showUnits ? 4 : 2} style={{ color: PAPER.muted }}>
-                    No lines recorded on this invoice
+                  <td className="px-4 py-3" colSpan={showTax ? 5 : 4} style={{ color: PAPER.muted }}>
+                    No items quoted yet
                   </td>
                 </tr>
               )}
@@ -178,14 +154,11 @@ export default function InvoiceDocumentView({
                   }}
                 >
                   <td className="px-4 py-3">{line.description}</td>
-                  {showUnits && (
+                  <td className="px-4 py-3 text-right tabular-nums">{qty(line.quantity)}</td>
+                  <td className="px-4 py-3 text-right tabular-nums">{money(line.unitPrice)}</td>
+                  {showTax && (
                     <td className="px-4 py-3 text-right tabular-nums">
-                      {line.quantity == null ? '' : qty(line.quantity)}
-                    </td>
-                  )}
-                  {showUnits && (
-                    <td className="px-4 py-3 text-right tabular-nums">
-                      {line.unitPrice == null ? '' : money(line.unitPrice)}
+                      {line.taxAmount ? money(line.taxAmount) : '-'}
                     </td>
                   )}
                   <td className="px-4 py-3 text-right font-medium tabular-nums">{money(line.amount)}</td>
@@ -225,7 +198,7 @@ export default function InvoiceDocumentView({
                   ))}
                 </dl>
                 <p className="mt-3 text-xs" style={{ color: PAPER.muted }}>
-                  Please quote {model.banking.reference} as the payment reference.
+                  Please quote {model.number} as the reference on any deposit.
                 </p>
               </>
             ) : (
@@ -241,34 +214,53 @@ export default function InvoiceDocumentView({
               {model.taxLines.map((tax, i) => (
                 <Row key={i} label={tax.label} value={money(tax.amount)} />
               ))}
-              <div style={{ borderTop: `1px solid ${PAPER.hairline}`, paddingTop: '0.375rem' }}>
-                <Row label="Total" value={money(model.total)} bold />
-              </div>
-              {model.amountPaid > 0 && <Row label="Received" value={`-${money(model.amountPaid)}`} />}
             </dl>
             <div
               className="mt-3 flex items-baseline justify-between rounded-md px-4 py-3"
               style={{ background: PAPER.brand, color: PAPER.paper }}
             >
-              <span className="font-bold">{settled ? 'Paid in full' : 'Balance due'}</span>
-              <span className="text-lg font-bold tabular-nums">{money(settled ? 0 : model.amountDue)}</span>
+              <span className="font-bold">Total</span>
+              <span className="text-lg font-bold tabular-nums">{money(model.total)}</span>
             </div>
-            {!model.linesReconcile && (
-              <p className="mt-2 flex gap-1.5 text-xs font-bold" style={{ color: PAPER.alarm }}>
-                <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-                The lines above do not add up to the total. The total is the amount receivable per the
-                ledger.
+            {!showTax && model.company.vatNumber && (
+              <p className="mt-2 text-xs" style={{ color: PAPER.muted }}>
+                No VAT has been quoted on these items.
               </p>
             )}
           </section>
         </div>
 
-        {model.notes && (
+        {model.terms && (
           <section style={{ borderTop: `1px solid ${PAPER.hairline}`, paddingTop: '1.25rem' }}>
             <h2 className="text-xs font-bold uppercase tracking-wider" style={{ color: PAPER.muted }}>
-              Notes
+              Terms and conditions
             </h2>
-            <p className="mt-2 whitespace-pre-wrap text-sm">{model.notes}</p>
+            <p className="mt-2 whitespace-pre-wrap text-sm">{model.terms}</p>
+          </section>
+        )}
+
+        {!model.isAccepted && !model.isDeclined && !model.isExpired && (
+          <section
+            className="rounded-lg p-5"
+            style={{ background: PAPER.tint, border: `1px solid ${PAPER.brand}` }}
+          >
+            <h2 className="text-xs font-bold uppercase tracking-wider" style={{ color: PAPER.brand }}>
+              Acceptance
+            </h2>
+            <p className="mt-2 text-sm">
+              By signing below {model.customer.name} accepts this quotation and the terms above, and
+              authorises {model.company.name} to proceed with the work described.
+            </p>
+            <div className="mt-6 grid gap-6 sm:grid-cols-3">
+              {['Signature', 'Name and capacity', 'Date'].map((label) => (
+                <div key={label}>
+                  <div style={{ borderTop: `1px solid ${PAPER.muted}` }} />
+                  <p className="mt-1 text-xs" style={{ color: PAPER.muted }}>
+                    {label}
+                  </p>
+                </div>
+              ))}
+            </div>
           </section>
         )}
 
@@ -277,7 +269,7 @@ export default function InvoiceDocumentView({
           style={{ borderTop: `1px solid ${PAPER.hairline}`, color: PAPER.muted }}
         >
           <span>{identity}</span>
-          <span>Invoice {model.number}</span>
+          <span>Quotation {model.number}</span>
         </footer>
       </div>
     </article>
