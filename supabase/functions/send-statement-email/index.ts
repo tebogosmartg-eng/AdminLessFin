@@ -10,16 +10,35 @@ import {
   sendOutboundEmail,
   outboundEmailFailure,
   relatedOne,
+  escapeHtml,
 } from '../_shared/outboundEmail.ts'
+import {
+  buildStatementRows,
+  closingBalance,
+  describeClosing,
+  fetchControlAccountIds,
+  fetchOpeningBalance,
+} from '../_shared/partyStatement.ts'
 
 
 const corsHeaders = ENTERPRISE_CORS_HEADERS
 
+/** "R 1 234,56" -- the same figure format the PDF and the screen print. */
 const formatCurrency = (amount: number) => {
-  return new Intl.NumberFormat('en-ZA', {
-    style: 'currency',
-    currency: 'ZAR',
-  }).format(amount);
+  const v = Number(amount) || 0;
+  const sign = v < 0 ? '-' : '';
+  const [whole, cents] = Math.abs(v).toFixed(2).split('.');
+  return `${sign}R ${whole.replace(/\B(?=(\d{3})+(?!\d))/g, ' ')},${cents}`;
+};
+
+const DATE_ONLY = /^\d{4}-\d{2}-\d{2}$/;
+
+/** "16 Sept 2026", independent of the edge runtime's locale. */
+const formatDay = (iso: string) => {
+  const d = new Date(String(iso).slice(0, 10) + 'T00:00:00Z');
+  return Number.isNaN(d.getTime())
+    ? String(iso)
+    : d.toLocaleDateString('en-ZA', { day: '2-digit', month: 'short', year: 'numeric', timeZone: 'UTC' });
 };
 
 serve(withEnterprisePlatform('send-statement-email', 'tenant', async (req, _ctx) => {
@@ -51,15 +70,13 @@ serve(withEnterprisePlatform('send-statement-email', 'tenant', async (req, _ctx)
 
     const { company_id, entityId, type, date_from, date_to, to, subject, body } = await req.json();
     
-    // We reuse the logic by calling the existing edge functions locally via fetch? 
-    // No, Deno deploy doesn't support self-fetch easily without full URL.
-    // We will just invoke the 'customers' or 'vendors' function logic by re-instantiating the client.
-    // Actually, simplest is to just call the DB directly here for the specific data we need, similar to the logic we just wrote.
-    
-    // However, to avoid code duplication hell, let's fetch the data we need.
-    // Since we are already in an edge function context, let's just use the Supabase client to fetch what we need.
-    
     if (!company_id) throw new Error("company_id is required.");
+    if (type !== 'customer' && type !== 'vendor') throw new Error("type must be 'customer' or 'vendor'.");
+    if (!entityId) throw new Error("entityId is required.");
+    if (!DATE_ONLY.test(String(date_from)) || !DATE_ONLY.test(String(date_to))) {
+      throw new Error('date_from and date_to must be dates in YYYY-MM-DD format.');
+    }
+    if (date_from > date_to) throw new Error('date_from must not be after date_to.');
     await assertMember(company_id);
 
     const supabaseAdmin = createClient(
@@ -69,150 +86,160 @@ serve(withEnterprisePlatform('send-statement-email', 'tenant', async (req, _ctx)
 
     const identity = await resolveEnterpriseIdentityEdge(supabaseAdmin, company_id);
 
-    // Re-implement simplified fetching logic for statement data to generate HTML
-    // We can't easily call the other edge function from here without a full URL and auth token.
-    // So we will just do a direct DB query for the *snapshot* data.
-    
-    // 1. Get Entity Name/Address
+    // 1. The party. Scoped to the caller's company: looked up by id alone, a
+    //    member of one company could have emailed a statement for another
+    //    company's customer simply by passing its id.
     const table = type === 'customer' ? 'customers' : 'vendors';
-    const { data: entity } = await supabaseAdmin.from(table).select('name, address, email').eq('id', entityId).maybeSingle();
+    const { data: entity, error: entityError } = await supabaseAdmin
+      .from(table)
+      .select('name, contact_name, address, email')
+      .eq('id', entityId)
+      .eq('company_id', company_id)
+      .maybeSingle();
+    if (entityError) throw entityError;
+    if (!entity) throw new Error(type === 'customer' ? 'Customer not found in this company.' : 'Supplier not found in this company.');
 
-    if (!entity) throw new Error("Entity not found");
-
-    // 2. Calculate Opening Balance
-    // (Simplified version: assume front-end sent us the balances? No, safer to recalc).
-    // Let's rely on the front-end passing the *summary* data if possible? 
-    // No, email generation should be server-side authoritative.
-    // I'll reuse the logic pattern from above.
-    
-    // FETCH CONTROL ACCOUNT IDS BY ROLE (never display name)
-    const accType = type === 'customer' ? 'Asset' : 'Liability';
-    const accRole = type === 'customer' ? 'trade_receivable' : 'trade_payable';
-    const { data: accounts } = await supabaseAdmin.from('chart_of_accounts').select('id').eq('company_id', company_id).eq('type', accType).eq('account_role', accRole);
-    const accIds = new Set(accounts?.map(a => a.id) || []);
-
-    // OPENING BALANCE
-    let opening_balance = 0;
-    const { data: openingMoves, error: openingError } = await supabaseAdmin
-        .from('journal_entry_items')
-        .select('amount, type, account_id')
-        .eq('journal_entries.company_id', company_id)
-        .eq(type === 'customer' ? 'journal_entries.customer_id' : 'journal_entries.vendor_id', entityId)
-        .lt('journal_entries.entry_date', date_from)
-        .select(`amount, type, account_id, journal_entries!inner(entry_date)`);
-    // Unchecked, a failure here silently emails an opening balance of zero.
-    if (openingError) throw openingError;
-    
-    openingMoves?.forEach(item => {
-        const isPositive = type === 'customer' ? item.type === 'debit' : item.type === 'credit';
-        opening_balance += isPositive ? item.amount : -item.amount;
+    // 2. The statement. Worked out in _shared/partyStatement.ts, the same code
+    //    the customers and vendors functions use, so what a customer is emailed
+    //    is exactly what the screen and the PDF show. This copy used to sum
+    //    every line of the party's journals for its opening balance -- zero by
+    //    construction -- and listed journals that never touched the control
+    //    account as "Other" rows with an arbitrary amount.
+    const side = type === 'customer' ? 'receivable' : 'payable';
+    const controlIds = await fetchControlAccountIds(supabaseAdmin, company_id, side);
+    const { opening_balance, opening_balance_known } = await fetchOpeningBalance(supabaseAdmin, {
+      companyId: company_id,
+      side,
+      partyId: entityId,
+      dateFrom: date_from,
+      controlIds,
     });
 
-    // TRANSACTIONS
     const { data: transactions, error: transactionsError } = await supabaseAdmin
-        .from('journal_entries')
-        // Both embeds name their foreign key: journal_entries reaches invoices and
-        // bills by two routes each, so an unqualified embed is rejected outright.
-        .select(`id, entry_date, description, invoices!invoice_id(invoice_number), bills!bill_id(bill_number), journal_entry_items(amount, type, account_id)`)
-        .eq('company_id', company_id)
-        .eq(type === 'customer' ? 'customer_id' : 'vendor_id', entityId)
-        .gte('entry_date', date_from)
-        .lte('entry_date', date_to)
-        .order('entry_date', { ascending: true });
+      .from('journal_entries')
+      // Forward embeds: the document each journal is FOR, so a payment made
+      // against a bill still quotes that bill's number.
+      .select(`id, entry_date, description, invoices!invoice_id(invoice_number), bills!bill_id(bill_number), journal_entry_items(amount, type, account_id)`)
+      .eq('company_id', company_id)
+      .eq(type === 'customer' ? 'customer_id' : 'vendor_id', entityId)
+      .gte('entry_date', date_from)
+      .lte('entry_date', date_to)
+      .order('entry_date', { ascending: true });
     // Unchecked, a failure here silently emails a statement with no transactions.
     if (transactionsError) throw transactionsError;
 
-    let runningBalance = opening_balance;
-    const statementRows = transactions?.map(t => {
-        let amount = 0;
-        let rowType = '';
-        const relevantItems = t.journal_entry_items.filter(i => accIds.has(i.account_id));
-        
-        if (relevantItems.length > 0) {
-             const debits = relevantItems.filter(i => i.type === 'debit').reduce((s, i) => s + i.amount, 0);
-             const credits = relevantItems.filter(i => i.type === 'credit').reduce((s, i) => s + i.amount, 0);
-             if (type === 'customer') {
-                 // AR: Debit+, Credit-
-                 if (debits > 0) { amount = debits; rowType = 'Invoice'; runningBalance += amount; }
-                 else { amount = credits; rowType = 'Payment'; runningBalance -= amount; }
-             } else {
-                 // AP: Credit+, Debit-
-                 if (credits > 0) { amount = credits; rowType = 'Bill'; runningBalance += amount; }
-                 else { amount = debits; rowType = 'Payment'; runningBalance -= amount; }
-             }
-        } else {
-            // Fallback
-            amount = t.journal_entry_items[0]?.amount || 0;
-            rowType = 'Other';
-        }
-        
-        return {
-            date: t.entry_date,
-            description: t.description,
-            ref: relatedOne(t.invoices)?.invoice_number || relatedOne(t.bills)?.bill_number || '-',
-            type: rowType,
-            amount,
-            balance: runningBalance
-        };
-    }) || [];
+    const rows = buildStatementRows(transactions, controlIds, side, (t: any) => ({
+      ref: relatedOne(t.invoices)?.invoice_number || relatedOne(t.bills)?.bill_number || '-',
+    }));
+    const closing = closingBalance(opening_balance, rows);
+    const closingText = describeClosing(side, closing, opening_balance_known);
+
+    let running = opening_balance;
+    const chargeLabel = side === 'receivable' ? 'Invoiced' : 'Billed';
+    const creditLabel = side === 'receivable' ? 'Received' : 'Paid';
+
+    // 3. The email. Table layout and inline styles only: Outlook and most
+    //    webmail clients ignore flexbox and <style> blocks, which is why the
+    //    old two-column header collapsed. Every interpolated value is escaped.
+    const BRAND = '#047756';
+    const BRAND_BRIGHT = '#10b77f';
+    const MUTED = '#76716b';
+    const HAIRLINE = '#e2ded8';
+    const TINT = '#ecfaf4';
+    const cell = 'padding:9px 10px;border-bottom:1px solid ' + HAIRLINE + ';font-size:13px;';
+    const money = 'text-align:right;white-space:nowrap;';
+
+    const rowHtml = rows.map((row) => {
+      const charge = row.type !== 'payment';
+      running = Math.round((running + (charge ? row.amount : -row.amount)) * 100) / 100;
+      return `
+                <tr>
+                  <td style="${cell}white-space:nowrap;">${escapeHtml(formatDay(row.date))}</td>
+                  <td style="${cell}">${escapeHtml(row.description || (charge ? 'Charge' : 'Payment'))}</td>
+                  <td style="${cell}">${escapeHtml(row.ref)}</td>
+                  <td style="${cell}${money}">${charge ? formatCurrency(row.amount) : ''}</td>
+                  <td style="${cell}${money}">${charge ? '' : formatCurrency(row.amount)}</td>
+                  <td style="${cell}${money}font-weight:600;">${formatCurrency(running)}</td>
+                </tr>`;
+    }).join('');
 
     const htmlBody = `
+      <!DOCTYPE html>
       <html>
-        <body style="font-family: sans-serif; color: #333;">
-          <div style="max-width: 700px; margin: auto; padding: 20px; border: 1px solid #eee; border-radius: 5px;">
-            <div style="border-bottom: 1px solid #eee; padding-bottom: 20px; margin-bottom: 20px;">
-              <h1 style="font-size: 24px; margin: 0;">Statement of Account</h1>
-              <p style="margin: 5px 0 0; color: #666;">${identity.name}</p>
-              ${identity.email ? `<p style="margin: 5px 0 0; color: #666;">${identity.email}</p>` : ''}
-            </div>
-            
-            <div style="display: flex; justify-content: space-between; margin-bottom: 30px;">
-              <div>
-                <strong style="display: block; margin-bottom: 5px;">To:</strong>
-                ${entity.name}<br>
-                ${entity.address || ''}
-              </div>
-              <div style="text-align: right;">
-                <strong style="display: block; margin-bottom: 5px;">Period:</strong>
-                ${new Date(date_from).toLocaleDateString()} to ${new Date(date_to).toLocaleDateString()}
-              </div>
-            </div>
-
-            <p style="margin-bottom: 20px;">${body.replace(/\n/g, '<br>')}</p>
-
-            <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
-              <thead>
-                <tr style="background-color: #f9f9f9;">
-                  <th style="text-align: left; padding: 10px; border-bottom: 2px solid #eee;">Date</th>
-                  <th style="text-align: left; padding: 10px; border-bottom: 2px solid #eee;">Description</th>
-                  <th style="text-align: left; padding: 10px; border-bottom: 2px solid #eee;">Ref</th>
-                  <th style="text-align: right; padding: 10px; border-bottom: 2px solid #eee;">Amount</th>
-                  <th style="text-align: right; padding: 10px; border-bottom: 2px solid #eee;">Balance</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr>
-                  <td colspan="4" style="padding: 10px; font-style: italic;"><strong>Opening Balance</strong></td>
-                  <td style="text-align: right; padding: 10px; font-weight: bold;">${formatCurrency(opening_balance)}</td>
-                </tr>
-                ${statementRows.map(row => `
+        <body style="margin:0;padding:24px 0;background:#f6f5f2;font-family:Helvetica,Arial,sans-serif;color:#1a1816;">
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:720px;margin:0 auto;background:#ffffff;border:1px solid ${HAIRLINE};border-collapse:collapse;">
+            <tr>
+              <td style="background:${BRAND};border-bottom:4px solid ${BRAND_BRIGHT};padding:22px 28px;color:#ffffff;">
+                <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
                   <tr>
-                    <td style="padding: 10px; border-bottom: 1px solid #eee;">${new Date(row.date).toLocaleDateString()}</td>
-                    <td style="padding: 10px; border-bottom: 1px solid #eee;">${row.description}</td>
-                    <td style="padding: 10px; border-bottom: 1px solid #eee;">${row.ref}</td>
-                    <td style="padding: 10px; border-bottom: 1px solid #eee; text-align: right;">${row.type === 'Payment' ? '-' : ''}${formatCurrency(row.amount)}</td>
-                    <td style="padding: 10px; border-bottom: 1px solid #eee; text-align: right;">${formatCurrency(row.balance)}</td>
+                    <td style="font-size:18px;font-weight:bold;">${escapeHtml(identity.name)}</td>
+                    <td style="text-align:right;">
+                      <div style="font-size:20px;font-weight:bold;letter-spacing:1px;">STATEMENT</div>
+                      <div style="font-size:12px;opacity:0.9;">${escapeHtml(formatDay(date_from))} to ${escapeHtml(formatDay(date_to))}</div>
+                    </td>
                   </tr>
-                `).join('')}
-              </tbody>
-              <tfoot>
-                <tr style="background-color: #f0fdf4;">
-                  <td colspan="4" style="padding: 15px; font-weight: bold; text-align: right;">Closing Balance</td>
-                  <td style="padding: 15px; font-weight: bold; text-align: right; font-size: 16px;">${formatCurrency(runningBalance)}</td>
-                </tr>
-              </tfoot>
-            </table>
-          </div>
+                </table>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:24px 28px 8px;">
+                <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+                  <tr>
+                    <td style="vertical-align:top;width:50%;padding-right:12px;">
+                      <div style="font-size:10px;font-weight:bold;letter-spacing:1px;color:${BRAND};text-transform:uppercase;">${type === 'customer' ? 'Account of' : 'Supplier'}</div>
+                      <div style="font-size:15px;font-weight:bold;margin-top:4px;">${escapeHtml(entity.name)}</div>
+                      ${entity.contact_name ? `<div style="font-size:13px;color:${MUTED};">Attn: ${escapeHtml(entity.contact_name)}</div>` : ''}
+                      ${entity.address ? `<div style="font-size:13px;color:${MUTED};white-space:pre-line;">${escapeHtml(entity.address)}</div>` : ''}
+                    </td>
+                    <td style="vertical-align:top;width:50%;background:${closing > 0 && opening_balance_known ? BRAND_BRIGHT : BRAND};color:#ffffff;padding:14px 16px;">
+                      <div style="font-size:10px;font-weight:bold;letter-spacing:1px;text-transform:uppercase;">${escapeHtml(closingText.label)}</div>
+                      <div style="font-size:24px;font-weight:bold;margin-top:4px;">${opening_balance_known ? formatCurrency(Math.abs(closing)) : 'Not available'}</div>
+                      <div style="font-size:12px;margin-top:4px;">${escapeHtml(closingText.wording)}</div>
+                    </td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+            ${body ? `
+            <tr>
+              <td style="padding:16px 28px 0;font-size:14px;line-height:1.5;white-space:pre-line;">${escapeHtml(body)}</td>
+            </tr>` : ''}
+            <tr>
+              <td style="padding:20px 28px;">
+                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;">
+                  <thead>
+                    <tr style="background:${BRAND};color:#ffffff;">
+                      <th style="padding:9px 10px;text-align:left;font-size:11px;">Date</th>
+                      <th style="padding:9px 10px;text-align:left;font-size:11px;">Description</th>
+                      <th style="padding:9px 10px;text-align:left;font-size:11px;">Reference</th>
+                      <th style="padding:9px 10px;text-align:right;font-size:11px;">${chargeLabel}</th>
+                      <th style="padding:9px 10px;text-align:right;font-size:11px;">${creditLabel}</th>
+                      <th style="padding:9px 10px;text-align:right;font-size:11px;">Balance</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr style="background:${TINT};">
+                      <td style="${cell}"></td>
+                      <td style="${cell}font-weight:bold;" colspan="4">Balance brought forward</td>
+                      <td style="${cell}${money}font-weight:bold;">${formatCurrency(opening_balance)}</td>
+                    </tr>
+                    ${rowHtml || `<tr><td style="${cell}color:${MUTED};" colspan="6">No movements in this period.</td></tr>`}
+                  </tbody>
+                  <tfoot>
+                    <tr style="background:${BRAND};color:#ffffff;">
+                      <td style="padding:11px 10px;font-weight:bold;font-size:13px;" colspan="5">Closing balance</td>
+                      <td style="padding:11px 10px;font-weight:bold;font-size:14px;${money}">${formatCurrency(closing)}</td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:0 28px 22px;font-size:11px;color:${MUTED};border-top:1px solid ${HAIRLINE};">
+                <div style="padding-top:12px;">${escapeHtml(identity.name)}${identity.email ? ' &middot; ' + escapeHtml(identity.email) : ''}</div>
+              </td>
+            </tr>
+          </table>
         </body>
       </html>
     `;

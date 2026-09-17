@@ -96,7 +96,13 @@ describe('edge function PostgREST embeds', () => {
   it('checks the error on the reads whose failure would otherwise be silent', () => {
     const statement = fs.readFileSync(path.join(FUNCTIONS_DIR, 'send-statement-email/index.ts'), 'utf8');
     expect(statement).toContain('if (transactionsError) throw transactionsError;');
-    expect(statement).toContain('if (openingError) throw openingError;');
+    // The opening-balance and control-account reads moved into the shared
+    // statement module, which every statement caller uses. The email must go
+    // through it, and it must throw on a failed read rather than return zero.
+    expect(statement).toContain('fetchOpeningBalance(supabaseAdmin');
+    expect(statement).toContain('fetchControlAccountIds(supabaseAdmin');
+    const shared = fs.readFileSync(path.join(FUNCTIONS_DIR, '_shared/partyStatement.ts'), 'utf8');
+    expect(shared.match(/if \(error\) throw error;/g)?.length).toBe(2);
 
     const calendar = fs.readFileSync(path.join(FUNCTIONS_DIR, 'calendar-events/index.ts'), 'utf8');
     expect(calendar).toContain('for the calendar:');

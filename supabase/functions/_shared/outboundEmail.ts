@@ -53,6 +53,22 @@ export function relatedOne(value) {
 }
 
 /**
+ * Text made safe to place inside email HTML.
+ *
+ * Email bodies interpolate a message the sender typed, party names and journal
+ * descriptions. Unescaped, a description containing "<" breaks the layout and
+ * one containing markup is rendered as markup in the recipient's mail client.
+ */
+export function escapeHtml(value) {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+/**
  * @param {{ name?: string, email?: string }} identity
  * @param {string} mailbox  e.g. purchasing | invoices | quotes | accounts | payroll
  */

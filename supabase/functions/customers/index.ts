@@ -8,6 +8,12 @@ import {
 } from '../_shared/enterpriseEdgePlatform.ts'
 import { computeArAgeAnalysis } from '../_shared/controlAccountAgeing.ts'
 import { computeControlAccountLedger } from '../_shared/controlAccountLedger.ts'
+import {
+  buildStatementRows,
+  closingBalance,
+  fetchControlAccountIds,
+  fetchOpeningBalance,
+} from '../_shared/partyStatement.ts'
 
 
 const corsHeaders = ENTERPRISE_CORS_HEADERS
@@ -119,44 +125,21 @@ serve(withEnterprisePlatform('customers', 'tenant', async (req, _ctx) => {
           .single();
         if (custError) throw custError;
 
-        // 2. Identify AR control accounts by account_role (never display name)
-        const { data: arAccounts } = await supabaseAdmin
-          .from('chart_of_accounts')
-          .select('id')
-          .eq('company_id', company_id)
-          .eq('type', 'Asset')
-          .eq('account_role', 'trade_receivable');
-        const arAccountIds = new Set(arAccounts?.map((a: any) => a.id) || []);
+        // 2-5. The statement itself. Worked out in _shared/partyStatement.ts,
+        //      which the vendors function and the statement email also use, so
+        //      the screen, the PDF and the email cannot disagree. Every figure
+        //      comes from control-account movements only: summing every line of
+        //      the customer's journals -- what all three copies used to do --
+        //      nets to zero by construction and opened every statement at 0.00.
+        const arAccountIds = await fetchControlAccountIds(supabaseAdmin, company_id, 'receivable');
+        const { opening_balance, opening_balance_known } = await fetchOpeningBalance(supabaseAdmin, {
+          companyId: company_id,
+          side: 'receivable',
+          partyId: customerId,
+          dateFrom: date_from,
+          controlIds: arAccountIds,
+        });
 
-        // 3. Calculate Opening Balance (Sum of AR moves before date_from)
-        let opening_balance = 0;
-        if (date_from) {
-            const { data: openingMoves, error: openingError } = await supabaseAdmin
-                .from('journal_entry_items')
-                .select('amount, type, account_id')
-                .eq('journal_entries.company_id', company_id)
-                .eq('journal_entries.customer_id', customerId)
-                .lt('journal_entries.entry_date', date_from)
-                .select(`
-                    amount, type, account_id,
-                    journal_entries!inner (company_id, customer_id, entry_date)
-                `);
-            
-            if (openingError) throw openingError;
-
-            openingMoves.forEach((item: any) => {
-                // If it hits AR account: Debit = +Balance, Credit = -Balance
-                if (arAccountIds.has(item.account_id)) {
-                    opening_balance += item.type === 'debit' ? item.amount : -item.amount;
-                } else {
-                    // Fallback: assume mostly Debit normal if not specific (Sales often Credit, but we track Customer balance here)
-                    // Simplified: Debits increase owing, Credits decrease owing
-                    opening_balance += item.type === 'debit' ? item.amount : -item.amount;
-                }
-            });
-        }
-
-        // 4. Fetch Transactions in range
         let query = supabaseAdmin
           .from('journal_entries')
           .select(`
@@ -181,49 +164,58 @@ serve(withEnterprisePlatform('customers', 'tenant', async (req, _ctx) => {
         const { data: transactions, error: transError } = await query;
         if (transError) throw transError;
 
-        const statement = transactions.map((t: any) => {
-          let amount = 0;
-          let type = 'other';
+        const statement = buildStatementRows(transactions, arAccountIds, 'receivable', (t: any) => ({
+          invoice_id: t.invoice_id,
+          invoice_number: invoiceNumberFromRelation(t.invoices),
+        }));
+        const closing_balance = closingBalance(opening_balance, statement);
 
-          // AR specific calculation
-          const arItems = t.journal_entry_items.filter((item: any) => arAccountIds.has(item.account_id));
-          
-          if (arItems.length > 0) {
-            const debits = arItems.filter((i: any) => i.type === 'debit').reduce((sum: number, i: any) => sum + i.amount, 0);
-            const credits = arItems.filter((i: any) => i.type === 'credit').reduce((sum: number, i: any) => sum + i.amount, 0);
-            
-            if (debits > 0) {
-              amount = debits;
-              type = 'invoice';
-            } else {
-              amount = credits;
-              type = 'payment';
-            }
-          } else {
-             // Fallback
-             const debits = t.journal_entry_items.filter((i: any) => i.type === 'debit').reduce((sum: number, i: any) => sum + i.amount, 0);
-             const credits = t.journal_entry_items.filter((i: any) => i.type === 'credit').reduce((sum: number, i: any) => sum + i.amount, 0);
-             if (debits > credits) {
-                 amount = debits;
-                 type = 'invoice';
-             } else {
-                 amount = credits;
-                 type = 'payment';
-             }
+        // The statement is a document that leaves the company, so it needs the
+        // same letterhead, identity and banking details the invoice does.
+        // Gathered here rather than by the browser: three more edge calls at
+        // roughly half a second each would be paid before a statement could be
+        // drawn, and this method is already the one round trip for the page.
+        const [stmtCompanyRes, stmtMasterRes, stmtBankRes] = await Promise.all([
+          supabaseAdmin
+            .from('companies')
+            .select('id, name, logo_url, address, tax_id')
+            .eq('id', company_id)
+            .maybeSingle(),
+          supabaseAdmin
+            .from('efs_company_master_data')
+            .select('company_profile, addresses, tax_registrations')
+            .eq('company_id', company_id)
+            .maybeSingle(),
+          supabaseAdmin
+            .from('bank_accounts')
+            .select('name, bank_name, account_number, branch_code, account_type, currency, status')
+            .eq('company_id', company_id)
+            .eq('is_default', true)
+            .maybeSingle(),
+        ]);
+        for (const [label, res] of [
+          ['company', stmtCompanyRes],
+          ['company master data', stmtMasterRes],
+          ['banking details', stmtBankRes],
+        ] as Array<[string, { error: unknown }]>) {
+          if (res.error) {
+            throw new Error(
+              `Could not read the ${label} for this statement: ${(res.error as { message?: string }).message ?? res.error}`,
+            );
           }
+        }
 
-          return {
-            id: t.id,
-            date: t.entry_date,
-            description: t.description,
-            invoice_id: t.invoice_id,
-            invoice_number: invoiceNumberFromRelation(t.invoices),
-            type,
-            amount,
-          };
-        });
-
-        data = { customer, statement, opening_balance };
+        data = {
+          customer,
+          statement,
+          opening_balance,
+          opening_balance_known,
+          closing_balance,
+          company: stmtCompanyRes.data ?? null,
+          master: stmtMasterRes.data ?? null,
+          // A closed or inactive account must not be printed as "pay us here".
+          banking: stmtBankRes.data && stmtBankRes.data.status === 'active' ? stmtBankRes.data : null,
+        };
         break;
 
       case 'POST':

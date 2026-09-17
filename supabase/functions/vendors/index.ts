@@ -8,6 +8,12 @@ import {
 } from '../_shared/enterpriseEdgePlatform.ts'
 import { computeApAgeAnalysis } from '../_shared/controlAccountAgeing.ts'
 import { computeControlAccountLedger } from '../_shared/controlAccountLedger.ts'
+import {
+  buildStatementRows,
+  closingBalance,
+  fetchControlAccountIds,
+  fetchOpeningBalance,
+} from '../_shared/partyStatement.ts'
 
 
 const corsHeaders = ENTERPRISE_CORS_HEADERS
@@ -120,36 +126,20 @@ serve(withEnterprisePlatform('vendors', 'tenant', async (req, _ctx) => {
         if (venError) throw venError;
         if (!vendor) throw new Error("Vendor not found.");
 
-        const { data: apAccounts } = await supabaseAdmin
-          .from('chart_of_accounts')
-          .select('id')
-          .eq('company_id', company_id)
-          .eq('type', 'Liability')
-          .eq('account_role', 'trade_payable');
-        const apAccountIds = new Set(apAccounts?.map((a: any) => a.id) || []);
-
-        let opening_balance = 0;
-        if (date_from) {
-          const { data: openingMoves, error: openingError } = await supabaseAdmin
-            .from('journal_entry_items')
-            .select(`
-              amount, type, account_id,
-              journal_entries!inner (company_id, vendor_id, entry_date)
-            `)
-            .eq('journal_entries.company_id', company_id)
-            .eq('journal_entries.vendor_id', vendorId)
-            .lt('journal_entries.entry_date', date_from);
-            
-          if (openingError) throw openingError;
-
-          (openingMoves || []).forEach((item: any) => {
-            if (apAccountIds.has(item.account_id)) {
-              opening_balance += item.type === 'credit' ? item.amount : -item.amount;
-            } else {
-              opening_balance += item.type === 'credit' ? item.amount : -item.amount;
-            }
-          });
-        }
+        // The statement itself. Worked out in _shared/partyStatement.ts, which
+        // the customers function and the statement email also use, so the
+        // screen, the PDF and the email cannot disagree. Control-account
+        // movements only: summing every line of the supplier's journals -- what
+        // all three copies used to do -- nets to zero by construction and opened
+        // every statement at 0.00.
+        const apAccountIds = await fetchControlAccountIds(supabaseAdmin, company_id, 'payable');
+        const { opening_balance, opening_balance_known } = await fetchOpeningBalance(supabaseAdmin, {
+          companyId: company_id,
+          side: 'payable',
+          partyId: vendorId,
+          dateFrom: date_from,
+          controlIds: apAccountIds,
+        });
 
         let query = supabaseAdmin
           .from('journal_entries')
@@ -157,7 +147,7 @@ serve(withEnterprisePlatform('vendors', 'tenant', async (req, _ctx) => {
             id,
             entry_date,
             description,
-            bills!journal_entry_id ( bill_number ),
+            bills!bill_id ( bill_number ),
             journal_entry_items (
               amount,
               type,
@@ -174,44 +164,9 @@ serve(withEnterprisePlatform('vendors', 'tenant', async (req, _ctx) => {
         const { data: transactions, error: transError } = await query;
         if (transError) throw transError;
 
-        const statement = (transactions || []).map((t: any) => {
-          let amount = 0;
-          let type = 'other';
-
-          const apItems = (t.journal_entry_items || []).filter((item: any) => apAccountIds.has(item.account_id));
-
-          if (apItems.length > 0) {
-            const debits = apItems.filter((i: any) => i.type === 'debit').reduce((sum: number, i: any) => sum + i.amount, 0);
-            const credits = apItems.filter((i: any) => i.type === 'credit').reduce((sum: number, i: any) => sum + i.amount, 0);
-            
-            if (credits > 0) {
-              amount = credits;
-              type = 'bill';
-            } else {
-              amount = debits;
-              type = 'payment';
-            }
-          } else {
-            const debits = (t.journal_entry_items || []).filter((i: any) => i.type === 'debit').reduce((sum: number, i: any) => sum + i.amount, 0);
-            const credits = (t.journal_entry_items || []).filter((i: any) => i.type === 'credit').reduce((sum: number, i: any) => sum + i.amount, 0);
-            if (credits > debits) {
-              amount = credits;
-              type = 'bill';
-            } else {
-              amount = debits;
-              type = 'payment';
-            }
-          }
-
-          return {
-            id: t.id,
-            date: t.entry_date,
-            description: t.description,
-            bill_number: billNumberFromRelation(t.bills),
-            type,
-            amount,
-          };
-        });
+        const statement = buildStatementRows(transactions, apAccountIds, 'payable', (t: any) => ({
+          bill_number: billNumberFromRelation(t.bills),
+        }));
 
         // ── Age analysis ────────────────────────────────────────────────
         // Buckets the vendor's OUTSTANDING bills by how far past their own due
@@ -316,7 +271,45 @@ serve(withEnterprisePlatform('vendors', 'tenant', async (req, _ctx) => {
           ),
         };
 
-        data = { vendor, statement, opening_balance, ageing };
+        const closing_balance = closingBalance(opening_balance, statement);
+
+        // The supplier statement carries the same letterhead as every other
+        // document that leaves the company. No banking panel: this statement
+        // accounts for what WE owe, so printing our account details on it
+        // would invite the wrong party to pay.
+        const [stmtCompanyRes, stmtMasterRes] = await Promise.all([
+          supabaseAdmin
+            .from('companies')
+            .select('id, name, logo_url, address, tax_id')
+            .eq('id', company_id)
+            .maybeSingle(),
+          supabaseAdmin
+            .from('efs_company_master_data')
+            .select('company_profile, addresses, tax_registrations')
+            .eq('company_id', company_id)
+            .maybeSingle(),
+        ]);
+        for (const [label, res] of [
+          ['company', stmtCompanyRes],
+          ['company master data', stmtMasterRes],
+        ] as Array<[string, { error: unknown }]>) {
+          if (res.error) {
+            throw new Error(
+              `Could not read the ${label} for this statement: ${(res.error as { message?: string }).message ?? res.error}`,
+            );
+          }
+        }
+
+        data = {
+          vendor,
+          statement,
+          opening_balance,
+          opening_balance_known,
+          closing_balance,
+          ageing,
+          company: stmtCompanyRes.data ?? null,
+          master: stmtMasterRes.data ?? null,
+        };
         break;
       }
 
