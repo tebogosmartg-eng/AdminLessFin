@@ -14,6 +14,16 @@ import { format } from 'date-fns';
 import { Badge } from '../components/ui/badge';
 import SendStatementDialog from '../components/SendStatementDialog';
 import ReportingPeriodPicker from '../components/ReportingPeriodPicker';
+import { buildStatementDocument } from '../lib/statements/statementDocument';
+import { downloadStatementPdf, openStatementPdf } from '../lib/statements/statementPdf';
+import { showError } from '../utils/toast';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '../components/ui/dropdown-menu';
+import { Loader2, FileText } from 'lucide-react';
 
 type Transaction = {
   id: string;
@@ -67,7 +77,44 @@ const CustomerDetail = () => {
     });
   }, [rawStatement, openingBalance]);
 
-  const currentBalance = statement.length > 0 ? statement[statement.length - 1].balance : openingBalance;
+  // The server states the closing balance from the receivables control
+  // account. Taking it from the last row shown would repeat the mistake the
+  // opening balance used to make: deriving a figure the ledger already knows.
+  const currentBalance = data?.closing_balance ?? (
+    statement.length > 0 ? statement[statement.length - 1].balance : openingBalance
+  );
+
+  const statementDocument = useMemo(() => {
+    if (!customer || !dateFrom || !dateTo) return null;
+    return buildStatementDocument({
+      side: 'receivable',
+      party: customer,
+      dateFrom,
+      dateTo,
+      opening_balance: openingBalance,
+      closing_balance: data?.closing_balance,
+      opening_balance_known: data?.opening_balance_known,
+      statement: rawStatement,
+      company: data?.company ?? null,
+      master: data?.master ?? null,
+      banking: data?.banking ?? null,
+    });
+  }, [customer, dateFrom, dateTo, openingBalance, rawStatement, data]);
+
+  const [exporting, setExporting] = useState<'download' | 'print' | null>(null);
+
+  const runExport = async (mode: 'download' | 'print') => {
+    if (!statementDocument) return;
+    setExporting(mode);
+    try {
+      if (mode === 'download') await downloadStatementPdf(statementDocument);
+      else await openStatementPdf(statementDocument);
+    } catch (error: any) {
+      showError(error?.message || 'The statement PDF could not be produced.');
+    } finally {
+      setExporting(null);
+    }
+  };
   
   // Totals for this period
   const totalInvoiced = statement.filter(t => t.type === 'invoice').reduce((sum, t) => sum + t.amount, 0);
@@ -175,9 +222,25 @@ const CustomerDetail = () => {
               <Button variant="outline" size="icon" onClick={handleDownloadCSV} title="Download CSV">
                 <Download className="h-4 w-4" />
               </Button>
-              <Button variant="outline" size="icon" onClick={() => window.print()} title="Print Statement">
-                <Printer className="h-4 w-4" />
-              </Button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" disabled={!statementDocument || exporting !== null}>
+                    {exporting !== null ? (
+                      <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Preparing…</>
+                    ) : (
+                      <><FileText className="mr-2 h-4 w-4" /> Statement PDF</>
+                    )}
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onSelect={() => runExport('download')}>
+                    <Download className="mr-2 h-4 w-4" /> Download
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onSelect={() => runExport('print')}>
+                    <Printer className="mr-2 h-4 w-4" /> Print
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
           </div>
         </CardHeader>

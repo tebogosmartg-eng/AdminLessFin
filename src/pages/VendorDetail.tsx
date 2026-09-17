@@ -3,13 +3,21 @@ import { useParams, Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '../integrations/supabase/client';
 import { useAuth } from '../contexts/AuthContext';
-import { downloadSupplierStatementPdf } from '../lib/statements/supplierStatementPdf';
+import { buildStatementDocument } from '../lib/statements/statementDocument';
+import { downloadStatementPdf, openStatementPdf } from '../lib/statements/statementPdf';
 import { useReportingPeriod } from '../contexts/ReportingPeriodContext';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/table';
 import { Skeleton } from '../components/ui/skeleton';
-import { Download, FileText, Printer, ArrowLeft, Mail, Phone, MapPin, Send } from 'lucide-react';
+import { Download, FileText, Printer, ArrowLeft, Mail, Phone, MapPin, Send, Loader2 } from 'lucide-react';
+import { showError } from '../utils/toast';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '../components/ui/dropdown-menu';
 import { formatCurrency, downloadCSV } from '../lib/utils';
 import { format } from 'date-fns';
 import SendStatementDialog from '../components/SendStatementDialog';
@@ -66,27 +74,47 @@ const VendorDetail = () => {
     });
   }, [rawStatement, openingBalance]);
 
-  const currentBalance = statement.length > 0 ? statement[statement.length - 1].balance : openingBalance;
+  // The server states the closing balance from the payables control account.
+  // Taking it from the last row shown would repeat the mistake the opening
+  // balance used to make: deriving a figure the ledger already knows.
+  const currentBalance = data?.closing_balance ?? (
+    statement.length > 0 ? statement[statement.length - 1].balance : openingBalance
+  );
   const totalBilled = statement.filter(t => t.type === 'bill').reduce((sum, t) => sum + t.amount, 0);
   const totalPaid = statement.filter(t => t.type === 'payment').reduce((sum, t) => sum + t.amount, 0);
 
   const ageing = data?.ageing ?? null;
 
-  const handleDownloadPDF = () => {
-    downloadSupplierStatementPdf({
-      companyName: activeCompany?.name ?? 'Statement',
-      companyAddress: (activeCompany as { address?: string } | null)?.address ?? null,
-      vendorName: vendor?.name ?? 'Supplier',
-      vendorAddress: vendor?.address ?? null,
+  const statementDocument = useMemo(() => {
+    if (!vendor || !dateFrom || !dateTo) return null;
+    return buildStatementDocument({
+      side: 'payable',
+      party: vendor,
       dateFrom,
       dateTo,
-      openingBalance,
-      closingBalance: currentBalance,
-      totalBilled,
-      totalPaid,
-      lines: statement,
+      opening_balance: openingBalance,
+      closing_balance: data?.closing_balance,
+      opening_balance_known: data?.opening_balance_known,
+      statement: rawStatement,
       ageing,
+      company: data?.company ?? null,
+      master: data?.master ?? null,
     });
+  }, [vendor, dateFrom, dateTo, openingBalance, rawStatement, ageing, data]);
+
+  const [exporting, setExporting] = useState<'download' | 'print' | null>(null);
+
+  const runExport = async (mode: 'download' | 'print') => {
+    if (!statementDocument) return;
+    setExporting(mode);
+    try {
+      if (mode === 'download') await downloadStatementPdf(statementDocument);
+      else await openStatementPdf(statementDocument);
+    } catch (error: any) {
+      showError(error?.message || 'The statement PDF could not be produced.');
+    } finally {
+      setExporting(null);
+    }
   };
 
   const handleDownloadCSV = () => {
@@ -223,14 +251,27 @@ const VendorDetail = () => {
               <Button variant="outline" onClick={() => setIsEmailOpen(true)} title="Email Statement">
                 <Send className="mr-2 h-4 w-4" /> Email
               </Button>
-              <Button variant="outline" onClick={handleDownloadPDF} title="Download statement as PDF">
-                <FileText className="mr-2 h-4 w-4" /> PDF
-              </Button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" disabled={!statementDocument || exporting !== null}>
+                    {exporting !== null ? (
+                      <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Preparing…</>
+                    ) : (
+                      <><FileText className="mr-2 h-4 w-4" /> Statement PDF</>
+                    )}
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onSelect={() => runExport('download')}>
+                    <Download className="mr-2 h-4 w-4" /> Download
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onSelect={() => runExport('print')}>
+                    <Printer className="mr-2 h-4 w-4" /> Print
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
               <Button variant="outline" size="icon" onClick={handleDownloadCSV} title="Download CSV">
                 <Download className="h-4 w-4" />
-              </Button>
-              <Button variant="outline" size="icon" onClick={() => window.print()} title="Print Statement">
-                <Printer className="h-4 w-4" />
               </Button>
             </div>
           </div>
