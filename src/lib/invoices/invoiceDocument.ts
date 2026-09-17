@@ -23,7 +23,10 @@
  *    that as authoritative and reports any disagreement rather than hiding it.
  *
  * Presentation only. Nothing here computes a balance: the amounts come from
- * the journal and the settlement figures from the allocation engine.
+ * the journal and the settlement figures from the allocation engine. The one
+ * distinction drawn here is between the two things that settle an invoice --
+ * money received and credit notes -- because a document that calls a credit
+ * "received" tells the customer they paid something they did not.
  */
 import { isTaxLedgerAccount, type AccountRoleMetadata } from '@/lib/accounting/accountRoles';
 import {
@@ -33,6 +36,7 @@ import {
   companyFromMaster,
   daysBetween,
   letterheadLines,
+  money,
   partyLines,
   relatedOne,
   round2,
@@ -100,7 +104,14 @@ export type RawInvoiceDocument = {
     account_type?: string | null;
     currency?: string | null;
   } | null;
-  settlement?: { gross?: number; allocated?: number; outstanding?: number } | null;
+  settlement?: {
+    gross?: number;
+    allocated?: number;
+    outstanding?: number;
+    /** The part of `allocated` that credit notes settled, rather than money. */
+    credited?: number;
+    credit_notes?: Array<{ credit_note_number?: string | null; amount?: number | string | null }> | null;
+  } | null;
 };
 
 export type InvoiceDocumentLine = {
@@ -127,8 +138,15 @@ export type InvoiceDocumentModel = {
   statusLabel: string;
   isVoid: boolean;
   isPaid: boolean;
-  /** True only when money has actually settled the invoice in full. */
+  /** True only when receipts and credits have actually settled the invoice in full. */
   settled: boolean;
+  /**
+   * What to call a settled invoice. "Paid in full" is a claim that money
+   * arrived, so an invoice a credit note cancelled says so instead.
+   */
+  settledLabel: 'Paid in full' | 'Credited in full' | 'Settled in full';
+  /** The stamp across a settled invoice: PAID, CREDITED or SETTLED. */
+  settledStamp: 'PAID' | 'CREDITED' | 'SETTLED';
   isOverdue: boolean;
   company: {
     name: string;
@@ -155,7 +173,11 @@ export type InvoiceDocumentModel = {
   subtotal: number;
   taxTotal: number;
   total: number;
+  /** Money received against the invoice. Credits are not money and are not in here. */
   amountPaid: number;
+  /** What credit notes took off the invoice. */
+  amountCredited: number;
+  creditNotes: Array<{ number: string; amount: number }>;
   amountDue: number;
   /** Address, contact and tax lines for the Bill To block, already filtered. */
   billToLines: string[];
@@ -248,16 +270,29 @@ export function buildInvoiceDocument(raw: RawInvoiceDocument): InvoiceDocumentMo
   const gross = raw.settlement?.gross;
   const grossIsUsable = gross != null && num(gross) !== 0;
   const total = grossIsUsable ? round2(num(gross)) : round2(subtotal + taxTotal);
-  const amountPaid = round2(num(raw.settlement?.allocated));
+  const allocated = round2(num(raw.settlement?.allocated));
+  const amountCredited = round2(Math.min(num(raw.settlement?.credited), allocated));
+  const amountPaid = round2(allocated - amountCredited);
+  const creditNotes = (raw.settlement?.credit_notes ?? [])
+    .map((c) => ({ number: str(c.credit_note_number), amount: round2(num(c.amount)) }))
+    .filter((c) => c.amount > 0);
   const amountDue =
     grossIsUsable && raw.settlement?.outstanding != null
       ? round2(num(raw.settlement.outstanding))
-      : round2(total - amountPaid);
+      : round2(total - allocated);
 
   const status = str(invoice.status);
   // "Paid in full" is a claim about money received, so it needs money to have
   // been received. An invoice worth nothing, or one merely drafted, is not paid.
-  const settled = status === 'paid' || (total > 0 && amountPaid > 0 && amountDue <= 0);
+  const settled = status === 'paid' || (total > 0 && allocated > 0 && amountDue <= 0);
+  const settledLabel: InvoiceDocumentModel['settledLabel'] =
+    amountCredited > 0 && amountPaid <= 0
+      ? 'Credited in full'
+      : amountCredited > 0
+        ? 'Settled in full'
+        : 'Paid in full';
+  const settledStamp: InvoiceDocumentModel['settledStamp'] =
+    settledLabel === 'Credited in full' ? 'CREDITED' : settledLabel === 'Settled in full' ? 'SETTLED' : 'PAID';
 
   const profile = raw.master?.company_profile ?? {};
   const addresses = raw.master?.addresses ?? {};
@@ -320,10 +355,12 @@ export function buildInvoiceDocument(raw: RawInvoiceDocument): InvoiceDocumentMo
     invoiceDate: str(invoice.invoice_date),
     dueDate,
     status,
-    statusLabel: STATUS_LABELS[status] ?? status,
+    statusLabel: status === 'paid' ? settledLabel : STATUS_LABELS[status] ?? status,
     isVoid: status === 'void',
     isPaid: status === 'paid',
     settled,
+    settledLabel,
+    settledStamp,
     isOverdue: status !== 'paid' && status !== 'void' && status !== 'draft' && amountDue > 0,
     company: {
       name: companyName,
@@ -351,6 +388,8 @@ export function buildInvoiceDocument(raw: RawInvoiceDocument): InvoiceDocumentMo
     taxTotal,
     total,
     amountPaid,
+    amountCredited,
+    creditNotes,
     amountDue,
     billToLines,
     fromLines,
@@ -358,6 +397,21 @@ export function buildInvoiceDocument(raw: RawInvoiceDocument): InvoiceDocumentMo
     notes: str(invoice.notes) || str(raw.company?.default_invoice_notes),
     linesReconcile: Math.abs(round2(subtotal + taxTotal) - total) < 0.005,
   };
+}
+
+/**
+ * "R 400,00 of R 1 150,00 already received", with credits named as credits.
+ * Null when nothing has settled any of the invoice yet.
+ */
+export function settlementProgress(
+  model: Pick<InvoiceDocumentModel, 'amountPaid' | 'amountCredited' | 'total'>,
+): string | null {
+  if (model.amountPaid > 0 && model.amountCredited > 0) {
+    return `${money(model.amountPaid)} received and ${money(model.amountCredited)} credited of ${money(model.total)}`;
+  }
+  if (model.amountCredited > 0) return `${money(model.amountCredited)} of ${money(model.total)} credited`;
+  if (model.amountPaid > 0) return `${money(model.amountPaid)} of ${money(model.total)} already received`;
+  return null;
 }
 
 /** "Invoice_INV-00042.pdf" — safe on every filesystem the browser may save to. */

@@ -198,6 +198,27 @@ describe('presentation', () => {
     expect(doc.lines.map((l) => l.reference)).toEqual(['INV-1', '-']);
   });
 
+  it('quotes a credit note by its own number, and never calls it a payment', () => {
+    // A credit note's journal is not FOR an invoice, so without its own number
+    // the row had no reference, and a blank description read "Payment received".
+    const doc = buildStatementDocument(
+      receivable({
+        statement: [
+          { date: '2026-09-05', description: 'Invoice INV-1', invoice_number: 'INV-1', type: 'invoice', amount: 400 },
+          { date: '2026-09-08', description: null, credit_note_number: 'CN-00001', type: 'payment', amount: 200 },
+        ],
+      }),
+    );
+    expect(doc.lines[1].reference).toBe('CN-00001');
+    expect(doc.lines[1].description).toBe('Credit note');
+    expect(doc.lines[1].direction).toBe('credit');
+  });
+
+  it('heads the receivable credit column for payments and credit notes alike', () => {
+    expect(buildStatementDocument(receivable()).wording.creditColumn).toBe('Credits');
+    expect(buildStatementDocument(payable()).wording.creditColumn).toBe('Paid');
+  });
+
   it('never leaves a description blank', () => {
     const doc = buildStatementDocument(
       receivable({

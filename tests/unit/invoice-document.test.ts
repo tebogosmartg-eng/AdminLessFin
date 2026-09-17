@@ -11,6 +11,7 @@ import {
   buildInvoiceDocument,
   invoiceFileName,
   daysOverdue,
+  settlementProgress,
   type RawInvoiceDocument,
 } from '@/lib/invoices/invoiceDocument';
 
@@ -385,5 +386,75 @@ describe('file name and overdue days', () => {
     expect(daysOverdue('2026-09-16', '2026-09-16')).toBeNull();
     expect(daysOverdue('2026-10-01', '2026-09-16')).toBeNull();
     expect(daysOverdue('', '2026-09-16')).toBeNull();
+  });
+});
+
+describe('a credit is not a payment', () => {
+  // Credit notes settle invoices through the same allocations receipts do. The
+  // document must still tell the two apart: printing a credit as "Received",
+  // or stamping a credited invoice PAID, tells the customer they paid money
+  // they never paid.
+  it('separates money received from credits applied', () => {
+    const doc = buildInvoiceDocument(raw({
+      settlement: {
+        gross: 1000, allocated: 700, outstanding: 300, credited: 300,
+        credit_notes: [{ credit_note_number: 'CN-00001', amount: 300 }],
+      },
+    }));
+    expect(doc.amountPaid).toBe(400);
+    expect(doc.amountCredited).toBe(300);
+    expect(doc.creditNotes).toEqual([{ number: 'CN-00001', amount: 300 }]);
+    expect(doc.amountDue).toBe(300);
+    expect(settlementProgress(doc)).toBe('R 400,00 received and R 300,00 credited of R 1 000,00');
+  });
+
+  it('calls an invoice a credit note cancelled "Credited in full", and stamps it CREDITED', () => {
+    const input = raw({
+      settlement: {
+        gross: 1000, allocated: 1000, outstanding: 0, credited: 1000,
+        credit_notes: [{ credit_note_number: 'CN-00002', amount: 1000 }],
+      },
+    });
+    input.invoice.status = 'paid';
+    const doc = buildInvoiceDocument(input);
+    expect(doc.settled).toBe(true);
+    expect(doc.amountPaid).toBe(0);
+    expect(doc.settledLabel).toBe('Credited in full');
+    expect(doc.settledStamp).toBe('CREDITED');
+    expect(doc.statusLabel).toBe('Credited in full');
+  });
+
+  it('says "Settled in full" when payments and credits together cleared it', () => {
+    const input = raw({
+      settlement: {
+        gross: 1000, allocated: 1000, outstanding: 0, credited: 250,
+        credit_notes: [{ credit_note_number: 'CN-00003', amount: 250 }],
+      },
+    });
+    input.invoice.status = 'paid';
+    const doc = buildInvoiceDocument(input);
+    expect(doc.settledLabel).toBe('Settled in full');
+    expect(doc.settledStamp).toBe('SETTLED');
+  });
+
+  it('keeps "Paid in full" and PAID when only money settled it', () => {
+    const input = raw({ settlement: { gross: 1000, allocated: 1000, outstanding: 0 } });
+    input.invoice.status = 'paid';
+    const doc = buildInvoiceDocument(input);
+    expect(doc.amountCredited).toBe(0);
+    expect(doc.creditNotes).toEqual([]);
+    expect(doc.settledLabel).toBe('Paid in full');
+    expect(doc.settledStamp).toBe('PAID');
+    expect(settlementProgress(doc)).toBe('R 1 000,00 of R 1 000,00 already received');
+  });
+
+  it('never reports more credited than was allocated', () => {
+    const doc = buildInvoiceDocument(raw({ settlement: { gross: 1000, allocated: 100, outstanding: 900, credited: 500 } }));
+    expect(doc.amountCredited).toBe(100);
+    expect(doc.amountPaid).toBe(0);
+  });
+
+  it('says nothing about progress when nothing has settled it', () => {
+    expect(settlementProgress(buildInvoiceDocument(raw()))).toBeNull();
   });
 });

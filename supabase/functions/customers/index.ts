@@ -148,6 +148,7 @@ serve(withEnterprisePlatform('customers', 'tenant', async (req, _ctx) => {
             description,
             invoice_id,
             invoices!invoice_id ( invoice_number ),
+            credit_notes!credit_notes_journal_entry_id_fkey ( id, credit_note_number ),
             journal_entry_items (
               amount,
               type,
@@ -167,6 +168,10 @@ serve(withEnterprisePlatform('customers', 'tenant', async (req, _ctx) => {
         const statement = buildStatementRows(transactions, arAccountIds, 'receivable', (t: any) => ({
           invoice_id: t.invoice_id,
           invoice_number: invoiceNumberFromRelation(t.invoices),
+          // A credit note's journal is not FOR an invoice, so without its own
+          // number the row would print with no reference at all.
+          credit_note_id: (Array.isArray(t.credit_notes) ? t.credit_notes[0] : t.credit_notes)?.id,
+          credit_note_number: (Array.isArray(t.credit_notes) ? t.credit_notes[0] : t.credit_notes)?.credit_note_number,
         }));
         const closing_balance = closingBalance(opening_balance, statement);
 

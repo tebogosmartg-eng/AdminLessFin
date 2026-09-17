@@ -31,6 +31,8 @@ type Transaction = {
   description: string;
   invoice_id?: string;
   invoice_number?: string;
+  credit_note_id?: string;
+  credit_note_number?: string;
   type: 'invoice' | 'payment';
   amount: number;
 };
@@ -126,8 +128,8 @@ const CustomerDetail = () => {
       ...statement.map(t => ({
         Date: new Date(t.date).toLocaleDateString(),
         Description: t.description,
-        Reference: t.invoice_number || '-',
-        Type: t.type === 'invoice' ? 'Invoice' : 'Payment',
+        Reference: t.invoice_number || t.credit_note_number || '-',
+        Type: t.type === 'invoice' ? 'Invoice' : t.credit_note_number ? 'Credit note' : 'Payment',
         Amount: (t.type === 'payment' ? -t.amount : t.amount).toFixed(2),
         Balance: t.balance.toFixed(2),
       }))
@@ -275,6 +277,10 @@ const CustomerDetail = () => {
                       {t.invoice_number && t.invoice_id ? (
                         <Link to={`/invoices/${t.invoice_id}`} className="underline decoration-dotted print:no-underline">
                           {t.invoice_number}
+                        </Link>
+                      ) : t.credit_note_number && t.credit_note_id ? (
+                        <Link to={`/credit-notes/${t.credit_note_id}`} className="underline decoration-dotted print:no-underline">
+                          {t.credit_note_number}
                         </Link>
                       ) : (
                         <span className="text-muted-foreground">-</span>

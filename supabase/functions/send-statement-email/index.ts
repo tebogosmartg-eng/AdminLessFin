@@ -119,7 +119,7 @@ serve(withEnterprisePlatform('send-statement-email', 'tenant', async (req, _ctx)
       .from('journal_entries')
       // Forward embeds: the document each journal is FOR, so a payment made
       // against a bill still quotes that bill's number.
-      .select(`id, entry_date, description, invoices!invoice_id(invoice_number), bills!bill_id(bill_number), journal_entry_items(amount, type, account_id)`)
+      .select(`id, entry_date, description, invoices!invoice_id(invoice_number), bills!bill_id(bill_number), credit_notes!credit_notes_journal_entry_id_fkey(credit_note_number), journal_entry_items(amount, type, account_id)`)
       .eq('company_id', company_id)
       .eq(type === 'customer' ? 'customer_id' : 'vendor_id', entityId)
       .gte('entry_date', date_from)
@@ -129,14 +129,19 @@ serve(withEnterprisePlatform('send-statement-email', 'tenant', async (req, _ctx)
     if (transactionsError) throw transactionsError;
 
     const rows = buildStatementRows(transactions, controlIds, side, (t: any) => ({
-      ref: relatedOne(t.invoices)?.invoice_number || relatedOne(t.bills)?.bill_number || '-',
+      ref: relatedOne(t.invoices)?.invoice_number
+        || relatedOne(t.credit_notes)?.credit_note_number
+        || relatedOne(t.bills)?.bill_number
+        || '-',
     }));
     const closing = closingBalance(opening_balance, rows);
     const closingText = describeClosing(side, closing, opening_balance_known);
 
     let running = opening_balance;
     const chargeLabel = side === 'receivable' ? 'Invoiced' : 'Billed';
-    const creditLabel = side === 'receivable' ? 'Received' : 'Paid';
+    // Payments and credit notes both reduce what a customer owes; "Received"
+    // would call a credit note money that arrived.
+    const creditLabel = side === 'receivable' ? 'Credits' : 'Paid';
 
     // 3. The email. Table layout and inline styles only: Outlook and most
     //    webmail clients ignore flexbox and <style> blocks, which is why the

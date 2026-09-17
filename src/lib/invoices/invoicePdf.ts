@@ -43,7 +43,7 @@ import {
   setText,
   type PdfDoc,
 } from '@/lib/documents/paperPdf';
-import { daysOverdue, type InvoiceDocumentModel } from './invoiceDocument';
+import { daysOverdue, settlementProgress, type InvoiceDocumentModel } from './invoiceDocument';
 
 export async function buildInvoicePdf(
   model: InvoiceDocumentModel,
@@ -122,7 +122,7 @@ export async function buildInvoicePdf(
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(7);
   setText(doc, PAPER_RGB.paper);
-  doc.text(settled ? 'PAID IN FULL' : 'AMOUNT DUE', rightColX + 16, panelTop + 20);
+  doc.text(settled ? model.settledLabel.toUpperCase() : 'AMOUNT DUE', rightColX + 16, panelTop + 20);
 
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(23);
@@ -134,9 +134,10 @@ export async function buildInvoicePdf(
     doc.text('No payment is due on this invoice.', rightColX + 16, panelTop + 68);
   } else {
     doc.text(`Due ${day(model.dueDate)}`, rightColX + 16, panelTop + 68);
-    if (model.amountPaid > 0) {
+    const progress = settlementProgress(model);
+    if (progress) {
       doc.text(
-        `${money(model.amountPaid)} of ${money(model.total)} already received`,
+        doc.splitTextToSize(progress, colWidth - 32)[0],
         rightColX + 16,
         panelTop + 82,
       );
@@ -193,7 +194,8 @@ export async function buildInvoicePdf(
   const totalsX = pageWidth - MARGIN - totalsWidth;
   const bankWidth = contentWidth - totalsWidth - 24;
   const bankHeight = 118;
-  const totalsHeight = 46 + model.taxLines.length * 14 + (model.amountPaid > 0 ? 16 : 0) + 40;
+  const totalsHeight = 46 + model.taxLines.length * 14 + (model.amountPaid > 0 ? 16 : 0)
+    + model.creditNotes.length * 14 + 40;
   const bandHeight = Math.max(totalsHeight, bankHeight) + (model.linesReconcile ? 0 : 24);
 
   if (y + bandHeight > pageHeight - 70) {
@@ -223,6 +225,13 @@ export async function buildInvoicePdf(
 
   if (model.amountPaid > 0) {
     totalRow('Received', `-${money(model.amountPaid)}`, false, PAPER_RGB.muted);
+  }
+  // Each credit note by number, so the customer can match it to the credit
+  // note they were sent.
+  for (const credit of model.creditNotes) {
+    totalRow(`Credit note ${credit.number}`, `-${money(credit.amount)}`, false, PAPER_RGB.muted);
+  }
+  if (model.amountPaid > 0 || model.creditNotes.length > 0) {
     y += 2;
   }
 
@@ -231,7 +240,7 @@ export async function buildInvoicePdf(
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(11);
   setText(doc, PAPER_RGB.paper);
-  doc.text(settled ? 'Paid in full' : 'Balance due', totalsX + 12, y + 7);
+  doc.text(settled ? model.settledLabel : 'Balance due', totalsX + 12, y + 7);
   doc.text(money(settled ? 0 : model.amountDue), pageWidth - MARGIN - 12, y + 7, { align: 'right' });
   let totalsBottom = y + 26;
 
@@ -272,7 +281,7 @@ export async function buildInvoicePdf(
   }
 
   if (model.isVoid) drawWatermark(ctx, 'VOID', PAPER_RGB.alarm);
-  else if (model.isPaid) drawWatermark(ctx, 'PAID', PAPER_RGB.brand);
+  else if (model.isPaid) drawWatermark(ctx, model.settledStamp, PAPER_RGB.brand);
 
   drawFooters(ctx, model.company, `Invoice ${model.number}`);
 

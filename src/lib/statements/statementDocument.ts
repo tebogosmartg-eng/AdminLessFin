@@ -38,6 +38,7 @@ export type RawStatementLine = {
   date: string;
   description?: string | null;
   invoice_number?: string | null;
+  credit_note_number?: string | null;
   bill_number?: string | null;
   /** 'invoice' | 'payment' on the receivable side, 'bill' | 'payment' on the payable side. */
   type: string;
@@ -128,7 +129,9 @@ const WORDING: Record<StatementSide, StatementDocumentModel['wording']> = {
     title: 'STATEMENT OF ACCOUNT',
     party: 'Account of',
     chargeColumn: 'Invoiced',
-    creditColumn: 'Received',
+    // Payments and credit notes both reduce the balance, and a credit note is
+    // not money received.
+    creditColumn: 'Credits',
     closingLabel: 'Balance due',
     settleWording: 'Please settle the balance due using the banking details below.',
   },
@@ -161,8 +164,10 @@ export function buildStatementDocument(raw: RawStatementDocument): StatementDocu
     running = round2(running + (direction === 'charge' ? amount : -amount));
     return {
       date: asText(row.date),
-      description: asText(row.description) || (direction === 'charge' ? 'Charge' : 'Payment received'),
-      reference: asText(row.invoice_number) || asText(row.bill_number) || '-',
+      description:
+        asText(row.description) ||
+        (direction === 'charge' ? 'Charge' : asText(row.credit_note_number) ? 'Credit note' : 'Payment received'),
+      reference: asText(row.invoice_number) || asText(row.credit_note_number) || asText(row.bill_number) || '-',
       direction,
       amount,
       balance: running,

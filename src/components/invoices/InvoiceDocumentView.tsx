@@ -14,7 +14,7 @@
  */
 import { CompanyLogo } from '@/components/brand';
 import { PAPER, day, money, qty, bankingUnavailableMessage } from '@/lib/documents/paperTheme';
-import { daysOverdue, type InvoiceDocumentModel } from '@/lib/invoices/invoiceDocument';
+import { daysOverdue, settlementProgress, type InvoiceDocumentModel } from '@/lib/invoices/invoiceDocument';
 import { AlertTriangle, Landmark } from 'lucide-react';
 
 function Row({ label, value, bold }: { label: string; value: string; bold?: boolean }) {
@@ -128,7 +128,7 @@ export default function InvoiceDocumentView({
             style={{ background: settled ? PAPER.brand : PAPER.brandBright, color: PAPER.paper }}
           >
             <h2 className="text-xs font-bold uppercase tracking-wider">
-              {settled ? 'Paid in full' : 'Amount due'}
+              {settled ? model.settledLabel : 'Amount due'}
             </h2>
             <p className="mt-2 text-3xl font-bold tabular-nums">
               {money(settled ? model.total : model.amountDue)}
@@ -138,11 +138,7 @@ export default function InvoiceDocumentView({
             ) : (
               <div className="mt-2 space-y-0.5 text-sm opacity-90">
                 <p>Due {day(model.dueDate)}</p>
-                {model.amountPaid > 0 && (
-                  <p>
-                    {money(model.amountPaid)} of {money(model.total)} already received
-                  </p>
-                )}
+                {settlementProgress(model) && <p>{settlementProgress(model)}</p>}
               </div>
             )}
           </section>
@@ -245,12 +241,15 @@ export default function InvoiceDocumentView({
                 <Row label="Total" value={money(model.total)} bold />
               </div>
               {model.amountPaid > 0 && <Row label="Received" value={`-${money(model.amountPaid)}`} />}
+              {model.creditNotes.map((credit, i) => (
+                <Row key={i} label={`Credit note ${credit.number}`} value={`-${money(credit.amount)}`} />
+              ))}
             </dl>
             <div
               className="mt-3 flex items-baseline justify-between rounded-md px-4 py-3"
               style={{ background: PAPER.brand, color: PAPER.paper }}
             >
-              <span className="font-bold">{settled ? 'Paid in full' : 'Balance due'}</span>
+              <span className="font-bold">{settled ? model.settledLabel : 'Balance due'}</span>
               <span className="text-lg font-bold tabular-nums">{money(settled ? 0 : model.amountDue)}</span>
             </div>
             {!model.linesReconcile && (

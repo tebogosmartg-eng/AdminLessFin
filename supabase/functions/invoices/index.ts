@@ -204,6 +204,35 @@ serve(withEnterprisePlatform('invoices', 'tenant', async (req, _ctx) => {
         const gross = Number(grossRes.data ?? 0);
         const allocated = Number(allocatedRes.data ?? 0);
 
+        // Allocations settle an invoice whether the money arrived or a credit
+        // note took the debt away, and the document must not call a credit
+        // "received". A settlement whose journal is a credit note's is a credit.
+        const { data: allocationRows, error: allocationError } = await supabaseAdmin
+          .from('invoice_payment_allocations')
+          .select('amount, journal_entry_id')
+          .eq('company_id', company_id)
+          .eq('invoice_id', invoice.id);
+        if (allocationError) {
+          throw new Error(`Could not read how this invoice was settled: ${allocationError.message}`);
+        }
+        const settlingJournals = [...new Set((allocationRows ?? []).map((a) => a.journal_entry_id))];
+        let creditNotes = [];
+        if (settlingJournals.length > 0) {
+          const { data: creditNoteRows, error: creditNoteError } = await supabaseAdmin
+            .from('credit_notes')
+            .select('credit_note_number, journal_entry_id')
+            .eq('company_id', company_id)
+            .in('journal_entry_id', settlingJournals);
+          if (creditNoteError) {
+            throw new Error(`Could not read the credit notes applied to this invoice: ${creditNoteError.message}`);
+          }
+          const numberByJournal = new Map((creditNoteRows ?? []).map((c) => [c.journal_entry_id, c.credit_note_number]));
+          creditNotes = (allocationRows ?? [])
+            .filter((a) => numberByJournal.has(a.journal_entry_id))
+            .map((a) => ({ credit_note_number: numberByJournal.get(a.journal_entry_id), amount: Number(a.amount) }));
+        }
+        const credited = Math.round(creditNotes.reduce((t, c) => t + c.amount, 0) * 100) / 100;
+
         data = {
           invoice,
           company: companyRes.data ?? null,
@@ -213,6 +242,8 @@ serve(withEnterprisePlatform('invoices', 'tenant', async (req, _ctx) => {
           settlement: {
             gross,
             allocated,
+            credited,
+            credit_notes: creditNotes,
             outstanding: Math.round((gross - allocated) * 100) / 100,
           },
         };
