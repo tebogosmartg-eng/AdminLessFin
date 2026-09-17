@@ -85,6 +85,65 @@ serve(withEnterprisePlatform('purchase-orders', 'tenant', async (req, _ctx) => {
           .single());
         break;
 
+      /**
+       * Everything the printed purchase order needs, in one round trip.
+       *
+       * A purchase order is an instruction to a supplier, so beyond the lines
+       * it needs who is ordering, where to deliver, and what reference to quote
+       * back. Company identity and the delivery address come from the same
+       * master data every other document uses, so a change of address reaches
+       * all of them at once.
+       *
+       * Every read is checked: a purchase order that silently omits the
+       * delivery address is one the supplier cannot fulfil.
+       */
+      case 'GET_DOCUMENT': {
+        if (!body.poId) throw new Error('poId is required.');
+
+        const { data: po, error: poError } = await supabaseAdmin
+          .from('purchase_orders')
+          .select(`
+            *,
+            vendors ( id, name, contact_name, address, email, phone, tax_id ),
+            purchase_order_items ( *, projects ( name ) )
+          `)
+          .eq('id', body.poId)
+          .eq('company_id', company_id)
+          .maybeSingle();
+        if (poError) throw poError;
+        if (!po) throw new Error('Purchase order not found in this company.');
+
+        const [companyRes, masterRes] = await Promise.all([
+          supabaseAdmin
+            .from('companies')
+            .select('id, name, logo_url, address, tax_id')
+            .eq('id', company_id)
+            .maybeSingle(),
+          supabaseAdmin
+            .from('efs_company_master_data')
+            .select('company_profile, addresses, tax_registrations')
+            .eq('company_id', company_id)
+            .maybeSingle(),
+        ]);
+        for (const [label, res] of [
+          ['company', companyRes],
+          ['company master data', masterRes],
+        ] as Array<[string, { error: unknown }]>) {
+          if (res.error) {
+            throw new Error(
+              `Could not read the ${label} for this purchase order: ${(res.error as { message?: string }).message ?? res.error}`,
+            );
+          }
+        }
+
+        data = {
+          purchase_order: po,
+          company: companyRes.data ?? null,
+          master: masterRes.data ?? null,
+        };
+        break;
+      }
+
       case 'GET_NEXT_NUMBER':
         data = await allocateNextPoNumber(supabaseAdmin, company_id);
         error = null;

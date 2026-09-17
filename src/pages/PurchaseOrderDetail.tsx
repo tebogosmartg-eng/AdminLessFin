@@ -6,7 +6,15 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../co
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from '../components/ui/table';
 import { Skeleton } from '../components/ui/skeleton';
 import { Button } from '../components/ui/button';
-import { Printer, FileCheck, Send, Paperclip, MessageSquare, Ban } from 'lucide-react';
+import { Printer, FileCheck, Send, Paperclip, MessageSquare, Ban, Download, Loader2, FileText } from 'lucide-react';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '../components/ui/dropdown-menu';
+import { buildPurchaseOrderDocument, type RawPurchaseOrderDocument } from '../lib/purchaseOrders/purchaseOrderDocument';
+import { downloadPurchaseOrderPdf, openPurchaseOrderPdf } from '../lib/purchaseOrders/purchaseOrderPdf';
 import { Badge } from '../components/ui/badge';
 import { Alert, AlertDescription, AlertTitle } from '../components/ui/alert';
 import { showError, showSuccess } from '../utils/toast';
@@ -54,6 +62,7 @@ const PurchaseOrderDetail = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['po_detail', id] });
       queryClient.invalidateQueries({ queryKey: ['purchase_orders'] });
+      queryClient.invalidateQueries({ queryKey: ['po_document'] });
       showSuccess('Purchase order cancelled.');
     },
     onError: (error: any) => showError(error.message),
@@ -70,12 +79,42 @@ const PurchaseOrderDetail = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['po_detail', id] });
       queryClient.invalidateQueries({ queryKey: ['purchase_orders'] });
+      queryClient.invalidateQueries({ queryKey: ['po_document'] });
       showSuccess('PO status updated.');
     },
     onError: (error: any) => showError(error.message),
   });
 
   const totalAmount = po?.purchase_order_items.reduce((sum: number, item: any) => sum + (item.quantity * item.unit_cost), 0) || 0;
+
+  // The printable purchase order is its own read: it needs company identity and
+  // the delivery address, which GET_ONE does not carry.
+  const { data: poDocument } = useQuery({
+    queryKey: ['po_document', activeCompany?.id, id],
+    enabled: !!id && !!activeCompany,
+    queryFn: async () => {
+      const { data, error } = await supabase.functions.invoke('purchase-orders', {
+        body: { method: 'GET_DOCUMENT', company_id: activeCompany!.id, poId: id },
+      });
+      if (error) throw error;
+      return buildPurchaseOrderDocument(data as RawPurchaseOrderDocument);
+    },
+  });
+
+  const [exporting, setExporting] = useState<'download' | 'print' | null>(null);
+
+  const runExport = async (mode: 'download' | 'print') => {
+    if (!poDocument) return;
+    setExporting(mode);
+    try {
+      if (mode === 'download') await downloadPurchaseOrderPdf(poDocument);
+      else await openPurchaseOrderPdf(poDocument);
+    } catch (error: any) {
+      showError(error?.message || 'The purchase order PDF could not be produced.');
+    } finally {
+      setExporting(null);
+    }
+  };
 
   if (isLoading) {
     return <div className="space-y-4"><Skeleton className="h-96 w-full" /></div>;
@@ -160,7 +199,25 @@ const PurchaseOrderDetail = () => {
                 <Ban className="mr-2 h-4 w-4" /> Cancel PO
               </Button>
             )}
-            <Button onClick={() => window.print()} variant="outline"><Printer className="mr-2 h-4 w-4" /> Print</Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" disabled={!poDocument || exporting !== null}>
+                  {exporting !== null ? (
+                    <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Preparing…</>
+                  ) : (
+                    <><FileText className="mr-2 h-4 w-4" /> Order PDF</>
+                  )}
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onSelect={() => runExport('download')}>
+                  <Download className="mr-2 h-4 w-4" /> Download
+                </DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => runExport('print')}>
+                  <Printer className="mr-2 h-4 w-4" /> Print
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </div>
         
