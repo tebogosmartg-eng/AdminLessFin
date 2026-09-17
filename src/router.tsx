@@ -45,6 +45,7 @@ const QuoteDetail = lazy(() => import("./pages/QuoteDetail"));
 const Invoices = lazy(() => import("./pages/Invoices"));
 const InvoiceDetail = lazy(() => import("./pages/InvoiceDetail"));
 const CreditNotes = lazy(() => import("./pages/CreditNotes"));
+const CreditNoteDetail = lazy(() => import("./pages/CreditNoteDetail"));
 const RecurringInvoices = lazy(() => import("./pages/RecurringInvoices"));
 const ReceivePayments = lazy(() => import("./pages/ReceivePayments"));
 const Customers = lazy(() => import("./pages/Customers"));
@@ -173,6 +174,7 @@ export const AppRouter = () => {
         <Route path="/invoices" element={<AccountingReadyGate module="invoices"><Invoices /></AccountingReadyGate>} />
         <Route path="/invoices/:id" element={<AccountingReadyGate module="invoices"><InvoiceDetail /></AccountingReadyGate>} />
         <Route path="/credit-notes" element={<CreditNotes />} />
+        <Route path="/credit-notes/:id" element={<CreditNoteDetail />} />
         <Route path="/recurring-invoices" element={<RecurringInvoices />} />
         <Route path="/receive-payments" element={<ReceivePayments />} />
         <Route path="/customers" element={<Customers />} />

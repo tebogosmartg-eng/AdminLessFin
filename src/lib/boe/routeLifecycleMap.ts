@@ -26,6 +26,7 @@ const ROUTE_BINDINGS: RoutePattern[] = [
   { pattern: /^\/invoices$/, binding: { lifecycleId: 'revenue', stageId: 'invoice', label: 'Invoices' } },
   { pattern: /^\/receive-payments$/, binding: { lifecycleId: 'revenue', stageId: 'payment', label: 'Receive Payments' } },
   { pattern: /^\/customers/, binding: { lifecycleId: 'revenue', stageId: 'customer', label: 'Customers' } },
+  { pattern: /^\/credit-notes\/[^/]+$/, binding: { lifecycleId: 'revenue', stageId: 'collections', label: 'Credit Note Detail' } },
   { pattern: /^\/credit-notes$/, binding: { lifecycleId: 'revenue', stageId: 'collections', label: 'Credit Notes' } },
 
   { pattern: /^\/purchases$/, binding: { lifecycleId: 'procurement', stageId: 'analytics', label: 'Spend Workspace' } },

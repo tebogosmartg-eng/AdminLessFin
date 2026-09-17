@@ -5,10 +5,11 @@ import { supabase } from '../integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/card';
 import { Skeleton } from '../components/ui/skeleton';
 import { Button } from '../components/ui/button';
-import { Printer, Send, HandCoins, Ban, MessageSquare, Download, Loader2, FileText } from 'lucide-react';
+import { Printer, Send, HandCoins, Ban, MessageSquare, Download, Loader2, FileText, ReceiptText } from 'lucide-react';
 import { Badge } from '../components/ui/badge';
 import { showError, showSuccess } from '../utils/toast';
 import InvoicePaymentForm from '../components/InvoicePaymentForm';
+import CreditNoteForm from '../components/CreditNoteForm';
 import { useAuth } from '../contexts/AuthContext';
 import SendInvoiceDialog from '../components/SendInvoiceDialog';
 import JournalEntryDetail from '../components/JournalEntryDetail';
@@ -36,6 +37,7 @@ type InvoiceDetailData = {
   due_date: string;
   status: 'draft' | 'sent' | 'partially_paid' | 'paid' | 'void';
   customers: {
+    id?: string;
     name: string;
     address: string | null;
     email: string | null;
@@ -63,6 +65,7 @@ const InvoiceDetail = () => {
   const queryClient = useQueryClient();
   const [isPaymentFormOpen, setIsPaymentFormOpen] = useState(false);
   const [isSendDialogOpen, setIsSendDialogOpen] = useState(false);
+  const [isCreditNoteOpen, setIsCreditNoteOpen] = useState(false);
   const [selectedEntryId, setSelectedEntryId] = useState<string | null>(null);
 
   const fetchInvoiceDetail = async () => {
@@ -220,6 +223,11 @@ const InvoiceDetail = () => {
                 {invoice.status === 'partially_paid' ? 'Receive Balance' : 'Receive Payment'}
               </Button>
             )}
+            {(invoice.status === 'sent' || invoice.status === 'partially_paid' || invoice.status === 'paid') && (
+              <Button variant="outline" onClick={() => setIsCreditNoteOpen(true)}>
+                <ReceiptText className="mr-2 h-4 w-4" /> Issue Credit Note
+              </Button>
+            )}
             {invoice.status === 'sent' && (
               <Button variant="destructive" onClick={() => voidMutation.mutate()} disabled={voidMutation.isPending}>
                 <Ban className="mr-2 h-4 w-4" /> Void
@@ -307,6 +315,12 @@ const InvoiceDetail = () => {
           totalAmount: totalAmount,
           customerName: invoice.customers?.name || 'Customer'
         }}
+      />
+      <CreditNoteForm
+        isOpen={isCreditNoteOpen}
+        setIsOpen={setIsCreditNoteOpen}
+        initialCustomerId={invoice.customers?.id}
+        initialInvoiceId={invoice.id}
       />
       <JournalEntryDetail
         isOpen={!!selectedEntryId}
