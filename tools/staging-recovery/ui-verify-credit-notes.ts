@@ -145,7 +145,9 @@ async function main() {
   await page.getByRole('button', { name: /apply to invoices/i }).first().click();
   const apply = page.getByRole('dialog');
   await apply.getByText(INVOICE_NUMBER).waitFor({ timeout: 30_000 });
-  await apply.getByRole('button', { name: /apply oldest first/i }).click();
+  // Typed against this invoice on purpose: "Apply oldest first" would spread
+  // the credit over the customer's older open invoices, which is its job.
+  await apply.getByLabel('Amount to apply to ' + INVOICE_NUMBER).fill(String(before.outstanding));
   await page.waitForTimeout(500);
   await apply.getByRole('button', { name: /^apply credit$/i }).click();
   await settle(page, 4000);
@@ -153,6 +155,8 @@ async function main() {
   check('the apply dialog settles the invoice again', /Applied in full/.test(text));
   const afterApply = await settlement();
   check('the ledger agrees', afterApply.outstanding === 0, `${afterApply.status} ${afterApply.outstanding}`);
+  const others = await api.from('invoice_payment_allocations').select('invoice_id').eq('company_id', co.id).neq('invoice_id', invoiceId);
+  check('no other invoice was touched', (others.data ?? []).length === 0, String((others.data ?? []).length));
 
   console.log(NL + '======== VOID ========');
   await page.getByRole('button', { name: /^void$/i }).click();

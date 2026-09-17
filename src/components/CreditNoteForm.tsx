@@ -552,7 +552,7 @@ const CreditNoteForm = ({ isOpen, setIsOpen, initialCustomerId, initialInvoiceId
                               </SelectTrigger>
                             </FormControl>
                             <SelectContent>
-                              <SelectItem value={NONE}>No VAT</SelectItem>
+                              <SelectItem value={NONE}>None</SelectItem>
                               {taxRates?.map((t) => (
                                 <SelectItem key={t.id} value={t.id}>
                                   {t.name ? `${t.name} (${t.rate}%)` : `${t.rate}%`}
