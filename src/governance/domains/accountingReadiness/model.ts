@@ -196,6 +196,7 @@ export const ACCOUNTING_READINESS_PERMISSIONS: Record<string, GovernancePermissi
 export const ACCOUNTING_GATED_MODULES = [
   'journal_entries',
   'invoices',
+  'credit_notes',
   'payroll',
   'banking',
   'financial_statements',
@@ -206,6 +207,7 @@ export type AccountingGatedModule = (typeof ACCOUNTING_GATED_MODULES)[number];
 export const ACCOUNTING_MODULE_LABELS: Record<AccountingGatedModule, string> = {
   journal_entries: 'Journal Entries',
   invoices: 'Invoices',
+  credit_notes: 'Credit Notes',
   payroll: 'Payroll',
   banking: 'Banking',
   financial_statements: 'Financial Statements',

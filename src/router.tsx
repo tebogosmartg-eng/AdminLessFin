@@ -173,8 +173,9 @@ export const AppRouter = () => {
         <Route path="/quotes/:id" element={<QuoteDetail />} />
         <Route path="/invoices" element={<AccountingReadyGate module="invoices"><Invoices /></AccountingReadyGate>} />
         <Route path="/invoices/:id" element={<AccountingReadyGate module="invoices"><InvoiceDetail /></AccountingReadyGate>} />
-        <Route path="/credit-notes" element={<CreditNotes />} />
-        <Route path="/credit-notes/:id" element={<CreditNoteDetail />} />
+        {/* Credit notes post to receivables, revenue and VAT exactly as invoices do, so they wait for the same foundation. */}
+        <Route path="/credit-notes" element={<AccountingReadyGate module="credit_notes"><CreditNotes /></AccountingReadyGate>} />
+        <Route path="/credit-notes/:id" element={<AccountingReadyGate module="credit_notes"><CreditNoteDetail /></AccountingReadyGate>} />
         <Route path="/recurring-invoices" element={<RecurringInvoices />} />
         <Route path="/receive-payments" element={<ReceivePayments />} />
         <Route path="/customers" element={<Customers />} />

@@ -47,6 +47,10 @@ export const MODULE_BLOCKED_GUIDANCE: Record<
     why: 'Invoices post journal entries to Accounts Receivable and revenue accounts. The accounting foundation must be complete first.',
     tip: 'You can add customers now. Complete Accounting Setup, then return here to create your first invoice.',
   },
+  credit_notes: {
+    why: 'Credit notes post journal entries that reverse revenue, output VAT and Accounts Receivable. The accounting foundation must be complete first.',
+    tip: 'Complete Accounting Setup, then return here to credit a customer.',
+  },
   journal_entries: {
     why: 'Journal entries write directly to the general ledger. Posting is blocked until your chart, tax, and calendar are validated.',
     tip: 'Complete only the unresolved Accounting Setup items. If a Chart of Accounts already exists, you will be taken to control-account mapping — not asked to generate a new chart.',
