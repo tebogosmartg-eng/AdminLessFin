@@ -151,7 +151,7 @@ export const SidebarNav = ({ className, onNavigate }: SidebarNavProps) => {
     { to: '/purchases', label: 'Spend', icon: Wallet, prefetch: () => prefetchForPeriod(queries.purchasesWorkspaceQuery) },
     { to: '/purchase-orders', label: 'Purchase Orders', icon: ShoppingBag, prefetch: () => prefetch(queries.purchaseOrdersQuery) },
     { to: '/bills', label: 'Bills', icon: Receipt, prefetch: () => prefetch(queries.billsQuery) },
-    { to: '/vendor-credits', label: 'Vendor Credits', icon: TicketMinus, prefetch: () => prefetch(queries.vendorCreditsQuery) },
+    { to: '/vendor-credits', label: 'Supplier Credits', icon: TicketMinus, prefetch: () => prefetch(queries.vendorCreditsQuery) },
     { to: '/recurring-bills', label: 'Recurring Bills', icon: Repeat, prefetch: () => prefetch(queries.recurringBillsQuery) },
     { to: '/pay-bills', label: 'Pay Bills', icon: Banknote, prefetch: () => prefetch(queries.vendorBalancesQuery) },
     { to: '/vendors', label: 'Suppliers', icon: Store, prefetch: () => prefetch(queries.vendorsQuery) },

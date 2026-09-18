@@ -226,7 +226,7 @@ export function CommandMenu() {
             </CommandItem>
             <CommandItem onSelect={() => runCommand(() => navigate("/vendor-credits"))}>
               <TicketMinus className="mr-2 h-4 w-4" />
-              <span>Vendor Credits</span>
+              <span>Supplier Credits</span>
             </CommandItem>
             <CommandItem onSelect={() => runCommand(() => navigate("/recurring-bills"))}>
               <Repeat className="mr-2 h-4 w-4" />

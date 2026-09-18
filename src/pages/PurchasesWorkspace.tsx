@@ -112,7 +112,7 @@ const PurchasesWorkspace = () => {
     { to: '/purchase-orders', label: 'Purchase Orders', icon: ShoppingBag, description: 'Commit spend before billing' },
     { to: '/bills', label: 'Bills', icon: Receipt, description: 'Record supplier invoices' },
     { to: '/pay-bills', label: 'Pay Bills', icon: Banknote, description: 'Settle accounts payable' },
-    { to: '/vendor-credits', label: 'Vendor Credits', icon: TicketMinus, description: 'Apply credits and adjustments' },
+    { to: '/vendor-credits', label: 'Supplier Credits', icon: TicketMinus, description: 'Credits from suppliers, set against their bills' },
     { to: '/recurring-bills', label: 'Recurring Bills', icon: Repeat, description: 'Automate regular obligations' },
     { to: '/vendors', label: 'Vendors', icon: Store, description: 'Manage supplier relationships' },
   ];

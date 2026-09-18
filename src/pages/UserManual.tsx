@@ -108,7 +108,7 @@ const UserManual = () => {
                 <li><strong>Purchase Orders (PO):</strong> Send formal orders to suppliers. Convert POs to Bills upon delivery.</li>
                 <li><strong>Bills:</strong> Record incoming invoices from suppliers to track Accounts Payable.</li>
                 <li><strong>Expense Claims:</strong> Employees can submit out-of-pocket expenses. Admins approve and reimburse them.</li>
-                <li><strong>Vendor Credits:</strong> Track refunds from suppliers and allocate them to reduce future bill payments.</li>
+                <li><strong>Supplier Credits:</strong> Record a credit a supplier has given you for returns, an overcharge or an agreed discount. It reduces what you owe them, either against the bill it relates to or against their next one. A supplier credit is posted to the ledger when recorded, and is voided rather than deleted.</li>
               </ul>
             </section>
 
