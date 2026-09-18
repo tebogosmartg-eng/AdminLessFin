@@ -89,24 +89,6 @@ const QuoteForm = ({ isOpen, setIsOpen, quoteId, duplicateFromId }: QuoteFormPro
     enabled: !!sourceId && isOpen && !!activeCompany,
   });
 
-  useEffect(() => {
-    if (sourceQuote && isOpen) {
-      form.reset({
-        // If duplicating, we reset number and dates
-        quote_number: isDuplicating ? '' : sourceQuote.quote_number,
-        quote_date: isDuplicating ? format(new Date(), 'yyyy-MM-dd') : sourceQuote.quote_date,
-        expiry_date: isDuplicating ? format(addDays(new Date(), 30), 'yyyy-MM-dd') : (sourceQuote.expiry_date || ''),
-        customer_id: sourceQuote.customer_id,
-        description: sourceQuote.description || '',
-        terms: sourceQuote.terms || '',
-        items: sourceQuote.quote_items.map((item: any) => ({
-          ...item,
-          tax_rate_id: item.tax_rate_id || '',
-        })),
-      });
-    }
-  }, [sourceQuote, isEditing, isDuplicating, isOpen, form]);
-
   const { data: nextQuoteNumber } = useQuery({
     queryKey: ['next_quote_number', activeCompany?.id],
     queryFn: async () => {
@@ -118,6 +100,29 @@ const QuoteForm = ({ isOpen, setIsOpen, quoteId, duplicateFromId }: QuoteFormPro
     },
     enabled: isOpen && !isEditing && !!activeCompany, // Fetch for new or duplicate
   });
+
+  useEffect(() => {
+    if (sourceQuote && isOpen) {
+      form.reset({
+        quote_number: isDuplicating
+          ? (typeof nextQuoteNumber === 'string' ? nextQuoteNumber : '')
+          : sourceQuote.quote_number,
+        quote_date: isDuplicating ? format(new Date(), 'yyyy-MM-dd') : sourceQuote.quote_date,
+        expiry_date: isDuplicating ? format(addDays(new Date(), 30), 'yyyy-MM-dd') : (sourceQuote.expiry_date || ''),
+        customer_id: sourceQuote.customer_id,
+        description: sourceQuote.description || '',
+        terms: sourceQuote.terms || '',
+        items: sourceQuote.quote_items.map((item: any) => ({
+          product_id: item.product_id || '',
+          description: item.description,
+          quantity: item.quantity,
+          unit_price: item.unit_price,
+          income_account_id: item.income_account_id || '',
+          tax_rate_id: item.tax_rate_id || '',
+        })),
+      });
+    }
+  }, [sourceQuote, isEditing, isDuplicating, isOpen, form, nextQuoteNumber]);
 
   useEffect(() => {
     if (nextQuoteNumber && !isEditing) {
@@ -195,6 +200,7 @@ const QuoteForm = ({ isOpen, setIsOpen, quoteId, duplicateFromId }: QuoteFormPro
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['quotes', activeCompany?.id] });
+      queryClient.invalidateQueries({ queryKey: ['next_quote_number', activeCompany?.id] });
       showSuccess(`Quote ${isEditing ? 'updated' : 'created'} successfully.`);
       setIsOpen(false);
     },

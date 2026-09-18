@@ -10,6 +10,41 @@ import {
 
 const corsHeaders = ENTERPRISE_CORS_HEADERS
 
+/** Next QTE-##### from existing numbers. Ignores QDOC-/probe refs so they cannot reset the sequence. */
+async function allocateNextQuoteNumber(client, companyId) {
+  const { data: existingNums, error: listErr } = await client
+    .from('quotes')
+    .select('quote_number')
+    .eq('company_id', companyId);
+  if (listErr) throw listErr;
+  let maxSeq = 0n;
+  for (const row of existingNums ?? []) {
+    const match = /^QTE-(\d+)$/i.exec(String(row.quote_number ?? ''));
+    if (!match) continue;
+    try {
+      const n = BigInt(match[1]);
+      if (n > maxSeq) maxSeq = n;
+    } catch { /* ignore unparseable */ }
+  }
+  return `QTE-${(maxSeq + 1n).toString().padStart(5, '0')}`;
+}
+
+function quoteItemRow(item, quoteId) {
+  return {
+    quote_id: quoteId,
+    product_id: item.product_id || null,
+    description: item.description,
+    quantity: item.quantity,
+    unit_price: item.unit_price,
+    income_account_id: item.income_account_id || null,
+    tax_rate_id: item.tax_rate_id || null,
+  };
+}
+
+function isUniqueViolation(err) {
+  return err?.code === '23505' || /duplicate key|unique constraint/i.test(String(err?.message ?? ''));
+}
+
 serve(withEnterprisePlatform('quotes', 'tenant', async (req, _ctx) => {
 
   try {
@@ -44,12 +79,6 @@ serve(withEnterprisePlatform('quotes', 'tenant', async (req, _ctx) => {
     const supabaseAdmin = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-    );
-    
-    const userSupabase = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
-      { auth: { autoRefreshToken: false, persistSession: false }, global: { headers: { Authorization: req.headers.get('Authorization')! } } }
     );
 
     let data, error;
@@ -177,20 +206,41 @@ serve(withEnterprisePlatform('quotes', 'tenant', async (req, _ctx) => {
         break;
       }
 
-      case 'POST':
-        const { items: postItems, ...postQuoteData } = body.quoteData;
-        const { data: newQuote, error: postError } = await supabaseAdmin
+      case 'POST': {
+        const { items: postItems, ...postQuoteData } = body.quoteData ?? {};
+        const requestedNumber = String(postQuoteData.quote_number ?? '').trim();
+        if (!requestedNumber) {
+          postQuoteData.quote_number = await allocateNextQuoteNumber(supabaseAdmin, company_id);
+        } else {
+          postQuoteData.quote_number = requestedNumber;
+        }
+
+        let newQuote, postError;
+        ({ data: newQuote, error: postError } = await supabaseAdmin
           .from('quotes')
           .insert({ ...postQuoteData, company_id })
           .select('id')
-          .single();
+          .single());
+
+        if (postError && isUniqueViolation(postError) && !requestedNumber) {
+          postQuoteData.quote_number = await allocateNextQuoteNumber(supabaseAdmin, company_id);
+          ({ data: newQuote, error: postError } = await supabaseAdmin
+            .from('quotes')
+            .insert({ ...postQuoteData, company_id })
+            .select('id')
+            .single());
+        }
+        if (postError && isUniqueViolation(postError)) {
+          throw new Error(`Quote number ${postQuoteData.quote_number} is already used in this company.`);
+        }
         if (postError) throw postError;
-        
-        const itemsToInsert = postItems.map(item => ({ ...item, quote_id: newQuote.id }));
+
+        const itemsToInsert = (postItems ?? []).map((item) => quoteItemRow(item, newQuote.id));
         const { error: postItemsError } = await supabaseAdmin.from('quote_items').insert(itemsToInsert);
         if (postItemsError) throw postItemsError;
         data = newQuote;
         break;
+      }
 
       case 'PUT': {
         if (!body.quoteId) throw new Error('quoteId is required.');
@@ -200,6 +250,9 @@ serve(withEnterprisePlatform('quotes', 'tenant', async (req, _ctx) => {
           .update(putQuoteData)
           .eq('id', body.quoteId)
           .eq('company_id', company_id);
+        if (putError && isUniqueViolation(putError)) {
+          throw new Error(`Quote number ${putQuoteData.quote_number} is already used in this company.`);
+        }
         if (putError) throw putError;
 
         // Status-only updates (accept / decline) send no lines. Replacing
@@ -211,7 +264,7 @@ serve(withEnterprisePlatform('quotes', 'tenant', async (req, _ctx) => {
             .delete()
             .eq('quote_id', body.quoteId);
           if (deleteItemsError) throw deleteItemsError;
-          const putItemsToInsert = putItems.map(item => ({ ...item, quote_id: body.quoteId }));
+          const putItemsToInsert = putItems.map((item) => quoteItemRow(item, body.quoteId));
           const { error: putItemsError } = await supabaseAdmin.from('quote_items').insert(putItemsToInsert);
           if (putItemsError) throw putItemsError;
         }
@@ -227,9 +280,16 @@ serve(withEnterprisePlatform('quotes', 'tenant', async (req, _ctx) => {
           .eq('company_id', company_id));
         break;
 
-      case 'GET_NEXT_QUOTE_NUMBER':
-        ({ data, error } = await userSupabase.rpc('get_next_quote_number_for_user'));
+      case 'GET_NEXT_QUOTE_NUMBER': {
+        const rpcResult = await supabaseAdmin.rpc('get_next_quote_number', { p_company_id: company_id });
+        if (!rpcResult.error && rpcResult.data) {
+          data = rpcResult.data;
+          break;
+        }
+        data = await allocateNextQuoteNumber(supabaseAdmin, company_id);
+        error = null;
         break;
+      }
 
       default:
         throw new Error(`Unsupported method: ${method}`);
