@@ -348,24 +348,42 @@ serve(withEnterprisePlatform('invoices', 'tenant', async (req, _ctx) => {
         break;
 
       case 'GET_NEXT_INVOICE_NUMBER': {
-        const rpcResult = await userSupabase.rpc('get_next_invoice_number_for_user');
-        if (!rpcResult.error) {
-          data = rpcResult.data;
+        // Asked of the company this request is FOR. The old call took no
+        // company and the routine resolved one from the user's active company,
+        // so asking about one company could be answered about another.
+        const rpcResult = await supabaseAdmin.rpc('invoice_next_number', { p_company_id: company_id });
+
+        // Whatever the routine says, the number must actually be free. The
+        // previous routine returned INV-00001 for any company whose newest
+        // invoice was not an INV-#####, and the fallback below never ran
+        // because that is a wrong ANSWER, not an error -- so the form offered a
+        // number that already existed and saving failed on a duplicate key.
+        let candidate = typeof rpcResult.data === 'string' ? rpcResult.data : null;
+        if (candidate) {
+          const { data: clash, error: clashErr } = await supabaseAdmin
+            .from('invoices')
+            .select('id')
+            .eq('company_id', company_id)
+            .eq('invoice_number', candidate)
+            .maybeSingle();
+          if (clashErr) throw clashErr;
+          if (clash) candidate = null;
+        }
+        if (candidate) {
+          data = candidate;
           break;
         }
-        // Resilience: the DB routine casts an invoice number's numeric suffix to
-        // `integer` and fails with 22003 ("out of range for type integer") when a
-        // company has any invoice number whose numeric run exceeds 2,147,483,647
-        // (e.g. timestamp-style references). Rather than surface a 500 that blocks
-        // the invoice form, fall back to a BigInt-safe next "INV-#####".
+
+        // Fall back to working it out here, BigInt-safe, over the same bounded
+        // digit run the routine uses.
         const { data: existingNums, error: listErr } = await supabaseAdmin
           .from('invoices')
           .select('invoice_number')
           .eq('company_id', company_id);
-        if (listErr) throw rpcResult.error; // cannot recover — surface original cause
+        if (listErr) throw rpcResult.error ?? listErr;
         let maxSeq = 0n;
         for (const row of existingNums ?? []) {
-          const match = /^INV-(\d+)$/.exec(String(row.invoice_number ?? ''));
+          const match = /^INV-(\d{1,9})$/.exec(String(row.invoice_number ?? ''));
           if (!match) continue;
           try {
             const n = BigInt(match[1]);
