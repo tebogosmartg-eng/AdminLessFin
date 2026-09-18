@@ -163,9 +163,10 @@ const QuoteDetail = () => {
                 </Button>
               </>
             )}
-            {quote.status === 'accepted' && (
+            {quote.status === 'accepted' && (quoteDocument?.leftToInvoice ?? 1) > 0.005 && (
               <Button onClick={() => setIsCreateInvoiceOpen(true)}>
-                <FileSignature className="mr-2 h-4 w-4" /> Create Invoice
+                <FileSignature className="mr-2 h-4 w-4" />
+                {quoteDocument?.isPartlyInvoiced ? 'Invoice the balance' : 'Create Invoice'}
               </Button>
             )}
             <DropdownMenu>

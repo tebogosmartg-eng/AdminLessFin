@@ -320,3 +320,71 @@ describe('conversion and identity', () => {
     expect(doc.banking).toMatchObject({ reference: 'QTE-00042', incomplete: false });
   });
 });
+
+describe('the lines, once a quotation records them properly', () => {
+  it('prints them in the order they were entered, not the order the database returned them', () => {
+    const doc = buildQuoteDocument(
+      raw({
+        quote: {
+          ...raw().quote,
+          quote_items: [
+            { position: 2, description: 'Delivery', quantity: 1, unit_price: 30, line_amount: 30 },
+            { position: 1, description: 'Widget', quantity: 2, unit_price: 100, line_amount: 200 },
+          ],
+        },
+      }),
+      { today: TODAY },
+    );
+    expect(doc.lines.map((l) => l.description)).toEqual(['Widget', 'Delivery']);
+  });
+
+  it('shows what was quoted, not what the rate happens to be today', () => {
+    // The customer accepted 200.00 + 30.00 VAT. Editing the tax rate afterwards
+    // must not restate the offer they accepted.
+    const doc = buildQuoteDocument(
+      raw({
+        quote: {
+          ...raw().quote,
+          quote_items: [
+            { position: 1, description: 'Widget', quantity: 2, unit_price: 100, line_amount: 200, tax_amount: 30, tax_rate_id: 'rate-vat' },
+          ],
+        },
+        taxRates: [{ id: 'rate-vat', name: 'VAT 15%', rate: 25 }],
+      }),
+      { today: TODAY },
+    );
+    expect(doc.lines[0].amount).toBe(200);
+    expect(doc.lines[0].taxAmount).toBe(30);
+    expect(doc.total).toBe(230);
+  });
+});
+
+describe('what has been invoiced off a quotation', () => {
+  const accepted = () => ({ ...raw().quote, status: 'accepted' });
+
+  it('says how much is still to come when only part of it has been invoiced', () => {
+    const doc = buildQuoteDocument(
+      raw({ quote: accepted(), conversion: { total: 1150, invoiced: 460, left_to_invoice: 690 } }),
+      { today: TODAY },
+    );
+    expect(doc.isPartlyInvoiced).toBe(true);
+    expect(doc.invoicedAmount).toBe(460);
+    expect(doc.leftToInvoice).toBe(690);
+    expect(validityWording(doc)).toContain('still to come');
+  });
+
+  it('says so plainly once all of it has been invoiced', () => {
+    const doc = buildQuoteDocument(
+      raw({ quote: accepted(), conversion: { total: 1150, invoiced: 1150, left_to_invoice: 0 } }),
+      { today: TODAY },
+    );
+    expect(doc.isPartlyInvoiced).toBe(false);
+    expect(validityWording(doc)).toBe('This quotation has been invoiced in full.');
+  });
+
+  it('still reads as a live offer when nothing has been invoiced', () => {
+    const doc = buildQuoteDocument(raw({ conversion: { total: 1150, invoiced: 0, left_to_invoice: 1150 } }), { today: TODAY });
+    expect(doc.isPartlyInvoiced).toBe(false);
+    expect(validityWording(doc)).not.toContain('invoiced');
+  });
+});

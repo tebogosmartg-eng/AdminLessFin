@@ -28,6 +28,7 @@ import { quoteTotals } from '../lib/quotes/quoteDocument';
 import { fetchQuoteDocument } from '../hooks/useQuoteDocument';
 import { downloadQuotePdf } from '../lib/quotes/quotePdf';
 import { quotesQuery } from '../lib/queries';
+import { edgeErrorMessage } from '../lib/platform/edgeError';
 import { Input } from '../components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 
@@ -69,13 +70,18 @@ const Quotes = () => {
       const { error } = await supabase.functions.invoke('quotes', {
         body: { method: 'DELETE', company_id: activeCompany.id, quoteId: id },
       });
-      if (error) throw error;
+      // The server refuses to delete an accepted or invoiced quotation, and
+      // says why. supabase-js hides that message behind a generic one unless
+      // the body is read, which is how a clear refusal became "Edge Function
+      // returned a non-2xx status code".
+      if (error) throw new Error(await edgeErrorMessage(error, 'The quotation could not be deleted.'));
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['quotes', activeCompany?.id] });
       showSuccess('Quote deleted successfully.');
     },
-    onError: (error: any) => showError(error.message),
+    onError: (error: unknown) =>
+      showError(error instanceof Error ? error.message : 'The quotation could not be deleted.'),
   });
 
   const handleEdit = (id: string) => {
@@ -222,7 +228,18 @@ const Quotes = () => {
                             <Download className="mr-2 h-4 w-4" />
                             {pdfBusyId === quote.id ? 'Preparing…' : 'Download PDF'}
                           </DropdownMenuItem>
-                          <DropdownMenuItem onClick={(e) => { e.stopPropagation(); deleteMutation.mutate(quote.id); }} className="text-red-600">Delete</DropdownMenuItem>
+                          {quote.status !== 'accepted' && (
+                            <DropdownMenuItem
+                              className="text-red-600"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (!window.confirm(`Delete quotation ${quote.quote_number}? This cannot be undone.`)) return;
+                                deleteMutation.mutate(quote.id);
+                              }}
+                            >
+                              Delete
+                            </DropdownMenuItem>
+                          )}
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </TableCell>

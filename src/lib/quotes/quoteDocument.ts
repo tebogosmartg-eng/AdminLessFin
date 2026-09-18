@@ -31,6 +31,7 @@ import {
   companyFromMaster,
   daysBetween,
   letterheadLines,
+  money,
   partyLines,
   relatedOne,
   round2,
@@ -41,9 +42,14 @@ import {
 
 export type RawQuoteItem = {
   id?: string;
+  /** Where the line sat when it was entered. */
+  position?: number | null;
   description?: string | null;
   quantity?: number | string | null;
   unit_price?: number | string | null;
+  /** What the line came to when it was quoted, and its VAT at that moment. */
+  line_amount?: number | string | null;
+  tax_amount?: number | string | null;
   tax_rate_id?: string | null;
   products?: { name?: string | null } | Array<{ name?: string | null }> | null;
   tax_rates?: { id?: string; name?: string | null; rate?: number | null }
@@ -92,6 +98,8 @@ export type RawQuoteDocument = {
   } | null;
   /** Every tax rate in the company, so a line can resolve its own rate. */
   taxRates?: Array<{ id: string; name?: string | null; rate?: number | null }> | null;
+  /** What the quote comes to and what has been invoiced off it, per the server. */
+  conversion?: { total?: number | string | null; invoiced?: number | string | null; left_to_invoice?: number | string | null } | null;
   /** Set when this quote has already been turned into an invoice. */
   invoices?: Array<{ id: string; invoice_number: string; status: string }> | null;
 };
@@ -136,8 +144,15 @@ export type QuoteDocumentModel = {
   scope: string;
   /** The quote's own terms, falling back to the company's standing wording. */
   terms: string;
-  /** The invoice this quote became, when it has been converted. */
+  /** The first invoice this quote became, when it has been converted. */
   convertedTo: { id: string; number: string } | null;
+  /** Every invoice raised off it: a deposit and a balance are two. */
+  invoices: Array<{ id: string; number: string }>;
+  /** What has been invoiced against it, and what of it is still to come. */
+  invoicedAmount: number;
+  leftToInvoice: number;
+  /** Part of it has been invoiced, and part has not. */
+  isPartlyInvoiced: boolean;
 };
 
 const STATUS_LABELS: Record<string, string> = {
@@ -193,14 +208,22 @@ export function buildQuoteDocument(
   options: { today: string },
 ): QuoteDocumentModel {
   const quote = raw.quote;
-  const items = quote.quote_items ?? [];
+  // In the order they were entered. Before quote_items carried a position the
+  // printed order was whatever the database happened to return, so two prints
+  // of one quotation could list the same work differently.
+  const items = [...(quote.quote_items ?? [])].sort(
+    (a, b) => asNumber(a.position) - asNumber(b.position),
+  );
   const byId = new Map<string, { name?: string | null; rate?: number | null }>();
   for (const r of raw.taxRates ?? []) byId.set(String(r.id), r);
 
   const lines: QuoteDocumentLine[] = items.map((item) => {
     const quantity = asNumber(item.quantity);
     const unitPrice = asNumber(item.unit_price);
-    const amount = round2(quantity * unitPrice);
+    // What was QUOTED where that is on record, and the arithmetic only as a
+    // fallback: a customer accepts a price, and editing the tax rate afterwards
+    // must not restate what they accepted.
+    const amount = item.line_amount == null ? round2(quantity * unitPrice) : round2(asNumber(item.line_amount));
     const rate = resolveRate(item, byId);
     return {
       description:
@@ -213,7 +236,9 @@ export function buildQuoteDocument(
       taxLabel: rate?.label ?? null,
       // Rounded per line, the same way post_sales_invoice_atomic rounds it, so
       // the quoted total and the invoice raised from it agree to the cent.
-      taxAmount: rate ? round2((amount * rate.rate) / 100) : 0,
+      taxAmount: item.tax_amount != null
+        ? round2(asNumber(item.tax_amount))
+        : rate ? round2((amount * rate.rate) / 100) : 0,
     };
   });
 
@@ -249,6 +274,13 @@ export function buildQuoteDocument(
   const settledByAnswer = status === 'accepted' || status === 'declined';
   const isExpired = !settledByAnswer && !!expiryDate && expiryDate < options.today;
   const converted = (raw.invoices ?? [])[0];
+  const invoices = (raw.invoices ?? []).map((i) => ({ id: asText(i.id), number: asText(i.invoice_number) }));
+  // From the server, which measures it off the invoices' own ledger movement
+  // rather than off a percentage anyone recorded.
+  const invoicedAmount = round2(asNumber(raw.conversion?.invoiced));
+  const leftToInvoice = raw.conversion?.left_to_invoice == null
+    ? round2(total - invoicedAmount)
+    : round2(asNumber(raw.conversion.left_to_invoice));
 
   return {
     quoteId: asText(quote.id),
@@ -281,11 +313,25 @@ export function buildQuoteDocument(
     scope: asText(quote.description),
     terms: asText(quote.terms) || asText(raw.company?.default_quote_terms),
     convertedTo: converted ? { id: converted.id, number: converted.invoice_number } : null,
+    invoices,
+    invoicedAmount,
+    leftToInvoice,
+    isPartlyInvoiced: invoicedAmount > 0.005 && leftToInvoice > 0.005,
   };
 }
 
 /** What the validity line says, in the words a customer reads. */
 export function validityWording(model: QuoteDocumentModel): string {
+  // What has been invoiced comes first, because it is the thing that has moved
+  // most recently and the thing a reader acts on. A quotation can be invoiced
+  // in stages -- a deposit, then the balance -- and saying only "accepted"
+  // leaves a part-invoiced quotation reading as though nothing has been billed.
+  if (model.isPartlyInvoiced) {
+    return `${money(model.invoicedAmount)} of this quotation has been invoiced, and ${money(model.leftToInvoice)} is still to come.`;
+  }
+  if (model.invoicedAmount > 0.005 && model.leftToInvoice <= 0.005) {
+    return 'This quotation has been invoiced in full.';
+  }
   if (!model.expiryDate) return 'This quotation does not carry an expiry date.';
   if (model.isAccepted) return 'This quotation has been accepted.';
   if (model.isDeclined) return 'This quotation was declined.';
