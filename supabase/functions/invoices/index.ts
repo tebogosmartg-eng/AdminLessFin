@@ -395,47 +395,41 @@ serve(withEnterprisePlatform('invoices', 'tenant', async (req, _ctx) => {
         break;
       }
 
-      case 'CREATE_FROM_QUOTE':
+      /**
+       * Raise an invoice from an accepted quotation.
+       *
+       * The whole of it now happens inside convert_quote_to_invoice_atomic,
+       * which locks the quote first. Building the lines here and posting them
+       * in a second call left a gap wide enough to drive two full invoices
+       * through from one quote -- and nothing checked the percentage, the
+       * quote's status, or what had already been invoiced against it. Probed
+       * against production, one quote was invoiced four times over, once at
+       * 500%, and once after being declined.
+       */
+      case 'CREATE_FROM_QUOTE': {
         const { quoteId, invoiceData: quoteInvoiceData, percentage } = body;
+        if (!quoteId) throw new Error('quoteId is required.');
+        const quoteInvoice = quoteInvoiceData ?? {};
+        if (!quoteInvoice.invoice_number) {
+          throw new Error('An invoice number is required. Ask for the next one first.');
+        }
 
-        const { data: quote, error: quoteError } = await supabaseAdmin
-          .from('quotes')
-          .select('*, quote_items(*, products(type))')
-          .eq('id', quoteId)
-          .eq('company_id', company_id)
-          .single();
-        
-        if (quoteError) throw quoteError;
-        if (!quote) throw new Error("Quote not found.");
-
-        const quote_p_items = quote.quote_items.map(item => ({
-          product_id: item.product_id || null,
-          quantity: item.quantity,
-          unit_price: item.unit_price * (percentage / 100.0),
-          income_account_id: item.income_account_id,
-          tax_rate_id: item.tax_rate_id || null,
-        }));
-
-        const { data: quoteInvoiceId, error: quoteRpcError } = await supabaseAdmin.rpc('post_sales_invoice_atomic', {
+        ({ data, error } = await supabaseAdmin.rpc('convert_quote_to_invoice_atomic', {
           p_company_id: company_id,
-          p_customer_id: quote.customer_id,
-          p_invoice_date: quoteInvoiceData.invoice_date,
-          p_due_date: quoteInvoiceData.due_date,
-          p_invoice_number: quoteInvoiceData.invoice_number,
-          p_ar_account_id: quoteInvoiceData.accounts_receivable_id,
-          p_inventory_asset_account_id: quoteInvoiceData.inventory_asset_account_id || null,
-          p_tax_payable_account_id: quoteInvoiceData.tax_payable_account_id || null,
-          p_description: quoteInvoiceData.description || `Invoice for Quote #${quote.quote_number} (${percentage}%)`,
-          p_items: quote_p_items,
-          p_notes: quoteInvoiceData.notes || null,
           p_quote_id: quoteId,
+          p_percentage: percentage,
+          p_invoice_date: quoteInvoice.invoice_date ?? null,
+          p_due_date: quoteInvoice.due_date ?? null,
+          p_invoice_number: quoteInvoice.invoice_number,
+          p_ar_account_id: quoteInvoice.accounts_receivable_id ?? null,
           p_actor_user_id: user.id,
-        });
-
-        if (quoteRpcError) throw quoteRpcError;
-
-        data = { id: quoteInvoiceId, message: 'Invoice created from quote successfully.' };
+          p_inventory_asset_account_id: quoteInvoice.inventory_asset_account_id || null,
+          p_tax_payable_account_id: quoteInvoice.tax_payable_account_id || null,
+          p_description: quoteInvoice.description || null,
+          p_notes: quoteInvoice.notes || null,
+        }));
         break;
+      }
 
       default:
         throw new Error(`Unsupported method: ${method}`);

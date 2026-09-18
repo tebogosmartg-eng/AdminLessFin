@@ -102,7 +102,7 @@ async function main() {
   await row.waitFor({ timeout: 30_000 }).catch(() => undefined);
   await page.screenshot({ path: path.join(OUT, 'bills.png'), fullPage: false });
   const rowText = await row.innerText().catch(() => '');
-  check('the bill is listed with what is still outstanding', rowText.includes(BILL_NUMBER) && /1\s?150/.test(rowText.replace(/ /g, ' ')), rowText.replace(/\s+/g, ' ').slice(0, 160));
+  check('the bill is listed with what is still outstanding', rowText.includes(BILL_NUMBER) && /1\s?150/.test(rowText.replace(/\u00a0/g, ' ')), rowText.replace(/\s+/g, ' ').slice(0, 160));
 
   await row.getByRole('button').last().click();
   const issue = page.getByRole('menuitem', { name: /issue supplier credit/i });

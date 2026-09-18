@@ -53,14 +53,20 @@ async function main() {
         status: 'draft', description: 'control probe', items: [line], ...overrides,
       },
     });
-    if (r.ok && (r.body as { id?: string })?.id) made.push((r.body as { id: string }).id);
+    const id = (r.body as { quote_id?: string; id?: string })?.quote_id ?? (r.body as { id?: string })?.id;
+    if (r.ok && id) made.push(id);
     return r;
   };
 
   console.log(NL + '======== WHAT A QUOTE MAY SAY ========');
   const badStatus = await newQuote({ status: 'totally-made-up' });
-  control('a quote cannot be given a status that does not exist', !badStatus.ok,
-    badStatus.ok ? 'accepted "totally-made-up"' : tech(badStatus));
+  const badStatusId = (badStatus.body as { quote_id?: string })?.quote_id;
+  const storedStatus = badStatusId
+    ? (await api.from('quotes').select('status').eq('id', badStatusId).single()).data?.status
+    : null;
+  control('a quote cannot be given a status that does not exist',
+    !badStatus.ok || storedStatus === 'draft',
+    badStatus.ok ? `created as "${storedStatus}"` : tech(badStatus));
 
   const noLines = await newQuote({ items: [] });
   control('a quote must have at least one line', !noLines.ok,
@@ -87,19 +93,34 @@ async function main() {
     wroteDirect ? 'a signed-in user inserted a quote directly' : directQuote.error?.message ?? '');
 
   console.log(NL + '======== AN ACCEPTED QUOTE ========');
-  const accepted = await newQuote({ status: 'accepted' });
-  const acceptedId = (accepted.body as { id: string }).id;
+  const accepted = await newQuote();
+  const acceptedId = (accepted.body as { quote_id?: string; id?: string }).quote_id
+    ?? (accepted.body as { id: string }).id;
+
+  const answered = await invoke(api, 'quotes', {
+    method: 'PUT', company_id: co.id, quoteId: acceptedId, quoteData: { status: 'accepted' },
+  });
+  control('a quotation can be marked accepted', answered.ok, tech(answered));
+
+  const nonsense = await invoke(api, 'quotes', {
+    method: 'PUT', company_id: co.id, quoteId: acceptedId, quoteData: { status: 'totally-made-up' },
+  });
+  control('a quotation cannot be answered with something that is not an answer', !nonsense.ok, tech(nonsense));
 
   const rewritten = await invoke(api, 'quotes', {
     method: 'PUT', company_id: co.id, quoteId: acceptedId,
-    quoteData: { items: [{ ...line, unit_price: 999999, description: 'Rewritten after acceptance' }] },
+    quoteData: {
+      customer_id: customer.data!.id, quote_date: TODAY, expiry_date: TODAY, description: 'control probe',
+      items: [{ ...line, unit_price: 999999, description: 'Rewritten after acceptance' }],
+    },
   });
   let nowSays = 0;
   if (rewritten.ok) {
     const check = await api.from('quote_items').select('unit_price').eq('quote_id', acceptedId);
     nowSays = Number((check.data ?? [])[0]?.unit_price ?? 0);
   }
-  control('the lines of an accepted quote cannot be rewritten', !rewritten.ok || nowSays !== 999999,
+  control('the lines of an accepted quote cannot be rewritten',
+    (!rewritten.ok && /can no longer be changed/i.test(JSON.stringify(rewritten.body))) || nowSays !== 999999,
     nowSays === 999999 ? 'the accepted price was changed to 999999' : tech(rewritten));
 
   console.log(NL + '======== TURNING A QUOTE INTO AN INVOICE ========');
@@ -139,9 +160,13 @@ async function main() {
   control('a quote cannot be invoiced for more than it was for', !over.ok,
     over.ok ? '500% of the quote was invoiced' : tech(over));
 
-  const declined = await newQuote({ status: 'declined' });
+  const declined = await newQuote();
+  const declinedId = (declined.body as { quote_id: string }).quote_id;
+  await invoke(api, 'quotes', {
+    method: 'PUT', company_id: co.id, quoteId: declinedId, quoteData: { status: 'declined', reason: 'probe' },
+  });
   const declinedConvert = await invoke(api, 'invoices', {
-    method: 'CREATE_FROM_QUOTE', company_id: co.id, quoteId: (declined.body as { id: string }).id, percentage: 100,
+    method: 'CREATE_FROM_QUOTE', company_id: co.id, quoteId: declinedId, percentage: 100,
     invoiceData: {
       invoice_date: TODAY, due_date: TODAY, accounts_receivable_id: ar.data!.id,
       invoice_number: await nextInvoiceNumber(), description: 'declined probe',
@@ -162,7 +187,7 @@ async function main() {
     deleteConverted.ok && !stillLinked ? 'the quote behind a posted invoice was deleted' : tech(deleteConverted));
 
   console.log(NL + '======== WHAT THE LINES REMEMBER ========');
-  const cols = await api.from('quote_items').select('*').eq('quote_id', made[made.length - 1] ?? acceptedId).limit(1);
+  const cols = await api.from('quote_items').select('*').eq('quote_id', acceptedId).limit(1);
   const sample = (cols.data ?? [])[0] ?? {};
   control('a quote line records where it sat, so the printed order is the entered order',
     Object.prototype.hasOwnProperty.call(sample, 'position'), Object.keys(sample).join(', '));
@@ -177,8 +202,11 @@ async function main() {
   for (const id of made) {
     await invoke(api, 'quotes', { method: 'DELETE', company_id: co.id, quoteId: id });
   }
-  const left = await api.from('quotes').select('id').eq('company_id', co.id).in('id', made);
-  console.log('  probe quotes left behind: ' + (left.data ?? []).length);
+  const left = await api.from('quotes').select('quote_number, status').eq('company_id', co.id).in('id', made);
+  const rows = left.data ?? [];
+  console.log(rows.length === 0
+    ? '  every probe quote removed'
+    : `  kept on record (invoiced, so not deletable — by design): ${rows.map((r) => r.quote_number + ' ' + r.status).join(', ')}`);
 
   console.log(NL + 'CONTROLS HELD ' + held + '  MISSING ' + missing);
   if (missing) {

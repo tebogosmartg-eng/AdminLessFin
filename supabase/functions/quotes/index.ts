@@ -1,85 +1,53 @@
 // @ts-nocheck
+/**
+ * Quotations.
+ *
+ * Every write goes through a database function, and every one of those is
+ * service_role only. This function is where the caller is authorised:
+ * bootstrapTenantRequest checks the user belongs to the company, and the
+ * database functions check it again against the actor they are given.
+ *
+ * What changed, and why: the module used to write quotes and quote_items
+ * straight from here with no validation at all, and RLS let any member write
+ * them by hand as well. Probed against production, it accepted a made-up
+ * status, a quote with no lines, a negative quantity, another company's income
+ * account, and the rewriting of a price the customer had already accepted.
+ */
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts"
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0'
 import {
   ENTERPRISE_CORS_HEADERS,
   withEnterprisePlatform,
   edgeFailure,
+  bootstrapTenantRequest,
 } from '../_shared/enterpriseEdgePlatform.ts'
-
 
 const corsHeaders = ENTERPRISE_CORS_HEADERS
 
-/** Next QTE-##### from existing numbers. Ignores QDOC-/probe refs so they cannot reset the sequence. */
-async function allocateNextQuoteNumber(client, companyId) {
-  const { data: existingNums, error: listErr } = await client
-    .from('quotes')
-    .select('quote_number')
-    .eq('company_id', companyId);
-  if (listErr) throw listErr;
-  let maxSeq = 0n;
-  for (const row of existingNums ?? []) {
-    const match = /^QTE-(\d+)$/i.exec(String(row.quote_number ?? ''));
-    if (!match) continue;
-    try {
-      const n = BigInt(match[1]);
-      if (n > maxSeq) maxSeq = n;
-    } catch { /* ignore unparseable */ }
+/** A failed read must stop the request, not come back as an empty document. */
+function mustRead(label: string, res: { error: unknown }) {
+  if (res.error) {
+    throw new Error(
+      `Could not read the ${label}: ${(res.error as { message?: string }).message ?? res.error}`,
+    );
   }
-  return `QTE-${(maxSeq + 1n).toString().padStart(5, '0')}`;
 }
 
-function quoteItemRow(item, quoteId) {
-  return {
-    quote_id: quoteId,
+/** The lines as the posting function wants them, tolerant of the form's 'none'. */
+function itemsForRpc(items: unknown) {
+  return (Array.isArray(items) ? items : []).map((item) => ({
     product_id: item.product_id || null,
     description: item.description,
     quantity: item.quantity,
     unit_price: item.unit_price,
     income_account_id: item.income_account_id || null,
-    tax_rate_id: item.tax_rate_id || null,
-  };
-}
-
-function isUniqueViolation(err) {
-  return err?.code === '23505' || /duplicate key|unique constraint/i.test(String(err?.message ?? ''));
+    tax_rate_id: item.tax_rate_id && item.tax_rate_id !== 'none' ? item.tax_rate_id : null,
+  }));
 }
 
 serve(withEnterprisePlatform('quotes', 'tenant', async (req, _ctx) => {
-
   try {
-    const supabase = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
-      { global: { headers: { Authorization: req.headers.get('Authorization')! } } }
-    )
-
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) throw new Error("User not authenticated.");
-
-    const body = await req.json();
-    const { method, company_id } = body;
-
-    if (!company_id) {
-      throw new Error("Company ID is required.");
-    }
-    _ctx.companyId = company_id;
-
-    const { data: companyMember, error: memberError } = await supabase
-      .from('company_users')
-      .select('user_id')
-      .eq('user_id', user.id)
-      .eq('company_id', company_id)
-      .single();
-
-    if (memberError || !companyMember) {
-      throw new Error("Permission denied.");
-    }
-
-    const supabaseAdmin = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-    );
+    const { user, admin: supabaseAdmin, body, company_id } = await bootstrapTenantRequest(req, _ctx);
+    const { method } = body;
 
     let data, error;
 
@@ -94,13 +62,14 @@ serve(withEnterprisePlatform('quotes', 'tenant', async (req, _ctx) => {
           .eq('company_id', company_id)
           .order('quote_date', { ascending: false }));
         break;
-      
+
       case 'GET_ONE':
         ({ data, error } = await supabaseAdmin
           .from('quotes')
           .select('*, customers ( name, address, email ), quote_items(*, products(name), tax_rates(id, name, rate))')
           .eq('id', body.quoteId)
           .eq('company_id', company_id)
+          .order('position', { foreignTable: 'quote_items', ascending: true })
           .single());
         break;
 
@@ -120,7 +89,7 @@ serve(withEnterprisePlatform('quotes', 'tenant', async (req, _ctx) => {
       case 'GET_DOCUMENT': {
         if (!body.quoteId) throw new Error('quoteId is required.');
 
-        const { data: quote, error: quoteError } = await supabaseAdmin
+        const quoteRes = await supabaseAdmin
           .from('quotes')
           .select(`
             id,
@@ -130,23 +99,31 @@ serve(withEnterprisePlatform('quotes', 'tenant', async (req, _ctx) => {
             status,
             description,
             terms,
+            accepted_at,
+            declined_at,
+            decline_reason,
             customers ( id, name, contact_name, address, email, phone, tax_id ),
             quote_items (
               id,
+              position,
               description,
               quantity,
               unit_price,
+              line_amount,
+              tax_amount,
               tax_rate_id,
               products ( name )
             )
           `)
           .eq('id', body.quoteId)
           .eq('company_id', company_id)
+          .order('position', { foreignTable: 'quote_items', ascending: true })
           .maybeSingle();
-        if (quoteError) throw quoteError;
+        mustRead('quotation', quoteRes);
+        const quote = quoteRes.data;
         if (!quote) throw new Error('Quote not found in this company.');
 
-        const [companyRes, masterRes, bankRes, ratesRes, invoiceRes] = await Promise.all([
+        const [companyRes, masterRes, bankRes, ratesRes, invoiceRes, grossRes, invoicedRes] = await Promise.all([
           supabaseAdmin
             .from('companies')
             .select('id, name, logo_url, address, tax_id, default_quote_terms')
@@ -178,6 +155,8 @@ serve(withEnterprisePlatform('quotes', 'tenant', async (req, _ctx) => {
             .eq('company_id', company_id)
             .eq('quote_id', body.quoteId)
             .order('invoice_date', { ascending: true }),
+          supabaseAdmin.rpc('quote_gross_amount', { p_quote_id: body.quoteId }),
+          supabaseAdmin.rpc('quote_invoiced_amount', { p_quote_id: body.quoteId }),
         ]);
 
         for (const [label, res] of [
@@ -186,6 +165,8 @@ serve(withEnterprisePlatform('quotes', 'tenant', async (req, _ctx) => {
           ['banking details', bankRes],
           ['tax rates', ratesRes],
           ['linked invoices', invoiceRes],
+          ['quotation total', grossRes],
+          ['amount already invoiced', invoicedRes],
         ] as Array<[string, { error: unknown }]>) {
           if (res.error) {
             throw new Error(
@@ -193,6 +174,9 @@ serve(withEnterprisePlatform('quotes', 'tenant', async (req, _ctx) => {
             );
           }
         }
+
+        const gross = Math.round(Number(grossRes.data ?? 0) * 100) / 100;
+        const invoiced = Math.round(Number(invoicedRes.data ?? 0) * 100) / 100;
 
         data = {
           quote,
@@ -202,92 +186,83 @@ serve(withEnterprisePlatform('quotes', 'tenant', async (req, _ctx) => {
           banking: bankRes.data && bankRes.data.status === 'active' ? bankRes.data : null,
           taxRates: ratesRes.data ?? [],
           invoices: invoiceRes.data ?? [],
+          // What is left to invoice, so a part-invoiced quote does not read as
+          // either untouched or finished.
+          conversion: {
+            total: gross,
+            invoiced,
+            left_to_invoice: Math.round((gross - invoiced) * 100) / 100,
+          },
         };
         break;
       }
 
       case 'POST': {
-        const { items: postItems, ...postQuoteData } = body.quoteData ?? {};
-        const requestedNumber = String(postQuoteData.quote_number ?? '').trim();
-        if (!requestedNumber) {
-          postQuoteData.quote_number = await allocateNextQuoteNumber(supabaseAdmin, company_id);
-        } else {
-          postQuoteData.quote_number = requestedNumber;
-        }
-
-        let newQuote, postError;
-        ({ data: newQuote, error: postError } = await supabaseAdmin
-          .from('quotes')
-          .insert({ ...postQuoteData, company_id })
-          .select('id')
-          .single());
-
-        if (postError && isUniqueViolation(postError) && !requestedNumber) {
-          postQuoteData.quote_number = await allocateNextQuoteNumber(supabaseAdmin, company_id);
-          ({ data: newQuote, error: postError } = await supabaseAdmin
-            .from('quotes')
-            .insert({ ...postQuoteData, company_id })
-            .select('id')
-            .single());
-        }
-        if (postError && isUniqueViolation(postError)) {
-          throw new Error(`Quote number ${postQuoteData.quote_number} is already used in this company.`);
-        }
-        if (postError) throw postError;
-
-        const itemsToInsert = (postItems ?? []).map((item) => quoteItemRow(item, newQuote.id));
-        const { error: postItemsError } = await supabaseAdmin.from('quote_items').insert(itemsToInsert);
-        if (postItemsError) throw postItemsError;
-        data = newQuote;
+        const quoteData = body.quoteData ?? {};
+        ({ data, error } = await supabaseAdmin.rpc('save_quote_atomic', {
+          p_company_id: company_id,
+          p_customer_id: quoteData.customer_id ?? null,
+          p_quote_date: quoteData.quote_date ?? null,
+          p_items: itemsForRpc(quoteData.items),
+          p_actor_user_id: user.id,
+          p_quote_id: null,
+          p_quote_number: quoteData.quote_number || null,
+          p_expiry_date: quoteData.expiry_date || null,
+          p_description: quoteData.description ?? null,
+          p_terms: quoteData.terms ?? null,
+        }));
         break;
       }
 
       case 'PUT': {
         if (!body.quoteId) throw new Error('quoteId is required.');
-        const { items: putItems, ...putQuoteData } = body.quoteData ?? {};
-        const { error: putError } = await supabaseAdmin
-          .from('quotes')
-          .update(putQuoteData)
-          .eq('id', body.quoteId)
-          .eq('company_id', company_id);
-        if (putError && isUniqueViolation(putError)) {
-          throw new Error(`Quote number ${putQuoteData.quote_number} is already used in this company.`);
-        }
-        if (putError) throw putError;
+        const quoteData = body.quoteData ?? {};
 
-        // Status-only updates (accept / decline) send no lines. Replacing
-        // items then would throw, or wipe the quote, which is how Mark as
-        // Accepted returned 500.
-        if (Array.isArray(putItems)) {
-          const { error: deleteItemsError } = await supabaseAdmin
-            .from('quote_items')
-            .delete()
-            .eq('quote_id', body.quoteId);
-          if (deleteItemsError) throw deleteItemsError;
-          const putItemsToInsert = putItems.map((item) => quoteItemRow(item, body.quoteId));
-          const { error: putItemsError } = await supabaseAdmin.from('quote_items').insert(putItemsToInsert);
-          if (putItemsError) throw putItemsError;
+        // Answering a quotation and rewriting one are different acts with
+        // different rules: an accepted quote's lines are fixed, but the answer
+        // itself is exactly what is being recorded. A status-only update is the
+        // former; the form always sends lines.
+        if (!Array.isArray(quoteData.items)) {
+          if (!quoteData.status) {
+            throw new Error('Nothing to change: send the quotation’s lines, or the answer it was given.');
+          }
+          ({ data, error } = await supabaseAdmin.rpc('set_quote_status_atomic', {
+            p_company_id: company_id,
+            p_quote_id: body.quoteId,
+            p_status: quoteData.status,
+            p_actor_user_id: user.id,
+            p_reason: quoteData.decline_reason ?? quoteData.reason ?? null,
+          }));
+          break;
         }
-        data = { id: body.quoteId };
+
+        ({ data, error } = await supabaseAdmin.rpc('save_quote_atomic', {
+          p_company_id: company_id,
+          p_customer_id: quoteData.customer_id ?? null,
+          p_quote_date: quoteData.quote_date ?? null,
+          p_items: itemsForRpc(quoteData.items),
+          p_actor_user_id: user.id,
+          p_quote_id: body.quoteId,
+          p_quote_number: quoteData.quote_number || null,
+          p_expiry_date: quoteData.expiry_date || null,
+          p_description: quoteData.description ?? null,
+          p_terms: quoteData.terms ?? null,
+        }));
         break;
       }
 
-      case 'DELETE':
-        ({ data, error } = await supabaseAdmin
-          .from('quotes')
-          .delete()
-          .eq('id', body.quoteId)
-          .eq('company_id', company_id));
+      case 'DELETE': {
+        if (!body.quoteId) throw new Error('quoteId is required.');
+        ({ data, error } = await supabaseAdmin.rpc('delete_quote_atomic', {
+          p_company_id: company_id,
+          p_quote_id: body.quoteId,
+          p_actor_user_id: user.id,
+        }));
         break;
+      }
 
       case 'GET_NEXT_QUOTE_NUMBER': {
-        const rpcResult = await supabaseAdmin.rpc('get_next_quote_number', { p_company_id: company_id });
-        if (!rpcResult.error && rpcResult.data) {
-          data = rpcResult.data;
-          break;
-        }
-        data = await allocateNextQuoteNumber(supabaseAdmin, company_id);
-        error = null;
+        ({ data, error } = await supabaseAdmin.rpc('get_next_quote_number', { p_company_id: company_id }));
         break;
       }
 
