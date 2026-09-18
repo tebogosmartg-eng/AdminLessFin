@@ -69,7 +69,11 @@ export type LifecycleNextAction = {
 export function quoteNextAction(quote: QuoteWorkflowState): LifecycleNextAction | null {
   switch (quote.status) {
     case 'draft':
-      return { label: 'Send quote', description: 'Email the quote to your customer for review.', action: 'send' };
+      return {
+        label: 'Send quote',
+        description: 'Email the quote, or mark it sent, accepted, or declined without email.',
+        action: 'send',
+      };
     case 'sent':
       return { label: 'Await customer approval', description: 'Mark as accepted or declined when the customer responds.', action: 'accept' };
     case 'accepted':

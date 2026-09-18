@@ -131,14 +131,36 @@ const QuoteDetail = () => {
             <h1 className="text-3xl font-bold">Quote {quote.quote_number}</h1>
             <Badge className="mt-2 capitalize">{quote.status}</Badge>
           </div>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2 justify-end">
             {(quote.status === 'draft' || quote.status === 'sent') && (
-              <Button onClick={() => setIsSendDialogOpen(true)}><Send className="mr-2 h-4 w-4" /> Send Quote</Button>
+              <Button onClick={() => setIsSendDialogOpen(true)}>
+                <Send className="mr-2 h-4 w-4" /> Send Quote
+              </Button>
             )}
-            {quote.status === 'sent' && (
+            {quote.status === 'draft' && (
+              <Button
+                variant="outline"
+                onClick={() => updateStatusMutation.mutate('sent')}
+                disabled={updateStatusMutation.isPending}
+              >
+                Mark as Sent
+              </Button>
+            )}
+            {(quote.status === 'draft' || quote.status === 'sent') && (
               <>
-                <Button onClick={() => updateStatusMutation.mutate('accepted')}><Check className="mr-2 h-4 w-4" /> Mark as Accepted</Button>
-                <Button variant="destructive" onClick={() => updateStatusMutation.mutate('declined')}><X className="mr-2 h-4 w-4" /> Mark as Declined</Button>
+                <Button
+                  onClick={() => updateStatusMutation.mutate('accepted')}
+                  disabled={updateStatusMutation.isPending}
+                >
+                  <Check className="mr-2 h-4 w-4" /> Mark as Accepted
+                </Button>
+                <Button
+                  variant="destructive"
+                  onClick={() => updateStatusMutation.mutate('declined')}
+                  disabled={updateStatusMutation.isPending}
+                >
+                  <X className="mr-2 h-4 w-4" /> Mark as Declined
+                </Button>
               </>
             )}
             {quote.status === 'accepted' && (
