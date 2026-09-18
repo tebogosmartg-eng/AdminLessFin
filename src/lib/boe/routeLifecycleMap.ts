@@ -34,6 +34,8 @@ const ROUTE_BINDINGS: RoutePattern[] = [
   { pattern: /^\/purchase-orders$/, binding: { lifecycleId: 'procurement', stageId: 'purchase_order', label: 'Purchase Orders' } },
   { pattern: /^\/bills$/, binding: { lifecycleId: 'procurement', stageId: 'bill', label: 'Bills' } },
   { pattern: /^\/pay-bills$/, binding: { lifecycleId: 'procurement', stageId: 'payment', label: 'Pay Bills' } },
+  { pattern: /^\/vendor-credits\/[^/]+$/, binding: { lifecycleId: 'procurement', stageId: 'payment', label: 'Supplier Credit Detail' } },
+  { pattern: /^\/vendor-credits$/, binding: { lifecycleId: 'procurement', stageId: 'payment', label: 'Supplier Credits' } },
   { pattern: /^\/vendors/, binding: { lifecycleId: 'procurement', stageId: 'vendor', label: 'Vendors' } },
 
   { pattern: /^\/payroll$/, binding: { lifecycleId: 'payroll', stageId: 'preparation', label: 'Payroll Command Centre' } },

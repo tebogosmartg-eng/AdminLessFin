@@ -51,6 +51,10 @@ export const MODULE_BLOCKED_GUIDANCE: Record<
     why: 'Credit notes post journal entries that reverse revenue, output VAT and Accounts Receivable. The accounting foundation must be complete first.',
     tip: 'Complete Accounting Setup, then return here to credit a customer.',
   },
+  vendor_credits: {
+    why: 'Supplier credits post journal entries that reverse an expense, input VAT and Accounts Payable. The accounting foundation must be complete first.',
+    tip: 'Complete Accounting Setup, then return here to record the supplier’s credit.',
+  },
   journal_entries: {
     why: 'Journal entries write directly to the general ledger. Posting is blocked until your chart, tax, and calendar are validated.',
     tip: 'Complete only the unresolved Accounting Setup items. If a Chart of Accounts already exists, you will be taken to control-account mapping — not asked to generate a new chart.',

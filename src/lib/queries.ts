@@ -31,6 +31,10 @@ export type BillQueryRow = {
   vendor_id: string;
   vendors: { name: string }[] | null;
   total: number;
+  /** Paid off by payments and supplier credits. */
+  settled: number;
+  /** total less settled: what is still owed on this bill. */
+  outstanding: number;
   bill_number: string | null;
   attachment_url: string | null;
 };
@@ -335,10 +339,16 @@ export const billsQuery = (companyId: string, filters?: Record<string, unknown>)
     });
     const result = parseFunctionResult<Record<string, unknown>[] | null>(data, error);
     if (!result) return [];
-    return result.map((entry) => ({
-      ...entry,
-      total: mapBillTotal(entry as { journal_entry_items?: { type: string; amount: number }[] }),
-    })) as BillQueryRow[];
+    return result.map((entry) => {
+      const total = mapBillTotal(entry as { journal_entry_items?: { type: string; amount: number }[] });
+      const settled = Number((entry as { settled?: number }).settled ?? 0);
+      return {
+        ...entry,
+        total,
+        settled,
+        outstanding: Math.round((total - settled) * 100) / 100,
+      };
+    }) as BillQueryRow[];
   },
 });
 

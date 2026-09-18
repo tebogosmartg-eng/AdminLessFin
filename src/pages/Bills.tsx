@@ -22,6 +22,7 @@ import BillForm from '../components/BillForm';
 import JournalEntryDetail from '../components/JournalEntryDetail';
 import JournalEntryForm from '../components/JournalEntryForm';
 import BillPaymentForm from '../components/BillPaymentForm';
+import VendorCreditForm from '../components/VendorCreditForm';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '../components/ui/dropdown-menu';
 import { showError, showSuccess } from '../utils/toast';
 import { useAuth } from '../contexts/AuthContext';
@@ -43,9 +44,16 @@ type BillEntry = {
   vendor_id: string;
   vendors: { name: string }[] | null;
   total: number;
+  settled: number;
+  outstanding: number;
   bill_number: string | null;
   attachment_url: string | null;
 };
+
+/** 'partially_paid' is a database value, not a sentence. */
+function billStatusLabel(status: string): string {
+  return status === 'partially_paid' ? 'Partly paid' : status;
+}
 
 const Bills = () => {
   useDocumentTitle('Bills');
@@ -59,6 +67,9 @@ const Bills = () => {
   // Payment State
   const [isPaymentFormOpen, setIsPaymentFormOpen] = useState(false);
   const [selectedBillForPayment, setSelectedBillForPayment] = useState<BillEntry | null>(null);
+
+  // Supplier credit State
+  const [creditTarget, setCreditTarget] = useState<BillEntry | null>(null);
 
   // Filter State
   const [searchTerm, setSearchTerm] = useState('');
@@ -100,6 +111,7 @@ const Bills = () => {
       case 'due_date': return b.due_date ? new Date(b.due_date).getTime() : 0;
       case 'vendor': return b.vendors?.[0]?.name ?? '';
       case 'total': return b.total ?? 0;
+      case 'outstanding': return b.outstanding ?? 0;
       default: return (b as unknown as Record<string, string>)[key];
     }
   });
@@ -109,7 +121,8 @@ const Bills = () => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     return sortedBills.filter(
-      (bill) => bill.due_date && new Date(bill.due_date) < today && bill.status === 'open'
+      (bill) =>
+        bill.due_date && new Date(bill.due_date) < today && bill.status !== 'paid' && bill.status !== 'void'
     );
   }, [sortedBills, overdueOnly]);
 
@@ -224,6 +237,7 @@ const Bills = () => {
               <SelectContent>
                 <SelectItem value="all">All Statuses</SelectItem>
                 <SelectItem value="open">Open</SelectItem>
+                <SelectItem value="partially_paid">Partly paid</SelectItem>
                 <SelectItem value="paid">Paid</SelectItem>
                 <SelectItem value="void">Void</SelectItem>
               </SelectContent>
@@ -269,6 +283,7 @@ const Bills = () => {
                 <SortableHeader sortKey="bill_number" sort={sort} onSort={requestSort}>Bill #</SortableHeader>
                 <SortableHeader sortKey="description" sort={sort} onSort={requestSort}>Description</SortableHeader>
                 <SortableHeader sortKey="total" sort={sort} onSort={requestSort} align="right">Amount</SortableHeader>
+                <SortableHeader sortKey="outstanding" sort={sort} onSort={requestSort} align="right">Outstanding</SortableHeader>
                 <SortableHeader sortKey="status" sort={sort} onSort={requestSort}>Status</SortableHeader>
                 <TableHead className="w-[50px]"></TableHead>
               </TableRow>
@@ -277,7 +292,7 @@ const Bills = () => {
               {isLoading ? (
                 Array.from({ length: 5 }).map((_, i) => (
                   <TableRow key={`skeleton-${i}`}>
-                    <TableCell colSpan={7}><Skeleton className="h-6 w-full" /></TableCell>
+                    <TableCell colSpan={8}><Skeleton className="h-6 w-full" /></TableCell>
                   </TableRow>
                 ))
               ) : displayedBills.length > 0 ? (
@@ -293,8 +308,11 @@ const Bills = () => {
                         </div>
                     </TableCell>
                     <TableCell className="text-right font-mono">{formatCurrency(bill.total)}</TableCell>
+                    <TableCell className="text-right font-mono">
+                      {bill.status === 'void' ? '-' : formatCurrency(bill.outstanding)}
+                    </TableCell>
                     <TableCell>
-                      <Badge variant={statusBadgeVariant(bill.status)} className="capitalize">{bill.status}</Badge>
+                      <Badge variant={statusBadgeVariant(bill.status)} className="capitalize">{billStatusLabel(bill.status)}</Badge>
                     </TableCell>
                     <TableCell>
                       <DropdownMenu>
@@ -323,6 +341,9 @@ const Bills = () => {
                                 <DropdownMenuItem onClick={() => voidMutation.mutate(bill.id)} className="text-red-600">Void</DropdownMenuItem>
                             </>
                           )}
+                          {bill.status !== 'void' && (
+                            <DropdownMenuItem onClick={() => setCreditTarget(bill)}>Issue Supplier Credit</DropdownMenuItem>
+                          )}
                           <DropdownMenuItem onClick={() => handleDelete(bill.id)} className="text-red-600">Delete</DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
@@ -331,7 +352,7 @@ const Bills = () => {
                 ))
               ) : (
                 <TableRow>
-                  <TableCell colSpan={7} className="p-0">
+                  <TableCell colSpan={8} className="p-0">
                     {(searchTerm || statusFilter !== 'all' || vendorFilter !== 'all' || dateFrom || dateTo) ? (
                       <EmptyState
                         icon={Search}
@@ -375,8 +396,16 @@ const Bills = () => {
           setIsOpen={setIsPaymentFormOpen}
           vendorId={selectedBillForPayment.vendor_id}
           vendorName={selectedBillForPayment.vendors?.[0]?.name || 'Vendor'}
-          amountDue={selectedBillForPayment.total}
+          amountDue={selectedBillForPayment.outstanding}
           billId={selectedBillForPayment.id}
+        />
+      )}
+      {creditTarget && (
+        <VendorCreditForm
+          isOpen={!!creditTarget}
+          setIsOpen={(open) => { if (!open) setCreditTarget(null); }}
+          initialVendorId={creditTarget.vendor_id}
+          initialBillId={creditTarget.id}
         />
       )}
     </>

@@ -58,6 +58,7 @@ const QuickCaptureExpense = lazy(() => import("./pages/QuickCaptureExpense"));
 const Bills = lazy(() => import("./pages/Bills"));
 const PayBills = lazy(() => import("./pages/PayBills"));
 const VendorCredits = lazy(() => import("./pages/VendorCredits"));
+const VendorCreditDetail = lazy(() => import("./pages/VendorCreditDetail"));
 const RecurringBills = lazy(() => import("./pages/RecurringBills"));
 const Vendors = lazy(() => import("./pages/Vendors"));
 const CreditorsAgeAnalysis = lazy(() => import("./pages/CreditorsAgeAnalysis"));
@@ -187,7 +188,8 @@ export const AppRouter = () => {
         <Route path="/purchases/quick-capture" element={<QuickCaptureExpense />} />
         <Route path="/bills" element={<Bills />} />
         <Route path="/pay-bills" element={<PayBills />} />
-        <Route path="/vendor-credits" element={<VendorCredits />} />
+        <Route path="/vendor-credits" element={<AccountingReadyGate module="vendor_credits"><VendorCredits /></AccountingReadyGate>} />
+        <Route path="/vendor-credits/:id" element={<AccountingReadyGate module="vendor_credits"><VendorCreditDetail /></AccountingReadyGate>} />
         <Route path="/recurring-bills" element={<RecurringBills />} />
         <Route path="/vendors" element={<Vendors />} />
         <Route path="/creditors-age-analysis" element={<CreditorsAgeAnalysis />} />
