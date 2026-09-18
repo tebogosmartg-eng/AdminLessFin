@@ -1,26 +1,27 @@
 {
   "company": {
-    "id": "3cbfd4eb-a095-43f3-837a-0b4f1e2c1752",
-    "name": "Spaceman",
+    "id": "be3855e9-d11c-48a8-8c39-10e12a0ff2df",
+    "name": "CERT TX 1785230675937",
     "tax_id": null,
-    "address": "188 MANDELA VILLAGE",
-    "logo_url": "https://zaulhnpohrgqqodvzhxp.supabase.co/storage/v1/object/public/attachments/3cbfd4eb-a095-43f3-837a-0b4f1e2c1752/logo-1785228804345.png",
-    "owner_id": "3cbfd4eb-a095-43f3-837a-0b4f1e2c1752",
-    "created_at": "2025-11-06T04:26:35.470798+00:00",
-    "default_invoice_notes": "E2E QA terms 1785296801601 — payment due 30 days",
+    "address": null,
+    "logo_url": null,
+    "owner_id": "908ad90e-ee0e-4957-943d-ed1ec2fb843a",
+    "created_at": "2026-07-28T09:24:37.540547+00:00",
+    "default_quote_terms": null,
+    "default_invoice_notes": null,
     "user_role": "owner"
   },
-  "bill_number": "SR-PAY-1787394650901",
+  "bill_number": "SR-PAY-1789733882446",
   "steps": [
     {
       "step": "10 bill recorded",
       "ok": true,
-      "detail": "SR-PAY-1787394650901"
+      "detail": "SR-PAY-1789733882446"
     },
     {
       "step": "10 AP increased",
       "ok": true,
-      "detail": "1021208.44 -> 1021665.22"
+      "detail": "1975 -> 2431.78"
     },
     {
       "step": "10 payment recorded",
@@ -30,12 +31,12 @@
     {
       "step": "10 AP reduced by payment",
       "ok": true,
-      "detail": "1021665.22 -> 1021208.44 (expected 1021208.44)"
+      "detail": "2431.78 -> 1975 (expected 1975)"
     },
     {
       "step": "10 bank reduced by payment",
       "ok": true,
-      "detail": "-3182.79 -> -3639.57 (expected -3639.5699999999997)"
+      "detail": "-36981.52 -> -37438.3 (expected -37438.299999999996)"
     },
     {
       "step": "10 bill marked paid",

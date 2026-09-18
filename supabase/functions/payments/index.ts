@@ -272,13 +272,18 @@ serve(withEnterprisePlatform('payments', 'tenant', async (req, _ctx) => {
         if (!isVendorPaymentData(vendorPaymentData)) throw new Error("Invalid vendor payment data.");
         
         if (billId) {
-          // Paying a specific bill
+          // Paying a specific bill. The company and the actor go with it: the
+          // old call took a bill id alone, so the company it posted into came
+          // from the bill itself and a member of one company could pay another
+          // company's bill.
           ({ data, error } = await supabaseAdmin.rpc('pay_specific_bill', {
+            p_company_id: company_id,
             p_bill_id: billId,
             p_payment_date: vendorPaymentData.payment_date,
             p_payment_account_id: vendorPaymentData.payment_account_id,
             p_ap_account_id: vendorPaymentData.accounts_payable_id,
             p_amount: vendorPaymentData.amount,
+            p_actor_user_id: user.id,
           }));
         } else {
           // General payment to vendor (Balance Forward)

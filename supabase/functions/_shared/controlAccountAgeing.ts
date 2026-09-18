@@ -256,32 +256,36 @@ export async function computeControlAgeAnalysis(
     }
   }
 
-  // 3b. What receipts have settled against each document.
+  // 3b. What has been settled against each document.
   //
   // The outstanding figure above comes from the document's OWN journal, and a
-  // receipt is a separate journal — so without this a part-paid invoice ages at
-  // its full value, and one settled by a payment on account ages for ever.
-  // Only receipts dated on or before the reporting date count: an age analysis
-  // as at a past date must not be credited with money received after it.
+  // payment is a separate journal — so without this a part-settled document
+  // ages at its full value, and one settled by a payment on account ages for
+  // ever. Only settlements dated on or before the reporting date count: an age
+  // analysis as at a past date must not be credited with money moved after it.
   //
-  // Receivables only. There is no allocation table on the payables side yet, so
-  // bills keep their existing behaviour exactly.
+  // Both sides now have an allocation table, and they are read identically:
+  // invoice_payment_allocations for receivables, bill_payment_allocations for
+  // payables.
+  const allocationTable = side === 'receivable' ? 'invoice_payment_allocations' : 'bill_payment_allocations';
+  const allocationKey = side === 'receivable' ? 'invoice_id' : 'bill_id';
   const allocatedByDocument: Record<string, number> = {};
-  if (side === 'receivable') {
+  {
     const docIds = (openDocs ?? []).map((d: { id: string }) => d.id);
     for (let i = 0; i < docIds.length; i += 200) {
       const chunk = docIds.slice(i, i + 200);
-      const rows = await readAll<{ invoice_id: string; amount: number }>((from, to) =>
-        db.from('invoice_payment_allocations')
-          .select('invoice_id, amount, journal_entries!inner ( company_id, entry_date )')
-          .in('invoice_id', chunk)
+      const rows = await readAll<Record<string, string | number>>((from, to) =>
+        db.from(allocationTable)
+          .select(allocationKey + ', amount, journal_entries!inner ( company_id, entry_date )')
+          .in(allocationKey, chunk)
           .eq('company_id', companyId)
           .eq('journal_entries.company_id', companyId)
           .lte('journal_entries.entry_date', asOf)
           .range(from, to),
       );
       for (const a of rows) {
-        allocatedByDocument[a.invoice_id] = (allocatedByDocument[a.invoice_id] ?? 0) + Number(a.amount);
+        const docId = a[allocationKey] as string;
+        allocatedByDocument[docId] = (allocatedByDocument[docId] ?? 0) + Number(a.amount);
       }
     }
   }

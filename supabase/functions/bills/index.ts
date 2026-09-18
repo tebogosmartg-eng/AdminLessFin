@@ -117,6 +117,27 @@ serve(withEnterprisePlatform('bills', 'tenant', async (req, _ctx) => {
               journal_entry_items: journalEntry?.journal_entry_items || [],
             };
           });
+
+          // What each bill has had settled against it, by payment or by
+          // supplier credit. One read for the whole page: a bill is not
+          // "open at its full value" once something has been paid off it.
+          const billIds = data.map((b: { id: string }) => b.id);
+          if (billIds.length > 0) {
+            const { data: allocations, error: allocError } = await supabaseAdmin
+              .from('bill_payment_allocations')
+              .select('bill_id, amount')
+              .eq('company_id', company_id)
+              .in('bill_id', billIds);
+            if (allocError) throw allocError;
+            const settledByBill: Record<string, number> = {};
+            for (const a of allocations ?? []) {
+              settledByBill[a.bill_id] = (settledByBill[a.bill_id] ?? 0) + Number(a.amount);
+            }
+            data = data.map((bill: { id: string }) => ({
+              ...bill,
+              settled: Math.round((settledByBill[bill.id] ?? 0) * 100) / 100,
+            }));
+          }
         }
         break;
       

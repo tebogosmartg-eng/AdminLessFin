@@ -128,7 +128,7 @@ serve(withEnterprisePlatform('global-search', 'tenant', async (req, _ctx) => {
       ...(purchaseOrders.data || []).map(i => ({ type: 'Purchase Order', id: i.id, title: i.po_number, subtitle: i.vendors?.name, url: `/purchase-orders/${i.id}` })),
       ...(recurringBills.data || []).map(i => ({ type: 'Recurring Bill', id: i.id, title: i.profile_name, subtitle: i.vendors?.name, url: '/recurring-bills' })),
       ...(creditNotes.data || []).map(i => ({ type: 'Credit Note', id: i.id, title: i.credit_note_number, subtitle: i.customers?.name, url: `/credit-notes/${i.id}` })),
-      ...(vendorCredits.data || []).map(i => ({ type: 'Vendor Credit', id: i.id, title: i.credit_number, subtitle: i.vendors?.name, url: '/vendor-credits' })),
+      ...(vendorCredits.data || []).map(i => ({ type: 'Supplier Credit', id: i.id, title: i.credit_number, subtitle: i.vendors?.name, url: `/vendor-credits/${i.id}` })),
       ...(rankedEmployees.map(({ i, mgr }) => ({
         type: 'Employee',
         id: i.id,
