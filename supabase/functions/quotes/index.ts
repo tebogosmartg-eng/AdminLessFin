@@ -192,8 +192,9 @@ serve(withEnterprisePlatform('quotes', 'tenant', async (req, _ctx) => {
         data = newQuote;
         break;
 
-      case 'PUT':
-        const { items: putItems, ...putQuoteData } = body.quoteData;
+      case 'PUT': {
+        if (!body.quoteId) throw new Error('quoteId is required.');
+        const { items: putItems, ...putQuoteData } = body.quoteData ?? {};
         const { error: putError } = await supabaseAdmin
           .from('quotes')
           .update(putQuoteData)
@@ -201,12 +202,22 @@ serve(withEnterprisePlatform('quotes', 'tenant', async (req, _ctx) => {
           .eq('company_id', company_id);
         if (putError) throw putError;
 
-        await supabaseAdmin.from('quote_items').delete().eq('quote_id', body.quoteId);
-        const putItemsToInsert = putItems.map(item => ({ ...item, quote_id: body.quoteId }));
-        const { error: putItemsError } = await supabaseAdmin.from('quote_items').insert(putItemsToInsert);
-        if (putItemsError) throw putItemsError;
+        // Status-only updates (accept / decline) send no lines. Replacing
+        // items then would throw, or wipe the quote, which is how Mark as
+        // Accepted returned 500.
+        if (Array.isArray(putItems)) {
+          const { error: deleteItemsError } = await supabaseAdmin
+            .from('quote_items')
+            .delete()
+            .eq('quote_id', body.quoteId);
+          if (deleteItemsError) throw deleteItemsError;
+          const putItemsToInsert = putItems.map(item => ({ ...item, quote_id: body.quoteId }));
+          const { error: putItemsError } = await supabaseAdmin.from('quote_items').insert(putItemsToInsert);
+          if (putItemsError) throw putItemsError;
+        }
         data = { id: body.quoteId };
         break;
+      }
 
       case 'DELETE':
         ({ data, error } = await supabaseAdmin
