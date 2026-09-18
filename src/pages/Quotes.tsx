@@ -222,7 +222,9 @@ const Quotes = () => {
                         <DropdownMenuTrigger asChild><Button variant="ghost" className="h-8 w-8 p-0" onClick={(e) => e.stopPropagation()}><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
                           <DropdownMenuItem onClick={() => navigate(`/quotes/${quote.id}`)}>View</DropdownMenuItem>
-                          <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleEdit(quote.id); }}>Edit</DropdownMenuItem>
+                          {quote.status !== 'accepted' && (
+                            <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleEdit(quote.id); }}>Edit</DropdownMenuItem>
+                          )}
                           <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleDuplicate(quote.id); }}>Duplicate</DropdownMenuItem>
                           <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleDownloadPdf(quote.id); }} disabled={pdfBusyId !== null}>
                             <Download className="mr-2 h-4 w-4" />
