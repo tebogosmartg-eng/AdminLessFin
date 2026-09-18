@@ -46,9 +46,8 @@ export function resolveNextAction(ctx: EntityContext): NextAction | null {
         const action = invoiceNextAction(ctx.state);
         if (!action) return null;
         const stageMap: Record<string, string> = {
-          send: 'collections',
+          send: 'invoice',
           payment: 'payment',
-          reconcile: 'reconciliation',
         };
         return {
           label: action.label,

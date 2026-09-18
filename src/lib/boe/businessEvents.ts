@@ -126,7 +126,7 @@ export const BUSINESS_EVENTS: Record<string, BusinessEventDefinition> = {
     accountingImpact: true,
     documentsProduced: ['receipt'],
     orchestrationPipeline: ['workflow', 'validation', 'accounting', 'document', 'activity', 'calendar', 'dashboard', 'audit'],
-    suggestedNextEvents: ['bank.reconciled'],
+    suggestedNextEvents: [],
   },
 
   // ── Procurement ──────────────────────────────────────────────────────────

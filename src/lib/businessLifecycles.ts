@@ -46,8 +46,8 @@ export const BUSINESS_LIFECYCLES: Record<LifecycleId, BusinessLifecycle> = {
       { id: 'collections', label: 'Collections', description: 'Monitor outstanding receivables' },
       { id: 'payment', label: 'Payment', description: 'Record customer payment', route: '/receive-payments' },
       { id: 'receipt', label: 'Receipt', description: 'Issue payment confirmation' },
-      { id: 'reconciliation', label: 'Bank Reconciliation', description: 'Match bank deposits', route: '/reconciliation' },
-      { id: 'statement', label: 'Customer Statement', description: 'Period statement and history' },
+      // Bank reconciliation is a banking control, not a revenue-completion stage.
+      // Customer statements are a reporting view, not an invoice lifecycle step.
       { id: 'analytics', label: 'Revenue Analytics', description: 'Analyse revenue performance', route: '/sales' },
       { id: 'history', label: 'Customer History', description: 'Full customer transaction history' },
     ],

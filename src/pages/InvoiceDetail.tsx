@@ -5,7 +5,7 @@ import { supabase } from '../integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/card';
 import { Skeleton } from '../components/ui/skeleton';
 import { Button } from '../components/ui/button';
-import { Printer, Send, HandCoins, Ban, MessageSquare, Download, Loader2, FileText, ReceiptText } from 'lucide-react';
+import { Printer, Send, HandCoins, Ban, MessageSquare, Download, Loader2, FileText, ReceiptText, Users, ChevronDown } from 'lucide-react';
 import { Badge } from '../components/ui/badge';
 import { showError, showSuccess } from '../utils/toast';
 import InvoicePaymentForm from '../components/InvoicePaymentForm';
@@ -18,7 +18,13 @@ import BusinessLifecycleStepper from '../components/BusinessLifecycleStepper';
 import LifecycleNextAction from '../components/LifecycleNextAction';
 import LifecycleContextBadge from '../components/boe/LifecycleContextBadge';
 import { buildChatUrl } from '../lib/boe/contextualChat';
-import { resolveInvoiceLifecycleStage, invoiceNextAction } from '../lib/revenueWorkflow';
+import {
+  resolveInvoiceLifecycleStage,
+  invoiceNextAction,
+  invoiceReceivableStatusLabel,
+  INVOICE_RECEIVABLE_STAGE_IDS,
+} from '../lib/revenueWorkflow';
+import { statusBadgeVariant } from '../lib/utils';
 import { invoiceJournalItems } from '../lib/invoiceJournal';
 import InvoiceDocumentView from '../components/invoices/InvoiceDocumentView';
 import { useInvoiceDocument } from '../hooks/useInvoiceDocument';
@@ -27,6 +33,8 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '../components/ui/dropdown-menu';
 
@@ -166,6 +174,7 @@ const InvoiceDetail = () => {
 
   const lifecycleStage = resolveInvoiceLifecycleStage(invoice);
   const nextAction = invoiceNextAction(invoice);
+  const statusLabel = invoiceReceivableStatusLabel(invoice);
 
   return (
     <>
@@ -180,7 +189,12 @@ const InvoiceDetail = () => {
                 </Link>
               </Button>
             </div>
-            <BusinessLifecycleStepper lifecycleId="revenue" currentStageId={lifecycleStage} compact />
+            <BusinessLifecycleStepper
+              lifecycleId="revenue"
+              currentStageId={lifecycleStage}
+              visibleStageIds={INVOICE_RECEIVABLE_STAGE_IDS}
+              compact
+            />
             {nextAction && (
               <LifecycleNextAction
                 label={nextAction.label}
@@ -209,9 +223,14 @@ const InvoiceDetail = () => {
         <div className="flex justify-between items-start mb-6 print:hidden">
           <div>
             <h1 className="text-3xl font-bold">Invoice {invoice.invoice_number}</h1>
-            <Badge className="mt-2 capitalize">{invoice.status}</Badge>
+            <Badge
+              className="mt-2"
+              variant={statusBadgeVariant(statusLabel.toLowerCase().includes('overdue') ? 'overdue' : invoice.status)}
+            >
+              {statusLabel}
+            </Badge>
           </div>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2 justify-end">
             {invoice.status === 'draft' && (
               <Button onClick={() => setIsSendDialogOpen(true)}>
                 <Send className="mr-2 h-4 w-4" /> Send Invoice
@@ -223,11 +242,6 @@ const InvoiceDetail = () => {
                 {invoice.status === 'partially_paid' ? 'Receive Balance' : 'Receive Payment'}
               </Button>
             )}
-            {(invoice.status === 'sent' || invoice.status === 'partially_paid' || invoice.status === 'paid') && (
-              <Button variant="outline" onClick={() => setIsCreditNoteOpen(true)}>
-                <ReceiptText className="mr-2 h-4 w-4" /> Issue Credit Note
-              </Button>
-            )}
             {invoice.status === 'sent' && (
               <Button variant="destructive" onClick={() => voidMutation.mutate()} disabled={voidMutation.isPending}>
                 <Ban className="mr-2 h-4 w-4" /> Void
@@ -235,21 +249,47 @@ const InvoiceDetail = () => {
             )}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="outline" disabled={!invoiceDocument || exporting !== null}>
+                <Button variant="outline">
                   {exporting !== null ? (
                     <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Preparing…</>
                   ) : (
-                    <><FileText className="mr-2 h-4 w-4" /> Invoice PDF</>
+                    <><FileText className="mr-2 h-4 w-4" /> Documents</>
                   )}
+                  <ChevronDown className="ml-2 h-4 w-4" />
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem onSelect={() => runExport('download')}>
+              <DropdownMenuContent align="end" className="w-56">
+                <DropdownMenuLabel>Invoice PDF</DropdownMenuLabel>
+                <DropdownMenuItem
+                  disabled={!invoiceDocument || exporting !== null}
+                  onSelect={() => void runExport('download')}
+                >
                   <Download className="mr-2 h-4 w-4" /> Download
                 </DropdownMenuItem>
-                <DropdownMenuItem onSelect={() => runExport('print')}>
+                <DropdownMenuItem
+                  disabled={!invoiceDocument || exporting !== null}
+                  onSelect={() => void runExport('print')}
+                >
                   <Printer className="mr-2 h-4 w-4" /> Print
                 </DropdownMenuItem>
+                {(invoice.status === 'sent' || invoice.status === 'partially_paid' || invoice.status === 'paid') && (
+                  <>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onSelect={() => setIsCreditNoteOpen(true)}>
+                      <ReceiptText className="mr-2 h-4 w-4" /> Issue Credit Note
+                    </DropdownMenuItem>
+                  </>
+                )}
+                {invoice.customers?.id && invoice.status !== 'draft' && (
+                  <>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem asChild>
+                      <Link to={`/customers/${invoice.customers.id}`}>
+                        <Users className="mr-2 h-4 w-4" /> View Customer Statement
+                      </Link>
+                    </DropdownMenuItem>
+                  </>
+                )}
               </DropdownMenuContent>
             </DropdownMenu>
           </div>

@@ -9,10 +9,15 @@ export type RevenueStageId =
   | 'collections'
   | 'payment'
   | 'receipt'
-  | 'reconciliation'
-  | 'statement'
   | 'analytics'
   | 'history';
+
+/**
+ * Invoice page stages: the customer's receivable, not the accounting engine's
+ * internal path. Bank reconciliation and customer statements stay available
+ * elsewhere; they are not required to complete an invoice.
+ */
+export const INVOICE_RECEIVABLE_STAGE_IDS = ['invoice', 'payment', 'receipt'] as const;
 
 export type QuoteWorkflowState = {
   status: 'draft' | 'sent' | 'accepted' | 'declined' | string;
@@ -20,6 +25,7 @@ export type QuoteWorkflowState = {
 
 export type InvoiceWorkflowState = {
   status: 'draft' | 'sent' | 'partially_paid' | 'paid' | 'void' | string;
+  due_date?: string | null;
 };
 
 export function resolveQuoteLifecycleStage(quote: QuoteWorkflowState): RevenueStageId {
@@ -41,10 +47,9 @@ export function resolveInvoiceLifecycleStage(invoice: InvoiceWorkflowState): Rev
   switch (invoice.status) {
     case 'draft':
       return 'invoice';
-    // Part-paid is still collections: there is money still to come in.
     case 'sent':
     case 'partially_paid':
-      return 'collections';
+      return 'payment';
     case 'paid':
       return 'receipt';
     case 'void':
@@ -58,7 +63,7 @@ export type LifecycleNextAction = {
   label: string;
   description: string;
   route?: string;
-  action?: 'send' | 'accept' | 'invoice' | 'payment' | 'reconcile' | 'statement';
+  action?: 'send' | 'accept' | 'invoice' | 'payment';
 };
 
 export function quoteNextAction(quote: QuoteWorkflowState): LifecycleNextAction | null {
@@ -74,6 +79,11 @@ export function quoteNextAction(quote: QuoteWorkflowState): LifecycleNextAction 
   }
 }
 
+/**
+ * Next action on the invoice itself. Recording payment completes the customer
+ * receivable. Bank reconciliation is a separate banking control and is never
+ * returned here.
+ */
 export function invoiceNextAction(invoice: InvoiceWorkflowState): LifecycleNextAction | null {
   switch (invoice.status) {
     case 'draft':
@@ -92,16 +102,34 @@ export function invoiceNextAction(invoice: InvoiceWorkflowState): LifecycleNextA
         route: '/receive-payments',
         action: 'payment',
       };
-    case 'paid':
-      return {
-        label: 'Reconcile bank deposit',
-        description: 'Match this payment in bank reconciliation.',
-        route: '/reconciliation',
-        action: 'reconcile',
-      };
     default:
       return null;
   }
+}
+
+/** Receivable-facing status. Overdue is display-only; the stored status stays `sent`. */
+export function invoiceReceivableStatusLabel(
+  invoice: InvoiceWorkflowState,
+  today: string = new Date().toISOString().slice(0, 10),
+): string {
+  switch (invoice.status) {
+    case 'draft':
+      return 'Draft';
+    case 'paid':
+      return 'Paid';
+    case 'void':
+      return 'Voided';
+    case 'partially_paid':
+      return invoiceIsPastDue(invoice.due_date, today) ? 'Overdue · Partially Paid' : 'Partially Paid';
+    case 'sent':
+      return invoiceIsPastDue(invoice.due_date, today) ? 'Overdue' : 'Sent';
+    default:
+      return invoice.status;
+  }
+}
+
+function invoiceIsPastDue(dueDate: string | null | undefined, today: string): boolean {
+  return !!dueDate && dueDate < today;
 }
 
 const LIFECYCLE_ID: LifecycleId = 'revenue';

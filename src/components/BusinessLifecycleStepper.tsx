@@ -6,7 +6,6 @@ import {
   type LifecycleId,
   BUSINESS_LIFECYCLES,
   lifecycleProgressPercent,
-  lifecycleStageIndex,
 } from '../lib/businessLifecycles';
 
 type Props = {
@@ -14,17 +13,41 @@ type Props = {
   currentStageId: string;
   /** Show only stages around the current position (compact mode for detail pages) */
   compact?: boolean;
+  /** Restrict the stepper to these stage ids, in this order. Progress is against this subset. */
+  visibleStageIds?: readonly string[];
   className?: string;
 };
 
-const BusinessLifecycleStepper = ({ lifecycleId, currentStageId, compact = false, className }: Props) => {
+const BusinessLifecycleStepper = ({
+  lifecycleId,
+  currentStageId,
+  compact = false,
+  visibleStageIds,
+  className,
+}: Props) => {
   const lifecycle = BUSINESS_LIFECYCLES[lifecycleId];
-  const progress = lifecycleProgressPercent(lifecycleId, currentStageId);
-  const currentIdx = lifecycleStageIndex(lifecycleId, currentStageId);
-
-  const visibleStages = compact
-    ? lifecycle.stages.filter((_, idx) => Math.abs(idx - currentIdx) <= 2)
+  const stages = visibleStageIds
+    ? visibleStageIds
+        .map((id) => lifecycle.stages.find((s) => s.id === id))
+        .filter((s): s is (typeof lifecycle.stages)[number] => !!s)
     : lifecycle.stages;
+  const currentIdx = stages.findIndex((s) => s.id === currentStageId);
+  const lastIdx = stages.length - 1;
+  const terminalComplete = currentIdx >= 0 && currentIdx === lastIdx;
+  const progress =
+    currentIdx < 0 || stages.length === 0
+      ? 0
+      : terminalComplete
+        ? 100
+        : visibleStageIds
+          ? Math.round(((currentIdx + 1) / stages.length) * 100)
+          : lifecycleProgressPercent(lifecycleId, currentStageId);
+
+  // A focused subset is already short; do not window it down further.
+  const windowed = compact && !visibleStageIds && stages.length > 5;
+  const visibleStages = windowed
+    ? stages.filter((_, idx) => Math.abs(idx - currentIdx) <= 2)
+    : stages;
 
   return (
     <div className={cn('space-y-3', className)}>
@@ -36,13 +59,17 @@ const BusinessLifecycleStepper = ({ lifecycleId, currentStageId, compact = false
       <ol
         className={cn(
           'grid gap-1',
-          compact ? 'grid-cols-5' : 'sm:grid-cols-3 lg:grid-cols-6 xl:grid-cols-12'
+          visibleStageIds && visibleStages.length <= 3
+            ? 'grid-cols-3'
+            : compact
+              ? 'grid-cols-5'
+              : 'sm:grid-cols-3 lg:grid-cols-6 xl:grid-cols-12'
         )}
       >
         {visibleStages.map((stage) => {
-          const idx = lifecycleStageIndex(lifecycleId, stage.id);
-          const complete = idx < currentIdx;
-          const current = stage.id === currentStageId;
+          const idx = stages.findIndex((s) => s.id === stage.id);
+          const complete = idx < currentIdx || (terminalComplete && idx === currentIdx);
+          const current = idx === currentIdx && !terminalComplete;
 
           const content = (
             <>
