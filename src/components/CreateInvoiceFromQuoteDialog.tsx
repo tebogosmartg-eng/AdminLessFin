@@ -9,21 +9,15 @@ import { Button } from './ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from './ui/dialog';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from './ui/form';
 import { Input } from './ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { RadioGroup, RadioGroupItem } from './ui/radio-group';
 import { showError, showSuccess } from '../utils/toast';
-import { Account } from '../pages/ChartOfAccounts';
 import { addDays, format } from 'date-fns';
 import { useNavigate } from 'react-router-dom';
-import { accountsQuery } from '../lib/queries';
 
 const invoiceFromQuoteSchema = z.object({
   invoice_number: z.string().min(1, "Invoice number is required."),
   invoice_date: z.string().min(1, "Date is required."),
   due_date: z.string().min(1, "Due date is required."),
-  accounts_receivable_id: z.string().min(1, "A/R account is required."),
-  inventory_asset_account_id: z.string().optional(),
-  tax_payable_account_id: z.string().optional(),
   description: z.string().optional(),
   invoice_type: z.enum(['full', 'percentage']),
   percentage: z.coerce.number().min(1, "Percentage must be > 0").max(100, "Percentage must be <= 100").optional(),
@@ -70,10 +64,6 @@ const CreateInvoiceFromQuoteDialog = ({ isOpen, setIsOpen, quote }: CreateInvoic
       form.setValue('invoice_number', nextInvoiceNumber);
     }
   }, [nextInvoiceNumber, form]);
-
-  const { data: accounts } = useQuery<Account[]>({ ...accountsQuery(activeCompany!.id), enabled: !!activeCompany });
-  const assetAccounts = accounts?.filter(a => a.type === 'Asset');
-  const liabilityAccounts = accounts?.filter(a => a.type === 'Liability');
 
   const mutation = useMutation({
     mutationFn: async (values: InvoiceFormValues) => {
@@ -161,11 +151,10 @@ const CreateInvoiceFromQuoteDialog = ({ isOpen, setIsOpen, quote }: CreateInvoic
               <FormField control={form.control} name="invoice_date" render={({ field }) => (<FormItem><FormLabel>Invoice Date</FormLabel><FormControl><Input type="date" {...field} /></FormControl><FormMessage /></FormItem>)} />
               <FormField control={form.control} name="due_date" render={({ field }) => (<FormItem><FormLabel>Due Date</FormLabel><FormControl><Input type="date" {...field} /></FormControl><FormMessage /></FormItem>)} />
             </div>
-            <div className="grid grid-cols-3 gap-4">
-              <FormField control={form.control} name="accounts_receivable_id" render={({ field }) => (<FormItem><FormLabel>A/R Account</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select A/R Account" /></SelectTrigger></FormControl><SelectContent>{assetAccounts?.map(acc => <SelectItem key={acc.id} value={acc.id}>{acc.name}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem>)} />
-              {hasInventoryItem && (<FormField control={form.control} name="inventory_asset_account_id" render={({ field }) => (<FormItem><FormLabel>Inventory Asset Account</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select Inventory Account" /></SelectTrigger></FormControl><SelectContent>{assetAccounts?.map(acc => <SelectItem key={acc.id} value={acc.id}>{acc.name}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem>)} />)}
-              {hasTax && (<FormField control={form.control} name="tax_payable_account_id" render={({ field }) => (<FormItem><FormLabel>Tax Payable Account</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select Tax Liability Account" /></SelectTrigger></FormControl><SelectContent>{liabilityAccounts?.map(acc => <SelectItem key={acc.id} value={acc.id}>{acc.name}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem>)} />)}
-            </div>
+            <p className="text-sm text-muted-foreground">
+              Receivables{hasTax ? ' and VAT' : ''}{hasInventoryItem ? ' and stock' : ''} post to the control
+              accounts mapped in your chart of accounts.
+            </p>
             <DialogFooter className="pt-4">
               <Button type="button" variant="outline" onClick={() => setIsOpen(false)}>Cancel</Button>
               <Button type="submit" disabled={mutation.isPending}>{mutation.isPending ? 'Creating...' : 'Create Invoice'}</Button>
