@@ -1,6 +1,8 @@
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
+import { useReportingPeriod } from '../../contexts/ReportingPeriodContext';
+import { asAtForPeriod, isoDay } from '../../lib/reportingPeriod/asAt';
 import { accountingApi } from '../../lib/accountingWorkspace';
 import { formatCurrency } from '../../lib/utils';
 import {
@@ -19,9 +21,17 @@ type Props = {
 
 export default function EnterpriseAccountCard({ accountId, open, onOpenChange }: Props) {
   const { activeCompany } = useAuth();
+  // As at the end of what the global context shows, within its financial
+  // year. It used to be today and 1 January whatever year was on screen.
+  // A balance is point-in-time: never later than today (asAtForPeriod).
+  const { dateTo, activeFinancialYear } = useReportingPeriod();
+  const asOf = asAtForPeriod(dateTo, isoDay(new Date()));
   const { data, isLoading } = useQuery({
-    queryKey: ['account-card', activeCompany?.id, accountId],
-    queryFn: () => accountingApi.accountCard(activeCompany!.id, accountId!),
+    queryKey: ['account-card', activeCompany?.id, accountId, asOf, activeFinancialYear?.id],
+    queryFn: () => accountingApi.accountCard(activeCompany!.id, accountId!, {
+      end_date: asOf,
+      financial_year_id: activeFinancialYear?.id,
+    }),
     enabled: open && !!activeCompany && !!accountId,
   });
 

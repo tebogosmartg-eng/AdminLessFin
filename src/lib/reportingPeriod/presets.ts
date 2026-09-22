@@ -1,7 +1,14 @@
 /**
  * Canonical reporting-period preset resolution.
- * Authority: company Financial Year from Enterprise Financial Calendar.
- * Pure helpers — no React, no persistence.
+ * Authority: the financial year SELECTED in the global context (company
+ * calendar, financial_years). Pure helpers — no React, no persistence.
+ *
+ * Every preset resolves to a range INSIDE the selected financial year, or to
+ * nothing. The header says which year is on screen; no preset may show figures
+ * from another one under it. That is why there is no "previous financial year"
+ * preset (choose that year in the switcher instead), why the relative presets
+ * anchor to a date clamped into the year, and why "previous quarter" in the
+ * first quarter is unavailable rather than quietly reaching into last year.
  */
 import {
   addMonths,
@@ -10,6 +17,7 @@ import {
   format,
   isValid,
   isWithinInterval,
+  max as maxDate,
   min as minDate,
   parseISO,
   startOfDay,
@@ -17,11 +25,10 @@ import {
   subDays,
   subMonths,
 } from 'date-fns';
-import type { FinancialYearDomainModel } from '@/governance/domains/financialCalendar/model';
 
 export type ReportingPeriodPreset =
   | 'current_financial_year'
-  | 'previous_financial_year'
+  | 'accounting_period'
   | 'current_quarter'
   | 'previous_quarter'
   | 'current_month'
@@ -36,25 +43,25 @@ export type ReportingPeriodRange = {
 };
 
 export const REPORTING_PERIOD_PRESET_LABELS: Record<ReportingPeriodPreset, string> = {
-  current_financial_year: 'Current Financial Year',
-  previous_financial_year: 'Previous Financial Year',
-  current_quarter: 'Current Quarter',
-  previous_quarter: 'Previous Quarter',
-  current_month: 'Current Month',
-  previous_month: 'Previous Month',
-  year_to_date: 'Year-to-Date',
-  month_to_date: 'Month-to-Date',
-  custom: 'Custom Range',
+  current_financial_year: 'Full financial year',
+  accounting_period: 'Accounting period',
+  current_quarter: 'Current quarter',
+  previous_quarter: 'Previous quarter',
+  current_month: 'Current month',
+  previous_month: 'Previous month',
+  year_to_date: 'Year to date',
+  month_to_date: 'Month to date',
+  custom: 'Custom range',
 };
 
+/** What the page-level picker offers. An accounting period is chosen in the header switcher. */
 export const REPORTING_PERIOD_PRESET_ORDER: ReportingPeriodPreset[] = [
   'current_financial_year',
-  'previous_financial_year',
+  'year_to_date',
   'current_quarter',
   'previous_quarter',
   'current_month',
   'previous_month',
-  'year_to_date',
   'month_to_date',
   'custom',
 ];
@@ -120,114 +127,104 @@ function quarterIndexContaining(quarters: ReportingPeriodRange[], asOf: Date): n
   return quarters.length - 1;
 }
 
-function previousFinancialYearRange(
-  years: FinancialYearDomainModel[],
-  activeStart: Date,
-  activeEnd: Date,
-): ReportingPeriodRange {
-  const sorted = [...years].sort((a, b) => a.startDate.localeCompare(b.startDate));
-  const activeIdx = sorted.findIndex(
-    (y) => y.startDate === toIsoDate(activeStart) || parseIsoDate(y.startDate).getTime() === activeStart.getTime(),
-  );
-  if (activeIdx > 0) {
-    const prev = sorted[activeIdx - 1];
-    return { from: parseIsoDate(prev.startDate), to: endOfDay(parseIsoDate(prev.endDate)) };
-  }
-  const linked = years.find((y) => {
-    const end = parseIsoDate(y.endDate);
-    return end.getTime() === subDays(activeStart, 1).getTime();
-  });
-  if (linked) {
-    return { from: parseIsoDate(linked.startDate), to: endOfDay(parseIsoDate(linked.endDate)) };
-  }
-  const spanMs = activeEnd.getTime() - activeStart.getTime();
-  const prevEnd = endOfDay(subDays(activeStart, 1));
-  const prevStart = startOfDay(new Date(prevEnd.getTime() - spanMs));
-  return { from: prevStart, to: prevEnd };
+/** The part of `range` inside the year, or null when they do not meet. */
+function withinYear(range: ReportingPeriodRange, fyStart: Date, fyEnd: Date): ReportingPeriodRange | null {
+  const from = maxDate([startOfDay(range.from), fyStart]);
+  const to = minDate([endOfDay(range.to), fyEnd]);
+  return from <= to ? { from, to } : null;
 }
 
 export type ResolvePresetInput = {
   preset: ReportingPeriodPreset;
   financialYearStart: Date;
   financialYearEnd: Date;
-  years?: FinancialYearDomainModel[];
   customRange?: ReportingPeriodRange | null;
+  /** The accounting period chosen in the header, for the 'accounting_period' preset. */
+  accountingPeriod?: { startDate: string; endDate: string } | null;
   asOf?: Date;
 };
 
 /**
- * Resolve a preset into an inclusive reporting date range.
- * Non-custom presets ignore customRange.
+ * The range a preset covers inside the selected financial year, or null when
+ * it has none there (e.g. "previous month" in the year's first month, or an
+ * accounting period from another year).
+ *
+ * Relative presets ("current month", "year to date") anchor to today when
+ * today is inside the year; for a past year they anchor to its last day, and
+ * for a future year to its first. So "current month" while viewing FY2025
+ * is the last month of FY2025, never a month of FY2026.
  */
-export function resolveReportingPeriodPreset(input: ResolvePresetInput): ReportingPeriodRange {
+export function presetRange(input: ResolvePresetInput): ReportingPeriodRange | null {
   const {
     preset,
     financialYearStart,
     financialYearEnd,
-    years = [],
     customRange = null,
+    accountingPeriod = null,
     asOf = new Date(),
   } = input;
 
   const fyStart = startOfDay(financialYearStart);
   const fyEnd = endOfDay(financialYearEnd);
-  const today = clampToRange(startOfDay(asOf), fyStart, fyEnd);
-  const calendarToday = startOfDay(asOf);
+  const anchor = clampToRange(startOfDay(asOf), fyStart, startOfDay(fyEnd));
 
   switch (preset) {
     case 'current_financial_year':
       return { from: fyStart, to: fyEnd };
 
-    case 'previous_financial_year':
-      return previousFinancialYearRange(years, fyStart, fyEnd);
+    case 'accounting_period': {
+      const from = parseIsoDateSafe(accountingPeriod?.startDate);
+      const to = parseIsoDateSafe(accountingPeriod?.endDate);
+      if (!from || !to) return null;
+      return withinYear({ from, to }, fyStart, fyEnd);
+    }
 
     case 'current_quarter': {
       const quarters = financialYearQuarters(fyStart, fyEnd);
-      const idx = quarterIndexContaining(quarters, calendarToday < fyStart ? fyStart : calendarToday > fyEnd ? fyEnd : calendarToday);
-      return quarters[idx];
+      return quarters[quarterIndexContaining(quarters, anchor)];
     }
 
     case 'previous_quarter': {
       const quarters = financialYearQuarters(fyStart, fyEnd);
-      const idx = quarterIndexContaining(quarters, calendarToday < fyStart ? fyStart : calendarToday > fyEnd ? fyEnd : calendarToday);
-      if (idx > 0) return quarters[idx - 1];
-      const prevFy = previousFinancialYearRange(years, fyStart, fyEnd);
-      const prevQuarters = financialYearQuarters(prevFy.from, prevFy.to);
-      return prevQuarters[prevQuarters.length - 1];
+      const idx = quarterIndexContaining(quarters, anchor);
+      return idx > 0 ? quarters[idx - 1] : null;
     }
 
-    case 'current_month': {
-      const from = startOfMonth(calendarToday);
-      const to = endOfMonth(calendarToday);
-      return { from, to };
-    }
+    case 'current_month':
+      return withinYear({ from: startOfMonth(anchor), to: endOfMonth(anchor) }, fyStart, fyEnd);
 
     case 'previous_month': {
-      const prev = subMonths(calendarToday, 1);
-      return { from: startOfMonth(prev), to: endOfMonth(prev) };
+      const prev = subMonths(startOfMonth(anchor), 1);
+      return withinYear({ from: startOfMonth(prev), to: endOfMonth(prev) }, fyStart, fyEnd);
     }
 
     case 'year_to_date':
-      return { from: fyStart, to: endOfDay(minDate([calendarToday, fyEnd])) };
+      return { from: fyStart, to: endOfDay(anchor) };
 
     case 'month_to_date':
-      return {
-        from: startOfMonth(calendarToday),
-        to: endOfDay(minDate([calendarToday, endOfMonth(calendarToday)])),
-      };
+      return withinYear({ from: startOfMonth(anchor), to: endOfDay(anchor) }, fyStart, fyEnd);
 
     case 'custom':
       if (customRange?.from && customRange?.to) {
-        return {
-          from: startOfDay(customRange.from),
-          to: endOfDay(customRange.to),
-        };
+        return withinYear(customRange, fyStart, fyEnd);
       }
       return { from: fyStart, to: fyEnd };
 
     default:
       return { from: fyStart, to: fyEnd };
   }
+}
+
+/**
+ * Resolve a preset into an inclusive reporting date range inside the year.
+ * A preset with no range in the year resolves to the full year, so a caller
+ * always gets the selected year's figures, never another year's.
+ */
+export function resolveReportingPeriodPreset(input: ResolvePresetInput): ReportingPeriodRange {
+  return presetRange(input) ?? {
+    from: startOfDay(input.financialYearStart),
+    to: endOfDay(input.financialYearEnd),
+  };
 }
 
 /** Calendar-year fallback when no Financial Year is configured yet. */

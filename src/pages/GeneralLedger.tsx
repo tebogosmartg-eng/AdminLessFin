@@ -17,7 +17,6 @@ import { useReportingPeriod } from '../contexts/ReportingPeriodContext';
 import { accountActivityQuery } from '../lib/accountingQueries';
 import { accountsQuery } from '../lib/queries';
 import { accountingApi } from '../lib/accountingWorkspace';
-import type { FinancialYearDomainModel, AccountingPeriodDomainModel } from '@/governance/domains/financialCalendar/model';
 import { accountantPrefs, moduleColorClass } from '../lib/accountantProductivity';
 import { formatCurrency, downloadCSV, cn } from '../lib/utils';
 import { useDocumentTitle } from '../hooks/useDocumentTitle';
@@ -43,11 +42,9 @@ const GeneralLedger = () => {
     dateFrom,
     dateTo,
     isReady,
-    setCustomRange,
-    selectedPreset,
-    financialYears,
-    accountingPeriods: financialPeriods,
+    activeFinancialYear,
   } = useReportingPeriod();
+  const financialYearId = activeFinancialYear?.id;
   const companyId = activeCompany?.id;
   const [searchParams, setSearchParams] = useSearchParams();
   const accountId = searchParams.get('account_id') || '';
@@ -102,14 +99,30 @@ const GeneralLedger = () => {
     enabled: !!companyId,
   });
 
+  // financial_year_id: "YTD Movement" runs from the start of the selected
+  // financial year, not from 1 January.
   const activityOpts = useMemo(() => ({
     page, page_size: PAGE_SIZE, start_date: startDate, end_date: endDate, group_by: groupBy,
-  }), [page, startDate, endDate, groupBy]);
+    financial_year_id: financialYearId,
+  }), [page, startDate, endDate, groupBy, financialYearId]);
 
   const { data, isLoading, isFetching, isError: activityIsError, error: activityError, refetch: refetchActivity } = useQuery({
     ...accountActivityQuery(companyId!, accountId, activityOpts),
     enabled: !!companyId && !!accountId && isReady,
-    placeholderData: (prev) => prev,
+    // Keep the previous rows on screen only while paging the SAME account and
+    // range. After a change of year, period or account they are someone
+    // else's figures, so the page shows loading instead of them.
+    placeholderData: (prev, prevQuery) => {
+      const prevOpts = prevQuery?.queryKey?.[3] as typeof activityOpts | undefined;
+      const sameScope =
+        prevQuery?.queryKey?.[1] === companyId &&
+        prevQuery?.queryKey?.[2] === accountId &&
+        prevOpts?.start_date === startDate &&
+        prevOpts?.end_date === endDate &&
+        prevOpts?.group_by === groupBy &&
+        prevOpts?.financial_year_id === financialYearId;
+      return sameScope ? prev : undefined;
+    },
   });
 
   const { data: explainer, isLoading: explainerLoading, isError: explainerIsError, error: explainerError, refetch: refetchExplainer } = useQuery({
@@ -153,32 +166,8 @@ const GeneralLedger = () => {
     enabled: !!companyId && !!accountId && isReady,
   });
 
-  // Phase 4C Part 8: Financial Year / Period shortcuts write into the shared
-  // Reporting Period Context (Custom Range) — never a parallel date authority.
-  const [periodFilter, setPeriodFilter] = useState<string>('reporting');
-  const handlePeriodFilterChange = (value: string) => {
-    setPeriodFilter(value);
-    if (value === 'reporting') return;
-    const [kind, id] = value.split(':');
-    const source = kind === 'fy' ? financialYears : financialPeriods;
-    const row = (source || []).find(
-      (r: FinancialYearDomainModel | AccountingPeriodDomainModel) => r.id === id
-    );
-    if (row?.startDate && row?.endDate) {
-      setCustomRange({
-        from: parseISO(row.startDate),
-        to: parseISO(row.endDate),
-      });
-      setPage(1);
-    }
-  };
-
-  // Keep FY/period select in sync when shared reporting period changes away from a FY/period pick.
-  useEffect(() => {
-    if (selectedPreset !== 'custom' && periodFilter !== 'reporting') {
-      setPeriodFilter('reporting');
-    }
-  }, [selectedPreset, periodFilter]);
+  // The financial year and period are chosen in the header (global context).
+  // This page used to carry its own year/period shortcut as well.
 
   // Phase 4C Part 8: contribution name filter (module/vendor/customer/
   // project/document type) — the underlying RPCs already return the full,
@@ -353,27 +342,10 @@ const GeneralLedger = () => {
                       </CardDescription>
                     </div>
                     <div className="flex flex-wrap gap-2">
-                      <Select value={periodFilter} onValueChange={handlePeriodFilterChange}>
-                        <SelectTrigger className="w-[180px] h-9"><SelectValue placeholder="Reporting shortcut" /></SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="reporting">Reporting Period</SelectItem>
-                          {(financialYears || []).map((fy) => (
-                            <SelectItem key={fy.id} value={`fy:${fy.id}`}>
-                              {fy.startDate} – {fy.endDate}
-                            </SelectItem>
-                          ))}
-                          {(financialPeriods || []).map((p) => (
-                            <SelectItem key={p.id} value={`period:${p.id}`}>
-                              Period {p.periodNumber} · {p.startDate} – {p.endDate}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
                       <ReportingPeriodPicker
                         showLabel={false}
                         onPeriodChange={() => {
                           setPage(1);
-                          setPeriodFilter('reporting');
                         }}
                       />
                       <Select value={groupBy} onValueChange={(v: any) => setGroupBy(v)}>

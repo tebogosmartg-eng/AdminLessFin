@@ -1,24 +1,60 @@
-import { Suspense } from 'react';
-import { NavLink, Outlet, useLocation } from 'react-router-dom';
+import { Suspense, useRef, type ReactNode } from 'react';
+import { Navigate, NavLink, Outlet, useLocation } from 'react-router-dom';
 import ErrorBoundary from './ErrorBoundary';
 import { useAuth } from '../contexts/AuthContext';
 import { Button } from './ui/button';
-import { LogOut, Menu, Settings, User as UserIcon } from 'lucide-react';
+import { Loader2, LogOut, Menu, Settings, User as UserIcon } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from './ui/dropdown-menu';
 import { SidebarNav } from './SidebarNav';
 import { ThemeToggle } from './ThemeToggle';
 import CompanySwitcher from './CompanySwitcher';
+import FinancialContextSwitcher from './FinancialContextSwitcher';
+import ContextNotice from './ContextNotice';
 import NotificationBell from './NotificationBell';
 import { CommandMenu } from './CommandMenu';
 import { AppSidebarLogo } from './brand';
 import { Sheet, SheetContent, SheetTitle, SheetTrigger } from './ui/sheet';
 import RouteLoadingFallback from './RouteLoadingFallback';
+import { listPathAfterSwitch } from '../lib/companyContext/switching';
+import { useIsMobile } from '../hooks/use-mobile';
+
+/**
+ * When the company changes under a page that shows one record (another tab
+ * switched, say), go to that record's list instead of asking the new company
+ * for the old company's record. The switcher in this tab navigates first, so
+ * here it only catches switches that started elsewhere.
+ */
+function CompanyScope({ companyId, children }: { companyId: string | null; children: ReactNode }) {
+  const location = useLocation();
+  const entered = useRef({ companyId, pathname: location.pathname });
+  if (entered.current.pathname !== location.pathname) {
+    entered.current = { companyId, pathname: location.pathname };
+  } else if (entered.current.companyId !== companyId) {
+    const listPath = listPathAfterSwitch(location.pathname);
+    if (listPath) return <Navigate to={listPath} replace />;
+    entered.current = { companyId, pathname: location.pathname };
+  }
+  return <>{children}</>;
+}
+
+function SwitchingCompany({ name }: { name: string }) {
+  return (
+    <div role="status" aria-live="polite" data-testid="switching-company" className="flex min-h-[40vh] flex-col items-center justify-center gap-3 text-center">
+      <Loader2 className="h-6 w-6 animate-spin text-primary" aria-hidden />
+      <p className="text-sm font-medium">Switching to {name}…</p>
+      <p className="max-w-sm text-xs text-muted-foreground">
+        Loading its books. Nothing from the previous company is kept on screen.
+      </p>
+    </div>
+  );
+}
 
 const Layout = () => {
-  const { signOut, profile } = useAuth();
+  const { signOut, profile, activeCompany, switchingTo } = useAuth();
   const location = useLocation();
+  const isMobile = useIsMobile();
 
   const navLinkClasses = ({ isActive }: { isActive: boolean }) =>
     cn(
@@ -47,9 +83,13 @@ const Layout = () => {
            </Button>
         </div>
       </aside>
-      <div className="flex flex-1 flex-col">
-        <header className="flex h-16 items-center justify-between gap-3 border-b border-border bg-card px-4 sm:px-6 print:hidden" role="banner">
-          <div className="flex items-center gap-4 flex-1">
+      {/* min-w-0: a wide table must not stretch the column (and the header
+          with it) past the screen. The company and year switchers have to stay
+          on screen on a phone. */}
+      <div className="flex min-w-0 flex-1 flex-col">
+        <header className="border-b border-border bg-card print:hidden" role="banner">
+          <div className="flex h-16 items-center gap-2 px-3 sm:gap-3 sm:px-6">
+          <div className="flex min-w-0 flex-1 items-center gap-2 sm:gap-3">
             <Sheet>
               <SheetTrigger asChild>
                 <Button variant="outline" size="icon" className="md:hidden" aria-label="Open navigation menu">
@@ -64,15 +104,20 @@ const Layout = () => {
                 </div>
               </SheetContent>
             </Sheet>
-            <CompanySwitcher />
-            <CommandMenu />
+            {/* Company and financial year are the global context: always in
+                view, never inferred by a page. */}
+            <CompanySwitcher className="min-w-0 flex-1 md:flex-none" />
+            {!isMobile && <FinancialContextSwitcher className="w-[21rem] shrink-0 lg:w-[24rem]" />}
+            <div className="flex shrink-0 md:min-w-0 md:flex-1">
+              <CommandMenu />
+            </div>
           </div>
-          <div className="flex items-center gap-4">
-            <ThemeToggle />
+          <div className="flex shrink-0 items-center gap-1 sm:gap-3">
+            <span className="hidden sm:inline-flex"><ThemeToggle /></span>
             <NotificationBell />
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" className="relative h-10 w-10 rounded-full">
+                <Button variant="ghost" className="relative h-10 w-10 rounded-full" aria-label="Open user menu">
                   <Avatar>
                     <AvatarImage src={profile?.avatar_url || undefined} alt="User avatar" />
                     <AvatarFallback>
@@ -105,17 +150,34 @@ const Layout = () => {
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
+          </div>
+          {isMobile && (
+            <div className="border-t border-border px-3 py-2">
+              <FinancialContextSwitcher className="w-full" />
+            </div>
+          )}
         </header>
-        <main className="flex-1 p-4 sm:p-6 print:p-0" role="main">
+        <ContextNotice />
+        <main className="min-w-0 flex-1 p-4 sm:p-6 print:p-0" role="main">
           {/* Route-level boundary: a crashing page (or a failed lazy chunk)
               degrades to a recoverable content-area fallback while the sidebar
               and header shell stay live. Keyed on pathname so it auto-clears
               when the user navigates away from the broken route. */}
-          <ErrorBoundary level="route" resetKeys={[location.pathname]}>
-            <Suspense fallback={<RouteLoadingFallback />}>
-              <Outlet />
-            </Suspense>
-          </ErrorBoundary>
+          {/* Keyed by company: switching remounts the page, so no component
+              state, effect or in-flight fetch from the previous company can
+              survive into the next one. While the switch runs the page is not
+              shown at all. */}
+          <CompanyScope companyId={activeCompany?.id ?? null}>
+            {switchingTo ? (
+              <SwitchingCompany name={switchingTo.name} />
+            ) : (
+              <ErrorBoundary key={activeCompany?.id ?? 'no-company'} level="route" resetKeys={[location.pathname]}>
+                <Suspense fallback={<RouteLoadingFallback />}>
+                  <Outlet />
+                </Suspense>
+              </ErrorBoundary>
+            )}
+          </CompanyScope>
         </main>
       </div>
     </div>

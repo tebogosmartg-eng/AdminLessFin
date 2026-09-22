@@ -33,6 +33,8 @@ import { showError, showSuccess } from '../utils/toast';
 import { DateRange } from 'react-day-picker';
 import { Popover, PopoverContent, PopoverTrigger } from '../components/ui/popover';
 import { Calendar } from '../components/ui/calendar';
+import ReportingPeriodPicker from '../components/ReportingPeriodPicker';
+import { useReportingPeriod } from '../contexts/ReportingPeriodContext';
 import { format, getYear } from 'date-fns';
 import { cn, formatCurrency, downloadCSV } from '../lib/utils';
 import { Account } from './ChartOfAccounts';
@@ -62,7 +64,10 @@ const JournalEntries = () => {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [selectedEntryIdForDetail, setSelectedEntryIdForDetail] = useState<string | null>(null);
   const [selectedEntryIdForEdit, setSelectedEntryIdForEdit] = useState<string | undefined>(undefined);
-  const [date, setDate] = useState<DateRange | undefined>({ from: undefined, to: undefined });
+  // The journal list shows the global context's year and period, like every
+  // other accounting screen. It used to default to every date in every year
+  // while the header named one year.
+  const { dateFrom, dateTo, isReady } = useReportingPeriod();
   const [filterAccount, setFilterAccount] = useState('all');
   const [filterVendor, setFilterVendor] = useState('all');
   const [filterCustomer, setFilterCustomer] = useState('all');
@@ -108,8 +113,8 @@ const JournalEntries = () => {
           )
         `,
         filters: {
-          date_from: date?.from ? format(date.from, 'yyyy-MM-dd') : null,
-          date_to: date?.to ? format(date.to, 'yyyy-MM-dd') : null,
+          date_from: dateFrom,
+          date_to: dateTo,
           account_id: filterAccount,
           vendor_id: filterVendor,
           customer_id: filterCustomer,
@@ -122,9 +127,9 @@ const JournalEntries = () => {
   };
 
   const { data: entries, isLoading } = useQuery<JournalEntry[]>({
-    queryKey: ['journal_entries', date, filterAccount, filterVendor, filterCustomer, activeCompany?.id],
+    queryKey: ['journal_entries', dateFrom, dateTo, filterAccount, filterVendor, filterCustomer, activeCompany?.id],
     queryFn: fetchJournalEntries,
-    enabled: !!activeCompany,
+    enabled: !!activeCompany && isReady,
   });
 
   const deleteMutation = useMutation({
@@ -208,41 +213,7 @@ const JournalEntries = () => {
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-2 pt-4 border-t -mx-6 px-6">
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button
-                  id="date"
-                  variant={"outline"}
-                  className={cn("w-[260px] justify-start text-left font-normal", !date && "text-muted-foreground")}
-                >
-                  <CalendarIcon className="mr-2 h-4 w-4" />
-                  {date?.from ? (
-                    date.to ? (
-                      <>
-                        {format(date.from, "LLL dd, y")} - {format(date.to, "LLL dd, y")}
-                      </>
-                    ) : (
-                      format(date.from, "LLL dd, y")
-                    )
-                  ) : (
-                    <span>Filter by date...</span>
-                  )}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0" align="start">
-                <Calendar
-                  initialFocus
-                  mode="range"
-                  defaultMonth={date?.from}
-                  selected={date}
-                  onSelect={setDate}
-                  numberOfMonths={2}
-                  captionLayout="dropdown-buttons"
-                  fromYear={getYear(new Date()) - 10}
-                  toYear={getYear(new Date()) + 5}
-                />
-              </PopoverContent>
-            </Popover>
+            <ReportingPeriodPicker showLabel={false} align="start" />
             <Select value={filterAccount} onValueChange={setFilterAccount}>
               <SelectTrigger className="w-[180px]">
                 <SelectValue placeholder="Filter by account" />

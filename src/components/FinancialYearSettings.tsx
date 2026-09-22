@@ -9,13 +9,18 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { showError, showSuccess } from '../utils/toast';
 import { useEffect, useMemo, useState } from 'react';
-import { format, getYear, set, isBefore, isAfter, addDays } from 'date-fns';
+import { format, getYear, set, isAfter, addDays } from 'date-fns';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from './ui/alert-dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table';
 import { Skeleton } from './ui/skeleton';
 import { financialCalendarService } from '@/governance/domains/financialCalendar/service';
 import { AnalyticsEvents } from '@/lib/analytics/events';
 import { trackEvent } from '@/lib/analytics/productAnalytics';
+import { useReportingPeriod } from '@/contexts/ReportingPeriodContext';
+import { parseIsoDateSafe } from '@/lib/reportingPeriod/presets';
+import { formatYearRange } from '@/lib/reportingPeriod/selection';
+import { STATUS_TONE_CLASSES, yearStatusMeta } from '@/lib/reportingPeriod/status';
+import { cn } from '@/lib/utils';
 
 /**
  * Settings → Financials — sole Financial Calendar configuration surface.
@@ -27,7 +32,14 @@ import { trackEvent } from '@/lib/analytics/productAnalytics';
  * Reporting authority after save:
  *   financial_years → ReportingPeriodContext (invalidateQueries financial_years)
  *
- * Profile financial_year_* fields are NEVER a reporting source of truth.
+ * Profile financial_year_* fields are NEVER a reporting source of truth, and
+ * no longer the source of what this screen calls the current year either:
+ * that is the company's current year (financial_year_current()), shown from
+ * ReportingPeriodContext. Which year a user is LOOKING at is the header
+ * switcher's job; this screen configures and adds years.
+ *
+ * Only owners and admins may change the calendar (enforced by the
+ * financial_years row policy; the controls are disabled for members).
  */
 
 const months = Array.from({ length: 12 }, (_, i) => ({ value: i + 1, name: new Date(0, i).toLocaleString('default', { month: 'long' }) }));
@@ -40,7 +52,9 @@ const financialYearSchema = z.object({
 type FinancialYearFormValues = z.infer<typeof financialYearSchema>;
 
 const FinancialYearSettings = () => {
-  const { user, profile, refreshProfile, activeCompany } = useAuth();
+  const { user, profile, refreshProfile, activeCompany, role } = useAuth();
+  const { financialYears, currentFinancialYear, setFinancialYear } = useReportingPeriod();
+  const canEditCalendar = role === 'owner' || role === 'admin';
   const queryClient = useQueryClient();
   const [isClosing, setIsClosing] = useState(false);
 
@@ -55,14 +69,23 @@ const FinancialYearSettings = () => {
   const watchedMonth = form.watch('financial_year_end_month');
   const displayMonthName = months[(watchedMonth || profile?.financial_year_end_month || 1) - 1]?.name;
 
+  // The year end shown is the company's (its current financial year), not a
+  // value saved on whoever happens to be signed in.
+  const currentYearEnd = parseIsoDateSafe(currentFinancialYear?.endDate);
   useEffect(() => {
-    if (profile) {
+    if (currentYearEnd) {
+      form.reset({
+        financial_year_end_month: currentYearEnd.getMonth() + 1,
+        financial_year_end_day: currentYearEnd.getDate(),
+      });
+    } else if (profile) {
       form.reset({
         financial_year_end_month: profile.financial_year_end_month || 12,
         financial_year_end_day: profile.financial_year_end_day || 31,
       });
     }
-  }, [profile, form]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentFinancialYear?.endDate, profile, form]);
 
   // The calendar-config writes below only persist the legacy profile signals.
   // The posting engine binds journal entries to `financial_years`, so the
@@ -113,6 +136,7 @@ const FinancialYearSettings = () => {
     onSuccess: async () => {
       await refreshProfile();
       queryClient.invalidateQueries({ queryKey: ['financial_years'] });
+      queryClient.invalidateQueries({ queryKey: ['financial-periods'] });
       queryClient.invalidateQueries({ queryKey: ['accountingReadiness'] });
       queryClient.invalidateQueries({ queryKey: ['efs_dashboard'] });
       queryClient.invalidateQueries({ queryKey: ['efs_workspaces'] });
@@ -173,50 +197,37 @@ const FinancialYearSettings = () => {
       showError(error instanceof Error ? error.message : String(error)),
   });
 
-  const { currentYearStartDate, currentYearEndDate } = useMemo(() => {
-    if (!profile?.current_financial_year_start || !profile.financial_year_end_month || !profile.financial_year_end_day) {
-      return { currentYearStartDate: null, currentYearEndDate: null };
-    }
-    const startDate = new Date(profile.current_financial_year_start);
-    const startYear = getYear(startDate);
-    const endMonth = profile.financial_year_end_month - 1;
-    const endDay = profile.financial_year_end_day;
-    const tempStartDate = set(new Date(0), { month: startDate.getMonth(), date: startDate.getDate() });
-    const tempEndDate = set(new Date(0), { month: endMonth, date: endDay });
-    const endYear = isBefore(tempEndDate, tempStartDate) ? startYear + 1 : startYear;
-    const endDate = set(new Date(0), { year: endYear, month: endMonth, date: endDay });
-    return { currentYearStartDate: startDate, currentYearEndDate: endDate };
-  }, [profile]);
+  // The company's current year, decided in the database — not worked out from
+  // the signed-in user's profile, which is per user and could disagree with
+  // every other screen.
+  const currentYearStartDate = parseIsoDateSafe(currentFinancialYear?.startDate);
+  const currentYearEndDate = currentYearEnd;
 
-  const activeYear = currentYearEndDate ? getYear(currentYearEndDate) : getYear(new Date());
-  const availableYears = Array.from({ length: 11 }, (_, i) => getYear(new Date()) - 5 + i);
+  const endMonthIndex = (form.watch('financial_year_end_month') || 12) - 1;
+  const endDay = form.watch('financial_year_end_day') || 31;
+  const existingEndYears = new Set(financialYears.map((y) => y.endDate.slice(0, 4)));
+  const availableYears = Array.from({ length: 11 }, (_, i) => getYear(new Date()) - 5 + i)
+    .filter((y) => !existingEndYears.has(String(y)));
 
-  const setActiveYearMutation = useMutation({
-    // Phase G3.5 — active FY start write through Governance (same UPDATE_PROFILE payload).
+  const addYearMutation = useMutation({
+    // Adds (materialises) a financial year for the company. It does not change
+    // which year anyone is looking at beyond selecting the new year in this tab.
     mutationFn: async (year: number) => {
-      if (!user || !profile?.financial_year_end_month || !profile?.financial_year_end_day) {
-        throw new Error("Profile settings are incomplete.");
-      }
-      const endMonth = profile.financial_year_end_month - 1;
-      const endDay = profile.financial_year_end_day;
-      const endDate = set(new Date(0), { year, month: endMonth, date: endDay });
+      if (!user) throw new Error('User not authenticated');
+      const endDate = set(new Date(0), { year, month: endMonthIndex, date: endDay });
       const newStartDate = addDays(endDate, 1);
       newStartDate.setFullYear(newStartDate.getFullYear() - 1);
-
-      const result = await financialCalendarService.setActiveFinancialYearStart(
-        format(newStartDate, 'yyyy-MM-dd'),
-      );
-      if (!result.success) throw new Error(result.error || 'Failed to update active financial year.');
       await ensureCalendarMaterialised(newStartDate);
+      return year;
     },
     onSuccess: async () => {
-      await refreshProfile();
-      queryClient.invalidateQueries({ queryKey: ['financial_years'] });
+      await queryClient.invalidateQueries({ queryKey: ['financial_years'] });
+      queryClient.invalidateQueries({ queryKey: ['financial-periods'] });
       queryClient.invalidateQueries({ queryKey: ['accountingReadiness'] });
       queryClient.invalidateQueries({ queryKey: ['efs_dashboard'] });
       queryClient.invalidateQueries({ queryKey: ['efs_workspaces'] });
       queryClient.invalidateQueries({ queryKey: ['efs_doc_model'] });
-      showSuccess("Active financial year has been updated.");
+      showSuccess('Financial year added.');
     },
     onError: (error: unknown) =>
       showError(error instanceof Error ? error.message : String(error)),
@@ -225,7 +236,7 @@ const FinancialYearSettings = () => {
   const handleYearChange = (yearString: string) => {
     const year = parseInt(yearString, 10);
     if (!isNaN(year)) {
-      setActiveYearMutation.mutate(year);
+      addYearMutation.mutate(year);
     }
   };
 
@@ -254,9 +265,12 @@ const FinancialYearSettings = () => {
                   <FormItem className="w-24"><FormLabel>Day</FormLabel><Select onValueChange={field.onChange} value={String(field.value)}><FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl><SelectContent>{days.map(d => <SelectItem key={d} value={String(d)}>{d}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem>
                 )} />
               </div>
-              <Button type="submit" disabled={settingsMutation.isPending}>
+              <Button type="submit" disabled={settingsMutation.isPending || !canEditCalendar}>
                 {settingsMutation.isPending ? 'Saving...' : 'Save Settings'}
               </Button>
+              {!canEditCalendar && (
+                <p className="text-xs text-muted-foreground">Only an owner or admin can change the company's financial calendar.</p>
+              )}
             </form>
           </Form>
         </CardContent>
@@ -264,14 +278,52 @@ const FinancialYearSettings = () => {
 
       <Card>
         <CardHeader>
-          <CardTitle>Set Active Financial Year</CardTitle>
-          <CardDescription>Select the financial year you are currently working in. This will set the default dates across the app and determine which year is closed.</CardDescription>
+          <CardTitle>Financial Years</CardTitle>
+          <CardDescription>
+            {activeCompany?.name ?? 'This company'}'s financial years. Which year you are looking at is chosen in the
+            header, for every screen at once; this is where years are added.
+          </CardDescription>
         </CardHeader>
-        <CardContent>
-          <div className="max-w-md">
-            <Select onValueChange={handleYearChange} value={String(activeYear)} disabled={setActiveYearMutation.isPending}>
+        <CardContent className="space-y-4">
+          {financialYears.length === 0 ? (
+            <p className="text-sm text-muted-foreground">No financial years yet.</p>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Year</TableHead>
+                  <TableHead>Dates</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead className="text-right">View</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {financialYears.map((y) => {
+                  const meta = yearStatusMeta(y.status);
+                  return (
+                    <TableRow key={y.id}>
+                      <TableCell className="font-medium">
+                        {y.yearCode}
+                        {y.isCurrent && <span className="ml-2 rounded bg-primary/10 px-1 text-[10px] font-semibold uppercase text-primary">Current</span>}
+                      </TableCell>
+                      <TableCell>{formatYearRange(y)}</TableCell>
+                      <TableCell>
+                        <span className={cn('inline-flex rounded-full border px-2 text-xs font-medium', STATUS_TONE_CLASSES[meta.tone])}>{meta.label}</span>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <Button variant="outline" size="sm" onClick={() => setFinancialYear(y.id)}>View this year</Button>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          )}
+          <div className="max-w-md space-y-1">
+            <p className="text-sm font-medium">Add a financial year</p>
+            <Select onValueChange={handleYearChange} value="" disabled={addYearMutation.isPending || !canEditCalendar}>
               <SelectTrigger>
-                <SelectValue placeholder="Select a year..." />
+                <SelectValue placeholder={canEditCalendar ? 'Choose the year to add…' : 'Owners and admins can add years'} />
               </SelectTrigger>
               <SelectContent>
                 {availableYears.map(year => (
@@ -294,7 +346,7 @@ const FinancialYearSettings = () => {
           <div>
             {currentYearStartDate && currentYearEndDate ? (
               <div className="mt-2 text-sm">
-                <p>Your current financial year runs from <span className="font-medium">{format(currentYearStartDate, 'PPP')}</span> to <span className="font-medium">{format(currentYearEndDate, 'PPP')}</span>.</p>
+                <p>The company's current financial year{currentFinancialYear ? ` (${currentFinancialYear.yearCode})` : ''} runs from <span className="font-medium">{format(currentYearStartDate, 'PPP')}</span> to <span className="font-medium">{format(currentYearEndDate, 'PPP')}</span>.</p>
                 <AlertDialog>
                   <AlertDialogTrigger asChild>
                     <Button variant="destructive" className="mt-4">Close Financial Year</Button>
@@ -316,7 +368,7 @@ const FinancialYearSettings = () => {
                 </AlertDialog>
               </div>
             ) : (
-              <p className="text-sm text-muted-foreground mt-2">Your current financial year is not set.</p>
+              <p className="text-sm text-muted-foreground mt-2">This company has no current financial year.</p>
             )}
           </div>
           <div className="border-t pt-6">

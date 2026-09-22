@@ -21,6 +21,7 @@ import { AnalyticsEvents, useFirstUsagePageView } from '../lib/analytics';
 import { Link } from 'react-router-dom';
 import { Alert, AlertDescription, AlertTitle } from '../components/ui/alert';
 import { accountingReadinessQuery } from '../lib/queries';
+import ContextYearBadge from '../components/ContextYearBadge';
 
 type AccountBalance = {
   id: string;
@@ -212,11 +213,7 @@ const FinancialStatements = () => {
             which keeps its own close, review and approval controls.
           </p>
         </div>
-        {yearCode && (
-          <Badge variant="outline" className="ml-2 align-middle">
-            Current Financial Year
-          </Badge>
-        )}
+        <ContextYearBadge className="ml-2" />
         <div className="flex items-center gap-2">
           <ReportingPeriodPicker />
           <Button variant="outline" onClick={() => window.print()}><Printer className="mr-2 h-4 w-4" /> Print</Button>

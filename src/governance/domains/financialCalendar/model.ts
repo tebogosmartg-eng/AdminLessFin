@@ -46,6 +46,11 @@ export interface AccountingPeriodDomainModel {
   financialYearCode: string | null;
   createdAt: string | null;
   updatedAt: string | null;
+  /**
+   * Decided once, by accounting_period_current() in the database: the period
+   * of the current year that contains today. Screens read this flag.
+   */
+  isCurrent: boolean;
 }
 
 // Validation model

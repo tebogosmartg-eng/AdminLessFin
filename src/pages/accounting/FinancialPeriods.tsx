@@ -11,7 +11,7 @@ import { Skeleton } from '../../components/ui/skeleton';
  */
 const FinancialPeriods = () => {
   useDocumentTitle('Financial Periods');
-  const { accountingPeriods: periods, isLoading, yearCode } = useReportingPeriod();
+  const { accountingPeriods: periods, isLoading, yearCode, isCurrentFinancialYear } = useReportingPeriod();
 
   return (
     <div className="space-y-4">
@@ -21,7 +21,7 @@ const FinancialPeriods = () => {
         </h1>
         <p className="text-sm text-muted-foreground mt-1">
           Accounting periods for the company Financial Calendar
-          {yearCode ? ' · Current Financial Year' : ''}.
+          {yearCode ? ` · selected year ${yearCode}${isCurrentFinancialYear ? ' (current)' : ''}` : ''}.
         </p>
       </div>
       <Card>

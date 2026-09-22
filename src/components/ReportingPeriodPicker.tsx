@@ -1,6 +1,11 @@
 /**
- * Shared Reporting Period picker.
- * Preset list is primary; calendar appears only for Custom Range.
+ * Shared Reporting Period picker (per page).
+ *
+ * It edits the SAME global context as the header switcher — there is no page
+ * copy of the period. It narrows the range inside the selected financial year:
+ * presets that have no range in that year are disabled, and a custom range can
+ * only be picked within the year. To look at another year, change the year in
+ * the header.
  */
 import { useState } from 'react';
 import { format } from 'date-fns';
@@ -45,16 +50,22 @@ export function ReportingPeriodPicker({
     selectedPreset,
     setPreset,
     setCustomRange,
+    isPresetAvailable,
     isReady,
+    yearCode,
+    reportingRangeLabel,
+    financialYearStart,
+    financialYearEnd,
   } = useReportingPeriod();
   const [customOpen, setCustomOpen] = useState(false);
 
   const rangeLabel = currentReportingPeriod
-    ? `${format(currentReportingPeriod.from, 'LLL dd, y')} – ${format(currentReportingPeriod.to, 'LLL dd, y')}`
+    ? `${format(currentReportingPeriod.from, 'dd MMM yyyy')} – ${format(currentReportingPeriod.to, 'dd MMM yyyy')}`
     : 'Loading period…';
 
   const handlePresetChange = (value: string) => {
     const preset = value as ReportingPeriodPreset;
+    if (preset === 'accounting_period') return; // chosen in the header
     if (preset === 'custom') {
       setPreset('custom');
       setCustomOpen(true);
@@ -76,7 +87,7 @@ export function ReportingPeriodPicker({
     <div className={cn('flex flex-col items-stretch gap-1 sm:items-end', className)}>
       {showLabel && (
         <span className="text-xs font-medium text-muted-foreground">
-          Reporting Period
+          Reporting period{yearCode ? ` · ${yearCode}` : ''}
         </span>
       )}
       <div className="flex flex-wrap items-center gap-2">
@@ -92,11 +103,18 @@ export function ReportingPeriodPicker({
             <SelectValue placeholder="Select period" />
           </SelectTrigger>
           <SelectContent>
-            {REPORTING_PERIOD_PRESET_ORDER.map((preset) => (
-              <SelectItem key={preset} value={preset}>
-                {REPORTING_PERIOD_PRESET_LABELS[preset]}
-              </SelectItem>
-            ))}
+            {selectedPreset === 'accounting_period' && (
+              <SelectItem value="accounting_period">{reportingRangeLabel}</SelectItem>
+            )}
+            {REPORTING_PERIOD_PRESET_ORDER.map((preset) => {
+              const available = isPresetAvailable(preset);
+              return (
+                <SelectItem key={preset} value={preset} disabled={!available}>
+                  {REPORTING_PERIOD_PRESET_LABELS[preset]}
+                  {!available ? ' (not in this year)' : ''}
+                </SelectItem>
+              );
+            })}
           </SelectContent>
         </Select>
 
@@ -126,6 +144,8 @@ export function ReportingPeriodPicker({
                 }
                 onSelect={handleCustomSelect}
                 numberOfMonths={2}
+                fromDate={financialYearStart ?? undefined}
+                toDate={financialYearEnd ?? undefined}
               />
             </PopoverContent>
           </Popover>

@@ -343,7 +343,12 @@ test.describe('Sales (Invoices) — UI create + persist + edit workflow', () => 
 
     // Customer (required) + dates.
     await page.getByRole('combobox', { name: /customer/i }).click();
-    await page.getByRole('option').first().click();
+    // The customer list loads with the page; until it arrives the only option
+    // is "Create new customer". Choosing the first option before then opened
+    // the create dialog instead (a race in the test, seen on both builds).
+    const firstCustomer = page.getByRole('option').filter({ hasNotText: /create new customer/i }).first();
+    await expect(firstCustomer).toBeVisible({ timeout: 20_000 });
+    await firstCustomer.click();
     await page.getByLabel('Invoice Date').fill('2026-01-15');
     await page.getByLabel('Due Date').fill('2026-02-15');
 

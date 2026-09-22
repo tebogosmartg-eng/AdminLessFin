@@ -11,6 +11,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useReportingPeriod } from '../contexts/ReportingPeriodContext';
 import { Badge } from '../components/ui/badge';
 import ReportingPeriodPicker from '../components/ReportingPeriodPicker';
+import ContextYearBadge from '../components/ContextYearBadge';
 
 type AccountBalance = {
   id: string;
@@ -164,11 +165,7 @@ const Reports = () => {
       <div className="flex justify-between items-center">
         <h1 className="text-3xl font-bold">
           Reports
-          {yearCode && (
-            <Badge variant="outline" className="ml-2 align-middle text-sm font-normal">
-              Current Financial Year
-            </Badge>
-          )}
+          <ContextYearBadge className="ml-2 text-sm" />
         </h1>
         <ReportingPeriodPicker />
       </div>

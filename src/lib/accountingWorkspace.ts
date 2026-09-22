@@ -89,6 +89,8 @@ export const accountingApi = {
     }),
   accountActivity: (companyId: string, accountId: string, opts: {
     page?: number; page_size?: number; start_date?: string; end_date?: string; group_by?: string;
+    /** The selected financial year: "YTD" runs from its start. */
+    financial_year_id?: string;
   }) => invokeAccounting(companyId, 'GET_ACCOUNT_ACTIVITY_WORKSPACE', { account_id: accountId, ...opts }),
   accountExplainer: (companyId: string, accountId: string, endDate?: string) =>
     invokeAccounting(companyId, 'GET_ACCOUNT_BALANCE_EXPLAINER', { account_id: accountId, end_date: endDate }),
@@ -96,8 +98,13 @@ export const accountingApi = {
     invokeAccounting(companyId, 'GET_ACCOUNT_ANALYTICS', { account_id: accountId, start_date: startDate, end_date: endDate }),
   accountSourceAnalysis: (companyId: string, accountId: string, startDate?: string, endDate?: string) =>
     invokeAccounting(companyId, 'GET_ACCOUNT_SOURCE_ANALYSIS', { account_id: accountId, start_date: startDate, end_date: endDate }),
-  accountCard: (companyId: string, accountId: string) =>
-    invokeAccounting(companyId, 'GET_ACCOUNT_CARD', { account_id: accountId }),
+  /** As at `asOf` (the global context's end date) within its financial year; today when omitted. */
+  accountCard: (companyId: string, accountId: string, asOf?: { end_date?: string | null; financial_year_id?: string | null }) =>
+    invokeAccounting(companyId, 'GET_ACCOUNT_CARD', {
+      account_id: accountId,
+      end_date: asOf?.end_date ?? undefined,
+      financial_year_id: asOf?.financial_year_id ?? undefined,
+    }),
   accountingTimeline: (companyId: string, page: number, pageSize: number, filters: AccountingFilters = {}) =>
     invokeAccounting(companyId, 'GET_ACCOUNTING_TIMELINE', { page, page_size: pageSize, filters }),
   financialHealth: (companyId: string) => invokeAccounting(companyId, 'GET_FINANCIAL_HEALTH'),

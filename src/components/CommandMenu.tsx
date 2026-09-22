@@ -138,12 +138,12 @@ export function CommandMenu() {
     <>
       <Button
         variant="outline"
-        className="relative h-9 w-full justify-start gap-2 rounded-md bg-muted/40 text-sm text-muted-foreground hover:bg-muted sm:pr-12 md:max-w-xs"
+        className="relative h-9 w-9 shrink-0 justify-center gap-2 rounded-md bg-muted/40 px-0 text-sm text-muted-foreground hover:bg-muted sm:w-full sm:justify-start sm:px-3 sm:pr-12 md:max-w-xs"
         onClick={() => setOpen(true)}
         aria-label="Open command menu"
       >
         <Search className="h-4 w-4 shrink-0" />
-        <span>Search or jump to…</span>
+        <span className="hidden truncate sm:inline">Search or jump to…</span>
         <kbd className="pointer-events-none absolute right-1.5 top-1.5 hidden h-5 select-none items-center gap-1 rounded border bg-background px-1.5 font-mono text-[10px] font-medium opacity-100 sm:flex">
           <span className="text-xs">⌘</span>K
         </kbd>

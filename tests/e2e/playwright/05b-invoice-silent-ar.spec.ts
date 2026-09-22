@@ -28,7 +28,12 @@ test.describe('P0 Invoice silent A/R validation', () => {
     await expect(page.getByRole('dialog')).toBeVisible();
 
     await page.getByRole('combobox', { name: /customer/i }).click();
-    await page.getByRole('option').first().click();
+    // The customer list loads with the page; until it arrives the only option
+    // is "Create new customer". Choosing the first option before then opened
+    // the create dialog instead (a race in the test, seen on both builds).
+    const firstCustomer = page.getByRole('option').filter({ hasNotText: /create new customer/i }).first();
+    await expect(firstCustomer).toBeVisible({ timeout: 20_000 });
+    await firstCustomer.click();
     await page.getByLabel('Invoice Date').fill('2026-07-29');
     await page.getByLabel('Due Date').fill('2026-08-28');
     await page.getByPlaceholder('Description').first().fill('P0 silent AR line');

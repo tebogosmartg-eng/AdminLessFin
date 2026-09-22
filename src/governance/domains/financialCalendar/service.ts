@@ -84,6 +84,7 @@ type RawAccountingPeriodRow = {
   created_at: string | null;
   updated_at: string | null;
   financial_years?: { year_code: string } | null;
+  is_current?: boolean;
 };
 
 export class FinancialCalendarService implements FinancialCalendarReadAPI, FinancialCalendarMutationAPI {
@@ -117,6 +118,7 @@ export class FinancialCalendarService implements FinancialCalendarReadAPI, Finan
       financialYearCode: row.financial_years?.year_code ?? null,
       createdAt: row.created_at ?? null,
       updatedAt: row.updated_at ?? null,
+      isCurrent: row.is_current === true,
     }));
   }
 

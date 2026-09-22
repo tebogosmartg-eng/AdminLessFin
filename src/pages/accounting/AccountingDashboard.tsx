@@ -16,7 +16,9 @@ import { useDocumentTitle } from '../../hooks/useDocumentTitle';
 import { formatCurrency, cn } from '../../lib/utils';
 import AccountingSearch from '../../components/accounting/AccountingSearch';
 import MaterialitySettingsDialog from '../../components/accounting/MaterialitySettingsDialog';
-import ReportingPeriodPicker from '../../components/ReportingPeriodPicker';
+import { formatPeriodName } from '../../lib/reportingPeriod/selection';
+import { periodStatusMeta, yearStatusMeta } from '../../lib/reportingPeriod/status';
+import { toIsoDate } from '../../lib/reportingPeriod/presets';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../components/ui/card';
 import { Button } from '../../components/ui/button';
 import { Badge } from '../../components/ui/badge';
@@ -25,7 +27,19 @@ import { Skeleton } from '../../components/ui/skeleton';
 const AccountingDashboard = () => {
   useDocumentTitle('Accounting Dashboard');
   const { activeCompany, role } = useAuth();
-  const { activeFinancialYearLabel, activeFinancialYear, openFinancialYears, closedFinancialYears } = useReportingPeriod();
+  const {
+    activeFinancialYearLabel,
+    activeFinancialYear,
+    isCurrentFinancialYear,
+    openFinancialYears,
+    closedFinancialYears,
+    dateTo,
+  } = useReportingPeriod();
+  // Intelligence compares a month with the one before it. For the current
+  // year that is as at today; for another year, as at the end of what is
+  // selected, so its figures belong to the year in the header.
+  const todayIso = toIsoDate(new Date());
+  const intelligenceAsOf = dateTo && dateTo < todayIso ? dateTo : undefined;
   const isAdmin = role === 'owner' || role === 'admin';
   const [materialityOpen, setMaterialityOpen] = useState(false);
   const { data, isLoading } = useQuery({
@@ -36,8 +50,8 @@ const AccountingDashboard = () => {
 
   // Phase 4C Part 3: Dashboard Intelligence, backed by GET_INTELLIGENCE_DASHBOARD.
   const { data: intelligence, isLoading: intelligenceLoading } = useQuery({
-    queryKey: ['intelligence-dashboard', activeCompany?.id],
-    queryFn: () => accountingApi.intelligenceDashboard(activeCompany!.id),
+    queryKey: ['intelligence-dashboard', activeCompany?.id, intelligenceAsOf ?? 'today'],
+    queryFn: () => accountingApi.intelligenceDashboard(activeCompany!.id, intelligenceAsOf),
     enabled: !!activeCompany,
     refetchInterval: 60_000,
   });
@@ -88,14 +102,25 @@ const AccountingDashboard = () => {
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <ReportingPeriodPicker showLabel={false} />
+          {/* No period picker here: the figures below are operational (today,
+              pending, the current period), and the year is the one in the
+              header. A picker that changed nothing was removed. */}
           <AccountingSearch />
         </div>
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <Stat label="Current Financial Year" value={activeFinancialYearLabel || '—'} hint={fy?.status} />
-        <Stat label="Accounting Period" value={period ? `P${period.period_number}` : '—'} hint={d.period_status} />
+        <Stat
+          label={isCurrentFinancialYear ? 'Financial Year (current)' : 'Financial Year (selected, not current)'}
+          value={activeFinancialYearLabel || '—'}
+          hint={fy ? yearStatusMeta(fy.status).label : undefined}
+          tone={isCurrentFinancialYear ? undefined : 'warn'}
+        />
+        <Stat
+          label="Current Accounting Period"
+          value={period ? `P${period.period_number} · ${formatPeriodName({ startDate: period.start_date, endDate: period.end_date })}` : '—'}
+          hint={period ? periodStatusMeta(period.status).label : undefined}
+        />
         <Stat label="Open Financial Years" value={String(openFinancialYears.length)} />
         <Stat label="Closed Financial Years" value={String(closedFinancialYears.length)} />
         <Stat label="Pending Postings" value={String(d.pending_posting_requests ?? '—')} tone={d.pending_posting_requests ? 'warn' : 'ok'} />

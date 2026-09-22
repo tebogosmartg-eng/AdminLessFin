@@ -44,6 +44,8 @@ import {
   loadSavedViews,
   persistSavedViews,
 } from '../lib/assets/eamTypes';
+import ContextYearBadge from '../components/ContextYearBadge';
+import { toIsoDate } from '../lib/reportingPeriod/presets';
 
 function verificationBadgeVariant(
   status?: string | null
@@ -118,8 +120,10 @@ const FixedAssets = () => {
     financialYearStart,
     financialYearEnd,
   } = useReportingPeriod();
-  const fyStart = financialYearStart ? financialYearStart.toISOString().slice(0, 10) : null;
-  const fyEnd = financialYearEnd ? financialYearEnd.toISOString().slice(0, 10) : null;
+  // Local dates, not toISOString(): that is UTC, which east of UTC moved
+  // every date back a day.
+  const fyStart = financialYearStart ? toIsoDate(financialYearStart) : null;
+  const fyEnd = financialYearEnd ? toIsoDate(financialYearEnd) : null;
 
   const [isAssetFormOpen, setIsAssetFormOpen] = useState(false);
   const [isDisposalFormOpen, setIsDisposalFormOpen] = useState(false);
@@ -285,9 +289,7 @@ const FixedAssets = () => {
           <p className="text-sm text-muted-foreground">
             Enterprise fixed asset register with verification and NBV tracking.
             {yearCode && (
-              <> · <Badge variant="outline" className="ml-1 align-middle">Current Financial Year</Badge>
-                {fyStart && fyEnd ? ` (${fyStart} → ${fyEnd})` : ''}
-              </>
+              <> · <ContextYearBadge className="ml-1" /></>
             )}
           </p>
         </div>

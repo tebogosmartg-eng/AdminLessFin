@@ -39,6 +39,7 @@ import {
   buildPayrollCalendarEvents,
 } from '../lib/payrollIntelligence';
 import type { Employee } from './Employees';
+import ContextYearBadge from '../components/ContextYearBadge';
 
 const PayrollWorkspace = () => {
   useDocumentTitle('Payroll');
@@ -129,7 +130,7 @@ const PayrollWorkspace = () => {
           <div className="text-sm text-muted-foreground">
             Operational intelligence for people, payroll and compliance.
             {yearCode && (
-              <> · <Badge variant="outline" className="ml-1 align-middle">Current Financial Year</Badge></>
+              <> · <ContextYearBadge className="ml-1" /></>
             )}
           </div>
         </div>

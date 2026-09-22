@@ -1,4 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../integrations/supabase/client';
 import { Session, User } from '@supabase/supabase-js';
 import {
@@ -19,6 +20,14 @@ import {
   markRegistrationTracked,
   wasRegistrationTracked,
 } from '../lib/analytics/session';
+import {
+  isContextMessage,
+  openContextChannel,
+  rememberRecentCompany,
+  type ContextMessage,
+} from '../lib/companyContext/switching';
+import { clearStoredSelections } from '../lib/reportingPeriod/selection';
+import { showSuccess } from '../utils/toast';
 
 type Profile = {
   id: string;
@@ -59,7 +68,15 @@ type AuthContextType = {
   loading: boolean;
   signOut: () => void;
   refreshProfile: () => Promise<void>;
+  /**
+   * The ONLY way the active company changes. Unmounts the page, cancels what
+   * is in flight, switches on the server, drops every cached answer, then
+   * loads the new company. Concurrent calls run one after another and only the
+   * last one requested is applied.
+   */
   switchCompany: (companyId: string) => Promise<void>;
+  /** The company being switched to, while a switch is in progress. */
+  switchingTo: Company | null;
 };
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -89,12 +106,14 @@ function sameProfile(a: Profile | null | undefined, b: Profile | null | undefine
 }
 
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
+  const queryClient = useQueryClient();
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [companies, setCompanies] = useState<Company[] | null>(null);
   const [activeCompany, setActiveCompany] = useState<Company | null>(null);
   const [role, setRole] = useState<'owner' | 'admin' | 'member'>('member');
+  const [switchingTo, setSwitchingTo] = useState<Company | null>(null);
   const [lifecycle, setLifecycle] = useState<AuthLifecycle>('BOOTING');
   const lastFetchUserId = useRef<string | null>(null);
   /** Shared in-flight bootstrap so init + SIGNED_IN do not race-wipe company role. */
@@ -248,6 +267,12 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       }
 
       if (shouldClearSession(event, Boolean(currentSession?.user))) {
+        // Nothing of the last user's may outlive their session: not cached
+        // figures, not the year they were looking at. This also runs in every
+        // other tab, because Supabase broadcasts the sign-out.
+        void queryClient.cancelQueries();
+        queryClient.clear();
+        clearStoredSelections();
         applySession(null);
         void fetchUserAndCompanyData(null);
         if (!cancelled) setLifecycle('AUTH_REQUIRED');
@@ -257,6 +282,13 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       if (!currentSession?.user || !shouldFetchCompany(event, currentSession.user.id)) {
         if (currentSession) applySession(currentSession);
         return;
+      }
+
+      // A different user signing in on this tab starts from nothing.
+      if (lastFetchUserId.current && lastFetchUserId.current !== currentSession.user.id) {
+        void queryClient.cancelQueries();
+        queryClient.clear();
+        clearStoredSelections();
       }
 
       applySession(currentSession);
@@ -313,33 +345,112 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       cancelled = true;
       authListener.subscription.unsubscribe();
     };
-  }, [applySession, fetchUserAndCompanyData]);
+  }, [applySession, fetchUserAndCompanyData, queryClient]);
 
   const signOut = useCallback(async () => {
     trackEvent({ eventName: AnalyticsEvents.AUTH_LOGOUT });
     await flushEvents();
+    await queryClient.cancelQueries();
+    queryClient.clear();
+    clearStoredSelections();
     await supabase.auth.signOut();
-  }, []);
+  }, [queryClient]);
 
   const refreshProfile = useCallback(async () => {
     if (!user) return;
     await fetchUserAndCompanyData(user, { force: true });
   }, [user, fetchUserAndCompanyData]);
 
-  const switchCompany = useCallback(async (companyId: string) => {
+  // ---- Switching company -------------------------------------------------
+  const activeCompanyRef = useRef<Company | null>(null);
+  activeCompanyRef.current = activeCompany;
+  const companiesRef = useRef<Company[] | null>(null);
+  companiesRef.current = companies;
+  /** The last company asked for. An older switch still queued is skipped. */
+  const latestSwitchTarget = useRef<string | null>(null);
+  const switchChain = useRef<Promise<void>>(Promise.resolve());
+  const channelRef = useRef<BroadcastChannel | null>(null);
+
+  const performSwitch = useCallback(async (companyId: string, origin: 'this-tab' | 'other-tab') => {
     if (!user) return;
-    const { error } = await supabase.functions.invoke('settings', {
-      body: { method: 'SWITCH_COMPANY', company_id: companyId, target_company_id: companyId },
-    });
-    if (error) throw error;
-    trackEvent({
-      eventName: AnalyticsEvents.COMPANY_SWITCHED,
-      companyId,
-      userId: user.id,
-      properties: { target_company_id: companyId },
-    });
-    await fetchUserAndCompanyData(user, { force: true });
-  }, [user, fetchUserAndCompanyData]);
+    if (latestSwitchTarget.current !== companyId) return; // superseded by a later choice
+    if (activeCompanyRef.current?.id === companyId) {
+      setSwitchingTo(null);
+      return;
+    }
+    const target = companiesRef.current?.find((c) => c.id === companyId) ?? null;
+    // The page unmounts now (Layout shows the switching state), so nothing on
+    // screen can render company B with company A's data, and no observer is
+    // left to refetch A's data into the cache.
+    setSwitchingTo(target ?? { id: companyId, name: 'company', owner_id: '', address: null, logo_url: null, tax_id: null });
+    try {
+      await queryClient.cancelQueries();
+      if (origin === 'this-tab') {
+        // The server checks membership and records the active company.
+        const { error } = await supabase.functions.invoke('settings', {
+          body: { method: 'SWITCH_COMPANY', company_id: companyId, target_company_id: companyId },
+        });
+        if (error) throw error;
+      }
+      // Every cached answer belonged to the previous company. Record pages,
+      // forms and payslips are cached by record id alone, so keeping any of it
+      // could put A's record on screen under B.
+      queryClient.clear();
+      await fetchUserAndCompanyData(user, { force: true });
+      rememberRecentCompany(user.id, companyId);
+      if (origin === 'this-tab') {
+        trackEvent({
+          eventName: AnalyticsEvents.COMPANY_SWITCHED,
+          companyId,
+          userId: user.id,
+          properties: { target_company_id: companyId },
+        });
+        const message: ContextMessage = { type: 'company-switched', userId: user.id, companyId };
+        channelRef.current?.postMessage(message);
+      } else if (target) {
+        showSuccess(`Switched to ${target.name} in another tab.`);
+      }
+    } finally {
+      if (latestSwitchTarget.current === companyId) setSwitchingTo(null);
+    }
+  }, [user, queryClient, fetchUserAndCompanyData]);
+
+  const queueSwitch = useCallback((companyId: string, origin: 'this-tab' | 'other-tab') => {
+    latestSwitchTarget.current = companyId;
+    // Show the switching state in the same render as whatever the caller just
+    // did (e.g. navigating off a record page), so no page mounts in between.
+    if (activeCompanyRef.current?.id !== companyId) {
+      const target = companiesRef.current?.find((c) => c.id === companyId);
+      if (target) setSwitchingTo(target);
+    }
+    const run = switchChain.current
+      .catch(() => undefined)
+      .then(() => performSwitch(companyId, origin));
+    switchChain.current = run;
+    return run;
+  }, [performSwitch]);
+
+  const switchCompany = useCallback((companyId: string) => queueSwitch(companyId, 'this-tab'), [queueSwitch]);
+
+  // Other tabs of the same user follow a switch: the active company lives on
+  // the server, so a tab still showing the old one would be out of step with
+  // it (and with anything that reads the saved company).
+  useEffect(() => {
+    if (!user) return;
+    const channel = openContextChannel();
+    channelRef.current = channel;
+    if (!channel) return;
+    channel.onmessage = (event: MessageEvent) => {
+      const message = event.data as unknown;
+      if (!isContextMessage(message) || message.userId !== user.id) return;
+      if (message.companyId === activeCompanyRef.current?.id) return;
+      void queueSwitch(message.companyId, 'other-tab').catch(() => undefined);
+    };
+    return () => {
+      channel.close();
+      if (channelRef.current === channel) channelRef.current = null;
+    };
+  }, [user, queueSwitch]);
 
   const loading = isAuthHydrating(lifecycle);
 
@@ -355,6 +466,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       signOut,
       refreshProfile,
       switchCompany,
+      switchingTo,
     }),
     [
       session,
@@ -367,6 +479,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       signOut,
       refreshProfile,
       switchCompany,
+      switchingTo,
     ],
   );
 
