@@ -18,6 +18,7 @@ import BusinessLifecycleStepper from '../components/BusinessLifecycleStepper';
 import LifecycleNextAction from '../components/LifecycleNextAction';
 import LifecycleContextBadge from '../components/boe/LifecycleContextBadge';
 import { buildChatUrl } from '../lib/boe/contextualChat';
+import { edgeErrorMessage } from '../lib/platform/edgeError';
 import {
   resolveInvoiceLifecycleStage,
   invoiceNextAction,
@@ -122,7 +123,11 @@ const InvoiceDetail = () => {
           invoiceId: id,
         },
       });
-      if (error) throw error;
+      // Voiding is refused for good reasons now -- the invoice has a receipt or
+      // a credit note against it, or it is already void. supabase-js collapses
+      // every non-2xx into "returned a non-2xx status code", so without this the
+      // user is told nothing at all.
+      if (error) throw new Error(await edgeErrorMessage(error, 'The invoice could not be voided.'));
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['invoice_detail', id] });

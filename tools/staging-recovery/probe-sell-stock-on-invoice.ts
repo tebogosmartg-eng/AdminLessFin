@@ -14,6 +14,7 @@
 import { connect, invoke, tech } from './edgeProbe';
 
 const COMPANY = 'CERT TX 1785230675937';
+const NL = String.fromCharCode(10);
 let held = 0;
 let missing = 0;
 const gaps: string[] = [];
@@ -24,6 +25,11 @@ function control(label: string, ok: boolean, detail = '') {
 }
 
 const n = (v: unknown) => Math.round(Number(v ?? 0) * 100) / 100;
+
+function report() {
+  console.log(`${NL}HELD ${held}   MISSING ${missing}`);
+  gaps.forEach((g) => console.log(`  - ${g}`));
+}
 
 async function main() {
   const { supabase: api, companies } = await connect(COMPANY);
@@ -96,8 +102,7 @@ async function main() {
 
   const invoiceId = (created.body as { id?: string })?.id;
   if (!created.ok || !invoiceId) {
-    console.log(`${String.fromCharCode(10)}HELD ${held}   MISSING ${missing}`);
-    gaps.forEach((g) => console.log(`  - ${g}`));
+    report();
     return;
   }
 
@@ -141,21 +146,62 @@ async function main() {
   control('stock on hand drops by one', n(after.data!.quantity_on_hand) === n(qtyBefore - 1),
     `${qtyBefore} -> ${n(after.data!.quantity_on_hand)}`);
 
-  // Put it back. Voiding reverses the journal; whether it also puts the stock
-  // back is worth stating rather than assuming, because an invoice that can be
-  // voided without restocking leaves the ledger and the stock records apart.
-  const voided = await invoke(api, 'invoices', { method: 'VOID', company_id: co.id, invoiceId });
-  console.log(`cleanup: void ${voided.ok ? 'ok' : 'FAILED ' + (tech(voided) || JSON.stringify(voided.body))}`);
-  if (voided.ok) {
-    const restocked = await api.from('products').select('quantity_on_hand').eq('id', product.id).single();
-    console.log(`after void, stock on hand: ${n(restocked.data!.quantity_on_hand)} (was ${qtyBefore} before the sale)`);
-    control('voiding the invoice puts the stock back',
-      n(restocked.data!.quantity_on_hand) === qtyBefore,
-      `${n(restocked.data!.quantity_on_hand)} vs ${qtyBefore}`);
+  // Voiding reverses the journal. Whether it also puts the stock back is the
+  // thing worth proving: an invoice that can be voided without restocking
+  // leaves the ledger and the stock records saying different things.
+  console.log(`${NL}======== VOIDING IT ========`);
+  const voided = await invoke(api, 'invoices', {
+    method: 'VOID', company_id: co.id, invoiceId, reason: 'stock sale probe cleanup',
+  });
+  control('the invoice can be voided', voided.ok,
+    voided.ok ? JSON.stringify(voided.body) : tech(voided) || JSON.stringify(voided.body));
+  if (!voided.ok) {
+    report();
+    return;
   }
 
-  console.log(`${String.fromCharCode(10)}HELD ${held}   MISSING ${missing}`);
-  gaps.forEach((g) => console.log(`  - ${g}`));
+  const reversalId = (voided.body as { reversal_journal_id?: string })?.reversal_journal_id;
+  control('the reversal went through the posting engine',
+    (voided.body as { through_posting_engine?: boolean })?.through_posting_engine === true);
+  control('the reversal has a real journal number',
+    Boolean((voided.body as { reversal_journal_number?: string })?.reversal_journal_number),
+    String((voided.body as { reversal_journal_number?: string })?.reversal_journal_number));
+
+  const reversal = await api.from('journal_entries')
+    .select('journal_number, invoice_id').eq('id', reversalId ?? '').maybeSingle();
+  control('the reversal is tied back to the invoice', reversal.data?.invoice_id === invoiceId);
+
+  const reqs = await api.from('posting_requests')
+    .select('idempotency_key, status').eq('company_id', co.id).eq('document_id', invoiceId);
+  const keys = (reqs.data ?? []) as Array<{ idempotency_key: string; status: string }>;
+  control('the reversal is recorded as a posting request',
+    keys.some((k) => k.idempotency_key.startsWith('reversal:') && k.status === 'committed'),
+    keys.map((k) => `${k.idempotency_key}=${k.status}`).join(' '));
+  control('the original posting is marked reversed',
+    keys.some((k) => k.idempotency_key.startsWith('sales_invoice:') && k.status === 'reversed'));
+
+  const restocked = await api.from('products').select('quantity_on_hand').eq('id', product.id).single();
+  control('voiding the invoice puts the stock back',
+    n(restocked.data!.quantity_on_hand) === qtyBefore,
+    `${n(restocked.data!.quantity_on_hand)} vs ${qtyBefore} before the sale`);
+
+  const returns = await api.from('inventory_transactions')
+    .select('quantity_change, transaction_type, journal_entry_id')
+    .eq('company_id', co.id).eq('source_doc_id', invoiceId).eq('transaction_type', 'receipt');
+  control('the return is recorded in the stock sub-ledger',
+    (returns.data ?? []).length > 0 && (returns.data ?? []).every((r) => r.journal_entry_id === reversalId),
+    JSON.stringify(returns.data ?? []));
+
+  const again = await invoke(api, 'invoices', { method: 'VOID', company_id: co.id, invoiceId });
+  control('it cannot be voided a second time', !again.ok && /already been voided/.test(tech(again) || ''),
+    tech(again) || JSON.stringify(again.body));
+
+  const afterAgain = await api.from('products').select('quantity_on_hand').eq('id', product.id).single();
+  control('the refused second void did not double the stock back',
+    n(afterAgain.data!.quantity_on_hand) === qtyBefore,
+    String(n(afterAgain.data!.quantity_on_hand)));
+
+  report();
 }
 
 main().catch((e) => { console.error(e); process.exit(1); });

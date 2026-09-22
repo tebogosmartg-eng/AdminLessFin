@@ -14328,7 +14328,15 @@ export type Database = {
         Args: { p_company_id: string; p_employee_number: string }
         Returns: boolean
       }
-      void_invoice: { Args: { p_invoice_id: string }; Returns: undefined }
+      void_invoice: {
+        Args: {
+          p_invoice_id: string
+          p_company_id?: string
+          p_actor_user_id?: string
+          p_reason?: string
+        }
+        Returns: Json
+      }
     }
     Enums: {
       account_type: "Asset" | "Liability" | "Equity" | "Income" | "Expense"

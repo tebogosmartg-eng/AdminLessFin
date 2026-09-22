@@ -342,10 +342,21 @@ serve(withEnterprisePlatform('invoices', 'tenant', async (req, _ctx) => {
         }
         break;
 
-      case 'VOID':
-        ({ error } = await supabaseAdmin.rpc('void_invoice', { p_invoice_id: body.invoiceId }));
-        data = { message: 'Invoice voided successfully' };
+      case 'VOID': {
+        // The company and the actor are required. void_invoice used to take an
+        // invoice id alone, with no membership check and EXECUTE granted to
+        // `authenticated`, so any signed-in user could void any company's
+        // invoice. It now re-checks the caller against company_users itself.
+        const { data: voidResult, error: voidError } = await supabaseAdmin.rpc('void_invoice', {
+          p_invoice_id: body.invoiceId,
+          p_company_id: company_id,
+          p_actor_user_id: user.id,
+          p_reason: body.reason ?? null,
+        });
+        if (voidError) throw voidError;
+        data = { message: 'Invoice voided successfully', ...(voidResult ?? {}) };
         break;
+      }
 
       case 'GET_NEXT_INVOICE_NUMBER': {
         // Asked of the company this request is FOR. The old call took no
