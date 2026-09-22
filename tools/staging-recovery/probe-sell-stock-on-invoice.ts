@@ -103,29 +103,34 @@ async function main() {
 
   // What did it actually post?
   const inv = await api.from('invoices').select('id, invoice_number, journal_entry_id').eq('id', invoiceId).single();
+  // A journal line is one signed 'amount' plus a 'type' of debit or credit --
+  // there are no debit/credit columns. Selecting ones that do not exist comes
+  // back as an error, not as zeroes, so it is read explicitly.
   const items = await api.from('journal_entry_items')
-    .select('debit, credit, account_id, chart_of_accounts!account_id(name, account_role)')
+    .select('amount, type, account_id, chart_of_accounts!account_id(name, account_role)')
     .eq('journal_entry_id', inv.data!.journal_entry_id);
+  if (items.error) throw new Error(`Could not read the journal: ${items.error.message}`);
   const rows = (items.data ?? []) as Array<{
-    debit: number; credit: number;
+    amount: number; type: string;
     chart_of_accounts: { name: string; account_role: string | null } | null;
   }>;
   const roleOf = (r: typeof rows[number]) => r.chart_of_accounts?.account_role ?? '';
-  const dr = n(rows.reduce((t, r) => t + Number(r.debit ?? 0), 0));
-  const cr = n(rows.reduce((t, r) => t + Number(r.credit ?? 0), 0));
+  const side = (r: typeof rows[number], want: string) => (r.type === want ? n(r.amount) : 0);
+  const dr = n(rows.reduce((t, r) => t + side(r, 'debit'), 0));
+  const cr = n(rows.reduce((t, r) => t + side(r, 'credit'), 0));
   console.log('journal:');
-  rows.forEach((r) => console.log(`    ${r.chart_of_accounts?.name} [${roleOf(r) || '-'}]  Dr ${n(r.debit)}  Cr ${n(r.credit)}`));
+  rows.forEach((r) => console.log(`    ${r.chart_of_accounts?.name} [${roleOf(r) || '-'}]  ${r.type} ${n(r.amount)}`));
 
   control('the journal balances', dr === cr && dr > 0, `Dr ${dr} / Cr ${cr}`);
-  control('cost of sales is charged', rows.some((r) => roleOf(r) === 'cogs' && n(r.debit) > 0));
-  control('stock is taken off the balance sheet', rows.some((r) => roleOf(r) === 'inventory_asset' && n(r.credit) > 0));
+  control('cost of sales is charged', rows.some((r) => roleOf(r) === 'cogs' && side(r, 'debit') > 0));
+  control('stock is taken off the balance sheet', rows.some((r) => roleOf(r) === 'inventory_asset' && side(r, 'credit') > 0));
 
   const txn = await api.from('inventory_transactions')
     .select('quantity_change, total_cost, transaction_type, journal_entry_id')
     .eq('company_id', co.id).eq('source_doc_id', invoiceId);
   control('the stock subledger records the issue', (txn.data ?? []).length > 0,
     JSON.stringify(txn.data ?? []));
-  const cogsPosted = n(rows.filter((r) => roleOf(r) === 'cogs').reduce((t, r) => t + Number(r.debit ?? 0), 0));
+  const cogsPosted = n(rows.filter((r) => roleOf(r) === 'cogs').reduce((t, r) => t + side(r, 'debit'), 0));
   const subledgerCost = n((txn.data ?? []).reduce((t, r) => t + Number(r.total_cost ?? 0), 0));
   control('the cost charged equals the cost taken out of stock', cogsPosted === subledgerCost,
     `GL ${cogsPosted} vs subledger ${subledgerCost}`);
@@ -136,9 +141,18 @@ async function main() {
   control('stock on hand drops by one', n(after.data!.quantity_on_hand) === n(qtyBefore - 1),
     `${qtyBefore} -> ${n(after.data!.quantity_on_hand)}`);
 
-  // Put it back.
+  // Put it back. Voiding reverses the journal; whether it also puts the stock
+  // back is worth stating rather than assuming, because an invoice that can be
+  // voided without restocking leaves the ledger and the stock records apart.
   const voided = await invoke(api, 'invoices', { method: 'VOID', company_id: co.id, invoiceId });
   console.log(`cleanup: void ${voided.ok ? 'ok' : 'FAILED ' + (tech(voided) || JSON.stringify(voided.body))}`);
+  if (voided.ok) {
+    const restocked = await api.from('products').select('quantity_on_hand').eq('id', product.id).single();
+    console.log(`after void, stock on hand: ${n(restocked.data!.quantity_on_hand)} (was ${qtyBefore} before the sale)`);
+    control('voiding the invoice puts the stock back',
+      n(restocked.data!.quantity_on_hand) === qtyBefore,
+      `${n(restocked.data!.quantity_on_hand)} vs ${qtyBefore}`);
+  }
 
   console.log(`${String.fromCharCode(10)}HELD ${held}   MISSING ${missing}`);
   gaps.forEach((g) => console.log(`  - ${g}`));
