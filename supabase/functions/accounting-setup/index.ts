@@ -1,6 +1,10 @@
 // @ts-nocheck
-// ERP Phase 1B — Accounting Setup edge: Validation Engine is the authority.
-// Step completion flags in accounting_readiness are a derived cache only.
+// Accounting Setup edge.
+//
+// Every FACT comes from the database function accounting_facts(company) -- the
+// single source. This function only composes those facts into the six setup
+// steps and their wording. The step columns on accounting_readiness are a
+// derived cache and are never read back as truth.
 import { serve } from 'https://deno.land/std@0.190.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0';
 import {
@@ -9,9 +13,9 @@ import {
   edgeFailure,
 } from '../_shared/enterpriseEdgePlatform.ts';
 import {
-  evaluateAccountingReadiness,
+  composeReadiness,
   nextIncompleteStep,
-} from '../_shared/accountingReadiness/evaluate.ts';
+} from '../_shared/accountingReadiness/compose.ts';
 
 const corsHeaders = ENTERPRISE_CORS_HEADERS;
 
@@ -52,61 +56,19 @@ async function ensureReadinessRow(supabaseAdmin: any, companyId: string) {
   return created;
 }
 
-async function loadEvaluation(supabaseAdmin: any, companyId: string, row: any) {
-  const results = await Promise.all([
-    supabaseAdmin
-      .from('financial_years')
-      .select('id, status')
-      .eq('company_id', companyId),
-    supabaseAdmin
-      .from('chart_of_accounts')
-      .select(
-        'id, name, type, account_role, category, subcategory, control_account, system_account, tax_treatment, financial_statement, normal_balance, account_code, account_number, is_active',
-      )
-      .eq('company_id', companyId),
-    supabaseAdmin.from('tax_rates').select('id').eq('company_id', companyId),
-    supabaseAdmin
-      .from('bank_accounts')
-      .select('id, opening_balance, opening_balance_posted')
-      .eq('company_id', companyId),
-    supabaseAdmin
-      .from('payroll_account_mappings')
-      .select('account_role')
-      .eq('company_id', companyId)
-      .eq('is_active', true),
-  ]);
-
-  for (const result of results) {
-    if (result.error) throw result.error;
-  }
-
-  const [
-    { data: financialYears },
-    { data: accounts },
-    { data: taxRates },
-    { data: bankAccounts },
-    { data: payrollMappings },
-  ] = results;
-
-  return evaluateAccountingReadiness({
-    flags: {
-      bank_accounts_skipped: row.bank_accounts_skipped,
-      opening_balances_zero_intentional: row.opening_balances_zero_intentional,
-      inventory_enabled: row.inventory_enabled,
-      fixed_assets_enabled: row.fixed_assets_enabled,
-      payroll_enabled: row.payroll_enabled,
-    },
-    financialYears: financialYears ?? [],
-    accounts: accounts ?? [],
-    taxRates: taxRates ?? [],
-    bankAccounts: bankAccounts ?? [],
-    payrollMappings: payrollMappings ?? [],
-  });
+async function loadEvaluation(supabaseAdmin: any, companyId: string, _row: any) {
+  // One call, one source. The facts used to be re-derived here from five
+  // separate table reads, in rules that existed a second time in the frontend
+  // and nowhere in the database.
+  const { data, error } = await supabaseAdmin.rpc('accounting_facts', { p_company_id: companyId });
+  if (error) throw error;
+  if (!data) throw new Error(`accounting_facts returned nothing for company ${companyId}`);
+  return composeReadiness(data);
 }
 
 /** Cache columns only — never the source of truth for readiness. */
 function cachePatchFromEvaluation(
-  evaluation: ReturnType<typeof evaluateAccountingReadiness>,
+  evaluation: ReturnType<typeof composeReadiness>,
   row: any,
 ) {
   // Never demote READY / LOCKED (Phase 1A backfill / freeze BC).
@@ -134,7 +96,7 @@ function cachePatchFromEvaluation(
   };
 }
 
-function composeResponse(row: any, evaluation: ReturnType<typeof evaluateAccountingReadiness>) {
+function composeResponse(row: any, evaluation: ReturnType<typeof composeReadiness>) {
   const preserveReady = row.status === 'READY' || row.status === 'LOCKED';
   const accountingReady = preserveReady ? true : evaluation.accountingReady;
   const status =

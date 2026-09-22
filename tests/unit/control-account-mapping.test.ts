@@ -3,8 +3,11 @@ import {
   analyseControlAccountMappings,
   buildRecommendedAccount,
 } from '../../src/governance/domains/accountingReadiness/controlAccountMapping';
-import { evaluateAccountingReadiness } from '../../src/governance/domains/accountingReadiness/validation';
 import { requiredControlRoles } from '../../src/governance/domains/accountingReadiness/model';
+import {
+  composeReadiness,
+  type AccountingFacts,
+} from '../../supabase/functions/_shared/accountingReadiness/compose';
 
 const named = (
   id: string,
@@ -134,33 +137,43 @@ describe('Control account mapping analysis', () => {
 });
 
 describe('Readiness: accounts exist vs control mappings', () => {
-  const unmappedExistingCoa = [
-    named('610', 'Accounts Receivable', 'Asset', { account_number: 610 }),
-    named('800', 'Accounts Payable', 'Liability', { account_number: 800 }),
-    named('820', 'VAT Control', 'Liability', { account_number: 820 }),
-    named('100', 'Bank', 'Asset', { account_number: 100 }),
-    named('300', 'Owner Capital', 'Equity', { account_number: 300 }),
-    named('200', 'Sales', 'Income', { account_number: 200 }),
-    named('500', 'Expenses', 'Expense', { account_number: 500 }),
-    named('110', 'Petty Cash', 'Asset', { account_number: 110 }),
-    named('210', 'Loans', 'Liability', { account_number: 210 }),
-    named('310', 'Drawings', 'Equity', { account_number: 310 }),
-    named('410', 'Other Income', 'Income', { account_number: 410 }),
-    named('510', 'Wages', 'Expense', { account_number: 510 }),
-    named('520', 'Rent', 'Expense', { account_number: 520 }),
-    named('530', 'Telephone', 'Expense', { account_number: 530 }),
-    named('540', 'Insurance', 'Expense', { account_number: 540 }),
-  ];
+  // A chart whose accounts merely LOOK like control accounts is not mapped.
+  // Which accounts satisfy which role is now decided by accounting_facts() in
+  // the database -- on account_role, classification and subcategory, never on
+  // display name -- and is proved against the real chart by
+  // tools/staging-recovery/probe-accounting-facts.ts. What is checked here is
+  // that the composition believes the facts rather than second-guessing them.
+  const unmappedFacts: AccountingFacts = {
+    company_id: 'co-1',
+    as_of: '2026-09-22',
+    calendar: {
+      has_year: true, has_open_year: true,
+      current_year: { id: 'fy', year_code: 'FY2026', status: 'open', start_date: '2026-01-01', end_date: '2026-12-31', contains_today: true },
+      year_count: 1, open_year_count: 1, open_years_containing_today: 1,
+      period_count: 12, open_period_count: 1, current_period: null,
+    },
+    chart: {
+      account_count: 15, active_count: 15, missing_types: [],
+      unclassified: [], duplicate_codes: [], duplicate_numbers: [], normal_balance_errors: [],
+    },
+    // Named "Accounts Receivable", "VAT Control", "Bank" -- and mapped to nothing.
+    control_accounts: {
+      trade_debtors: false, trade_creditors: false, vat_control: false, bank: false,
+      retained_earnings: false, profit_loss: true,
+      inventory: false, fixed_assets: false, payroll_clearing: false,
+    },
+    tax: { rate_count: 1, vat_account_count: 0 },
+    banking: { bank_account_count: 0, opening_balances_posted: true },
+    ledger: { journal_count: 0, total_debits: 0, total_credits: 0, balanced: true, unbalanced_journals: [] },
+    payroll: { active_mapping_count: 0 },
+    flags: {
+      bank_accounts_skipped: true, opening_balances_zero_intentional: true,
+      inventory_enabled: false, fixed_assets_enabled: false, payroll_enabled: false,
+    },
+  };
 
-  it('detects an existing chart without treating it as mapped or ready', () => {
-    const result = evaluateAccountingReadiness({
-      flags: {},
-      financialYears: [{ status: 'open' }],
-      accounts: unmappedExistingCoa,
-      taxRates: [{ id: 'tax-1' }],
-      bankAccounts: [{ id: 'bank-1', opening_balance: 0, opening_balance_posted: true }],
-    });
-
+  it('an existing chart is detected without being treated as mapped or ready', () => {
+    const result = composeReadiness(unmappedFacts);
     expect(result.validation.chartOfAccountsExists).toBe(true);
     expect(result.validation.accountCount).toBe(15);
     expect(result.validation.mappingsComplete).toBe(false);
@@ -170,74 +183,44 @@ describe('Readiness: accounts exist vs control mappings', () => {
     expect(result.validation.missingControlAccounts.length).toBeGreaterThan(0);
   });
 
-  it('does not become READY merely because account names look like control accounts', () => {
-    const result = evaluateAccountingReadiness({
-      flags: { opening_balances_zero_intentional: true, bank_accounts_skipped: true },
-      financialYears: [{ status: 'open' }],
-      accounts: unmappedExistingCoa,
-      taxRates: [{ id: 'tax-1' }],
-      bankAccounts: [],
-    });
+  it('does not become ready merely because the account names read like control accounts', () => {
+    const result = composeReadiness(unmappedFacts);
     expect(result.accountingReady).toBe(false);
     expect(result.validation.mappingsComplete).toBe(false);
+    expect(result.validation.missingControlAccounts).toContain('trade_debtors');
+    expect(result.validation.missingControlAccounts).toContain('vat_control');
   });
 
-  it('becomes mapping-complete only after roles are persisted on existing accounts', () => {
-    const mapped = unmappedExistingCoa.map((account) => {
-      if (account.name === 'Accounts Receivable') return { ...account, account_role: 'trade_receivable' };
-      if (account.name === 'Accounts Payable') return { ...account, account_role: 'trade_payable' };
-      if (account.name === 'VAT Control') return { ...account, account_role: 'vat_control', tax_treatment: 'vat_control' };
-      if (account.name === 'Bank') return { ...account, account_role: 'bank', subcategory: 'Cash and Cash Equivalents' };
-      if (account.name === 'Owner Capital') return { ...account, account_role: 'retained_earnings' };
-      return account;
+  it('becomes mapping-complete once the roles are persisted on those accounts', () => {
+    const result = composeReadiness({
+      ...unmappedFacts,
+      control_accounts: {
+        ...unmappedFacts.control_accounts,
+        trade_debtors: true, trade_creditors: true, vat_control: true,
+        bank: true, retained_earnings: true,
+      },
     });
-
-    const result = evaluateAccountingReadiness({
-      flags: { opening_balances_zero_intentional: true, bank_accounts_skipped: true },
-      financialYears: [{ status: 'open' }],
-      accounts: mapped,
-      taxRates: [{ id: 'tax-1' }],
-      bankAccounts: [],
-    });
-
-    expect(result.validation.chartOfAccountsExists).toBe(true);
-    expect(result.validation.accountCount).toBe(15);
     expect(result.validation.mappingsComplete).toBe(true);
     expect(result.validation.mandatoryControlAccounts).toBe(true);
     expect(result.accountingReady).toBe(true);
   });
 
-  it('does not block core readiness for disabled inventory, payroll, or fixed assets', () => {
-    const mapped = [
-      { id: '1', name: 'AR', type: 'Asset', account_role: 'trade_receivable', is_active: true, account_number: 1220, account_code: '1220', normal_balance: 'debit' },
-      { id: '2', name: 'AP', type: 'Liability', account_role: 'trade_payable', is_active: true, account_number: 2110, account_code: '2110', normal_balance: 'credit' },
-      { id: '3', name: 'VAT', type: 'Liability', account_role: 'vat_control', tax_treatment: 'vat_control', is_active: true, account_number: 2125, account_code: '2125', normal_balance: 'credit' },
-      { id: '4', name: 'Bank', type: 'Asset', account_role: 'bank', subcategory: 'Cash and Cash Equivalents', is_active: true, account_number: 1260, account_code: '1260', normal_balance: 'debit' },
-      { id: '5', name: 'RE', type: 'Equity', account_role: 'retained_earnings', system_account: true, is_active: true, account_number: 3020, account_code: '3020', normal_balance: 'credit' },
-      { id: '6', name: 'Sales', type: 'Income', is_active: true, account_number: 4010, account_code: '4010', normal_balance: 'credit' },
-      { id: '7', name: 'Expense', type: 'Expense', is_active: true, account_number: 6010, account_code: '6010', normal_balance: 'debit' },
-    ];
-
-    const coreReady = evaluateAccountingReadiness({
-      flags: { opening_balances_zero_intentional: true, bank_accounts_skipped: true },
-      financialYears: [{ status: 'open' }],
-      accounts: mapped,
-      taxRates: [{ id: 'tax-1' }],
-      bankAccounts: [],
-    });
+  it('does not block core readiness for disabled inventory, payroll or fixed assets', () => {
+    const mapped: AccountingFacts = {
+      ...unmappedFacts,
+      control_accounts: {
+        ...unmappedFacts.control_accounts,
+        trade_debtors: true, trade_creditors: true, vat_control: true,
+        bank: true, retained_earnings: true,
+      },
+    };
+    const coreReady = composeReadiness(mapped);
     expect(coreReady.accountingReady).toBe(true);
     expect(coreReady.validation.missingControlAccounts).toEqual([]);
 
-    const withInventory = evaluateAccountingReadiness({
-      flags: {
-        opening_balances_zero_intentional: true,
-        bank_accounts_skipped: true,
-        inventory_enabled: true,
-      },
-      financialYears: [{ status: 'open' }],
-      accounts: mapped,
-      taxRates: [{ id: 'tax-1' }],
-      bankAccounts: [],
+    const withInventory = composeReadiness({
+      ...mapped,
+      flags: { ...mapped.flags, inventory_enabled: true },
     });
     expect(withInventory.accountingReady).toBe(false);
     expect(withInventory.validation.missingControlAccounts).toEqual(['inventory']);
