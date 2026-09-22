@@ -39,9 +39,30 @@ serve(withEnterprisePlatform('settings', 'tenant', async (req, _ctx) => {
 
     // Handle profile-level updates that don't strictly require a company_id context
     if (method === 'UPDATE_PROFILE') {
+        // Only the user's own editable fields. This wrote the request body as
+        // given, with the service role, so it could set active_company_id (the
+        // company switch has its own checked method below) or the app role.
+        const PROFILE_FIELDS = [
+          'full_name',
+          'avatar_url',
+          'financial_year_end_month',
+          'financial_year_end_day',
+          'current_financial_year_start',
+        ];
+        const requested = (body.profileData && typeof body.profileData === 'object') ? body.profileData : {};
+        const rejected = Object.keys(requested).filter((k) => !PROFILE_FIELDS.includes(k));
+        if (rejected.length > 0) {
+            throw new Error(`These profile fields cannot be changed here: ${rejected.join(', ')}.`);
+        }
+        const profileUpdate = Object.fromEntries(
+            Object.entries(requested).filter(([k]) => PROFILE_FIELDS.includes(k)),
+        );
+        if (Object.keys(profileUpdate).length === 0) {
+            throw new Error('Nothing to update.');
+        }
         ({ data, error } = await supabaseAdmin
             .from('profiles')
-            .update(body.profileData)
+            .update(profileUpdate)
             .eq('id', user.id)
             .select()
             .single());

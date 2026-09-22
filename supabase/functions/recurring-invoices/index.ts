@@ -30,6 +30,23 @@ serve(async (req) => {
       throw new Error("Company ID is required.");
     }
 
+    // Every method below uses the service role, which bypasses row security,
+    // so membership has to be proved here. It was not: any signed-in user could
+    // list, change, delete or PROCESS_DUE (issue and post invoices for) another
+    // company's recurring invoices by naming its id.
+    const { data: membership, error: membershipError } = await supabase
+      .from('company_users')
+      .select('user_id')
+      .eq('user_id', user.id)
+      .eq('company_id', company_id)
+      .maybeSingle();
+    if (membershipError || !membership) {
+      return new Response(JSON.stringify({ error: 'Permission denied.' }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 403,
+      });
+    }
+
     const supabaseAdmin = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
@@ -72,6 +89,17 @@ serve(async (req) => {
 
       case 'PUT':
         const { items: putItems, ...putData } = body.data;
+        // The lines below are replaced by id alone, so the profile must be
+        // proved to belong to this company first.
+        const { data: ownProfile, error: ownError } = await supabaseAdmin
+          .from('recurring_invoices')
+          .select('id')
+          .eq('id', body.id)
+          .eq('company_id', company_id)
+          .maybeSingle();
+        if (ownError) throw ownError;
+        if (!ownProfile) throw new Error('Recurring invoice not found.');
+        delete putData.company_id;
         const { error: putError } = await supabaseAdmin
           .from('recurring_invoices')
           .update(putData)
@@ -211,9 +239,11 @@ serve(async (req) => {
     });
 
   } catch (error) {
-    return new Response(JSON.stringify({ error: error.message }), {
+    // EF-03: an anonymous caller is a 401, not a server error.
+    const message = error instanceof Error ? error.message : String(error);
+    return new Response(JSON.stringify({ error: message }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      status: 500,
+      status: /not authenticated/i.test(message) ? 401 : 500,
     });
   }
 })

@@ -1118,17 +1118,21 @@ serve(withEnterprisePlatform("financial-statements", "tenant", async (req, _ctx)
           if (fyErr) throw fyErr;
           selectedFy = fy;
         } else {
-          const { data: years, error: yearsErr } = await admin
-            .from("financial_years")
-            .select("id, year_code, start_date, end_date, status")
-            .eq("company_id", company_id)
-            .order("start_date", { ascending: false });
-          if (yearsErr) throw yearsErr;
-          selectedFy =
-            years?.find((y) => y.status === "open") ||
-            years?.find((y) => y.status === "reopened") ||
-            years?.[0] ||
-            null;
+          // No year named: the current year, by the one rule in the database.
+          // This used to be "the latest-starting open year", a rule of its own
+          // that could name a different year from every other screen.
+          const { data: current, error: currentErr } = await admin
+            .rpc("financial_year_current", { p_company_id: company_id });
+          if (currentErr) throw currentErr;
+          selectedFy = current?.id
+            ? {
+                id: current.id,
+                year_code: current.year_code,
+                start_date: current.start_date,
+                end_date: current.end_date,
+                status: current.status,
+              }
+            : null;
         }
 
         let workspace = null;

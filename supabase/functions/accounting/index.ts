@@ -33,6 +33,65 @@ function dayBefore(isoDate: string) {
   return d.toISOString().slice(0, 10)
 }
 
+/** A composite RPC with no row comes back as nulls, not null. */
+function rowOrNull<T extends { id?: unknown }>(row: T | null | undefined): T | null {
+  return row && row.id ? row : null
+}
+
+/**
+ * The company's calendar with the current year and period decided once, in the
+ * database (financial_year_current / accounting_period_current). Every action
+ * that reports "the current year" or "the current period" reads it from here;
+ * none works it out for itself. The period rule used to be "the first period
+ * that is open or contains today", which is the latest open period, not today's.
+ */
+async function loadCalendar(admin: any, companyId: string) {
+  const [yearsRes, periodsRes, { data: currentYearRow }, { data: currentPeriodRow }] = await Promise.all([
+    admin.from('financial_years').select('*').eq('company_id', companyId).order('start_date', { ascending: false }),
+    admin.from('accounting_periods')
+      .select('*, financial_years ( id, year_code, status, start_date, end_date )')
+      .eq('company_id', companyId)
+      .order('start_date', { ascending: false }),
+    admin.rpc('financial_year_current', { p_company_id: companyId }),
+    admin.rpc('accounting_period_current', { p_company_id: companyId }),
+  ])
+  if (yearsRes.error) throw yearsRes.error
+  if (periodsRes.error) throw periodsRes.error
+  const currentYear = rowOrNull(currentYearRow)
+  const currentPeriod = rowOrNull(currentPeriodRow)
+  const years = (yearsRes.data || []).map((y: any) => ({ ...y, is_current: y.id === currentYear?.id }))
+  const periods = (periodsRes.data || []).map((p: any) => ({ ...p, is_current: p.id === currentPeriod?.id }))
+  return { years, periods, currentYear, currentPeriod }
+}
+
+/**
+ * The first day of the financial year that contains `date`. "Year to date" is
+ * a financial-year idea; this used to be `${year}-01-01` everywhere, which is
+ * wrong for every company whose year does not start in January.
+ *
+ * An explicit financial_year_id from the caller (the year selected in the
+ * global context) wins when it contains the date. Otherwise the current year if
+ * it contains the date, else the latest-starting year that does. Only when no
+ * financial year covers the date at all does it fall back to 1 January.
+ */
+async function financialYearStartFor(admin: any, companyId: string, date: string, preferredYearId?: unknown) {
+  if (typeof preferredYearId === 'string' && preferredYearId) {
+    const { data: chosen } = await admin.from('financial_years')
+      .select('id, start_date, end_date').eq('id', preferredYearId).eq('company_id', companyId).maybeSingle()
+    if (chosen && chosen.start_date <= date && date <= chosen.end_date) return chosen.start_date as string
+  }
+  const [{ data: covering }, { data: currentRow }] = await Promise.all([
+    admin.from('financial_years').select('id, start_date, end_date')
+      .eq('company_id', companyId).lte('start_date', date).gte('end_date', date)
+      .order('start_date', { ascending: false }),
+    admin.rpc('financial_year_current', { p_company_id: companyId }),
+  ])
+  const current = rowOrNull(currentRow)
+  const rows = covering || []
+  const match = rows.find((y: any) => y.id === current?.id) || rows[0]
+  return (match?.start_date as string | undefined) ?? `${date.slice(0, 4)}-01-01`
+}
+
 function sourceRoute(module: string | null, documentType: string | null, documentId: string | null) {
   if (!documentId) return null
   const m = (module || '').toLowerCase()
@@ -240,26 +299,16 @@ serve(withEnterprisePlatform('accounting', 'tenant', async (req, _ctx) => {
       // ── Phase 4A read models ──────────────────────────────────────────────
 
       case 'GET_ENTERPRISE_CONTEXT': {
-        const [{ data: company }, { data: years }, { data: periods }] = await Promise.all([
+        const [{ data: company }, calendar] = await Promise.all([
           supabaseAdmin.from('companies').select('id, name').eq('id', company_id).single(),
-          supabaseAdmin.from('financial_years').select('*').eq('company_id', company_id).order('start_date', { ascending: false }),
-          supabaseAdmin.from('accounting_periods').select('*').eq('company_id', company_id).order('start_date', { ascending: false }),
+          loadCalendar(supabaseAdmin, company_id),
         ]);
-        const today = new Date().toISOString().slice(0, 10);
-        // One rule, in the database — see financial_year_current().
-        const { data: currentYearRow } = await supabaseAdmin
-          .rpc('financial_year_current', { p_company_id: company_id });
-        const currentYear = currentYearRow ?? ((years || [])[0] || null);
-        const currentPeriod = (periods || []).find((p: any) =>
-          String(p.status).toLowerCase() === 'open' ||
-          (p.start_date <= today && p.end_date >= today)
-        ) || null;
         data = {
           company,
-          financial_years: years || [],
-          accounting_periods: periods || [],
-          current_financial_year: currentYear,
-          current_accounting_period: currentPeriod,
+          financial_years: calendar.years,
+          accounting_periods: calendar.periods,
+          current_financial_year: calendar.currentYear,
+          current_accounting_period: calendar.currentPeriod,
         };
         break;
       }
@@ -268,24 +317,8 @@ serve(withEnterprisePlatform('accounting', 'tenant', async (req, _ctx) => {
         const today = new Date().toISOString().slice(0, 10);
         const todayStart = `${today}T00:00:00.000Z`;
 
-        const ctxRes = await (async () => {
-          const [{ data: years }, { data: periods }] = await Promise.all([
-            supabaseAdmin.from('financial_years').select('*').eq('company_id', company_id).order('start_date', { ascending: false }),
-            supabaseAdmin.from('accounting_periods').select('*').eq('company_id', company_id).order('start_date', { ascending: false }),
-          ]);
-          // One rule, in the database. This used to take the first open year in
-          // start_date order WITHOUT checking the dates, so it could select a
-          // year that does not contain today while the frontend selected one
-          // that does.
-          const { data: currentYearRow } = await supabaseAdmin
-            .rpc('financial_year_current', { p_company_id: company_id });
-          const currentYear = currentYearRow ?? ((years || [])[0] || null);
-          const currentPeriod = (periods || []).find((p: any) =>
-            String(p.status).toLowerCase() === 'open' ||
-            (p.start_date <= today && p.end_date >= today)
-          ) || null;
-          return { years: years || [], periods: periods || [], currentYear, currentPeriod };
-        })();
+        // One rule for the current year and period, in the database.
+        const ctxRes = await loadCalendar(supabaseAdmin, company_id);
 
         const [
           lastPosting,
@@ -876,7 +909,8 @@ serve(withEnterprisePlatform('accounting', 'tenant', async (req, _ctx) => {
         // January. The fallback is retained only for callers that pass no dates,
         // so behaviour is unchanged for them. No balance math is altered.
         const today = body.end_date ?? new Date().toISOString().slice(0, 10);
-        const yearStart = body.start_date ?? `${today.slice(0, 4)}-01-01`;
+        const yearStart = body.start_date
+          ?? await financialYearStartFor(supabaseAdmin, company_id, today, body.financial_year_id);
 
         const [{ data: account }, { data: closing }, { data: opening }, { data: ytd }, { data: recentPr }, { data: recentLines }] = await Promise.all([
           supabaseAdmin.from('chart_of_accounts').select('*').eq('id', accountId).eq('company_id', company_id).single(),
@@ -1190,30 +1224,16 @@ serve(withEnterprisePlatform('accounting', 'tenant', async (req, _ctx) => {
       }
 
       case 'GET_FINANCIAL_PERIODS': {
-        const { data: periods, error: pErr } = await supabaseAdmin
-          .from('accounting_periods')
-          .select('*, financial_years ( id, year_code, status, start_date, end_date )')
-          .eq('company_id', company_id)
-          .order('start_date', { ascending: false });
-        if (pErr) throw pErr;
-        data = periods || [];
+        // is_current comes from accounting_period_current(), like the year's.
+        data = (await loadCalendar(supabaseAdmin, company_id)).periods;
         break;
       }
 
       case 'GET_FINANCIAL_YEARS': {
-        const [{ data: years, error: yErr }, { data: currentYear }] = await Promise.all([
-          supabaseAdmin
-            .from('financial_years')
-            .select('*')
-            .eq('company_id', company_id)
-            .order('start_date', { ascending: false }),
-          supabaseAdmin.rpc('financial_year_current', { p_company_id: company_id }),
-        ]);
-        if (yErr) throw yErr;
         // Which year is current is decided once, in the database. Callers read
         // this flag; they must not re-derive it, because two screens inferring
         // it separately is how they came to disagree.
-        data = (years || []).map((y: any) => ({ ...y, is_current: y.id === currentYear?.id }));
+        data = (await loadCalendar(supabaseAdmin, company_id)).years;
         break;
       }
 
@@ -1223,8 +1243,12 @@ serve(withEnterprisePlatform('accounting', 'tenant', async (req, _ctx) => {
         const accountId = body.account_id;
         if (!accountId) throw new Error('account_id required');
         const { page, pageSize, offset } = clampPage(body.page, body.page_size);
-        const startDate = body.start_date || `${new Date().getFullYear()}-01-01`;
         const endDate = body.end_date || new Date().toISOString().slice(0, 10);
+        // "YTD" is financial-year-to-date: from the start of the financial year
+        // containing the end date. It was 1 January regardless, so a March-year
+        // company saw a YTD movement that began two months into its year.
+        const yearStart = await financialYearStartFor(supabaseAdmin, company_id, endDate, body.financial_year_id);
+        const startDate = body.start_date || yearStart;
         const groupBy = body.group_by || 'day';
 
         const { data: account } = await supabaseAdmin
@@ -1232,7 +1256,6 @@ serve(withEnterprisePlatform('accounting', 'tenant', async (req, _ctx) => {
         if (!account) throw new Error('Account not found');
 
         const monthStart = `${endDate.slice(0, 7)}-01`;
-        const yearStart = `${endDate.slice(0, 4)}-01-01`;
 
         const [{ data: asOfNow }, { data: asOfOpen }, { data: asOfYtdOpen }, { data: asOfMonthOpen }] = await Promise.all([
           userSupabase.rpc('get_balances_as_of_date', { p_end_date: endDate, p_company_id: company_id }),
@@ -1521,8 +1544,9 @@ serve(withEnterprisePlatform('accounting', 'tenant', async (req, _ctx) => {
       case 'GET_ACCOUNT_SOURCE_ANALYSIS': {
         const accountId = body.account_id;
         if (!accountId) throw new Error('account_id required');
-        const startDate = body.start_date || `${new Date().getFullYear()}-01-01`;
         const endDate = body.end_date || new Date().toISOString().slice(0, 10);
+        const startDate = body.start_date
+          || await financialYearStartFor(supabaseAdmin, company_id, endDate, body.financial_year_id);
 
         const [{ data: byModule }, { data: byVendor }, { data: byCustomer }, { data: byProject }, { data: byDocType }, { data: monthSeries }] = await Promise.all([
           userSupabase.rpc('get_account_movement_by_dimension', { p_company_id: company_id, p_account_id: accountId, p_start_date: startDate, p_end_date: endDate, p_dimension: 'module' }),
@@ -1990,7 +2014,9 @@ serve(withEnterprisePlatform('accounting', 'tenant', async (req, _ctx) => {
 
         const ready = checklist.filter((c) => c.status === 'ready').length;
         data = {
-          open_periods: openPeriods || [],
+          // openPeriods is the query RESPONSE; its rows are .data. Returning the
+          // response object meant the page never had a list to render.
+          open_periods: openPeriods.data || [],
           checklist,
           readiness_pct: Math.round((ready / checklist.length) * 100),
           ready_count: ready,
@@ -2003,9 +2029,11 @@ serve(withEnterprisePlatform('accounting', 'tenant', async (req, _ctx) => {
       case 'GET_ACCOUNT_CARD': {
         const accountId = body.account_id;
         if (!accountId) throw new Error('account_id required');
-        // Enrich inquiry with linked entities (read-only joins)
-        const today = new Date().toISOString().slice(0, 10);
-        const yearStart = `${today.slice(0, 4)}-01-01`;
+        // Enrich inquiry with linked entities (read-only joins). The as-at date
+        // is the caller's reporting date when given (the global context), else
+        // today; the year opening is the financial year's, not 1 January.
+        const today = body.end_date || new Date().toISOString().slice(0, 10);
+        const yearStart = await financialYearStartFor(supabaseAdmin, company_id, today, body.financial_year_id);
         const monthStart = `${today.slice(0, 7)}-01`;
 
         const [{ data: account }, { data: balNow }, { data: balYear }, { data: balMonth }, { data: recentLines }, { data: bankLinks }] = await Promise.all([

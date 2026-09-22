@@ -41,6 +41,13 @@ serve(withEnterprisePlatform('invite-user', 'tenant', async (req, _ctx) => {
     if (!userRole || !['admin', 'owner'].includes(userRole.role)) {
       throw new Error("Permission denied: You must be an admin or owner to invite users.");
     }
+    if (!['member', 'admin', 'owner'].includes(role)) {
+      throw new Error("Role must be member, admin or owner.");
+    }
+    // Nobody grants more than they hold: only an owner may invite an owner.
+    if (role === 'owner' && userRole.role !== 'owner') {
+      throw new Error("Permission denied: only an owner can invite another owner.");
+    }
 
     // If permission check passes, use the admin client to send the invite
     const supabaseAdmin = createClient(
@@ -48,14 +55,29 @@ serve(withEnterprisePlatform('invite-user', 'tenant', async (req, _ctx) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    const { data: inviteData, error: inviteError } = await supabaseAdmin.auth.admin.inviteUserByEmail(email, {
+    // The invitation is recorded here, by the server. handle_new_user joins the
+    // new user to the company only when this row exists for their email, and
+    // takes the role from it. The metadata below is a claim anyone can make on
+    // a public sign-up, so on its own it grants nothing.
+    const { data: invitation, error: invitationError } = await supabaseAdmin
+      .from('company_invitations')
+      .insert({ company_id, email: String(email).trim(), role, invited_by: user.id })
+      .select('id')
+      .single();
+    if (invitationError) throw invitationError;
+
+    const { data: inviteData, error: inviteError } = await supabaseAdmin.auth.admin.inviteUserByEmail(String(email).trim(), {
       data: {
         invited_to_company_id: company_id,
         invited_role: role,
       }
     });
 
-    if (inviteError) throw inviteError;
+    if (inviteError) {
+      // Nothing was sent, so nothing may be claimed.
+      await supabaseAdmin.from('company_invitations').delete().eq('id', invitation.id);
+      throw inviteError;
+    }
 
     return new Response(JSON.stringify(inviteData), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
