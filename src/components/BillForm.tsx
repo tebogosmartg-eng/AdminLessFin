@@ -123,12 +123,12 @@ const BillForm = ({ isOpen, setIsOpen, billId, duplicateFromId, initialData, onS
   const expenseAccounts = useMemo(() => accounts?.filter(a => a.type === 'Expense'), [accounts]);
   const assetAccounts = useMemo(() => accounts?.filter(a => a.type === 'Asset'), [accounts]);
   const apAccounts = useMemo(() => accounts?.filter(a => a.type === 'Liability'), [accounts]);
-  // A bill may not post to an account the Accounting Policy Engine reserves to
-  // the Inventory or Fixed Assets module — it rejects the posting with
-  // "may only be posted from the Inventory module". Offering such an account
-  // here guaranteed a failure the customer could not anticipate, so the picker
-  // shows only what a bill can legitimately post to. The database rule is
-  // unchanged and remains the authority.
+  // A bill may not post to stock, cost-of-sales or depreciation accounts: the
+  // Accounting Policy Engine reserves those to the routines that move the
+  // corresponding sub-ledger, and a bill moves neither. Offering such an
+  // account here guaranteed a failure the customer could not anticipate, so
+  // the picker shows only what a bill can legitimately post to. The database
+  // rule is unchanged and remains the authority.
   const lineAccountOptions = useMemo(
     () => manuallyPostableAccounts([...(expenseAccounts || []), ...(assetAccounts || [])]),
     [expenseAccounts, assetAccounts],

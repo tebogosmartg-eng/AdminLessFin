@@ -74,6 +74,7 @@ const accounts = [
   { id: 'vat', name: 'VAT Control', tax_treatment: 'vat_control', account_role: 'vat_control' },
   { id: 'dep', name: 'Depreciation Expense', account_role: 'depreciation_expense' },
   { id: 'inv', name: 'Inventory Asset', account_role: 'inventory_asset' },
+  { id: 'cogs', name: 'Cost of Goods Sold', account_role: 'cogs' },
   { id: 'exp', name: 'Office Expense' },
   { id: 'bank', name: 'Bank Current Account', account_role: 'bank', subcategory: 'Cash and Cash Equivalents' },
 ];
@@ -195,6 +196,64 @@ describe('Accounting Policy Engine', () => {
       },
     );
     expect(result.violations.some((v) => v.code === 'inventory.inventory_module_only')).toBe(true);
+  });
+
+  // Selling stock moves it off the balance sheet and charges its cost, and
+  // post_sales_invoice_atomic writes the stock sub-ledger in the same
+  // transaction. Before this was allowed, a stock item could not be sold on an
+  // invoice at all.
+  it('lets a sales invoice charge cost of sales and relieve stock', () => {
+    const result = evaluateAccountingPolicies(
+      systemPolicies,
+      accounts,
+      [],
+      {
+        module: 'sales_invoice',
+        description: 'Invoice INV-00001',
+        lines: [{ account_id: 'cogs', debit: 300 }, { account_id: 'inv', credit: 300 }],
+      },
+    );
+    expect(result.violations.some((v) => v.code === 'inventory.inventory_module_only')).toBe(false);
+    expect(result.blocking).toBe(false);
+  });
+
+  // The opening is for the sales invoice only. Every other module still has to
+  // go through the Inventory module to move stock.
+  it.each(['manual_journal', 'accounts_payable', 'banking', 'payroll', 'fixed_assets'])(
+    'still refuses a stock posting from %s',
+    (module) => {
+      const result = evaluateAccountingPolicies(
+        systemPolicies,
+        accounts,
+        [],
+        { module, description: 'Stock adjust', lines: [{ account_id: 'cogs', debit: 300 }] },
+      );
+      expect(result.violations.some((v) => v.code === 'inventory.inventory_module_only')).toBe(true);
+    },
+  );
+
+  it.each(['inventory_receipt', 'inventory_issue'])('still lets %s move stock', (module) => {
+    const result = evaluateAccountingPolicies(
+      systemPolicies,
+      accounts,
+      [],
+      { module, description: 'Stock move', lines: [{ account_id: 'inv', debit: 300 }] },
+    );
+    expect(result.violations.some((v) => v.code === 'inventory.inventory_module_only')).toBe(false);
+  });
+
+  // The message named the Inventory module, which stopped being the rule.
+  it('says what the rule is when it refuses', () => {
+    const result = evaluateAccountingPolicies(
+      systemPolicies,
+      accounts,
+      [],
+      { module: 'manual_journal', description: 'Stock adjust', lines: [{ account_id: 'inv', debit: 300 }] },
+    );
+    const message = result.violations.find((v) => v.code === 'inventory.inventory_module_only')?.message ?? '';
+    expect(message).toContain('Inventory Asset');
+    expect(message).toContain('manual_journal');
+    expect(message).not.toContain('may only be posted from the Inventory module');
   });
 
   it('warns when manual journal lacks description', () => {

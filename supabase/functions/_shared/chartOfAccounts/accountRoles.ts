@@ -260,18 +260,25 @@ export function roleForTemplateCode(code: string, tax?: string | null): AccountR
 }
 
 /**
- * Accounts the Accounting Policy Engine reserves to a specific module.
+ * Accounts that only a sub-ledger routine may post.
  *
  * Mirrors the `inventory_module_only` and `depreciation_module_only` evaluation
- * hooks in migration 20260729120000_coa_account_role_metadata.sql, which reject
- * a posting whose lines touch these roles from any other module:
+ * hooks, which reject a posting whose lines touch these roles unless it comes
+ * from a module that moves the matching sub-ledger in the same transaction:
  *
- *   inventory_asset, cogs                      -> Inventory module
- *   depreciation_expense, accumulated_depreciation -> Fixed Assets module
+ *   inventory_asset, cogs                          -> stock receipts, stock
+ *                                                     issues and sales invoices
+ *   depreciation_expense, accumulated_depreciation -> Fixed Assets
  *
- * Offering these in a Bill or Invoice account picker guarantees a rejected
- * posting the customer cannot predict, so pickers use this to filter. This
- * ENFORCES the control at the point of choice — it never bypasses it; the
+ * The allow-lists live in accounting_subledger_modules() in the database and in
+ * SUBLEDGER_MODULES in the policy engine.
+ *
+ * These pickers are for postings made BY HAND — a bill line, a manual journal,
+ * a receipt — and none of those move stock, so none of them may choose these
+ * accounts. A sales invoice does not use this filter: it posts cost of sales
+ * from the product's own mapping, not from anything the user picks.
+ *
+ * This ENFORCES the control at the point of choice — it never bypasses it; the
  * database remains the authority and still rejects the posting.
  */
 export const MODULE_RESTRICTED_ACCOUNT_ROLES: Record<string, AccountRole[]> = {

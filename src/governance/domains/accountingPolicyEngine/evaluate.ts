@@ -8,6 +8,22 @@ import type {
   PolicyViolation,
 } from './model';
 
+/**
+ * The posting-engine modules that own each sub-ledger, mirroring
+ * accounting_subledger_modules() in the database. A module belongs here only
+ * if its posting routine writes the sub-ledger in the same transaction as the
+ * journal, so the ledger and the sub-ledger cannot drift apart.
+ *
+ * 'sales_invoice' is here because post_sales_invoice_atomic consumes stock and
+ * writes inventory_transactions alongside the journal. It is shared with credit
+ * notes, which cannot reach a stock account: post_credit_note_atomic refuses
+ * any line account that is not an Income account.
+ */
+export const SUBLEDGER_MODULES = {
+  inventory: ['inventory_receipt', 'inventory_issue', 'sales_invoice'],
+  fixed_assets: ['fixed_assets'],
+} as const;
+
 export type PolicyAccount = {
   id: string;
   name: string;
@@ -137,8 +153,8 @@ export function evaluateAccountingPolicies(
   const warnings: PolicyViolation[] = [];
   let blocking = false;
 
-  const inventoryModules = new Set(['inventory_receipt', 'inventory_issue']);
-  const assetModules = new Set(['fixed_assets']);
+  const inventoryModules = new Set<string>(SUBLEDGER_MODULES.inventory);
+  const assetModules = new Set<string>(SUBLEDGER_MODULES.fixed_assets);
 
   for (const def of definitions) {
     const severity = effectiveSeverity(def);
@@ -217,7 +233,7 @@ export function evaluateAccountingPolicies(
           for (const line of posting.lines) {
             const account = accountById.get(line.account_id);
             if (account && isInventoryAccount(account)) {
-              message = `Inventory account ${account.name} may only be posted from the Inventory module.`;
+              message = `Stock account ${account.name} is written only where stock actually moves, so it cannot be posted from ${posting.module}.`;
               break;
             }
           }
