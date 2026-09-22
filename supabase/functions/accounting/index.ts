@@ -246,10 +246,10 @@ serve(withEnterprisePlatform('accounting', 'tenant', async (req, _ctx) => {
           supabaseAdmin.from('accounting_periods').select('*').eq('company_id', company_id).order('start_date', { ascending: false }),
         ]);
         const today = new Date().toISOString().slice(0, 10);
-        const currentYear = (years || []).find((y: any) =>
-          ['open', 'active', 'current', 'reopened'].includes(String(y.status).toLowerCase()) ||
-          (y.start_date <= today && y.end_date >= today)
-        ) || (years || [])[0] || null;
+        // One rule, in the database — see financial_year_current().
+        const { data: currentYearRow } = await supabaseAdmin
+          .rpc('financial_year_current', { p_company_id: company_id });
+        const currentYear = currentYearRow ?? ((years || [])[0] || null);
         const currentPeriod = (periods || []).find((p: any) =>
           String(p.status).toLowerCase() === 'open' ||
           (p.start_date <= today && p.end_date >= today)
@@ -273,10 +273,13 @@ serve(withEnterprisePlatform('accounting', 'tenant', async (req, _ctx) => {
             supabaseAdmin.from('financial_years').select('*').eq('company_id', company_id).order('start_date', { ascending: false }),
             supabaseAdmin.from('accounting_periods').select('*').eq('company_id', company_id).order('start_date', { ascending: false }),
           ]);
-          const currentYear = (years || []).find((y: any) =>
-            ['open', 'active', 'current', 'reopened'].includes(String(y.status).toLowerCase()) ||
-            (y.start_date <= today && y.end_date >= today)
-          ) || (years || [])[0] || null;
+          // One rule, in the database. This used to take the first open year in
+          // start_date order WITHOUT checking the dates, so it could select a
+          // year that does not contain today while the frontend selected one
+          // that does.
+          const { data: currentYearRow } = await supabaseAdmin
+            .rpc('financial_year_current', { p_company_id: company_id });
+          const currentYear = currentYearRow ?? ((years || [])[0] || null);
           const currentPeriod = (periods || []).find((p: any) =>
             String(p.status).toLowerCase() === 'open' ||
             (p.start_date <= today && p.end_date >= today)
@@ -1198,13 +1201,19 @@ serve(withEnterprisePlatform('accounting', 'tenant', async (req, _ctx) => {
       }
 
       case 'GET_FINANCIAL_YEARS': {
-        const { data: years, error: yErr } = await supabaseAdmin
-          .from('financial_years')
-          .select('*')
-          .eq('company_id', company_id)
-          .order('start_date', { ascending: false });
+        const [{ data: years, error: yErr }, { data: currentYear }] = await Promise.all([
+          supabaseAdmin
+            .from('financial_years')
+            .select('*')
+            .eq('company_id', company_id)
+            .order('start_date', { ascending: false }),
+          supabaseAdmin.rpc('financial_year_current', { p_company_id: company_id }),
+        ]);
         if (yErr) throw yErr;
-        data = years || [];
+        // Which year is current is decided once, in the database. Callers read
+        // this flag; they must not re-derive it, because two screens inferring
+        // it separately is how they came to disagree.
+        data = (years || []).map((y: any) => ({ ...y, is_current: y.id === currentYear?.id }));
         break;
       }
 

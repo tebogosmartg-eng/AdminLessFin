@@ -70,6 +70,7 @@ type RawFinancialYearRow = {
   status: FinancialYearDomainModel['status'];
   previous_financial_year_id: string | null;
   created_at: string | null;
+  is_current?: boolean;
 };
 
 type RawAccountingPeriodRow = {
@@ -98,6 +99,7 @@ export class FinancialCalendarService implements FinancialCalendarReadAPI, Finan
       status: row.status,
       previousFinancialYearId: row.previous_financial_year_id ?? null,
       createdAt: row.created_at ?? null,
+      isCurrent: row.is_current === true,
     }));
   }
 

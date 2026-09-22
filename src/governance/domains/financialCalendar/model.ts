@@ -19,6 +19,12 @@ export interface FinancialYearDomainModel {
   status: FinancialYearStatus;
   previousFinancialYearId: string | null;
   createdAt: string | null;
+  /**
+   * Decided once, by financial_year_current() in the database. Screens read
+   * this; they must not work out which year is current for themselves, because
+   * two screens inferring it separately is how they came to disagree.
+   */
+  isCurrent: boolean;
 }
 
 export interface AccountingPeriodDomainModel {
