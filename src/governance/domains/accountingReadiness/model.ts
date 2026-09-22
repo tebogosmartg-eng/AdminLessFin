@@ -128,7 +128,23 @@ export type AccountingReadinessRecord = {
   lastValidatedAt: string | null;
 };
 
+/** A recorded reason the modules are open although setup is not complete. */
+export type AccountingReadinessException = {
+  reason: string | null;
+  grantedAt: string | null;
+  grantedBy: string | null;
+};
+
 export type AccountingReadinessSnapshot = AccountingReadinessRecord & {
+  /**
+   * Whether invoices, banking, payroll and journals open. Only the module gate
+   * reads this. It equals `accountingReady` except while a RECORDED exception is
+   * in force -- every other screen shows `accountingReady` and `status`, which
+   * are always the live truth.
+   */
+  modulesUnlocked: boolean;
+  /** Present while an exception, not completed setup, is what opens the modules. */
+  readinessException: AccountingReadinessException | null;
   progressPercent: number;
   steps: Record<SetupStepKey, { complete: boolean; label: string }>;
   validation: {
@@ -148,6 +164,15 @@ export type AccountingReadinessSnapshot = AccountingReadinessRecord & {
     missingControlAccounts: ControlAccountRole[];
     coaIntegrityErrors: string[];
     errors: string[];
+    /** More than one open financial year includes today. */
+    financialYearAmbiguous?: boolean;
+    /** The year every screen treats as current, decided by financial_year_current(). */
+    currentFinancialYear?: {
+      id: string; year_code: string | null; status: string;
+      start_date: string; end_date: string; contains_today: boolean;
+    } | null;
+    /** Debits equal credits across the whole ledger. */
+    ledgerBalanced?: boolean;
   };
 };
 

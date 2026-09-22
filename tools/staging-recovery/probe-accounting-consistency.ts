@@ -46,12 +46,13 @@ async function main() {
     // The financial year the accounting screens use.
     const years = await invoke(api, 'accounting', { method: 'GET_FINANCIAL_YEARS', company_id: co.id });
     const yearRows = (Array.isArray(years.body) ? years.body : (years.body as { years?: unknown[] })?.years ?? []) as Array<{
-      id: string; start_date: string; end_date: string; status?: string; is_active?: boolean; year_code?: string;
+      id: string; start_date: string; end_date: string; status?: string; is_current?: boolean; year_code?: string;
     }>;
-    const activeYear = yearRows.find((y) => y.is_active) ?? yearRows.find((y) => y.status === 'open') ?? yearRows[0];
+    // The year every surface is meant to use, as decided by financial_year_current().
+    const activeYear = yearRows.find((y) => y.is_current) ?? yearRows[0];
     if (!activeYear) {
-      console.log(`## ${co.name}: no financial year at all`);
-      findings.push({ company: co.name, fact: 'financial year', a: 'accounting=none', b: '-', agree: false });
+      // Not a disagreement: setup reports "Active financial year is required".
+      console.log(`## ${co.name}: no financial year yet${NL}`);
       continue;
     }
     const start = activeYear.start_date;
@@ -94,21 +95,37 @@ async function main() {
     }
 
     // ---- readiness: does the headline agree with its own evidence?
+    //
+    // The contract: `status` and `accounting_ready` are the live truth, so they
+    // must agree with the steps and progress in the same response. Only
+    // `modules_unlocked` may differ, and only while a recorded exception says
+    // why. (A company that is NOT ready can perfectly well have a valid
+    // financial year, so "not ready" is only a conflict when the evidence says
+    // every step is complete.)
     if (s) {
       const v = (s.validation ?? {}) as Record<string, unknown>;
+      const r = s as typeof s & { modules_unlocked?: boolean; readiness_exception?: { reason?: string } | null };
       const stepsAllComplete = Object.values(s.steps ?? {}).every((x) => x.complete);
-      compare(co.name, 'accounting_ready vs its own steps',
+      compare(co.name, 'accounting_ready agrees with its own steps',
         String(Boolean(s.accounting_ready)), String(stepsAllComplete), 'headline', 'steps');
-      compare(co.name, 'accounting_ready vs progress 100%',
+      compare(co.name, 'accounting_ready agrees with progress',
         String(Boolean(s.accounting_ready)), String((s.progress_percent ?? 0) >= 100), 'headline', 'progress');
-      compare(co.name, 'accounting_ready vs control accounts mapped',
-        String(Boolean(s.accounting_ready)), String(Boolean(v.mandatoryControlAccounts)), 'headline', 'validation');
-      compare(co.name, 'accounting_ready vs active financial year',
-        String(Boolean(s.accounting_ready)), String(Boolean(v.activeFinancialYear)), 'headline', 'validation');
-      compare(co.name, 'accounting_ready vs CoA integrity',
-        String(Boolean(s.accounting_ready)), String(Boolean(v.coaIntegrity)), 'headline', 'validation');
-      compare(co.name, 'accounting_ready vs tax configured',
-        String(Boolean(s.accounting_ready)), String(Boolean(v.taxConfigurationExists)), 'headline', 'validation');
+      compare(co.name, 'status READY only when setup is complete',
+        String(s.status === 'READY'), String(stepsAllComplete), 'status', 'steps');
+      if (s.accounting_ready) {
+        compare(co.name, 'a ready company has its control accounts',
+          'true', String(Boolean(v.mandatoryControlAccounts)), 'headline', 'validation');
+        compare(co.name, 'a ready company has tax configured',
+          'true', String(Boolean(v.taxConfigurationExists)), 'headline', 'validation');
+        compare(co.name, 'a ready company has an open financial year',
+          'true', String(Boolean(v.activeFinancialYear)), 'headline', 'validation');
+      }
+      const unlockedWithoutReason = r.modules_unlocked === true && !s.accounting_ready && !r.readiness_exception;
+      compare(co.name, 'modules open without setup only under a recorded exception',
+        'false', String(unlockedWithoutReason), 'expected', 'observed');
+      if (r.readiness_exception) {
+        console.log(`   modules open under a recorded exception: ${String(r.readiness_exception.reason ?? '').slice(0, 90)}...`);
+      }
 
       // ---- the same CoA facts, seen by setup and by health
       const h = health.body as Record<string, unknown> | null;

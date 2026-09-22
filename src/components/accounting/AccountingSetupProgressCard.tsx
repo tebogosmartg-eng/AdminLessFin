@@ -29,8 +29,9 @@ const AccountingSetupProgressCard = ({ readiness }: AccountingSetupProgressCardP
           <div>
             <CardTitle className="text-lg">Accounting Setup</CardTitle>
             <CardDescription>
-              Complete these steps before you can invoice, post journals, or generate financial
-              statements. Progress updates automatically as you configure each area.
+              {readiness.readinessException
+                ? 'Invoicing, banking, payroll and journals stay open under a recorded exception while these steps are finished. Progress updates automatically as you configure each area.'
+                : 'Complete these steps before you can invoice, post journals, or generate financial statements. Progress updates automatically as you configure each area.'}
             </CardDescription>
           </div>
           <div className="text-right text-sm font-medium">{readiness.progressPercent}%</div>
@@ -74,6 +75,12 @@ const AccountingSetupProgressCard = ({ readiness }: AccountingSetupProgressCardP
             );
           })}
         </div>
+
+        {readiness.readinessException?.reason && (
+          <p className="rounded-md border border-amber-200/70 bg-amber-50/40 px-3 py-2 text-xs text-amber-900 dark:border-amber-900/40 dark:bg-amber-950/20 dark:text-amber-200">
+            {readiness.readinessException.reason}
+          </p>
+        )}
 
         <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
           <p className="text-xs text-muted-foreground">

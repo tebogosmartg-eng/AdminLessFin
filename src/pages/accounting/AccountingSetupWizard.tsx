@@ -212,6 +212,29 @@ const AccountingSetupWizard = () => {
             <span>{readiness.progressPercent}%</span>
           </div>
           <Progress value={readiness.progressPercent} className="h-2" />
+          {readiness.readinessException && (
+            <Alert className="border-amber-200/70 bg-amber-50/30 dark:border-amber-900/40 dark:bg-amber-950/10">
+              <AlertTriangle className="h-4 w-4 text-amber-600" />
+              <AlertTitle>Modules open under a recorded exception</AlertTitle>
+              <AlertDescription>
+                {readiness.readinessException.reason ??
+                  'Invoicing, banking, payroll and journals are open although setup is not complete.'}
+              </AlertDescription>
+            </Alert>
+          )}
+          {readiness.validation.financialYearAmbiguous && (
+            <Alert className="border-amber-200/70 bg-amber-50/30 dark:border-amber-900/40 dark:bg-amber-950/10">
+              <AlertTriangle className="h-4 w-4 text-amber-600" />
+              <AlertTitle>More than one open financial year includes today</AlertTitle>
+              <AlertDescription>
+                Every screen is using{' '}
+                {readiness.validation.currentFinancialYear
+                  ? `${readiness.validation.currentFinancialYear.year_code ?? 'the latest'} (${readiness.validation.currentFinancialYear.start_date} to ${readiness.validation.currentFinancialYear.end_date})`
+                  : 'the latest-starting year'}
+                . Close or correct the other so the current year is not a choice.
+              </AlertDescription>
+            </Alert>
+          )}
           <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
             {(
               [

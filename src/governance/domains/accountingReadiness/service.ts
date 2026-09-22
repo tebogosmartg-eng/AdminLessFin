@@ -26,6 +26,8 @@ type RawReadinessRow = {
   fixed_assets_enabled: boolean;
   payroll_enabled: boolean;
   last_validated_at: string | null;
+  modules_unlocked?: boolean;
+  readiness_exception?: { reason: string | null; grantedAt: string | null; grantedBy: string | null } | null;
   progress_percent?: number;
   steps?: AccountingReadinessSnapshot['steps'];
   validation?: AccountingReadinessSnapshot['validation'];
@@ -49,6 +51,10 @@ function mapSnapshot(row: RawReadinessRow): AccountingReadinessSnapshot {
     fixedAssetsEnabled: row.fixed_assets_enabled,
     payrollEnabled: row.payroll_enabled,
     lastValidatedAt: row.last_validated_at,
+    // Older responses carried only the ratcheted accounting_ready, which WAS the
+    // module gate; fall back to it so a stale edge deploy does not lock anyone out.
+    modulesUnlocked: row.modules_unlocked ?? row.accounting_ready,
+    readinessException: row.readiness_exception ?? null,
     progressPercent: row.progress_percent ?? 0,
     steps: row.steps ?? ({} as AccountingReadinessSnapshot['steps']),
     validation: row.validation ?? {

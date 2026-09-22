@@ -27,7 +27,10 @@ export default function AccountingReadyGate({ children, module }: AccountingRead
     enabled: !!activeCompany,
   });
 
-  if (readiness?.accountingReady) {
+  // The gate is the one place that honours a recorded exception. Every other
+  // screen shows the live status, so none of them can call a company "ready"
+  // while its setup is incomplete.
+  if (readiness?.modulesUnlocked) {
     return <>{children}</>;
   }
 

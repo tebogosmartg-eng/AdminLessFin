@@ -15,6 +15,7 @@ import {
 import {
   composeReadiness,
   nextIncompleteStep,
+  resolveReadinessGate,
 } from '../_shared/accountingReadiness/compose.ts';
 
 const corsHeaders = ENTERPRISE_CORS_HEADERS;
@@ -66,24 +67,22 @@ async function loadEvaluation(supabaseAdmin: any, companyId: string, _row: any) 
   return composeReadiness(data);
 }
 
-/** Cache columns only — never the source of truth for readiness. */
+/**
+ * Cache columns only — never read back as the truth for readiness.
+ *
+ * `status` and `accounting_ready` are written as the live evaluation says. They
+ * used to be ratcheted -- once READY, always READY -- which is how the cache,
+ * and every screen reading the headline, came to disagree with the steps in the
+ * very same response.
+ */
 function cachePatchFromEvaluation(
   evaluation: ReturnType<typeof composeReadiness>,
   row: any,
 ) {
-  // Never demote READY / LOCKED (Phase 1A backfill / freeze BC).
-  const preserveReady = row.status === 'READY' || row.status === 'LOCKED';
-  const accountingReady = preserveReady ? true : evaluation.accountingReady;
-  const status =
-    row.status === 'LOCKED'
-      ? 'LOCKED'
-      : accountingReady
-        ? 'READY'
-        : evaluation.status;
-
+  const gate = resolveReadinessGate(row, evaluation);
   return {
-    status,
-    accounting_ready: accountingReady,
+    status: gate.status,
+    accounting_ready: gate.setupComplete,
     current_step: nextIncompleteStep(evaluation.steps),
     financial_calendar_complete: evaluation.steps.financial_calendar.complete,
     chart_of_accounts_complete: evaluation.steps.chart_of_accounts.complete,
@@ -91,27 +90,34 @@ function cachePatchFromEvaluation(
     bank_accounts_complete: evaluation.steps.bank_accounts.complete,
     opening_balances_complete: evaluation.steps.opening_balances.complete,
     validation_complete: evaluation.steps.validation.complete,
+    // A recorded exception has done its job once setup is genuinely complete.
+    // Clearing it means a later regression gates the modules again rather than
+    // being hidden behind a flag nobody remembers setting.
+    ...(gate.clearException
+      ? {
+          modules_unlocked_by_exception: false,
+          exception_reason: null,
+          exception_granted_at: null,
+          exception_granted_by: null,
+        }
+      : {}),
     last_validated_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
   };
 }
 
 function composeResponse(row: any, evaluation: ReturnType<typeof composeReadiness>) {
-  const preserveReady = row.status === 'READY' || row.status === 'LOCKED';
-  const accountingReady = preserveReady ? true : evaluation.accountingReady;
-  const status =
-    row.status === 'LOCKED'
-      ? 'LOCKED'
-      : accountingReady
-        ? 'READY'
-        : evaluation.status;
-
+  const gate = resolveReadinessGate(row, evaluation);
   return {
     company_id: row.company_id,
-    status,
-    accounting_ready: accountingReady,
+    // The truth, identical on every screen: READY only when setup is complete.
+    status: gate.status,
+    accounting_ready: gate.setupComplete,
+    // Whether the operational modules open. Differs from accounting_ready only
+    // while a RECORDED exception is in force, and that exception travels with it.
+    modules_unlocked: gate.modulesUnlocked,
+    readiness_exception: gate.exception,
     current_step: nextIncompleteStep(evaluation.steps),
-    // Derived step flags (response authority) — DB cache may lag until refresh
     financial_calendar_complete: evaluation.steps.financial_calendar.complete,
     chart_of_accounts_complete: evaluation.steps.chart_of_accounts.complete,
     tax_configuration_complete: evaluation.steps.tax_configuration.complete,
@@ -188,7 +194,8 @@ serve(withEnterprisePlatform('accounting-setup', 'tenant', async (req, _ctx) => 
           row.tax_configuration_complete === patch.tax_configuration_complete &&
           row.bank_accounts_complete === patch.bank_accounts_complete &&
           row.opening_balances_complete === patch.opening_balances_complete &&
-          row.validation_complete === patch.validation_complete;
+          row.validation_complete === patch.validation_complete &&
+          !('modules_unlocked_by_exception' in patch);
         if (!cacheUnchanged) {
           row = await persistCache(supabaseAdmin, companyId, row, evaluation);
         }

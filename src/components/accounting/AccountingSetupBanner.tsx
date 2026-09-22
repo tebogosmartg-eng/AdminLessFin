@@ -32,8 +32,9 @@ const AccountingSetupBanner = ({ actionLabel = 'Posting transactions' }: Account
       <AlertTitle>Accounting setup in progress ({readiness.progressPercent}%)</AlertTitle>
       <AlertDescription className="space-y-3">
         <p>
-          {actionLabel} requires a validated accounting foundation. Complete Accounting Setup
-          before posting — otherwise you may see errors when saving.
+          {readiness.readinessException
+            ? `${actionLabel} is open under a recorded exception while Accounting Setup is finished.`
+            : `${actionLabel} requires a validated accounting foundation. Complete Accounting Setup before posting — otherwise you may see errors when saving.`}
         </p>
         <Button asChild size="sm" variant="outline">
           <Link to={accountingSetupPath(readiness.currentStep)}>

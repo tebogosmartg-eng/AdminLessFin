@@ -278,3 +278,62 @@ export function composeReadiness(facts: AccountingFacts): ReadinessEvaluation {
 export function nextIncompleteStep(steps: ReadinessEvaluation['steps']): SetupStepKey {
   return STEP_ORDER.find((key) => !steps[key].complete) ?? 'validation';
 }
+
+/** The stored row's say in the verdict: intent, a lock, or a recorded exception. */
+export type ReadinessRowState = {
+  status?: string | null;
+  modules_unlocked_by_exception?: boolean | null;
+  exception_reason?: string | null;
+  exception_granted_at?: string | null;
+  exception_granted_by?: string | null;
+};
+
+export type ReadinessGate = {
+  /** Setup is genuinely complete. The truth, and what every screen shows. */
+  setupComplete: boolean;
+  /** Status shown everywhere. READY only when setup is genuinely complete. */
+  status: AccountingReadinessStatus;
+  /** Whether the operational modules open. The only thing an exception affects. */
+  modulesUnlocked: boolean;
+  /** Present while a recorded exception is what keeps the modules open. */
+  exception: { reason: string | null; grantedAt: string | null; grantedBy: string | null } | null;
+  /** The stored exception has served its purpose and should be cleared. */
+  clearException: boolean;
+};
+
+/**
+ * What the stored row adds to the evaluation.
+ *
+ * It used to add a ratchet: a company that had ever been READY stayed READY,
+ * whatever its books said, while the same response carried live steps that
+ * disagreed -- so the dashboard said "ready" and Accounting Setup said 67%.
+ *
+ * Now the status is always the evaluation's. The only thing that can open the
+ * modules without complete setup is an exception that is RECORDED, with a
+ * reason, a date and a person, and is shown on every screen that shows the
+ * status. It clears itself the first time setup is genuinely complete, so a
+ * later regression gates the modules again instead of being hidden.
+ */
+export function resolveReadinessGate(row: ReadinessRowState, evaluation: ReadinessEvaluation): ReadinessGate {
+  const setupComplete = evaluation.accountingReady;
+  // Deliberately frozen by an administrator. Nothing sets this today; it is
+  // visible as its own status, so it is not a silent override.
+  if (row.status === 'LOCKED') {
+    return { setupComplete, status: 'LOCKED', modulesUnlocked: true, exception: null, clearException: false };
+  }
+  const hasException = row.modules_unlocked_by_exception === true;
+  const exceptionActive = hasException && !setupComplete;
+  return {
+    setupComplete,
+    status: evaluation.status,
+    modulesUnlocked: setupComplete || exceptionActive,
+    exception: exceptionActive
+      ? {
+          reason: row.exception_reason ?? null,
+          grantedAt: row.exception_granted_at ?? null,
+          grantedBy: row.exception_granted_by ?? null,
+        }
+      : null,
+    clearException: hasException && setupComplete,
+  };
+}

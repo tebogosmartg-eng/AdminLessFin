@@ -3,9 +3,10 @@
  *
  * Every FACT now comes from the database function accounting_facts(company):
  * which control roles the chart carries, whether it is classified, whether a
- * financial year is open, whether VAT is configured. Those rules are proved
+ * financial year is open, whether VAT is configured. Those rules -- including
+ * that an account is matched on its role and never on its name -- are proved
  * against the real database by tools/staging-recovery/probe-accounting-facts.ts
- * and by the migration rehearsal.
+ * and the migration rehearsal.
  *
  * What is left in TypeScript, and what these test, is what the facts add up to:
  * the six setup steps, the progress, the status, and the sentences Accounting
@@ -16,6 +17,7 @@ import { describe, expect, it } from 'vitest';
 import {
   composeReadiness,
   nextIncompleteStep,
+  resolveReadinessGate,
   type AccountingFacts,
 } from '../../supabase/functions/_shared/accountingReadiness/compose';
 
@@ -233,5 +235,70 @@ describe('accounting readiness composition', () => {
     // calendar + chart done; tax, banking, opening balances, validation not
     expect(r.progressPercent).toBe(33);
     expect(r.status).toBe('IN_PROGRESS');
+  });
+});
+
+/**
+ * The gate.
+ *
+ * The edge function used to ratchet readiness: a company that had ever been
+ * READY stayed READY whatever its books said, while the same response carried
+ * live steps that disagreed. Four companies were in that state, one of them a
+ * live client with no equity account.
+ *
+ * Now the status is always the evaluation's, and the only thing that opens the
+ * modules without complete setup is an exception that is RECORDED.
+ */
+describe('the readiness gate', () => {
+  const incomplete = composeReadiness(facts({ tax: { rate_count: 0, vat_account_count: 0 } }));
+  const complete = composeReadiness(facts());
+
+  it('no longer ratchets: a company once READY reports its real status', () => {
+    const gate = resolveReadinessGate({ status: 'READY' }, incomplete);
+    expect(gate.status).toBe('IN_PROGRESS');
+    expect(gate.setupComplete).toBe(false);
+    expect(gate.modulesUnlocked).toBe(false);
+  });
+
+  it('opens the modules under a recorded exception, and says so', () => {
+    const gate = resolveReadinessGate({
+      status: 'READY',
+      modules_unlocked_by_exception: true,
+      exception_reason: 'Grandfathered while the books are corrected.',
+      exception_granted_at: '2026-09-22T00:00:00Z',
+    }, incomplete);
+    expect(gate.modulesUnlocked).toBe(true);
+    // the exception opens the modules; it does not make the company "ready"
+    expect(gate.setupComplete).toBe(false);
+    expect(gate.status).toBe('IN_PROGRESS');
+    expect(gate.exception?.reason).toBe('Grandfathered while the books are corrected.');
+    expect(gate.clearException).toBe(false);
+  });
+
+  it('clears the exception the first time setup is genuinely complete', () => {
+    const gate = resolveReadinessGate({ status: 'IN_PROGRESS', modules_unlocked_by_exception: true }, complete);
+    expect(gate.clearException).toBe(true);
+    expect(gate.exception).toBeNull();
+    expect(gate.modulesUnlocked).toBe(true);
+    expect(gate.status).toBe('READY');
+  });
+
+  it('gates again if setup regresses after the exception has cleared', () => {
+    const gate = resolveReadinessGate({ status: 'READY', modules_unlocked_by_exception: false }, incomplete);
+    expect(gate.modulesUnlocked).toBe(false);
+  });
+
+  it('a complete company is READY with no exception', () => {
+    const gate = resolveReadinessGate({ status: 'READY' }, complete);
+    expect(gate).toEqual({
+      setupComplete: true, status: 'READY', modulesUnlocked: true, exception: null, clearException: false,
+    });
+  });
+
+  it('keeps an administrator lock visible as its own status', () => {
+    const gate = resolveReadinessGate({ status: 'LOCKED' }, incomplete);
+    expect(gate.status).toBe('LOCKED');
+    expect(gate.modulesUnlocked).toBe(true);
+    expect(gate.setupComplete).toBe(false);
   });
 });
