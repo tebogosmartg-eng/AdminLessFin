@@ -325,6 +325,7 @@ export default function FinancialStatementsWorkspaceDashboard() {
                 workspaceId={workspaceId}
                 dashboard={d}
                 generalInfo={generalInfo}
+                generalInfoReady={generalInfoQuery.isFetched}
                 selection={selection}
                 onSelect={setSelection}
                 locked={locked}
@@ -341,6 +342,7 @@ export default function FinancialStatementsWorkspaceDashboard() {
                   workspaceId={workspaceId}
                   dashboard={d}
                   generalInfo={generalInfo}
+                  generalInfoReady={generalInfoQuery.isFetched}
                   onOpen={(location) => {
                     setSelection(location);
                     setMode('document');
@@ -359,6 +361,7 @@ export default function FinancialStatementsWorkspaceDashboard() {
                 workspaceId={workspaceId}
                 dashboard={d}
                 generalInfo={generalInfo}
+                generalInfoReady={generalInfoQuery.isFetched}
               />
             )}
           </TabsContent>

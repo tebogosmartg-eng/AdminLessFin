@@ -227,13 +227,22 @@ export function assessReadiness(model: DocumentModel): Readiness {
   }
 
   // ── Who the statements are for ────────────────────────────────────────────
-  const registered = model.entity?.registered_name || model.companyName;
+  //
+  // The company's own name is an internal label chosen at sign-up — often still
+  // the default one — and it is not the name the entity is registered under.
+  // The cover falls back to it so the document is never nameless, but falling
+  // back is a finding, not a resting state: it is how a set of statements ends
+  // up headed "My's Company".
+  const registered = model.entity?.registered_name;
   if (!registered || !String(registered).trim()) {
     issues.push({
       id: 'no-entity-name',
       state: 'action_required',
-      title: 'The entity has no registered name',
-      detail: 'The cover and every page header need the name the entity is registered under.',
+      title: model.companyName
+        ? `The cover reads "${model.companyName}" because no registered name is recorded`
+        : 'The entity has no registered name',
+      detail:
+        'The cover, every page header and the exported file are named after the entity. Enter the name it is registered under under General Information.',
       location: { kind: 'information', id: 'information' },
     });
   }

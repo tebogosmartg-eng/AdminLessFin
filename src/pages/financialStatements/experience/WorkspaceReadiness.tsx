@@ -16,6 +16,7 @@ export default function WorkspaceReadiness({
   workspaceId,
   dashboard,
   generalInfo,
+  generalInfoReady,
   onOpen,
 }: {
   companyId: string;
@@ -23,6 +24,8 @@ export default function WorkspaceReadiness({
   workspaceId: string;
   dashboard: EfsDashboard;
   generalInfo: EfsWorkspaceGeneralInformation | null;
+  /** General information has been asked for and answered. */
+  generalInfoReady?: boolean;
   onOpen: (location: ReadinessLocation) => void;
 }) {
   const modelQuery = useDocumentModel({
@@ -31,6 +34,7 @@ export default function WorkspaceReadiness({
     workspaceId,
     dashboard,
     generalInfo,
+    generalInfoReady,
   });
 
   if (modelQuery.isLoading) return <Skeleton className="h-64 w-full" />;

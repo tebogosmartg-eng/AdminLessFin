@@ -28,12 +28,15 @@ export default function FinaliseAndExport({
   workspaceId,
   dashboard,
   generalInfo,
+  generalInfoReady,
 }: {
   companyId: string;
   companyName?: string;
   workspaceId: string;
   dashboard: EfsDashboard;
   generalInfo: EfsWorkspaceGeneralInformation | null;
+  /** General information has been asked for and answered. */
+  generalInfoReady?: boolean;
 }) {
   const qc = useQueryClient();
   const overridesApi = useDocumentOverrides(workspaceId, companyId);
@@ -43,6 +46,7 @@ export default function FinaliseAndExport({
     workspaceId,
     dashboard,
     generalInfo,
+    generalInfoReady,
   });
 
   const version = dashboard.snapshot?.currentVersion ?? null;

@@ -42,6 +42,7 @@ export default function WorkspaceDocumentWorkspace({
   workspaceId,
   dashboard,
   generalInfo,
+  generalInfoReady,
   selection,
   onSelect,
   locked = false,
@@ -51,6 +52,8 @@ export default function WorkspaceDocumentWorkspace({
   workspaceId: string;
   dashboard: EfsDashboard;
   generalInfo: EfsWorkspaceGeneralInformation | null;
+  /** General information has been asked for and answered. */
+  generalInfoReady?: boolean;
   /** Owned by the page, so a readiness finding can open the page it concerns. */
   selection: DocSelection;
   onSelect: (selection: DocSelection) => void;
@@ -67,6 +70,7 @@ export default function WorkspaceDocumentWorkspace({
     workspaceId,
     dashboard,
     generalInfo,
+    generalInfoReady,
   });
 
   const invalidateModel = modelQuery.reload;

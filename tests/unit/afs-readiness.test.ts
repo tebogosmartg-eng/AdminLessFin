@@ -28,7 +28,9 @@ function model(overrides: Partial<DocumentModel> = {}): DocumentModel {
     frameworkPackId: 'p1',
     frameworkKey: 'IFRS_SME',
     frameworkLabel: 'IFRS for SMEs',
-    entity: null,
+    // A registered entity: the cover has a name of its own, so readiness has
+    // nothing to say about it. See afs-cover-entity-name.test.ts.
+    entity: { registered_name: 'Test Co (Pty) Ltd' } as DocumentModel['entity'],
     period: { label: 'FY2026' },
     statements: [
       {

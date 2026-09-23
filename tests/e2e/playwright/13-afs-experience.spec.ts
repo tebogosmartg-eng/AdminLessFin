@@ -186,6 +186,35 @@ test('the cover always names the reporting framework', async ({ page }) => {
   await expect(select).not.toHaveText(/Choose a framework/);
 });
 
+test('the cover is headed by the same entity as the page', async ({ page }) => {
+  await page.goto('/financial-statements-workspace');
+  await waitForRouteSettled(page);
+  await waitForDocument(page);
+
+  // The page header and the cover are composed from the same general
+  // information, on separate requests. The document model used to be cached
+  // before that information arrived, so the header showed the entity's
+  // registered name while the cover — and the PDF — printed the company's
+  // internal sign-up name instead.
+  const heading = (await page.locator('h1').first().innerText()).trim();
+
+  await page.getByRole('button', { name: /^Cover$/ }).first().click();
+  const cover = page.getByText('Registered name').locator('xpath=..');
+  await expect(cover).toBeVisible({ timeout: 30_000 });
+  const registered = (await cover.innerText()).replace(/Registered name/i, '').trim();
+
+  expect(registered).not.toBe('');
+  expect(registered).toBe(heading);
+
+  // This company has no registered name recorded, so the cover is falling back
+  // to the company's sign-up name. That is allowed — a document is never
+  // nameless — but it has to be reported rather than left to look deliberate.
+  await page.getByTestId('afs-mode-review').click();
+  await expect(page.getByTestId('afs-readiness-state')).toBeVisible({ timeout: 45_000 });
+  await expect(page.getByTestId('afs-readiness-issue').filter({ hasText: /registered name/i }))
+    .toHaveCount(1, { timeout: 30_000 });
+});
+
 test('11: review states the readiness of the statements, not a score', async ({ page }) => {
   await page.goto('/financial-statements-workspace');
   await waitForRouteSettled(page);
