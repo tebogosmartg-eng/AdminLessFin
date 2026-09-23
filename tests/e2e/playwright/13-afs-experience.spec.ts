@@ -281,44 +281,50 @@ test('presentation belongs to the engagement, not to one browser', async ({ page
   await waitForDocument(page);
   const url = page.url();
 
-  // Hide a note, which used to be written only to this browser's localStorage.
   const tree = page.getByRole('navigation', { name: /document structure/i });
-  const note = tree.getByTestId('afs-tree-note').filter({ hasText: /Note \d+\./ }).first();
-  // Hiding a note drops it from the numbering, so match on the title alone. A
+  // A note that is currently shown. Because this choice now persists on the
+  // engagement, an earlier run may have left others hidden.
+  const note = tree.locator('[data-testid="afs-tree-note"]:not(.line-through)').first();
+  await expect(note).toBeVisible({ timeout: 60_000 });
+  // Hiding a note drops it from the numbering, so match on the title alone; a
   // policy can carry the same title, hence the note-specific test id.
   const title = (await note.innerText()).trim().replace(/^Note\s+\d+\.\s*/, '');
   const noteByTitle = (scope: typeof tree) =>
     scope.getByTestId('afs-tree-note').filter({ hasText: title }).first();
-  await note.hover();
-  await note.locator('xpath=following-sibling::button[1]').click();
-  await page.waitForTimeout(2500);
-  await expect(noteByTitle(tree)).toHaveClass(/line-through/, { timeout: 30_000 });
+  const toggle = () => noteByTitle(tree).locator('xpath=following-sibling::button[1]').click();
 
-  // A second browser context: a different storage partition entirely, standing
-  // in for the reviewer on another machine.
-  const other = await browser.newContext({ storageState: STORAGE_STATE });
-  const reviewer = await other.newPage();
   try {
-    await reviewer.goto(url);
-    await waitForRouteSettled(reviewer);
-    await waitForDocument(reviewer);
-    // The reviewer's own browser has never seen this choice, and yet.
-    const hiddenThere = noteByTitle(
-      reviewer.getByRole('navigation', { name: /document structure/i }),
-    );
-    await expect(hiddenThere).toHaveClass(/line-through/, { timeout: 45_000 });
-    await reviewer.screenshot({
-      path: 'tests/e2e/artifacts/after-15-presentation-shared.png',
-      fullPage: true,
-    });
-  } finally {
-    await other.close();
-  }
+    await noteByTitle(tree).hover();
+    await toggle();
+    await expect(noteByTitle(tree)).toHaveClass(/line-through/, { timeout: 30_000 });
 
-  // Put it back so later tests and the artefacts see the full document.
-  await note.hover();
-  await note.locator('xpath=following-sibling::button[1]').click();
-  await page.waitForTimeout(2000);
+    // A second browser context: a different storage partition entirely,
+    // standing in for the reviewer on another machine.
+    const other = await browser.newContext({ storageState: STORAGE_STATE });
+    const reviewer = await other.newPage();
+    try {
+      await reviewer.goto(url);
+      await waitForRouteSettled(reviewer);
+      await waitForDocument(reviewer);
+      // The reviewer's own browser has never seen this choice, and yet.
+      const hiddenThere = noteByTitle(
+        reviewer.getByRole('navigation', { name: /document structure/i }),
+      );
+      await expect(hiddenThere).toHaveClass(/line-through/, { timeout: 45_000 });
+      await reviewer.screenshot({
+        path: 'tests/e2e/artifacts/after-15-presentation-shared.png',
+        fullPage: true,
+      });
+    } finally {
+      await other.close();
+    }
+  } finally {
+    // Show it again whatever happened: this state is shared now, so leaving it
+    // hidden would follow every later run and every other reader.
+    await noteByTitle(tree).hover();
+    await toggle();
+    await expect(noteByTitle(tree)).not.toHaveClass(/line-through/, { timeout: 30_000 });
+  }
 });
 
 test('a note table is edited as a table', async ({ page }) => {
