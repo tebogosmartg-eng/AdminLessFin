@@ -112,6 +112,8 @@ export type DocNoteNode = {
 };
 
 export type DocumentPeriod = {
+  /** The reporting period row, so a framework can be rebound against it. */
+  id?: string;
   label?: string;
   /**
    * Prior-period caption. Read by the comparative, consistency and corporate
@@ -126,6 +128,8 @@ export type DocumentPeriod = {
 
 export type DocumentModel = {
   companyId: string;
+  /** The company's own name — the fallback for the entity on the cover. */
+  companyName?: string;
   workspaceId: string;
   workspaceName: string;
   frameworkPackId: string | null;
@@ -358,11 +362,12 @@ export async function ensureGenericDocument(params: {
 /** Assemble the full client document model from existing read APIs. */
 export async function loadDocumentModel(params: {
   companyId: string;
+  companyName?: string;
   workspaceId: string;
   dashboard: EfsDashboard;
   generalInfo: EfsWorkspaceGeneralInformation | null;
 }): Promise<DocumentModel> {
-  const { companyId, workspaceId, dashboard, generalInfo } = params;
+  const { companyId, companyName, workspaceId, dashboard, generalInfo } = params;
   const frameworkPackId = dashboard.framework?.id ?? null;
   const frameworkKey =
     dashboard.framework?.framework_key ??
@@ -434,6 +439,7 @@ export async function loadDocumentModel(params: {
 
   return {
     companyId,
+    companyName,
     workspaceId,
     workspaceName: dashboard.workspace?.name || 'Annual Financial Statements',
     frameworkPackId,
@@ -447,6 +453,7 @@ export async function loadDocumentModel(params: {
             dashboard.reportingPeriod.year_code ||
             dashboard.reportingPeriod.period_key ||
             dashboard.reportingPeriod.label,
+          id: dashboard.reportingPeriod.id,
           period_key: dashboard.reportingPeriod.period_key,
           start_date: dashboard.reportingPeriod.start_date,
           end_date: dashboard.reportingPeriod.end_date,

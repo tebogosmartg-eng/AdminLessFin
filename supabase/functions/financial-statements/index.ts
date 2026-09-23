@@ -1115,6 +1115,19 @@ serve(withEnterprisePlatform("financial-statements", "tenant", async (req, _ctx)
         const entity = await ensureDefaultEntity(admin, company_id, company?.name);
         if (!body.framework_pack_id) throw new Error("framework_pack_id is required.");
 
+        // What the workspace was reporting under before this call, so the
+        // document can be reflowed off it below.
+        let previousPackId = null;
+        if (body.workspace_id) {
+          const { data: prior } = await admin
+            .from("efs_reporting_workspaces")
+            .select("efs_framework_bindings(framework_pack_id)")
+            .eq("id", body.workspace_id)
+            .eq("company_id", company_id)
+            .maybeSingle();
+          previousPackId = prior?.efs_framework_bindings?.framework_pack_id ?? null;
+        }
+
         // Supersede prior active bindings for this period (if provided)
         if (body.reporting_period_id) {
           await admin
@@ -1147,6 +1160,26 @@ serve(withEnterprisePlatform("financial-statements", "tenant", async (req, _ctx)
             .update({ framework_binding_id: data.id, updated_at: new Date().toISOString() })
             .eq("id", body.workspace_id)
             .eq("company_id", company_id);
+          // Changing the framework changes which disclosures the statements
+          // must carry. Notes that came from the framework being left behind
+          // are marked superseded rather than deleted: the tree greys them out
+          // and the PDF leaves them off, but nothing the user wrote is lost and
+          // the status can be put back. Anything already moved past draft is
+          // left alone — that is someone's work, not scaffolding.
+          let supersededCount = 0;
+          if (previousPackId && previousPackId !== body.framework_pack_id) {
+            const { data: stale, error: staleErr } = await admin
+              .from("efs_disclosure_instances")
+              .update({ status: "superseded", updated_at: new Date().toISOString() })
+              .eq("company_id", company_id)
+              .eq("workspace_id", body.workspace_id)
+              .eq("framework_pack_id", previousPackId)
+              .eq("status", "draft")
+              .select("id");
+            if (staleErr) throw staleErr;
+            supersededCount = (stale || []).length;
+          }
+
           await writeActivity(admin, {
             company_id,
             workspace_id: body.workspace_id,
@@ -1154,9 +1187,15 @@ serve(withEnterprisePlatform("financial-statements", "tenant", async (req, _ctx)
             entity_type: "framework_binding",
             entity_id: data.id,
             actor_user_id: user.id,
-            message: `Framework pack bound`,
-            payload: { framework_pack_id: body.framework_pack_id },
+            message: `Reporting framework changed`,
+            payload: {
+              framework_pack_id: body.framework_pack_id,
+              previous_framework_pack_id: previousPackId,
+              disclosures_superseded: supersededCount,
+            },
           });
+          data.disclosures_superseded = supersededCount;
+          data.previous_framework_pack_id = previousPackId;
         }
 
         await writeAudit(admin, {

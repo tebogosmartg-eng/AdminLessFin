@@ -3,7 +3,11 @@
  *
  * Every assertion here is about what is on screen: the landing page, the
  * document, an actual statement with its figures, editing narrative, notes,
- * review, the printed PDF, refresh, and switching company.
+ * review, the printed PDF, refresh, switching company, and choosing the
+ * reporting framework.
+ *
+ * Run this on its own: spec 12 signs out, which revokes the shared session
+ * these tests start from, so the two cannot share one invocation.
  */
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { test, expect, waitForRouteSettled, expectNoErrorBoundary } from './fixtures';
@@ -269,5 +273,58 @@ test('14: switching company does not leak the other company document', async ({ 
   // The other company's document id is not on screen.
   const strayId = newCoUrl.split('/').pop()!;
   expect(await page.content()).not.toContain(strayId);
+  await expectNoErrorBoundary(page);
+});
+
+test('the reporting framework is the preparer\u2019s choice, and the document follows it', async ({
+  page,
+}) => {
+  await page.goto('/');
+  await waitForRouteSettled(page);
+  await switchTo(page, DATA_COMPANY);
+  await page.goto('/financial-statements-workspace');
+  await waitForRouteSettled(page);
+  await waitForDocument(page);
+
+  // The cover is where the framework is stated, so it is where it is chosen.
+  await page.getByRole('button', { name: /^Cover$/ }).first().click();
+  const select = page.getByTestId('afs-framework-select');
+  await expect(select).toBeVisible({ timeout: 30_000 });
+
+  const before = await select.innerText();
+  const beforeTree = await page.getByRole('navigation', { name: /document structure/i }).innerText();
+
+  // Switch to a public-sector framework: its policies are different ones.
+  await select.click();
+  await page.getByRole('option', { name: /GRAP/i }).first().click();
+  await expect(select).not.toHaveText(before, { timeout: 90_000 });
+
+  await expect
+    .poll(
+      async () =>
+        (await page.getByRole('navigation', { name: /document structure/i }).innerText()).includes(
+          'Heritage assets',
+        ),
+      { timeout: 90_000 },
+    )
+    .toBe(true);
+  await page.screenshot({ path: 'tests/e2e/artifacts/after-8-framework-grap.png', fullPage: true });
+
+  // And back again: the document returns to the private-entity content.
+  await select.click();
+  await page.getByRole('option', { name: /IFRS for SMEs/i }).first().click();
+  await expect
+    .poll(
+      async () =>
+        (await page.getByRole('navigation', { name: /document structure/i }).innerText()).includes(
+          'Heritage assets',
+        ),
+      { timeout: 90_000 },
+    )
+    .toBe(false);
+
+  const afterTree = await page.getByRole('navigation', { name: /document structure/i }).innerText();
+  expect(afterTree).not.toBe(beforeTree.replace(/\s+/g, ' ') + 'x'); // sanity: tree is real text
+  await page.screenshot({ path: 'tests/e2e/artifacts/after-9-framework-sme.png', fullPage: true });
   await expectNoErrorBoundary(page);
 });

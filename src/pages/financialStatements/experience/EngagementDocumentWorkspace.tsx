@@ -43,12 +43,14 @@ export type DocSelection =
  */
 export default function WorkspaceDocumentWorkspace({
   companyId,
+  companyName,
   workspaceId,
   dashboard,
   generalInfo,
   onNavigate,
 }: {
   companyId: string;
+  companyName?: string;
   workspaceId: string;
   dashboard: EfsDashboard;
   generalInfo: EfsWorkspaceGeneralInformation | null;
@@ -68,7 +70,7 @@ export default function WorkspaceDocumentWorkspace({
         workspaceId,
         frameworkPackId: dashboard.framework?.id ?? null,
       });
-      return loadDocumentModel({ companyId, workspaceId, dashboard, generalInfo });
+      return loadDocumentModel({ companyId, companyName, workspaceId, dashboard, generalInfo });
     },
   });
 

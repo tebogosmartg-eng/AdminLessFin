@@ -19,11 +19,13 @@ import { Skeleton } from '../../components/ui/skeleton';
  */
 export default function FinaliseAndExport({
   companyId,
+  companyName,
   workspaceId,
   dashboard,
   generalInfo,
 }: {
   companyId: string;
+  companyName?: string;
   workspaceId: string;
   dashboard: EfsDashboard;
   generalInfo: EfsWorkspaceGeneralInformation | null;
@@ -39,7 +41,7 @@ export default function FinaliseAndExport({
         workspaceId,
         frameworkPackId: dashboard.framework?.id ?? null,
       });
-      return loadDocumentModel({ companyId, workspaceId, dashboard, generalInfo });
+      return loadDocumentModel({ companyId, companyName, workspaceId, dashboard, generalInfo });
     },
   });
 

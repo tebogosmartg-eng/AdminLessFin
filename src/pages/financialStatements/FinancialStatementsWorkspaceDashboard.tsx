@@ -295,6 +295,7 @@ export default function FinancialStatementsWorkspaceDashboard() {
             {companyId && workspaceId && (
               <EngagementDocumentWorkspace
                 companyId={companyId}
+                companyName={activeCompany?.name}
                 workspaceId={workspaceId}
                 dashboard={d}
                 generalInfo={generalInfo}
@@ -319,6 +320,7 @@ export default function FinancialStatementsWorkspaceDashboard() {
             {companyId && workspaceId && (
               <FinaliseAndExport
                 companyId={companyId}
+                companyName={activeCompany?.name}
                 workspaceId={workspaceId}
                 dashboard={d}
                 generalInfo={generalInfo}

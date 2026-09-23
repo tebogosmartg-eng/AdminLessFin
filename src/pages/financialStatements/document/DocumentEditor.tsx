@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useMutation } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { invokeFinancialStatements } from '../../../lib/financialStatements/api';
 import { accountingPoliciesService } from '../../../governance/domains/accountingPolicies/service';
 import type {
@@ -24,7 +24,14 @@ import { Textarea } from '../../../components/ui/textarea';
 import { Badge } from '../../../components/ui/badge';
 import { cn, formatCurrency } from '../../../lib/utils';
 import { showError, showSuccess } from '../../../utils/toast';
-import { Save } from 'lucide-react';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '../../../components/ui/select';
+import { Loader2, Save } from 'lucide-react';
 
 type EditorContext = {
   companyId: string;
@@ -538,12 +545,132 @@ function NoteEditor({ note, ctx }: { note: DocNoteNode; ctx: EditorContext }) {
   );
 }
 
-function CoverEditor({ model }: { model: DocumentModel }) {
+type FrameworkPackOption = {
+  id: string;
+  framework_key: string;
+  label: string;
+  efs_frameworks?: { name?: string };
+};
+
+/**
+ * The reporting framework the statements are prepared under.
+ *
+ * It decides the statement wording, which disclosures are required and which
+ * accounting policies are written, so it is a decision the preparer makes —
+ * not a fixed property of the module. Until now it was whichever pack sorted
+ * first alphabetically, with nowhere in the product to change it.
+ */
+function FrameworkSelector({
+  model,
+  workspaceId,
+  onChanged,
+}: {
+  model: DocumentModel;
+  workspaceId: string;
+  onChanged: () => void;
+}) {
+  const qc = useQueryClient();
+  const packsQuery = useQuery({
+    queryKey: ['efs_framework_packs', model.companyId],
+    queryFn: () =>
+      invokeFinancialStatements<FrameworkPackOption[]>(model.companyId, 'LIST_FRAMEWORK_PACKS'),
+    staleTime: 5 * 60_000,
+  });
+
+  const change = useMutation({
+    mutationFn: async (packId: string) => {
+      const bound = await invokeFinancialStatements<{ disclosures_superseded?: number }>(
+        model.companyId,
+        'BIND_FRAMEWORK',
+        {
+          framework_pack_id: packId,
+          workspace_id: workspaceId,
+          reporting_period_id: model.period?.id ?? undefined,
+          period_from: model.period?.start_date ?? undefined,
+          period_to: model.period?.end_date ?? undefined,
+        },
+      );
+      // Bring in the new framework's required disclosures, then rebuild the
+      // statements so their wording follows the framework too.
+      await invokeFinancialStatements(model.companyId, 'ASSEMBLE_DISCLOSURES_FROM_FRAMEWORK', {
+        workspace_id: workspaceId,
+        framework_pack_id: packId,
+      });
+      await invokeFinancialStatements(model.companyId, 'GENERATE_STATEMENTS', {
+        workspace_id: workspaceId,
+      }).catch(() => {
+        // Statements are rebuilt on the next update if none are prepared yet.
+      });
+      return bound;
+    },
+    onSuccess: async (bound) => {
+      const moved = bound?.disclosures_superseded ?? 0;
+      showSuccess(
+        moved > 0
+          ? `Reporting framework changed. ${moved} note${moved === 1 ? '' : 's'} from the previous framework moved out of the document.`
+          : 'Reporting framework changed.',
+      );
+      // The framework on screen is read from the workspace dashboard, so that
+      // query has to be refetched too — invalidating only the document model
+      // left the old framework's name on the cover.
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: ['efs_dashboard', model.companyId, workspaceId] }),
+        qc.invalidateQueries({ queryKey: ['efs_statements', model.companyId, workspaceId] }),
+        qc.invalidateQueries({ queryKey: ['efs_doc_model', model.companyId, workspaceId] }),
+      ]);
+      onChanged();
+    },
+    onError: (e: unknown) => showError(e instanceof Error ? e.message : String(e)),
+  });
+
+  const packs = packsQuery.data || [];
+  const current = packs.find((p) => p.id === model.frameworkPackId);
+
+  return (
+    <div className="flex items-center justify-end gap-2">
+      <Select
+        value={model.frameworkPackId ?? undefined}
+        onValueChange={(v) => v !== model.frameworkPackId && change.mutate(v)}
+        disabled={change.isPending || packsQuery.isLoading}
+      >
+        <SelectTrigger className="h-8 w-[290px]" data-testid="afs-framework-select">
+          <SelectValue placeholder={current?.label || model.frameworkLabel || 'Choose a framework'} />
+        </SelectTrigger>
+        <SelectContent>
+          {packs.map((p) => (
+            <SelectItem key={p.id} value={p.id} data-testid="afs-framework-option">
+              {p.efs_frameworks?.name || p.label}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+      {change.isPending && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}
+    </div>
+  );
+}
+
+function CoverEditor({
+  model,
+  workspaceId,
+  onSaved,
+}: {
+  model: DocumentModel;
+  workspaceId: string;
+  onSaved: () => void;
+}) {
   const display = corporateDisplayFromModel(model);
-  const rows: Array<[string, string]> = [
+  const rows: Array<[string, React.ReactNode]> = [
     ['Registered name', display.registeredName],
     ['Trading name', display.tradingName || '—'],
-    ['Reporting framework', display.reportingFramework || model.frameworkLabel],
+    [
+      'Reporting framework',
+      <FrameworkSelector
+        key="fw"
+        model={model}
+        workspaceId={workspaceId}
+        onChanged={onSaved}
+      />,
+    ],
     ['Reporting period', model.period?.period_key || model.period?.label || '—'],
     ['Reporting currency', display.reportingCurrency],
   ];
@@ -552,14 +679,17 @@ function CoverEditor({ model }: { model: DocumentModel }) {
       <CardHeader>
         <CardTitle className="text-base">Cover Page</CardTitle>
         <CardDescription>
-          The cover is generated from the engagement information. Update these details in the
-          Information tab; they flow straight into the preview and PDF.
+          The cover is taken from General Information, in the navigator on the left. Everything here
+          flows straight into the preview and the PDF.
         </CardDescription>
       </CardHeader>
       <CardContent>
         <dl className="grid gap-2 text-sm">
           {rows.map(([k, v]) => (
-            <div key={k} className="flex justify-between gap-4 border-b py-1.5 last:border-0">
+            <div
+              key={k}
+              className="flex min-h-9 items-center justify-between gap-4 border-b py-1.5 last:border-0"
+            >
               <dt className="text-muted-foreground">{k}</dt>
               <dd className="text-right font-medium">{v}</dd>
             </div>
@@ -668,7 +798,8 @@ export default function DocumentEditor({
   const ctx: EditorContext = { companyId, model, overridesApi, onSaved };
   const kind = selection.kind;
 
-  if (kind === 'cover') return <CoverEditor model={model} />;
+  if (kind === 'cover')
+    return <CoverEditor model={model} workspaceId={workspaceId} onSaved={onSaved} />;
   // The entity's own details are part of the document, so they are edited from
   // the document rather than from a separate "Information" tab.
   if (kind === 'information') {

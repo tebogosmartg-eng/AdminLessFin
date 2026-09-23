@@ -54,8 +54,10 @@ function buildStubModel(
 export function corporateDisplayFromModel(model: DocumentModel): CorporateDisplayValues {
   const corp = provideCorporateInformation(model);
   return {
+    // NOT model.workspaceName: that is "FY2026 Financial Statements", which was
+    // being printed on the cover as the entity's registered name.
     registeredName:
-      corp.entityIdentity.registeredName.formatted || model.workspaceName || 'Reporting Entity',
+      corp.entityIdentity.registeredName.formatted || model.companyName || 'Reporting Entity',
     tradingName: corp.entityIdentity.tradingName.formatted || '',
     registrationNumber: corp.entityIdentity.registrationNumber.formatted || '',
     natureOfBusiness: corp.entityIdentity.natureOfBusiness.formatted || '',
