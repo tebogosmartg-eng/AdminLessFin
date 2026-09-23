@@ -67,6 +67,12 @@ export default function WorkspaceStatements({
   }
 
   const statements = statementsQuery.data?.statements || [];
+  // A comparative column is shown only when the engagement actually has prior
+  // figures. A column of blanks reads as "nil", which is a different claim.
+  const hasComparatives = (lines?: EfsStatementInstance['lines']) =>
+    (lines || []).some((l) => l.prior_amount != null && Number(l.prior_amount) !== 0);
+  const currentLabel = periodLabel ? periodLabel.split('·').slice(-1)[0].trim() : 'Current';
+  const priorLabel = 'Prior';
   const corporateDisplay = corporateDisplayFromEntity(generalInfo);
   const companyName = corporateDisplay.registeredName || corporateDisplay.tradingName || 'Annual Financial Statements';
 
@@ -210,7 +216,10 @@ export default function WorkspaceStatements({
                     <thead>
                       <tr className="border-b bg-muted/40 text-left">
                         <th className="px-3 py-2 font-medium">Description</th>
-                        <th className="px-3 py-2 text-right font-medium">Amount</th>
+                        <th className="px-3 py-2 text-right font-medium">{currentLabel}</th>
+                        {hasComparatives(s.lines) && (
+                          <th className="px-3 py-2 text-right font-medium">{priorLabel}</th>
+                        )}
                       </tr>
                     </thead>
                     <tbody>
@@ -219,13 +228,28 @@ export default function WorkspaceStatements({
                           key={`${ln.line_code}-${idx}`}
                           className={cn(
                             'border-b last:border-0',
-                            ln.is_total && 'bg-muted/20 font-semibold',
+                            (ln.is_total || ln.is_grand_total) && 'bg-muted/20 font-semibold',
+                            ln.is_subtotal && 'font-medium',
+                            ln.is_header && 'font-medium text-muted-foreground',
+                            ln.is_reconciling && 'text-amber-800 dark:text-amber-300',
                           )}
                         >
-                          <td className="px-3 py-2">{ln.label}</td>
-                          <td className="px-3 py-2 text-right tabular-nums">
-                            {formatCurrency(ln.amount)}
+                          <td
+                            className="px-3 py-2"
+                            style={{ paddingLeft: `${0.75 + (ln.level ?? 0) * 1.25}rem` }}
+                          >
+                            {ln.label}
                           </td>
+                          {/* A heading carries no figure of its own; printing
+                              formatCurrency(null) put R 0,00 against every one. */}
+                          <td className="px-3 py-2 text-right tabular-nums">
+                            {ln.amount == null ? '' : formatCurrency(ln.amount)}
+                          </td>
+                          {hasComparatives(s.lines) && (
+                            <td className="px-3 py-2 text-right tabular-nums text-muted-foreground">
+                              {ln.prior_amount == null ? '' : formatCurrency(ln.prior_amount)}
+                            </td>
+                          )}
                         </tr>
                       ))}
                     </tbody>

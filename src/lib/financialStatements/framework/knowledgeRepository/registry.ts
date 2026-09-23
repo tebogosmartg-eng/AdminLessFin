@@ -39,6 +39,7 @@ const PACKS: Record<FrameworkKey, FrameworkKnowledgePack> = {
   IFRS_SME: buildPack('IFRS_SME'),
   GRAP: buildPack('GRAP'),
   IPSAS: buildPack('IPSAS'),
+  MCS: buildPack('MCS'),
 };
 
 const DEFINITIONS: Record<FrameworkKey, FrameworkDefinition> = {
@@ -46,6 +47,7 @@ const DEFINITIONS: Record<FrameworkKey, FrameworkDefinition> = {
   IFRS_SME: PACKS.IFRS_SME.definition,
   GRAP: PACKS.GRAP.definition,
   IPSAS: PACKS.IPSAS.definition,
+  MCS: PACKS.MCS.definition,
 };
 
 export function getFrameworkKnowledgePack(

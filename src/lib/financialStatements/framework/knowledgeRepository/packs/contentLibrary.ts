@@ -1335,6 +1335,51 @@ function publicSectorExtensionPoints(): FrameworkExtensionPoint[] {
   ];
 }
 
+/**
+ * South African Modified Cash Standard.
+ *
+ * MCS is a modified CASH basis: revenue is recognised when cash is received and
+ * expenditure when cash is paid, with specified modifications. Reusing the
+ * accrual public-sector policies verbatim would describe the wrong basis, so the
+ * basis, revenue and expenditure policies are authored here and the remaining
+ * public-sector policies (which are basis-neutral presentation and disclosure
+ * matters) are carried over.
+ */
+const MCS_LABEL = 'the Modified Cash Standard';
+
+function modifiedCashStandardPolicies(): FrameworkPolicyDef[] {
+  const carriedOver = publicSectorPolicies(MCS_LABEL).filter(
+    (p) => !['POL.BASIS', 'POL.REVENUE_NONEXCHANGE', 'POL.REVENUE_EXCHANGE'].includes(p.code),
+  );
+  return [
+    pol({
+      code: 'POL.BASIS',
+      title: 'Basis of preparation',
+      intro:
+        'The annual financial statements have been prepared in accordance with the Modified Cash Standard prescribed by the National Treasury, which is the modified cash basis of accounting. Under this basis transactions are recognised when cash is received or paid, modified by the recognition of specified assets, liabilities and disclosures required by the Standard.',
+      presentation:
+        'The financial statements are presented in South African Rand, the functional and presentation currency of the entity, and comparative information is presented for the preceding reporting period.',
+    }),
+    pol({
+      code: 'POL.REVENUE_MCS',
+      title: 'Revenue',
+      recognition:
+        'Revenue is recognised in the statement of financial performance when cash is received, except where the Modified Cash Standard requires a receivable to be recognised. Amounts owing to the entity at the reporting date that do not meet that requirement are disclosed rather than recognised.',
+      initialMeasurement:
+        'Revenue is measured at the amount of cash received, net of any amounts collected on behalf of and payable to third parties.',
+    }),
+    pol({
+      code: 'POL.EXPENDITURE_MCS',
+      title: 'Expenditure',
+      recognition:
+        'Expenditure is recognised in the statement of financial performance when cash is paid, except where the Modified Cash Standard requires a payable or accrual to be recognised. Commitments and accruals that are not recognised are disclosed in the notes.',
+      initialMeasurement:
+        'Expenditure is measured at the amount of cash paid, inclusive of any non-recoverable value added tax.',
+    }),
+    ...carriedOver,
+  ];
+}
+
 // ── Framework assembly ───────────────────────────────────────────────────────
 const IFRS_DEFINITION: FrameworkDefinition = deepFreeze({
   key: 'IFRS',
@@ -1380,10 +1425,22 @@ const IPSAS_DEFINITION: FrameworkDefinition = deepFreeze({
   extensionPoints: publicSectorExtensionPoints(),
 });
 
+const MCS_DEFINITION: FrameworkDefinition = deepFreeze({
+  key: 'MCS',
+  label: 'Modified Cash Standard (South Africa)',
+  scope:
+    'Applied by South African departments and public entities required by the National Treasury to report on the modified cash basis of accounting.',
+  statements: PUBLIC_SECTOR_STATEMENTS,
+  policies: modifiedCashStandardPolicies(),
+  notes: publicSectorNotes(MCS_LABEL),
+  extensionPoints: publicSectorExtensionPoints(),
+});
+
 /** Raw pack definitions before Knowledge Repository metadata enrichment. */
 export const RAW_PACK_DEFINITIONS: Record<FrameworkKey, FrameworkDefinition> = deepFreeze({
   IFRS: IFRS_DEFINITION,
   IFRS_SME: IFRS_SME_DEFINITION,
   GRAP: GRAP_DEFINITION,
   IPSAS: IPSAS_DEFINITION,
+  MCS: MCS_DEFINITION,
 });

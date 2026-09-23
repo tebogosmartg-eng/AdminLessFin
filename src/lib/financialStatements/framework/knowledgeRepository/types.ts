@@ -7,7 +7,7 @@
  * traceability, presentation, applicability) without changing engine behaviour.
  */
 
-export type FrameworkKey = 'IFRS' | 'IFRS_SME' | 'GRAP' | 'IPSAS';
+export type FrameworkKey = 'IFRS' | 'IFRS_SME' | 'GRAP' | 'IPSAS' | 'MCS';
 
 export type FrameworkRequirement = 'mandatory' | 'optional';
 

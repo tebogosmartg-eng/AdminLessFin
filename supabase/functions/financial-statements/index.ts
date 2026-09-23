@@ -292,13 +292,21 @@ async function findOrCreateReportingPeriod(admin, company_id, entity, financial_
     );
   }
 
+  // The period key used to be the year code alone. `financial_years.year_code`
+  // is not unique within a company — a company that changed its year end can
+  // hold two years both coded FY2026 — so the second one collided with the
+  // first on (company, entity, period_key) and Financial Statements could not
+  // be opened for it at all. The key is disambiguated by the year's end date
+  // when the code is already taken by a DIFFERENT financial year.
+  const period_key = await resolvePeriodKey(admin, company_id, entity.id, fy);
+
   const { data, error } = await admin
     .from("efs_reporting_periods")
     .insert({
       company_id,
       reporting_entity_id: entity.id,
       financial_year_id: fy.id,
-      period_key: fy.year_code,
+      period_key,
       label: fy.year_code,
       start_date: fy.start_date,
       end_date: fy.end_date,
@@ -310,18 +318,45 @@ async function findOrCreateReportingPeriod(admin, company_id, entity, financial_
     .single();
   if (error) {
     if (error.code === "23505") {
-      const { data: retry } = await admin
+      // Someone else created it between the check and the insert: adopt by
+      // financial year, then by key.
+      const { data: byYear } = await admin
         .from("efs_reporting_periods")
         .select("*")
         .eq("company_id", company_id)
         .eq("reporting_entity_id", entity.id)
         .eq("financial_year_id", financial_year_id)
         .maybeSingle();
-      if (retry) return await syncReportingPeriodFromFinancialYear(admin, retry);
+      if (byYear) return await syncReportingPeriodFromFinancialYear(admin, byYear);
+      const { data: byKey } = await admin
+        .from("efs_reporting_periods")
+        .select("*")
+        .eq("company_id", company_id)
+        .eq("reporting_entity_id", entity.id)
+        .eq("period_key", period_key)
+        .maybeSingle();
+      if (byKey) return await syncReportingPeriodFromFinancialYear(admin, byKey);
     }
     throw error;
   }
   return data;
+}
+
+/**
+ * A period key that identifies this financial year and no other.
+ * Returns the year code when it is free or already this year's; otherwise
+ * qualifies it with the year end, e.g. "FY2026 (31 Dec 2026)".
+ */
+async function resolvePeriodKey(admin, company_id, reporting_entity_id, fy) {
+  const { data: clash } = await admin
+    .from("efs_reporting_periods")
+    .select("id, financial_year_id")
+    .eq("company_id", company_id)
+    .eq("reporting_entity_id", reporting_entity_id)
+    .eq("period_key", fy.year_code)
+    .maybeSingle();
+  if (!clash || clash.financial_year_id === fy.id) return fy.year_code;
+  return `${fy.year_code} (${fy.end_date})`;
 }
 
 /**
@@ -551,11 +586,71 @@ async function migrateLegacyReportingPeriod(admin, {
   };
 }
 
+/**
+ * The framework a new engagement starts on.
+ *
+ * This used to be the alphabetically first pack, which is "GRAP Pack 2026.1" —
+ * so every company silently began reporting under the South African public
+ * sector standard. A default has to be something, so it is the general purpose
+ * private entity framework; it is a starting point the user can change, not a
+ * determination of which framework applies to them.
+ */
+const DEFAULT_FRAMEWORK_KEY = "IFRS_SME";
+
+/**
+ * A review decision is signed under a role. That role must be one the caller
+ * actually holds: an explicit assignment on this review, or — so a single
+ * accountant working alone is not locked out of their own file — the company
+ * owner acting as partner and an admin acting as manager.
+ */
+async function assertActorHoldsRole(admin, company_id, pack_review_id, user_id, actor_role) {
+  const { data: assignments } = await admin
+    .from("efs_pack_review_assignments")
+    .select("role_code, status")
+    .eq("company_id", company_id)
+    .eq("pack_review_id", pack_review_id)
+    .eq("reviewer_user_id", user_id);
+  const assigned = new Set(
+    (assignments || [])
+      .filter((a) => a.status !== "revoked")
+      .map((a) => String(a.role_code || "").toLowerCase()),
+  );
+  if (assigned.has(actor_role)) return;
+
+  const { data: membership } = await admin
+    .from("company_users")
+    .select("role")
+    .eq("company_id", company_id)
+    .eq("user_id", user_id)
+    .maybeSingle();
+  const companyRole = String(membership?.role || "").toLowerCase();
+  const impliedByCompanyRole =
+    companyRole === "owner"
+      ? ["partner", "manager", "preparer"]
+      : companyRole === "admin"
+        ? ["manager", "preparer"]
+        : ["preparer"];
+  if (impliedByCompanyRole.includes(actor_role)) return;
+
+  throw new Error(
+    `You are not assigned as ${actor_role} on this review, so you cannot sign a ${actor_role} decision.`,
+  );
+}
+
 async function resolveDefaultFrameworkPackId(admin, framework_pack_id) {
   if (framework_pack_id) return framework_pack_id;
+  const { data: preferred } = await admin
+    .from("efs_framework_packs")
+    .select("id")
+    .eq("framework_key", DEFAULT_FRAMEWORK_KEY)
+    .in("status", ["published", "active"])
+    .order("version_id", { ascending: false })
+    .limit(1);
+  if (preferred?.[0]?.id) return preferred[0].id;
   const { data: packs } = await admin
     .from("efs_framework_packs")
     .select("id")
+    .in("status", ["published", "active"])
     .order("label")
     .limit(1);
   return packs?.[0]?.id ?? null;
@@ -1273,21 +1368,12 @@ serve(withEnterprisePlatform("financial-statements", "tenant", async (req, _ctx)
             items: [],
             note: "Close checklist / tasks arrive in later phases",
           },
-          validationSummary: {
-            pass: 0,
-            fail: 0,
-            advisory: 0,
-            note: "Use RUN_VALIDATION / GET_VALIDATION_DASHBOARD — Validation identifies defects; does not approve",
-          },
-          reviewStatus: {
-            manager: "use_GET_REVIEW_DASHBOARD",
-            partner: "use_GET_REVIEW_DASHBOARD",
-            note: "Manager/Partner Review Workflow is Phase D2 — does not change accounting",
-          },
-          publicationStatus: {
-            status: "not_ready",
-            note: "Publication / XBRL / AI remain deferred until Review Workflow certified",
-          },
+          // These summaries have their own endpoints. Returning a placeholder
+          // string here put "use_GET_REVIEW_DASHBOARD" on screen as the name of
+          // the manager and the partner who reviewed the statements.
+          validationSummary: null,
+          reviewStatus: null,
+          publicationStatus: null,
           recentActivity: activity || [],
           phase: "D2",
           statementPreparationEnabled: !!(currentVersion && ["certified", "frozen", "publication_bound"].includes(currentVersion.status)),
@@ -1940,6 +2026,41 @@ serve(withEnterprisePlatform("financial-statements", "tenant", async (req, _ctx)
             .from("chart_of_accounts")
             .select("id, account_role, category, subcategory, account_code, tax_treatment, cash_flow_classification")
             .eq("company_id", company_id);
+          // Seal the classification alongside the amounts. The statements are
+          // presented from chart_of_accounts.category / .subcategory, so if the
+          // classification is not part of the sealed fact, re-classifying an
+          // account later would silently restate a frozen statement — and the
+          // content hash would not change.
+          const metaById = new Map((coaMeta || []).map((m) => [m.id, m]));
+          const stampClassification = (rows) =>
+            (rows || []).map((row) => {
+              const m = metaById.get(row.id);
+              if (!m) return row;
+              return {
+                ...row,
+                category: row.category ?? m.category ?? null,
+                subcategory: row.subcategory ?? m.subcategory ?? null,
+                account_role: row.account_role ?? m.account_role ?? null,
+                account_code: row.account_code ?? m.account_code ?? null,
+              };
+            });
+
+          if (dataset.balances_as_of?.accounts) {
+            dataset.balances_as_of.accounts = stampClassification(dataset.balances_as_of.accounts);
+          } else if (Array.isArray(dataset.balances_as_of)) {
+            dataset.balances_as_of = stampClassification(dataset.balances_as_of);
+          }
+          if (dataset.balances_prior_as_of?.accounts) {
+            dataset.balances_prior_as_of.accounts = stampClassification(
+              dataset.balances_prior_as_of.accounts,
+            );
+          } else if (Array.isArray(dataset.balances_prior_as_of)) {
+            dataset.balances_prior_as_of = stampClassification(dataset.balances_prior_as_of);
+          }
+          if (Array.isArray(dataset.period_activity)) {
+            dataset.period_activity = stampClassification(dataset.period_activity);
+          }
+
           const closingAccounts =
             dataset.balances_as_of?.accounts ?? dataset.balances_as_of ?? closingBalances ?? [];
           const openingAccounts =
@@ -2275,7 +2396,7 @@ serve(withEnterprisePlatform("financial-statements", "tenant", async (req, _ctx)
             *,
             efs_framework_bindings(
               framework_pack_id,
-              efs_framework_packs(id, framework_key, version_id, label)
+              efs_framework_packs(id, framework_key, version_id, label, presentation)
             )
           `)
           .eq("id", body.workspace_id)
@@ -4748,6 +4869,16 @@ serve(withEnterprisePlatform("financial-statements", "tenant", async (req, _ctx)
         if (!["manager", "partner", "preparer"].includes(body.actor_role)) {
           throw new Error("actor_role must be manager | partner | preparer");
         }
+        // The role a decision is signed under is the caller's, not the caller's
+        // claim. Before this check any member could post actor_role=partner and
+        // sign a partner approval of the financial statements.
+        await assertActorHoldsRole(
+          admin,
+          company_id,
+          body.pack_review_id,
+          user.id,
+          body.actor_role,
+        );
 
         const { data: review, error: rErr } = await admin
           .from("efs_pack_reviews")

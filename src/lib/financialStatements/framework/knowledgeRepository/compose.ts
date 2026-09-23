@@ -21,6 +21,10 @@ export function normaliseFrameworkKey(input: string | null | undefined): Framewo
   if (raw.includes('SME')) return 'IFRS_SME';
   if (raw.includes('GRAP')) return 'GRAP';
   if (raw.includes('IPSAS')) return 'IPSAS';
+  // The Modified Cash Standard used to fall through to the IFRS return below,
+  // so an MCS engagement was assembled with full IFRS accrual policies and
+  // notes and said nothing about it.
+  if (raw.includes('MCS') || raw.includes('MODIFIEDCASH')) return 'MCS';
   return 'IFRS';
 }
 

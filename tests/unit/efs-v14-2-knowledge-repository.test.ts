@@ -25,7 +25,9 @@ describe('V14.2 Enterprise Reporting Knowledge Repository', () => {
       expect(pack.definition.policies.length).toBeGreaterThan(0);
       expect(pack.definition.versionId).toBe(ACTIVE_FRAMEWORK_VERSION);
     }
-    expect(listFrameworkKnowledgePacks()).toHaveLength(4);
+    // IFRS, IFRS for SMEs, GRAP, IPSAS and the SA Modified Cash Standard.
+    // MCS was added once it was found that it resolved silently to full IFRS.
+    expect(listFrameworkKnowledgePacks()).toHaveLength(5);
   });
 
   it('enriches IFRS for SMEs disclosures with checklist metadata', () => {
@@ -97,7 +99,7 @@ describe('V14.2 Enterprise Reporting Knowledge Repository', () => {
 
   it('reports repository coverage summary', () => {
     const summary = getRepositoryCoverageSummary();
-    expect(summary.packCount).toBe(4);
+    expect(summary.packCount).toBe(5);
     expect(summary.disclosureCount).toBeGreaterThan(50);
     expect(summary.policyCount).toBeGreaterThan(40);
     expect(summary.ifrsSmeChecklist.weightedPercent).toBeGreaterThan(0);

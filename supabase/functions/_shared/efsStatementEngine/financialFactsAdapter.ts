@@ -15,6 +15,16 @@ export type AccountFact = {
   closing_balance?: number;
   period_activity?: number;
   activity?: number;
+  /**
+   * Account classification, as it stood when the snapshot was sealed. The
+   * statements are presented from this, so it has to be part of the sealed
+   * fact — not looked up live, which would let a later re-classification
+   * silently restate a frozen statement.
+   */
+  category?: string | null;
+  subcategory?: string | null;
+  account_role?: string | null;
+  account_code?: string | null;
 };
 
 export type CashFlowFact = {
@@ -48,12 +58,23 @@ function asArray(v) {
   return Array.isArray(v) ? v : [];
 }
 
+/** Carry sealed classification through untouched (absent on pre-classification snapshots). */
+function classification(a) {
+  return {
+    category: a.category ?? null,
+    subcategory: a.subcategory ?? null,
+    account_role: a.account_role ?? null,
+    account_code: a.account_code ?? null,
+  };
+}
+
 function normalizeActivity(rows) {
   return asArray(rows).map((a) => ({
     id: a.id,
     account_number: a.account_number,
     name: a.name,
     type: a.type,
+    ...classification(a),
     opening_balance: Number(a.opening_balance ?? 0),
     closing_balance: Number(a.closing_balance ?? a.balance ?? 0),
     period_activity: Number(
@@ -83,6 +104,7 @@ export function adaptFinancialFacts(factRow, snapshotVersionId) {
     account_number: a.account_number,
     name: a.name,
     type: a.type,
+    ...classification(a),
     balance: Number(a.balance ?? 0),
   }));
   const balances_prior_as_of = asArray(ds.balances_prior_as_of?.accounts ?? ds.balances_prior_as_of).map((a) => ({
@@ -90,6 +112,7 @@ export function adaptFinancialFacts(factRow, snapshotVersionId) {
     account_number: a.account_number,
     name: a.name,
     type: a.type,
+    ...classification(a),
     balance: Number(a.balance ?? 0),
   }));
   const period_activity = normalizeActivity(ds.period_activity ?? ds.periodActivity);

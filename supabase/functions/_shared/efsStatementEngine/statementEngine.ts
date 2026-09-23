@@ -6,6 +6,12 @@
 // @ts-nocheck
 import { classifyFactsToTaxonomy, buildTypeMap } from "./frameworkMapping.ts";
 import {
+  buildPerformanceLines,
+  buildPositionLines,
+  hasClassification,
+  presentationFor,
+} from "./detailedLines.ts";
+import {
   buildCanonicalFinancialAggregation,
   canonicalToPerformanceLines,
   canonicalToPositionLines,
@@ -48,8 +54,19 @@ function factsToCanonical(facts) {
   });
 }
 
-export function generateFinancialPosition(facts, taxonomyLines, _buckets, agg) {
+export function generateFinancialPosition(facts, taxonomyLines, _buckets, agg, frameworkPack) {
   const canonical = agg || factsToCanonical(facts);
+  // Present from the ledger's own classification where the seal carries it.
+  // Snapshots sealed before classification was part of the fact fall back to the
+  // five type-level lines rather than being restated from today's chart.
+  if (hasClassification(facts.balances_as_of)) {
+    return buildPositionLines({
+      closing: facts.balances_as_of,
+      prior: facts.balances_prior_as_of,
+      canonical,
+      presentation: presentationFor(frameworkPack),
+    });
+  }
   return canonicalToPositionLines(canonical, labelMap(taxonomyLines)).map((ln) => ({
     ...ln,
     amount: round2(ln.amount),
@@ -57,8 +74,15 @@ export function generateFinancialPosition(facts, taxonomyLines, _buckets, agg) {
   }));
 }
 
-export function generateFinancialPerformance(facts, taxonomyLines, _buckets, agg) {
+export function generateFinancialPerformance(facts, taxonomyLines, _buckets, agg, frameworkPack) {
   const canonical = agg || factsToCanonical(facts);
+  if (hasClassification(facts.period_activity)) {
+    return buildPerformanceLines({
+      activity: facts.period_activity,
+      canonical,
+      presentation: presentationFor(frameworkPack),
+    });
+  }
   return canonicalToPerformanceLines(canonical, labelMap(taxonomyLines)).map((ln) => ({
     ...ln,
     amount: round2(ln.amount),
@@ -131,6 +155,7 @@ export function runStatementEngine({
       taxonomyLines.filter((l) => l.statement_type === def.statement_type),
       buckets,
       agg,
+      frameworkPack,
     );
     statements.push({
       statement_type: def.statement_type,

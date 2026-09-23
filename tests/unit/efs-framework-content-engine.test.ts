@@ -110,6 +110,24 @@ describe('Critical Gap 2 — Framework key normalisation', () => {
     expect(normaliseFrameworkKey(null)).toBe('IFRS');
   });
 
+  it('does not turn the Modified Cash Standard into full IFRS', () => {
+    // MCS matched none of the branches above and fell through to the IFRS
+    // default, so an MCS engagement was assembled with full IFRS accrual
+    // policies and notes and said nothing about it.
+    expect(normaliseFrameworkKey('MCS')).toBe('MCS');
+    expect(normaliseFrameworkKey('Modified Cash Standard')).toBe('MCS');
+    expect(normaliseFrameworkKey('MCS Pack 2026.1')).toBe('MCS');
+
+    const mcs = getFrameworkDefinition('MCS');
+    const basis = mcs.policies.find((p) => p.code === 'POL.BASIS');
+    expect(basis?.body).toMatch(/modified cash basis/i);
+    expect(basis?.body).not.toMatch(/International Financial Reporting Standards/i);
+    // The basis of accounting is the point of the standard: it must say so.
+    expect(mcs.policies.some((p) => p.code === 'POL.EXPENDITURE_MCS')).toBe(true);
+    expect(getFrameworkDefinition('IFRS').policies.find((p) => p.code === 'POL.BASIS')?.body)
+      .not.toEqual(basis?.body);
+  });
+
   it('framework definitions are immutable (deep frozen)', () => {
     const def = getFrameworkDefinition('IFRS');
     expect(Object.isFrozen(def)).toBe(true);

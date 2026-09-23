@@ -309,7 +309,17 @@ export type EfsStatementLine = {
   line_code: string;
   label: string;
   section: string;
-  amount: number;
+  /** Null on a heading, which carries no figure of its own. */
+  amount: number | null;
+  /** Indent depth: 0 = section, 1 = line within a section. */
+  level?: number;
+  /** Category subtotal, summing the lines printed directly above it. */
+  is_subtotal?: boolean;
+  /**
+   * The classified detail did not add up to the accounting engine's total, and
+   * the difference is shown rather than absorbed into another line.
+   */
+  is_reconciling?: boolean;
   /** Comparative (prior-period) amount when two-year presentation is available. */
   prior_amount?: number | null;
   /** Display note number / cross-reference shown in the Note column. */
