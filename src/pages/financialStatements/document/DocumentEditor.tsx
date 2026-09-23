@@ -973,7 +973,12 @@ function FrameworkSelector({
         disabled={change.isPending || packsQuery.isLoading}
       >
         <SelectTrigger className="h-8 w-[290px]" data-testid="afs-framework-select">
-          <SelectValue placeholder={current?.label || model.frameworkLabel || 'Choose a framework'} />
+          {/* Naming the framework explicitly rather than letting the trigger
+              derive it: until the options arrive there is no item matching the
+              bound value, and the field renders blank on the cover page. */}
+          <SelectValue placeholder="Choose a framework">
+            {current?.efs_frameworks?.name || current?.label || model.frameworkLabel || null}
+          </SelectValue>
         </SelectTrigger>
         <SelectContent>
           {packs.map((p) => (

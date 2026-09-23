@@ -173,6 +173,19 @@ test('10: notes and disclosures are editable from the document', async ({ page }
   await expectNoErrorBoundary(page);
 });
 
+test('the cover always names the reporting framework', async ({ page }) => {
+  await page.goto('/financial-statements-workspace');
+  await waitForRouteSettled(page);
+  await waitForDocument(page);
+
+  await page.getByRole('button', { name: /^Cover$/ }).first().click();
+  const select = page.getByTestId('afs-framework-select');
+  await expect(select).toBeVisible({ timeout: 30_000 });
+  // It rendered blank while its options were still loading.
+  await expect(select).toHaveText(/\S/, { timeout: 30_000 });
+  await expect(select).not.toHaveText(/Choose a framework/);
+});
+
 test('11: review states the readiness of the statements, not a score', async ({ page }) => {
   await page.goto('/financial-statements-workspace');
   await waitForRouteSettled(page);
