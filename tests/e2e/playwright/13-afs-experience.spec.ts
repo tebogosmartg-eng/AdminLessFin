@@ -283,16 +283,16 @@ test('presentation belongs to the engagement, not to one browser', async ({ page
 
   // Hide a note, which used to be written only to this browser's localStorage.
   const tree = page.getByRole('navigation', { name: /document structure/i });
-  const note = tree.getByRole('button', { name: /Note \d+\./ }).first();
-  // Hiding a note drops it from the numbering, so match on the title alone.
+  const note = tree.getByTestId('afs-tree-note').filter({ hasText: /Note \d+\./ }).first();
+  // Hiding a note drops it from the numbering, so match on the title alone. A
+  // policy can carry the same title, hence the note-specific test id.
   const title = (await note.innerText()).trim().replace(/^Note\s+\d+\.\s*/, '');
+  const noteByTitle = (scope: typeof tree) =>
+    scope.getByTestId('afs-tree-note').filter({ hasText: title }).first();
   await note.hover();
   await note.locator('xpath=following-sibling::button[1]').click();
   await page.waitForTimeout(2500);
-  await expect(tree.getByRole('button', { name: title, exact: true })).toHaveClass(
-    /line-through/,
-    { timeout: 30_000 },
-  );
+  await expect(noteByTitle(tree)).toHaveClass(/line-through/, { timeout: 30_000 });
 
   // A second browser context: a different storage partition entirely, standing
   // in for the reviewer on another machine.
@@ -302,10 +302,10 @@ test('presentation belongs to the engagement, not to one browser', async ({ page
     await reviewer.goto(url);
     await waitForRouteSettled(reviewer);
     await waitForDocument(reviewer);
-    const hiddenThere = reviewer
-      .getByRole('navigation', { name: /document structure/i })
-      .getByRole('button', { name: title, exact: true });
     // The reviewer's own browser has never seen this choice, and yet.
+    const hiddenThere = noteByTitle(
+      reviewer.getByRole('navigation', { name: /document structure/i }),
+    );
     await expect(hiddenThere).toHaveClass(/line-through/, { timeout: 45_000 });
     await reviewer.screenshot({
       path: 'tests/e2e/artifacts/after-15-presentation-shared.png',

@@ -18,6 +18,7 @@ function TreeRow({
   badge,
   hideable,
   hidden,
+  testId,
   onSelect,
   onToggleHidden,
 }: {
@@ -28,6 +29,8 @@ function TreeRow({
   badge?: string;
   hideable?: boolean;
   hidden?: boolean;
+  /** Names the kind of row, so a test can tell a note from a policy of the same title. */
+  testId?: string;
   onSelect: () => void;
   onToggleHidden?: () => void;
 }) {
@@ -41,6 +44,7 @@ function TreeRow({
       <button
         type="button"
         onClick={onSelect}
+        data-testid={testId}
         style={{ paddingLeft: 8 + depth * 14 }}
         className={cn(
           'flex-1 truncate py-1.5 pr-2 text-left text-sm',
@@ -194,6 +198,7 @@ export default function DocumentTree({
               key={n.id}
               label={number ? `Note ${number}. ${title}` : title}
               depth={1}
+              testId="afs-tree-note"
               active={isActive('note', n.id)}
               muted={hidden}
               hideable={n.status !== 'superseded'}
