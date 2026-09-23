@@ -1,21 +1,15 @@
 import { useState } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
 import type {
   EfsDashboard,
   EfsWorkspaceGeneralInformation,
 } from '../../../lib/financialStatements/api';
-import {
-  ensureGenericDocument,
-  loadDocumentModel,
-} from '../../../lib/financialStatements/document/documentModel';
+import { useDocumentModel } from '../../../lib/financialStatements/document/useDocumentModel';
 import { useDocumentOverrides } from '../../../lib/financialStatements/document/documentStore';
-import { resolveEngagementReportingPeriod } from '../../../lib/financialStatements/calendarYearBinding';
-import { useReportingPeriod } from '../../../contexts/ReportingPeriodContext';
 import DocumentTree from '../document/DocumentTree';
 import DocumentEditor from '../document/DocumentEditor';
 import DocumentPreview from '../document/DocumentPreview';
 import DocumentPropertiesPanel from '../document/DocumentPropertiesPanel';
-import DocumentValidationPanel from '../document/DocumentValidationPanel';
+import ReadinessReview from '../document/ReadinessReview';
 import AddDisclosureDialog from '../document/AddDisclosureDialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../../components/ui/tabs';
 import { Skeleton } from '../../../components/ui/skeleton';
@@ -47,35 +41,34 @@ export default function WorkspaceDocumentWorkspace({
   workspaceId,
   dashboard,
   generalInfo,
-  onNavigate,
+  selection,
+  onSelect,
+  locked = false,
 }: {
   companyId: string;
   companyName?: string;
   workspaceId: string;
   dashboard: EfsDashboard;
   generalInfo: EfsWorkspaceGeneralInformation | null;
-  onNavigate?: (target: string) => void;
+  /** Owned by the page, so a readiness finding can open the page it concerns. */
+  selection: DocSelection;
+  onSelect: (selection: DocSelection) => void;
+  /** The statements have been marked final; the document is read-only. */
+  locked?: boolean;
 }) {
-  const qc = useQueryClient();
-  const { financialYears, activeFinancialYear } = useReportingPeriod();
-  const [selection, setSelection] = useState<DocSelection>({ kind: 'cover', id: 'cover' });
   const [addDisclosureOpen, setAddDisclosureOpen] = useState(false);
   const overridesApi = useDocumentOverrides(workspaceId);
+  const setSelection = onSelect;
 
-  const modelQuery = useQuery({
-    queryKey: ['efs_doc_model', companyId, workspaceId],
-    queryFn: async () => {
-      await ensureGenericDocument({
-        companyId,
-        workspaceId,
-        frameworkPackId: dashboard.framework?.id ?? null,
-      });
-      return loadDocumentModel({ companyId, companyName, workspaceId, dashboard, generalInfo });
-    },
+  const modelQuery = useDocumentModel({
+    companyId,
+    companyName,
+    workspaceId,
+    dashboard,
+    generalInfo,
   });
 
-  const invalidateModel = () =>
-    qc.invalidateQueries({ queryKey: ['efs_doc_model', companyId, workspaceId] });
+  const invalidateModel = modelQuery.reload;
 
   if (modelQuery.isLoading) {
     return (
@@ -97,11 +90,6 @@ export default function WorkspaceDocumentWorkspace({
   }
 
   const model = modelQuery.data;
-  const fy = resolveEngagementReportingPeriod(
-    model.period || dashboard.reportingPeriod,
-    financialYears,
-    activeFinancialYear,
-  );
 
   return (
     <div className="space-y-4">
@@ -146,7 +134,9 @@ export default function WorkspaceDocumentWorkspace({
                 selection={selection}
                 overridesApi={overridesApi}
                 generalInfo={generalInfo}
+                locked={locked}
                 onSaved={invalidateModel}
+                onNoteStored={(id) => setSelection({ kind: 'note', id })}
               />
             </TabsContent>
             <TabsContent value="preview" className="mt-0">
@@ -169,12 +159,9 @@ export default function WorkspaceDocumentWorkspace({
               />
             </TabsContent>
             <TabsContent value="validation" className="mt-0">
-              <DocumentValidationPanel
-                companyId={companyId}
-                workspaceId={workspaceId}
-                model={model}
-                overrides={overridesApi.overrides}
-              />
+              {/* The same assessment the Review mode shows. There were two
+                  panels on different query keys, which could disagree. */}
+              <ReadinessReview model={model} onOpen={setSelection} />
             </TabsContent>
           </Tabs>
         </div>

@@ -173,15 +173,116 @@ test('10: notes and disclosures are editable from the document', async ({ page }
   await expectNoErrorBoundary(page);
 });
 
-test('11: review and validation are visible', async ({ page }) => {
+test('11: review states the readiness of the statements, not a score', async ({ page }) => {
   await page.goto('/financial-statements-workspace');
   await waitForRouteSettled(page);
   await waitForDocument(page);
 
   await page.getByTestId('afs-mode-review').click();
-  await expect(page.getByText(/validation/i).first()).toBeVisible({ timeout: 45_000 });
+  const state = page.getByTestId('afs-readiness-state');
+  await expect(state).toBeVisible({ timeout: 45_000 });
+  // One of the four states an accountant can act on.
+  await expect(state).toHaveText(/^(Ready|Warning|Action required|Blocked)$/);
   await page.screenshot({ path: 'tests/e2e/artifacts/after-6-review.png', fullPage: true });
   await expectNoErrorBoundary(page);
+});
+
+test('11b: a readiness finding opens the page it is about', async ({ page }) => {
+  await page.goto('/financial-statements-workspace');
+  await waitForRouteSettled(page);
+  await waitForDocument(page);
+  await page.getByTestId('afs-mode-review').click();
+  await expect(page.getByTestId('afs-readiness-state')).toBeVisible({ timeout: 45_000 });
+
+  const issues = page.getByTestId('afs-readiness-issue');
+  const count = await issues.count();
+  test.skip(count === 0, 'These statements are clean, so there is nothing to navigate to.');
+
+  // The first navigable finding must take the reader into the document.
+  for (let i = 0; i < count; i += 1) {
+    const issue = issues.nth(i);
+    if (await issue.isDisabled()) continue;
+    await issue.click();
+    await expect(page.getByRole('navigation', { name: /document structure/i })).toBeVisible({
+      timeout: 30_000,
+    });
+    await page.screenshot({ path: 'tests/e2e/artifacts/after-11-readiness-jump.png', fullPage: true });
+    await expectNoErrorBoundary(page);
+    return;
+  }
+  test.skip(true, 'No finding carried a location.');
+});
+
+test('a figure can be traced to the accounts behind it', async ({ page }) => {
+  await page.goto('/financial-statements-workspace');
+  await waitForRouteSettled(page);
+  await waitForDocument(page);
+
+  await page.getByRole('button', { name: /Statement of Financial Position/i }).first().click();
+  const traceable = page.getByTestId('afs-traceable-line').first();
+  await expect(traceable).toBeVisible({ timeout: 45_000 });
+  // The row's own text carries the figures too; the label is the first cell.
+  const label = (await traceable.locator('td').first().innerText()).trim();
+
+  await traceable.click();
+  const dialog = page.getByRole('dialog');
+  await expect(dialog).toBeVisible({ timeout: 15_000 });
+  await expect(dialog).toContainText(label.slice(0, 18));
+  // The point of the panel: named ledger accounts, not just a total.
+  await expect(dialog.getByRole('cell').first()).toBeVisible();
+  await expect(dialog).toContainText(/Total/i);
+  await page.screenshot({ path: 'tests/e2e/artifacts/after-12-view-source.png', fullPage: true });
+  await expectNoErrorBoundary(page);
+});
+
+test('generated note wording can be edited and it persists', async ({ page }) => {
+  await page.goto('/financial-statements-workspace');
+  await waitForRouteSettled(page);
+  await waitForDocument(page);
+
+  await page.getByRole('button', { name: /Note \d+\./ }).first().click();
+  const area = page.locator('textarea').first();
+  await expect(area).toBeVisible({ timeout: 30_000 });
+
+  // Before the fix this content had no database row, and saving it returned
+  // "Paragraph not found."
+  const marker = `Authored in the browser at ${new Date().toISOString()}.`;
+  await area.fill(marker);
+  await page.getByRole('button', { name: /save (paragraph|section)/i }).first().click();
+  await expect(page.getByTestId('afs-origin-authored').first()).toBeVisible({ timeout: 45_000 });
+
+  await page.reload();
+  await waitForRouteSettled(page);
+  await waitForDocument(page);
+  await page.getByRole('button', { name: /Note \d+\./ }).first().click();
+  await expect(page.locator('textarea').first()).toHaveValue(new RegExp(marker.slice(0, 30)), {
+    timeout: 45_000,
+  });
+  await page.screenshot({ path: 'tests/e2e/artifacts/after-13-authored-note.png', fullPage: true });
+  await expectNoErrorBoundary(page);
+});
+
+test('a note table is edited as a table', async ({ page }) => {
+  await page.goto('/financial-statements-workspace');
+  await waitForRouteSettled(page);
+  await waitForDocument(page);
+
+  // Find a note that carries a table.
+  const notes = page.getByRole('button', { name: /Note \d+\./ });
+  const total = await notes.count();
+  for (let i = 0; i < total; i += 1) {
+    await notes.nth(i).click();
+    const grid = page.getByTestId('afs-table-editor').first();
+    if (!(await grid.isVisible().catch(() => false))) continue;
+
+    const before = await grid.locator('tbody tr').count();
+    await grid.getByTestId('afs-table-add-row').click();
+    await expect(grid.locator('tbody tr')).toHaveCount(before + 1);
+    await page.screenshot({ path: 'tests/e2e/artifacts/after-14-table-grid.png', fullPage: true });
+    await expectNoErrorBoundary(page);
+    return;
+  }
+  test.skip(true, 'No note in this framework carries a table.');
 });
 
 test('12: the printed document previews as a real PDF', async ({ page }) => {
@@ -281,7 +382,6 @@ test('the reporting framework is the preparer\u2019s choice, and the document fo
 }) => {
   await page.goto('/');
   await waitForRouteSettled(page);
-  await switchTo(page, DATA_COMPANY);
   await page.goto('/financial-statements-workspace');
   await waitForRouteSettled(page);
   await waitForDocument(page);

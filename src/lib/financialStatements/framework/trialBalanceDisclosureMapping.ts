@@ -12,6 +12,7 @@ import type { EfsStatementLine } from '../api';
 import type { DocStatementNode, DocTable } from '../document/documentModel';
 import { formatAmount } from '../publication/afsProfessionalPdf';
 import type { FrameworkTableDef } from './frameworkContent';
+import { resolveFact } from './lineCodeAliases';
 
 /** Marker inserted into a cell that the accountant must complete manually. */
 export const MANUAL_FIELD_TOKEN = '[ — ]';
@@ -25,13 +26,22 @@ export type ManualField = {
 
 export type FactLookup = Map<string, number>;
 
-/** Build a fast line_code → amount lookup from all statement lines. */
+/**
+ * Build a fast line_code → amount lookup from all statement lines.
+ *
+ * Prior-period figures are filed under "<code>.prior", which is the name the
+ * framework tables ask for in their comparative column. Without them every
+ * comparative cell printed "[ — ]" and was reported as needing manual input,
+ * even where last year's figure was sitting in the statement beside it.
+ */
 export function buildFactLookup(statements: DocStatementNode[]): FactLookup {
   const lookup: FactLookup = new Map();
   for (const statement of statements) {
     for (const line of statement.lines as EfsStatementLine[]) {
-      if (line && typeof line.line_code === 'string') {
-        lookup.set(line.line_code, Number(line.amount) || 0);
+      if (!line || typeof line.line_code !== 'string') continue;
+      if (line.amount != null) lookup.set(line.line_code, Number(line.amount) || 0);
+      if (line.prior_amount != null) {
+        lookup.set(`${line.line_code}.prior`, Number(line.prior_amount) || 0);
       }
     }
   }
@@ -60,18 +70,22 @@ export function populateFrameworkTable(
   const rows: string[][] = [];
 
   for (const mapping of def.factMappings || []) {
-    const hasCurrent = facts.has(mapping.line_code);
-    const current = hasCurrent ? formatAmount(facts.get(mapping.line_code) as number) : MANUAL_FIELD_TOKEN;
+    // The engine and the framework library name the same figure differently in
+    // places, so try every name this line is known by before giving up on it.
+    const current = resolveFact(facts, mapping.line_code);
 
-    const row: string[] = [mapping.label, current];
+    const row: string[] = [
+      mapping.label,
+      current.found ? formatAmount(current.amount) : MANUAL_FIELD_TOKEN,
+    ];
     if (def.columns.length >= 3) {
       const priorCode = mapping.comparative_line_code;
-      const hasPrior = priorCode ? facts.has(priorCode) : false;
-      row.push(hasPrior ? formatAmount(facts.get(priorCode as string) as number) : MANUAL_FIELD_TOKEN);
+      const prior = priorCode ? resolveFact(facts, priorCode) : { found: false, amount: 0 };
+      row.push(prior.found ? formatAmount(prior.amount) : MANUAL_FIELD_TOKEN);
     }
     rows.push(row);
 
-    if (!hasCurrent) {
+    if (!current.found) {
       manualFields.push({
         noteCode,
         tableTitle: def.title,

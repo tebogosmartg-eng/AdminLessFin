@@ -3853,6 +3853,208 @@ serve(withEnterprisePlatform("financial-statements", "tenant", async (req, _ctx)
         break;
       }
 
+      /**
+       * Save a piece of the document that the framework generated.
+       *
+       * Generated narrative and tables have no row of their own: they are
+       * composed from the framework each time the document loads, which is what
+       * keeps them in step with the accounting records. The moment an accountant
+       * edits one it stops being generated and becomes theirs, so it needs a row.
+       * This creates that row on first edit — and the note itself, if the
+       * framework offered it but it was never assembled — then updates it.
+       *
+       * The split is the point: untouched content keeps refreshing with the
+       * ledger, authored content is left alone when the statements are rebuilt.
+       */
+      case "SAVE_AUTHORED_CONTENT": {
+        if (!body.workspace_id) throw new Error("workspace_id is required.");
+        if (!body.disclosure_code) throw new Error("disclosure_code is required.");
+        const authoredKind = String(body.content_kind || "");
+        if (!["section", "paragraph", "table"].includes(authoredKind)) {
+          throw new Error("content_kind must be section, paragraph or table.");
+        }
+        if (!body.content_code) throw new Error("content_code is required.");
+
+        // The framework hangs off the active binding, not off the workspace row.
+        const { data: authoredWs, error: authoredWsErr } = await admin
+          .from("efs_reporting_workspaces")
+          .select("id, company_id, efs_framework_bindings(framework_pack_id)")
+          .eq("id", body.workspace_id)
+          .eq("company_id", company_id)
+          .maybeSingle();
+        if (authoredWsErr) throw authoredWsErr;
+        if (!authoredWs) throw new Error("Financial statements not found for this company.");
+
+        const authoredPackId =
+          body.framework_pack_id ||
+          authoredWs.efs_framework_bindings?.framework_pack_id ||
+          null;
+
+        let authoredInst = null;
+        {
+          const { data, error } = await admin
+            .from("efs_disclosure_instances")
+            .select("id, status, title")
+            .eq("workspace_id", body.workspace_id)
+            .eq("company_id", company_id)
+            .eq("disclosure_code", body.disclosure_code)
+            .maybeSingle();
+          if (error) throw error;
+          authoredInst = data;
+        }
+
+        if (authoredInst && authoredInst.status === "superseded") {
+          throw new Error(
+            "This note belongs to a previous reporting framework and can no longer be edited.",
+          );
+        }
+
+        if (!authoredInst) {
+          const { data: authoredMap } = await admin
+            .from("efs_framework_disclosure_mappings")
+            .select("id, template_id, structure_node_code, disclosure_node_code, requirement_level, sort_order")
+            .eq("framework_pack_id", authoredPackId)
+            .eq("disclosure_code", body.disclosure_code)
+            .maybeSingle();
+
+          // NODE.STMT.SFP is seeded for every deployment, so a framework note
+          // with no mapping of its own still has somewhere to attach.
+          const authoredNode =
+            (await resolveStructureNodeByCode(admin, authoredMap?.structure_node_code)) ||
+            (await resolveStructureNodeByCode(admin, "NODE.STMT.SFP"));
+          if (!authoredNode) throw new Error("The statement structure is unavailable for this note.");
+          const authoredDiscNode = await resolveDisclosureNodeByCode(
+            admin,
+            authoredMap?.disclosure_node_code,
+          );
+          const authoredPoint = await resolveNoteAttachmentPoint(admin, {
+            structure_node_id: authoredNode.id,
+            disclosure_node_id: authoredDiscNode?.id ?? null,
+          });
+
+          const { data: createdInst, error: createdErr } = await admin
+            .from("efs_disclosure_instances")
+            .insert({
+              company_id,
+              workspace_id: body.workspace_id,
+              template_id: authoredMap?.template_id ?? null,
+              framework_pack_id: authoredPackId,
+              framework_mapping_id: authoredMap?.id ?? null,
+              disclosure_code: body.disclosure_code,
+              title: body.note_title || body.disclosure_code,
+              disclosure_kind: "note",
+              attachment_point_id: authoredPoint.id,
+              structure_node_id: authoredNode.id,
+              disclosure_node_id: authoredDiscNode?.id ?? null,
+              requirement_level: authoredMap?.requirement_level || "required",
+              status: "in_progress",
+              sort_order: body.sort_order ?? authoredMap?.sort_order ?? 100,
+              prepared_by: user.id,
+              prepared_at: new Date().toISOString(),
+              created_by: user.id,
+            })
+            .select("id, status, title")
+            .single();
+          if (createdErr) throw createdErr;
+          authoredInst = createdInst;
+
+          await admin
+            .from("efs_attachment_points")
+            .update({ status: "bound", reserved_artefact_ref: authoredInst.id })
+            .eq("id", authoredPoint.id);
+          await ensureOpenNotePlaceholder(admin, {
+            structure_node_id: authoredNode.id,
+            disclosure_node_id: authoredDiscNode?.id ?? null,
+          });
+        }
+
+        const authoredTable = {
+          section: "efs_disclosure_sections",
+          paragraph: "efs_disclosure_paragraphs",
+          table: "efs_disclosure_tables",
+        }[authoredKind];
+        const authoredCodeColumn = {
+          section: "section_code",
+          paragraph: "paragraph_code",
+          table: "table_code",
+        }[authoredKind];
+
+        const { data: existingChild, error: existingChildErr } = await admin
+          .from(authoredTable)
+          .select("*")
+          .eq("disclosure_instance_id", authoredInst.id)
+          .eq(authoredCodeColumn, body.content_code)
+          .maybeSingle();
+        if (existingChildErr) throw existingChildErr;
+
+        let authoredPatch;
+        if (authoredKind === "table") {
+          authoredPatch = {
+            title: body.title ?? existingChild?.title ?? body.content_code,
+            columns_json: body.columns_json ?? existingChild?.columns_json ?? [],
+            rows_json: body.rows_json ?? existingChild?.rows_json ?? [],
+          };
+        } else if (authoredKind === "section") {
+          authoredPatch = {
+            title: body.title ?? existingChild?.title ?? body.content_code,
+            body: body.body ?? existingChild?.body ?? "",
+          };
+        } else {
+          authoredPatch = { body: body.body ?? existingChild?.body ?? "" };
+        }
+
+        let authoredRow;
+        if (existingChild) {
+          const { data, error } = await admin
+            .from(authoredTable)
+            .update(authoredPatch)
+            .eq("id", existingChild.id)
+            .select()
+            .single();
+          if (error) throw error;
+          authoredRow = data;
+        } else {
+          const { data, error } = await admin
+            .from(authoredTable)
+            .insert({
+              company_id,
+              disclosure_instance_id: authoredInst.id,
+              [authoredCodeColumn]: body.content_code,
+              sort_order: body.sort_order ?? 100,
+              ...authoredPatch,
+            })
+            .select()
+            .single();
+          if (error) throw error;
+          authoredRow = data;
+        }
+
+        if (authoredInst.status === "draft") {
+          await admin
+            .from("efs_disclosure_instances")
+            .update({ status: "in_progress", updated_at: new Date().toISOString() })
+            .eq("id", authoredInst.id);
+        }
+
+        // Who changed what, and what it was before.
+        await admin.from("efs_audit_events").insert({
+          company_id,
+          entity_type: `disclosure_${authoredKind}`,
+          entity_id: authoredRow.id,
+          action: existingChild ? "authored.updated" : "authored.materialised",
+          actor_user_id: user.id,
+          before_state: existingChild ?? null,
+          after_state: authoredRow,
+        });
+
+        result = {
+          disclosure_instance_id: authoredInst.id,
+          materialised: !existingChild,
+          [authoredKind]: authoredRow,
+        };
+        break;
+      }
+
       case "TRANSITION_DISCLOSURE_STATUS": {
         if (!body.disclosure_instance_id || !body.to_status) {
           throw new Error("disclosure_instance_id and to_status required.");

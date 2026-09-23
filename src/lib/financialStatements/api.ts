@@ -331,7 +331,18 @@ export type EfsStatementLine = {
   is_subheader?: boolean;
   /** Grand total — double underline treatment. */
   is_grand_total?: boolean;
-  accounts?: Array<{ id?: string | null; name: string; type?: string; amount: number }>;
+  /**
+   * The ledger accounts this line was built from, with what each contributed.
+   * Sealed into the statement at generation, so a figure can be traced back to
+   * its accounts long after the balances have moved on.
+   */
+  accounts?: Array<{
+    id?: string | null;
+    name: string;
+    type?: string;
+    account_code?: string | null;
+    amount: number;
+  }>;
 };
 
 export type EfsStatementInstance = {

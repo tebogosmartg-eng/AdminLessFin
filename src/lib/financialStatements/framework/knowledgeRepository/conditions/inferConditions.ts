@@ -2,6 +2,7 @@
  * Disclosure condition inference from statement facts (V14.3).
  */
 import type { DisclosureConditionMap } from '../types';
+import { lineCodeCandidates } from '../../lineCodeAliases';
 
 type FactLine = { line_code?: string; amount?: number | null };
 type StatementLike = { lines?: FactLine[] };
@@ -60,9 +61,13 @@ function buildFacts(statements: StatementLike[] | undefined): Map<string, number
 }
 
 function hasNonZero(facts: Map<string, number>, codes: string[]): boolean {
+  // A condition asks for the standards' name for a line; the engine files it
+  // under the chart of accounts' name. Widen the ask to every known alias, or a
+  // company plainly holding inventory is told it has none to disclose.
+  const wanted = codes.flatMap((code) => lineCodeCandidates(code));
   for (const [key, amount] of facts) {
     if (Math.abs(amount) <= 0) continue;
-    for (const code of codes) {
+    for (const code of wanted) {
       if (key === code || key.startsWith(`${code}.`)) return true;
     }
   }
@@ -81,8 +86,7 @@ export function inferDisclosureConditions(
   }
 
   const hasTradingFacts =
-    (facts.has('sfp.ppe') && Math.abs(facts.get('sfp.ppe') || 0) > 0) ||
-    (facts.has('perf.total_revenue') && Math.abs(facts.get('perf.total_revenue') || 0) > 0);
+    hasNonZero(facts, ['sfp.ppe']) || hasNonZero(facts, ['perf.total_revenue']);
 
   if (hasTradingFacts) {
     if (!inferred.hasFinancialInstruments) inferred.hasFinancialInstruments = true;

@@ -20,8 +20,10 @@ import { Skeleton } from '../../components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../components/ui/tabs';
 import { ArrowLeft, Loader2, RefreshCw } from 'lucide-react';
 import { showError, showSuccess } from '../../utils/toast';
-import EngagementDocumentWorkspace from './experience/EngagementDocumentWorkspace';
-import EngagementValidation from './experience/EngagementValidation';
+import EngagementDocumentWorkspace, {
+  type DocSelection,
+} from './experience/EngagementDocumentWorkspace';
+import WorkspaceReadiness from './experience/WorkspaceReadiness';
 import EngagementReview from './experience/EngagementReview';
 import LegacyEngagementMigrationCard from './experience/LegacyEngagementMigrationCard';
 import FinaliseAndExport from './FinaliseAndExport';
@@ -48,6 +50,9 @@ export default function FinancialStatementsWorkspaceDashboard() {
   const navigate = useNavigate();
   const companyId = activeCompany?.id;
   const [mode, setMode] = useState('document');
+  // The page owns which part of the document is open, so a readiness finding in
+  // Review can put the reader in front of the page it is about.
+  const [selection, setSelection] = useState<DocSelection>({ kind: 'cover', id: 'cover' });
   const [legacyDismissed, setLegacyDismissed] = useState(false);
   const autoPrepared = useRef(false);
 
@@ -170,7 +175,10 @@ export default function FinancialStatementsWorkspaceDashboard() {
     dashQuery.data?.snapshot?.currentVersion?.frozen_at ||
     null;
 
-  const accountingChanged = useAccountingChangesDetected({
+  // The hook returns a result object, not a flag. Reading it as a boolean made
+  // the "your records have changed" banner true forever, so it warned about a
+  // stale document on every visit, including the moment one was just built.
+  const { accountingChanged } = useAccountingChangesDetected({
     companyId,
     startDate: dashQuery.data?.reportingPeriod?.start_date,
     endDate: dashQuery.data?.reportingPeriod?.end_date,
@@ -203,6 +211,11 @@ export default function FinancialStatementsWorkspaceDashboard() {
   const registeredName =
     rawName && rawName.trim().toLowerCase() !== 'reporting entity' ? rawName : null;
   const preparing = prepare.isPending;
+  // A frozen snapshot is the lock: the accounting behind these statements is
+  // sealed, so the document that reports it stops being editable until someone
+  // reopens it deliberately.
+  const versionStatus = d.snapshot?.currentVersion?.status;
+  const locked = versionStatus === 'frozen' || versionStatus === 'publication_bound';
 
   const MODES = [
     { value: 'document', label: 'Document' },
@@ -230,11 +243,14 @@ export default function FinancialStatementsWorkspaceDashboard() {
             {fy.isHistorical ? ' · not the current financial year' : ''}
           </p>
         </div>
+        {/* Rebuilding a final set would quietly supersede the frozen version
+            that was signed. Reopening is the way back, and it is explicit. */}
         <Button
           variant="outline"
           size="sm"
           onClick={() => prepare.mutate()}
-          disabled={preparing}
+          disabled={preparing || locked}
+          title={locked ? 'These statements are final. Reopen them to rebuild.' : undefined}
           data-testid="afs-update"
         >
           {preparing ? (
@@ -246,7 +262,17 @@ export default function FinancialStatementsWorkspaceDashboard() {
         </Button>
       </div>
 
-      {accountingChanged && !preparing && (
+      {locked && (
+        <p
+          className="rounded-md border bg-muted/40 px-3 py-2 text-sm text-muted-foreground"
+          data-testid="afs-locked-banner"
+        >
+          These financial statements are final. The accounting behind them is frozen and the
+          document cannot be edited. Reopen them under Finalise &amp; Export to make changes.
+        </p>
+      )}
+
+      {accountingChanged && !preparing && !locked && (
         <p className="rounded-md border border-amber-300/60 bg-amber-50/60 px-3 py-2 text-sm text-amber-900 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-200">
           Your accounting records have changed since these statements were built. Update from
           accounting to bring them in.
@@ -299,17 +325,26 @@ export default function FinancialStatementsWorkspaceDashboard() {
                 workspaceId={workspaceId}
                 dashboard={d}
                 generalInfo={generalInfo}
+                selection={selection}
+                onSelect={setSelection}
+                locked={locked}
               />
             )}
           </TabsContent>
 
-          <TabsContent value="review" className="mt-0 min-w-0 space-y-6">
+          <TabsContent value="review" className="mt-0 min-w-0 space-y-8">
             {companyId && workspaceId && (
               <>
-                <EngagementValidation
+                <WorkspaceReadiness
                   companyId={companyId}
+                  companyName={activeCompany?.name}
                   workspaceId={workspaceId}
-                  frameworkPackId={d.framework?.id ?? null}
+                  dashboard={d}
+                  generalInfo={generalInfo}
+                  onOpen={(location) => {
+                    setSelection(location);
+                    setMode('document');
+                  }}
                 />
                 <EngagementReview companyId={companyId} workspaceId={workspaceId} />
               </>
