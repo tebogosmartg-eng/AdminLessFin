@@ -103,6 +103,11 @@ export default function DocumentTree({
         onSelect={() => onSelect({ kind: 'cover', id: 'cover' })}
       />
       <TreeRow
+        label="General Information"
+        active={isActive('information', 'information')}
+        onSelect={() => onSelect({ kind: 'information', id: 'information' })}
+      />
+      <TreeRow
         label="Contents"
         active={isActive('contents', 'contents')}
         onSelect={() => onSelect({ kind: 'contents', id: 'contents' })}

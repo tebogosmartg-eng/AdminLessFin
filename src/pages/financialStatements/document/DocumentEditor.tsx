@@ -14,6 +14,8 @@ import type { DocumentOverridesApi } from '../../../lib/financialStatements/docu
 import { professionalStatementTitle } from '../../../lib/financialStatements/publication/afsProfessionalPdf';
 import { corporateDisplayFromModel } from '../../../lib/financialStatements/corporateInformation/accessors';
 import type { DocSelection } from '../experience/EngagementDocumentWorkspace';
+import type { EfsWorkspaceGeneralInformation } from '../../../lib/financialStatements/api';
+import EngagementInformation from '../experience/EngagementInformation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../../components/ui/card';
 import { Button } from '../../../components/ui/button';
 import { Input } from '../../../components/ui/input';
@@ -78,6 +80,12 @@ function StatementEditor({
     statement.statement_type,
     resolvedTitle(ctx.overridesApi.overrides, statement.id, statement.title),
   );
+  // A comparative column of blanks would read as "nil", which is a different
+  // claim, so it is shown only when there are prior figures to show.
+  const showComparatives = statement.lines.some(
+    (l) => l.prior_amount != null && Number(l.prior_amount) !== 0,
+  );
+  const currentColumn = ctx.model?.period?.label || 'Current year';
   return (
     <Card>
       <CardHeader>
@@ -98,25 +106,50 @@ function StatementEditor({
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b bg-muted/40 text-left">
-                <th className="px-3 py-2 font-medium">Description</th>
-                <th className="px-3 py-2 text-right font-medium">Amount</th>
+                <th className="px-3 py-2 font-medium">&nbsp;</th>
+                <th className="px-3 py-2 text-right font-medium">{currentColumn}</th>
+                {showComparatives && (
+                  <th className="px-3 py-2 text-right font-medium text-muted-foreground">
+                    Prior year
+                  </th>
+                )}
               </tr>
             </thead>
             <tbody>
               {statement.lines.length === 0 ? (
                 <tr>
-                  <td className="px-3 py-3 text-muted-foreground" colSpan={2}>
-                    Amounts will appear once the trial balance has been captured.
+                  <td className="px-3 py-3 text-muted-foreground" colSpan={showComparatives ? 3 : 2}>
+                    Amounts will appear once the statements have been built from your accounting
+                    records.
                   </td>
                 </tr>
               ) : (
                 statement.lines.map((ln, idx) => (
                   <tr
                     key={`${ln.line_code}-${idx}`}
-                    className={cn('border-b last:border-0', ln.is_total && 'bg-muted/20 font-semibold')}
+                    className={cn(
+                      'border-b last:border-0',
+                      (ln.is_total || ln.is_grand_total) && 'bg-muted/20 font-semibold',
+                      ln.is_subtotal && 'font-medium',
+                      ln.is_header && 'font-medium text-muted-foreground',
+                      ln.is_reconciling && 'text-amber-800 dark:text-amber-300',
+                    )}
                   >
-                    <td className="px-3 py-2">{ln.label}</td>
-                    <td className="px-3 py-2 text-right tabular-nums">{formatCurrency(ln.amount)}</td>
+                    <td
+                      className="px-3 py-2"
+                      style={{ paddingLeft: `${0.75 + (ln.level ?? 0) * 1.25}rem` }}
+                    >
+                      {ln.label}
+                    </td>
+                    {/* A heading carries no figure; formatCurrency(null) printed R 0,00. */}
+                    <td className="px-3 py-2 text-right tabular-nums">
+                      {ln.amount == null ? '' : formatCurrency(ln.amount)}
+                    </td>
+                    {showComparatives && (
+                      <td className="px-3 py-2 text-right tabular-nums text-muted-foreground">
+                        {ln.prior_amount == null ? '' : formatCurrency(ln.prior_amount)}
+                      </td>
+                    )}
                   </tr>
                 ))
               )}
@@ -617,21 +650,37 @@ function ContentsInfo() {
 
 export default function DocumentEditor({
   companyId,
+  workspaceId,
   model,
   selection,
   overridesApi,
+  generalInfo,
   onSaved,
 }: {
   companyId: string;
+  workspaceId: string;
   model: DocumentModel;
   selection: DocSelection;
   overridesApi: DocumentOverridesApi;
+  generalInfo?: EfsWorkspaceGeneralInformation | null;
   onSaved: () => void;
 }) {
   const ctx: EditorContext = { companyId, model, overridesApi, onSaved };
   const kind = selection.kind;
 
   if (kind === 'cover') return <CoverEditor model={model} />;
+  // The entity's own details are part of the document, so they are edited from
+  // the document rather than from a separate "Information" tab.
+  if (kind === 'information') {
+    return (
+      <EngagementInformation
+        companyId={companyId}
+        workspaceId={workspaceId}
+        generalInfo={generalInfo}
+        frameworkLabel={model.frameworkLabel ?? undefined}
+      />
+    );
+  }
   if (kind === 'contents') return <ContentsInfo />;
   if (kind === 'signature') return <SignatureEditor model={model} selectionId={selection.id} />;
 

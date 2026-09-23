@@ -1,7 +1,6 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useNavigate } from 'react-router-dom';
-import { format } from 'date-fns';
 import { useAuth } from '../../contexts/AuthContext';
 import { useReportingPeriod } from '../../contexts/ReportingPeriodContext';
 import {
@@ -9,41 +8,31 @@ import {
   invokeFinancialStatements,
   type EfsWorkspaceListItem,
 } from '../../lib/financialStatements/api';
-import { workspaceStatusLabel } from '../../lib/financialStatements/presentation';
-import {
-  formatCalendarYearDisplay,
-  resolveCalendarYearForWorkspace,
-  resolveEngagementReportingPeriod,
-} from '../../lib/financialStatements/calendarYearBinding';
-import { yearStatusMeta } from '../../lib/reportingPeriod/status';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../../components/ui/card';
-import { Badge } from '../../components/ui/badge';
+import { resolveCalendarYearForWorkspace } from '../../lib/financialStatements/calendarYearBinding';
+import { formatYearRange } from '../../lib/reportingPeriod/selection';
 import { Button } from '../../components/ui/button';
 import { Skeleton } from '../../components/ui/skeleton';
 import { showError } from '../../utils/toast';
-import { FileSignature, ArrowRight, Loader2 } from 'lucide-react';
+import { ArrowRight, Loader2 } from 'lucide-react';
 
 /**
- * Financial Statements module landing — engagement list.
+ * Financial Statements — the way in.
  *
- * Financial Year labels come from ReportingPeriodContext (Settings calendar only),
- * and the year this page acts on is the SELECTED year from that same context —
- * the one shown in the header — so Financial Statements can never act on a
- * different year from the rest of Accounting.
+ * This page answers one question: what do I do to produce my Annual Financial
+ * Statements? So it says which company and year it is about, whether the
+ * statements exist yet, and offers the single action that follows. It used to
+ * be a register of "engagements" which, for almost every company, was an empty
+ * table telling the reader to go and do something in Settings.
  *
- * An engagement is created by one explicit first-use action, not automatically:
- * opening one binds a reporting framework and seals a trial balance, which is a
- * decision, not a side effect of navigation. The action is idempotent
- * (ENSURE_WORKSPACE_FOR_FINANCIAL_YEAR) and the database carries a unique index
- * per (company, entity, financial year), so it cannot produce a second
- * engagement for a year that already has one.
+ * When the year's statements already exist the page does not ask again — it
+ * opens them.
  */
 export default function FinancialStatementsWorkspaceHome() {
   const { activeCompany } = useAuth();
   const {
     financialYears,
     activeFinancialYear,
-    isCurrentFinancialYear,
+    setFinancialYear,
     isLoading: calendarLoading,
   } = useReportingPeriod();
   const navigate = useNavigate();
@@ -56,246 +45,136 @@ export default function FinancialStatementsWorkspaceHome() {
     enabled: !!companyId,
   });
 
-  const rows = useMemo(() => {
-    const years = financialYears;
-    const workspaces = workspacesQuery.data || [];
-    return workspaces.map((ws) => {
-      const calendarYear = resolveCalendarYearForWorkspace(ws, years);
-      const resolved = resolveEngagementReportingPeriod(
-        ws.efs_reporting_periods,
-        years,
-        activeFinancialYear,
-      );
-      const framework =
-        ws.efs_framework_bindings?.efs_framework_packs?.efs_frameworks?.name ||
-        ws.efs_framework_bindings?.efs_framework_packs?.label ||
-        '—';
-      // Never fall back to frozen efs_reporting_periods.label (e.g. "Financial Year 2025/26").
-      const yearLabel = calendarYear
-        ? formatCalendarYearDisplay(calendarYear)
-        : resolved.displayLabel;
-      return {
-        workspace: ws,
-        financialYearId: calendarYear?.id ?? ws.efs_reporting_periods?.financial_year_id ?? null,
-        financialYear: yearLabel,
-        isHistorical: resolved.isHistorical,
-        isLegacyUnbound: resolved.isLegacyUnbound,
-        framework,
-        status: workspaceStatusLabel(ws.status),
-        progress: Number(ws.progress_pct || 0),
-        updatedAt: ws.updated_at,
-      };
-    });
+  /** The statements for the year the header is in, if they have been started. */
+  const forSelectedYear = useMemo(() => {
+    if (!activeFinancialYear) return null;
+    return (
+      (workspacesQuery.data || []).find((ws) => {
+        const year = resolveCalendarYearForWorkspace(ws, financialYears);
+        const yearId = year?.id ?? ws.efs_reporting_periods?.financial_year_id ?? null;
+        return yearId === activeFinancialYear.id;
+      }) ?? null
+    );
   }, [workspacesQuery.data, financialYears, activeFinancialYear]);
 
-  /** The engagement for the year the user is currently in, if it exists. */
-  const selectedYearRow = useMemo(
-    () =>
-      activeFinancialYear
-        ? rows.find((row) => row.financialYearId === activeFinancialYear.id) ?? null
-        : null,
-    [rows, activeFinancialYear],
-  );
+  // Already prepared: go straight in rather than showing a page about a page.
+  useEffect(() => {
+    if (forSelectedYear) {
+      navigate(`/financial-statements-workspace/${forSelectedYear.id}`, { replace: true });
+    }
+  }, [forSelectedYear, navigate]);
 
-  const setUpMutation = useMutation({
+  const prepare = useMutation({
     mutationFn: async () => {
-      if (!companyId) throw new Error('No active company.');
-      if (!activeFinancialYear) {
-        throw new Error(
-          'Select a Financial Year first. Annual Financial Statements are prepared for a year in the Financial Calendar.',
-        );
-      }
+      if (!companyId || !activeFinancialYear) throw new Error('Select a financial year first.');
       return ensureWorkspaceForFinancialYear(companyId, activeFinancialYear.id);
     },
     onSuccess: async (ensured) => {
       await queryClient.invalidateQueries({ queryKey: ['efs_workspaces', companyId] });
-      // Land in the engagement itself — setting one up and then being returned
-      // to an empty list is the behaviour this action exists to remove.
       navigate(`/financial-statements-workspace/${ensured.workspace.id}`);
     },
-    onError: (error: unknown) =>
-      showError(error instanceof Error ? error.message : String(error)),
+    onError: (e: unknown) => showError(e instanceof Error ? e.message : String(e)),
   });
 
-  const yearStatus = activeFinancialYear ? yearStatusMeta(activeFinancialYear.status) : null;
-  const listLoading = workspacesQuery.isLoading || calendarLoading;
+  const loading = calendarLoading || workspacesQuery.isLoading;
 
   return (
-    <div className="space-y-6 p-6">
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight flex items-center gap-2">
-            <FileSignature className="h-6 w-6" />
-            Financial Statements
-          </h1>
-          <p className="text-sm text-muted-foreground">
-            Prepare Annual Financial Statements engagements. Live operational reports remain under
-            Reports.
-          </p>
-        </div>
+    <div className="mx-auto max-w-2xl px-6 py-16">
+      <h1 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+        Financial Statements
+      </h1>
+      <p className="mt-2 text-3xl font-semibold tracking-tight" data-testid="afs-context">
+        {activeCompany?.name ?? 'Company'}
+      </p>
+      <p className="mt-1 text-lg text-muted-foreground">
+        {loading
+          ? 'Loading…'
+          : activeFinancialYear
+            ? `${activeFinancialYear.yearCode} · ${formatYearRange(activeFinancialYear)}`
+            : 'No financial year yet'}
+      </p>
+
+      <div className="mt-10">
+        {loading && <Skeleton className="h-11 w-72" />}
+
+        {!loading && !activeFinancialYear && (
+          <>
+            <p className="mb-4 text-muted-foreground">
+              Annual Financial Statements are prepared for a financial year. This company does not
+              have one yet.
+            </p>
+            <Button asChild size="lg">
+              <Link to="/settings?tab=accounting">Set up the financial year</Link>
+            </Button>
+          </>
+        )}
+
+        {!loading && activeFinancialYear && !forSelectedYear && (
+          <>
+            <p className="mb-4 text-muted-foreground">
+              Your {activeFinancialYear.yearCode} statements have not been started. Preparing them
+              builds the statements from your accounting records — nothing is posted to the ledger.
+            </p>
+            <Button
+              size="lg"
+              onClick={() => prepare.mutate()}
+              disabled={prepare.isPending}
+              data-testid="afs-prepare"
+            >
+              {prepare.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Prepare Financial Statements
+              {!prepare.isPending && <ArrowRight className="ml-2 h-4 w-4" />}
+            </Button>
+          </>
+        )}
+
+        {!loading && forSelectedYear && (
+          <Button
+            size="lg"
+            onClick={() => navigate(`/financial-statements-workspace/${forSelectedYear.id}`)}
+          >
+            Open Financial Statements
+            <ArrowRight className="ml-2 h-4 w-4" />
+          </Button>
+        )}
       </div>
 
-      {/* The selected year, and the one action available for it. */}
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base">
-            {activeCompany?.name ?? 'Company'}
-            {activeFinancialYear ? ` · ${activeFinancialYear.yearCode}` : ''}
-          </CardTitle>
-          <CardDescription>
-            {calendarLoading && 'Loading the Financial Calendar…'}
-            {!calendarLoading && activeFinancialYear && (
-              <>
-                {formatCalendarYearDisplay(activeFinancialYear)}
-                {yearStatus ? ` · ${yearStatus.label}` : ''}
-                {!isCurrentFinancialYear && ' · not the current Financial Year'}
-              </>
-            )}
-            {!calendarLoading && !activeFinancialYear && financialYears.length === 0 && (
-              <>
-                This company has no Financial Year yet. Annual Financial Statements are prepared for
-                a year in the Financial Calendar.
-              </>
-            )}
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {listLoading && <Skeleton className="h-10 w-64" />}
-
-          {!listLoading && !activeFinancialYear && (
-            <Button asChild variant="outline">
-              <Link to="/settings?tab=accounting">Set up the Financial Year</Link>
-            </Button>
-          )}
-
-          {!listLoading && activeFinancialYear && selectedYearRow && (
-            <div className="flex flex-wrap items-center gap-3">
-              <Button
-                onClick={() =>
-                  navigate(`/financial-statements-workspace/${selectedYearRow.workspace.id}`)
-                }
-              >
-                Open {activeFinancialYear.yearCode} engagement
-                <ArrowRight className="ml-2 h-4 w-4" />
-              </Button>
-              <span className="text-sm text-muted-foreground">
-                {selectedYearRow.status} · {selectedYearRow.progress.toFixed(0)}% complete
-              </span>
-            </div>
-          )}
-
-          {!listLoading && activeFinancialYear && !selectedYearRow && (
-            <div className="flex flex-wrap items-center gap-3">
-              <Button
-                onClick={() => setUpMutation.mutate()}
-                disabled={setUpMutation.isPending}
-                data-testid="afs-set-up"
-              >
-                {setUpMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                Set up Annual Financial Statements
-              </Button>
-              <span className="text-sm text-muted-foreground">
-                Opens the {activeFinancialYear.yearCode} engagement for{' '}
-                {activeCompany?.name ?? 'this company'}. Nothing is posted to the ledger.
-              </span>
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base">Engagements</CardTitle>
-          <CardDescription>
-            One engagement per Enterprise Financial Calendar year. Selecting a row opens the
-            existing engagement.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="p-0">
-          {workspacesQuery.isLoading && (
-            <div className="space-y-2 p-4">
-              <Skeleton className="h-10 w-full" />
-              <Skeleton className="h-10 w-full" />
-            </div>
-          )}
-          {workspacesQuery.isError && (
-            <p className="p-4 text-sm text-destructive">
-              {(workspacesQuery.error as Error).message}
-            </p>
-          )}
-          {!workspacesQuery.isLoading && rows.length === 0 && (
-            <p className="p-6 text-center text-sm text-muted-foreground">
-              No engagements yet. Use the action above to set up Annual Financial Statements for the
-              Financial Year you are in.
-            </p>
-          )}
-          {rows.length > 0 && (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b bg-muted/40 text-left text-xs text-muted-foreground">
-                    <th className="px-4 py-3 font-medium">Financial Year</th>
-                    <th className="px-4 py-3 font-medium">Reporting Framework</th>
-                    <th className="px-4 py-3 font-medium">Status</th>
-                    <th className="px-4 py-3 font-medium">Progress</th>
-                    <th className="px-4 py-3 font-medium">Last Updated</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {rows.map((row) => (
-                    <tr
-                      key={row.workspace.id}
-                      className={`cursor-pointer border-b transition-colors hover:bg-muted/40${
-                        row.financialYearId && row.financialYearId === activeFinancialYear?.id
-                          ? ' bg-muted/30'
-                          : ''
-                      }`}
-                      onClick={() =>
-                        navigate(`/financial-statements-workspace/${row.workspace.id}`)
-                      }
-                    >
-                      <td className="px-4 py-3 font-medium">
-                        {row.isLegacyUnbound ? (
-                          <>
-                            Legacy Financial Statement Engagement
-                            <span className="mt-0.5 block text-xs font-normal text-amber-800 dark:text-amber-300">
-                              {row.financialYear.includes('·')
-                                ? row.financialYear.split('·').slice(1).join('·').trim()
-                                : 'Not linked to Enterprise Financial Calendar'}
-                              {' · open to migrate'}
-                            </span>
-                          </>
-                        ) : (
-                          <>
-                            {row.financialYear}
-                            {row.isHistorical ? (
-                              <span className="mt-0.5 block text-xs font-normal text-muted-foreground">
-                                Not current Financial Year
-                              </span>
-                            ) : null}
-                          </>
-                        )}
-                      </td>
-                      <td className="px-4 py-3">{row.framework}</td>
-                      <td className="px-4 py-3">
-                        <Badge variant="secondary">{row.status}</Badge>
-                      </td>
-                      <td className="px-4 py-3 text-muted-foreground">
-                        {row.progress.toFixed(0)}%
-                      </td>
-                      <td className="px-4 py-3 text-muted-foreground">
-                        {row.updatedAt
-                          ? format(new Date(row.updatedAt), 'dd MMM yyyy HH:mm')
-                          : '—'}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+      {/* Earlier years, as plain links — not a register to be administered. */}
+      {!loading && (workspacesQuery.data || []).length > 0 && (
+        <div className="mt-12 border-t pt-6">
+          <p className="mb-2 text-sm text-muted-foreground">Other years</p>
+          <div className="flex flex-wrap gap-x-5 gap-y-2">
+            {(workspacesQuery.data || [])
+              .filter((ws) => ws.id !== forSelectedYear?.id)
+              .map((ws) => {
+                const year = resolveCalendarYearForWorkspace(ws, financialYears);
+                // Changing the year changes it for the whole app, which then
+                // opens that year's statements — rather than linking straight
+                // to a document the header does not agree with.
+                return year ? (
+                  <button
+                    key={ws.id}
+                    type="button"
+                    onClick={() => setFinancialYear(year.id)}
+                    className="text-sm underline underline-offset-4 hover:text-foreground"
+                    data-testid="afs-other-year"
+                  >
+                    {year.yearCode}
+                  </button>
+                ) : (
+                  <Link
+                    key={ws.id}
+                    to={`/financial-statements-workspace/${ws.id}`}
+                    className="text-sm underline underline-offset-4 hover:text-foreground"
+                    data-testid="afs-other-year"
+                  >
+                    {ws.efs_reporting_periods?.label || 'Earlier year'}
+                  </Link>
+                );
+              })}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

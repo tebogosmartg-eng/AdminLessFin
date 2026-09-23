@@ -125,7 +125,7 @@ test('Financial Statements sends a company with no year to the one place years a
   await expect(page.getByRole('link', { name: /set up the financial year/i })).toBeVisible({
     timeout: 30_000,
   });
-  await expect(page.getByTestId('afs-set-up')).toHaveCount(0);
+  await expect(page.getByTestId('afs-prepare')).toHaveCount(0);
   await expectNoErrorBoundary(page);
 });
 
@@ -159,7 +159,7 @@ test('a valid year offers one first-use action that names it, and lands in the e
     current.id,
     { timeout: 30_000 },
   );
-  const setUp = page.getByTestId('afs-set-up');
+  const setUp = page.getByTestId('afs-prepare');
   await expect(setUp).toBeVisible({ timeout: 30_000 });
   await expect(page.getByText(current.year_code, { exact: false }).first()).toBeVisible();
   // The old dead end is gone.
@@ -187,11 +187,10 @@ test('the engagement survives a reload and a direct URL, and the home now opens 
 
   await page.goto('/financial-statements-workspace');
   await waitForRouteSettled(page);
-  await expect(page.getByTestId('afs-set-up')).toHaveCount(0);
-  const open = page.getByRole('button', { name: /open .* engagement/i });
-  await expect(open).toBeVisible({ timeout: 30_000 });
-  await open.click();
-  await expect(page).toHaveURL(new RegExp(`/financial-statements-workspace/${ws.id}`), { timeout: 60_000 });
+  // Prepared already: the landing opens the statements rather than asking again.
+  await expect(page).toHaveURL(new RegExp(`/financial-statements-workspace/${ws.id}`), {
+    timeout: 60_000,
+  });
 });
 
 test('running set-up again returns the same engagement, even when two calls race', async () => {
@@ -251,17 +250,15 @@ test('another financial year is offered its own engagement, never the first one'
   await page.keyboard.press('Escape');
   await expect(page.getByTestId('financial-context-switcher')).toHaveAttribute('data-year-id', other.id);
 
-  // That year has no engagement, so it is offered one of its own — the first
-  // year's engagement is never presented as this year's.
-  await expect(page.getByTestId('afs-set-up')).toBeVisible({ timeout: 30_000 });
-  await expect(page.getByRole('button', { name: /open .* engagement/i })).toHaveCount(0);
+  // That year has no statements, so it is offered its own — the first year's
+  // are never presented as this year's.
+  await expect(page.getByTestId('afs-prepare')).toBeVisible({ timeout: 30_000 });
 
-  // Back in the current year, its own engagement is offered again.
+  // Back in the current year, its own statements open again.
   await page.getByTestId('financial-context-switcher').click();
   await page.locator(`[data-testid="financial-year-option"][data-year-id="${current.id}"]`).click();
   await page.keyboard.press('Escape');
-  await expect(page.getByRole('button', { name: /open .* engagement/i })).toBeVisible({ timeout: 30_000 });
-  await expect(page.getByTestId('afs-set-up')).toHaveCount(0);
+  await expect(page).toHaveURL(/\/financial-statements-workspace\/[0-9a-f-]{36}/, { timeout: 60_000 });
 });
 
 test('switching company never shows the other company engagement', async ({ page, diagnostics }) => {
@@ -273,17 +270,19 @@ test('switching company never shows the other company engagement', async ({ page
   await switchTo(page, otherCompany!.id);
   await waitForRouteSettled(page);
 
-  const theirs = await workspacesOf(otherCompany!.id);
-  const rows = page.locator('table tbody tr');
+  // Under the other company, this company's statements are neither open nor
+  // named anywhere on the page.
   await expect
-    .poll(async () => rows.count(), { timeout: 30_000 })
-    .toBe(theirs.length);
-  // The new company's engagement id is not on screen under another company.
+    .poll(async () => page.url().includes(mine.id), { timeout: 30_000 })
+    .toBe(false);
   expect(await page.content()).not.toContain(mine.id);
 
   await switchTo(page, newCompanyId!);
   await waitForRouteSettled(page);
-  await expect.poll(async () => rows.count(), { timeout: 30_000 }).toBe(1);
+  // Back in its own company, its own statements open.
+  await expect
+    .poll(async () => page.url().includes(mine.id), { timeout: 60_000 })
+    .toBe(true);
   await expectNoErrorBoundary(page);
   expect(diagnostics.pageErrors).toEqual([]);
 });
@@ -307,9 +306,6 @@ test('signing out and back in keeps the engagement', async ({ page }) => {
   await page.getByRole('button', { name: /sign in/i }).first().click();
   await expect(page).not.toHaveURL(/\/auth/, { timeout: 60_000 });
 
-  await page.goto('/financial-statements-workspace');
-  await waitForRouteSettled(page);
-  await expect(page.getByRole('button', { name: /open .* engagement/i })).toBeVisible({ timeout: 45_000 });
   await page.goto(`/financial-statements-workspace/${ws.id}`);
   await waitForRouteSettled(page);
   await expectNoErrorBoundary(page);

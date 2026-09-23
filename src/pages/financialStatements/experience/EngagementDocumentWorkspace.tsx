@@ -25,6 +25,7 @@ import { RefreshCw } from 'lucide-react';
 /** Selection contract shared across the document workspace panels. */
 export type DocSelection =
   | { kind: 'cover'; id: string }
+  | { kind: 'information'; id: string }
   | { kind: 'contents'; id: string }
   | { kind: 'statement'; id: string }
   | { kind: 'policySet'; id: string }
@@ -102,38 +103,19 @@ export default function WorkspaceDocumentWorkspace({
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h2 className="text-lg font-semibold tracking-tight">Financial Statement Document</h2>
-          <p className="text-sm text-muted-foreground">
-            {model.frameworkLabel}
-            {` · ${fy.displayLabel}`}
-            {model.trialBalanceCaptured
-              ? ' · Populated from trial balance'
-              : ' · Generic document (awaiting trial balance)'}
-          </p>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          {!model.trialBalanceCaptured && onNavigate ? (
-            <>
-              <Button variant="default" size="sm" onClick={() => onNavigate('trial-balance')}>
-                Open Trial Balance
-              </Button>
-              <Button variant="outline" size="sm" onClick={() => onNavigate('statements')}>
-                Generate Statements
-              </Button>
-            </>
-          ) : null}
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => invalidateModel()}
-            disabled={modelQuery.isFetching}
-          >
-            <RefreshCw className={`mr-2 h-4 w-4 ${modelQuery.isFetching ? 'animate-spin' : ''}`} />
-            Refresh document
-          </Button>
-        </div>
+      <div className="flex items-center justify-between">
+        {/* The framework is the only thing worth saying here; the company, the
+            year and the status are already in the page header above. */}
+        <p className="text-sm text-muted-foreground">{model.frameworkLabel}</p>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => invalidateModel()}
+          disabled={modelQuery.isFetching}
+        >
+          <RefreshCw className={`mr-2 h-4 w-4 ${modelQuery.isFetching ? 'animate-spin' : ''}`} />
+          Reload
+        </Button>
       </div>
 
       <div className="grid gap-4 lg:grid-cols-[260px_minmax(0,1fr)_320px]">
@@ -157,9 +139,11 @@ export default function WorkspaceDocumentWorkspace({
             <TabsContent value="editor" className="mt-0">
               <DocumentEditor
                 companyId={companyId}
+                workspaceId={workspaceId}
                 model={model}
                 selection={selection}
                 overridesApi={overridesApi}
+                generalInfo={generalInfo}
                 onSaved={invalidateModel}
               />
             </TabsContent>
