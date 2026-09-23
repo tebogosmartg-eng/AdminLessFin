@@ -28,12 +28,13 @@ export type DocSelection =
   | { kind: 'signature'; id: string };
 
 /**
- * V11.0 — Accounts Production document workspace.
+ * The document workspace: structure on the left, the page in the middle, its
+ * properties and the readiness of the whole set on the right.
  *
- * A single surface combining Document Tree + Editor + Live Preview + Validation
- * + Properties inside the existing Financial Statements engagement dashboard.
- * Fully additive: consumes existing edge APIs (read + existing edit methods) and
- * persists presentation-only choices client-side. Never modifies the engine.
+ * It reads the statements the engine produced and never recomputes a figure.
+ * What it does own is authored content and presentation, and both now persist
+ * on the engagement rather than in the browser, so everyone working on this set
+ * of financial statements is reading the same document.
  */
 export default function WorkspaceDocumentWorkspace({
   companyId,
@@ -57,7 +58,7 @@ export default function WorkspaceDocumentWorkspace({
   locked?: boolean;
 }) {
   const [addDisclosureOpen, setAddDisclosureOpen] = useState(false);
-  const overridesApi = useDocumentOverrides(workspaceId);
+  const overridesApi = useDocumentOverrides(workspaceId, companyId);
   const setSelection = onSelect;
 
   const modelQuery = useDocumentModel({
@@ -107,6 +108,13 @@ export default function WorkspaceDocumentWorkspace({
           Reload
         </Button>
       </div>
+
+      {/* Losing a reviewer's ordering quietly is worse than saying it failed. */}
+      {overridesApi.error && (
+        <p className="rounded-md border border-destructive/40 bg-destructive/5 px-3 py-2 text-sm text-destructive">
+          A presentation change could not be saved: {overridesApi.error}
+        </p>
+      )}
 
       <div className="grid gap-4 lg:grid-cols-[260px_minmax(0,1fr)_320px]">
         <div className="rounded-md border bg-card">

@@ -3854,6 +3854,78 @@ serve(withEnterprisePlatform("financial-statements", "tenant", async (req, _ctx)
       }
 
       /**
+       * How this engagement's document is presented — which sections are shown,
+       * the order they appear in, any renamed heading.
+       *
+       * This lived in the preparer's browser, so a reviewer opening the same
+       * engagement read a different document and printed a different PDF.
+       */
+      case "GET_DOCUMENT_PRESENTATION": {
+        if (!body.workspace_id) throw new Error("workspace_id is required.");
+        const { data, error } = await admin
+          .from("efs_document_presentation")
+          .select("overrides, updated_at, updated_by")
+          .eq("company_id", company_id)
+          .eq("workspace_id", body.workspace_id)
+          .maybeSingle();
+        if (error) throw error;
+        result = data ?? { overrides: {}, updated_at: null, updated_by: null };
+        break;
+      }
+
+      case "SAVE_DOCUMENT_PRESENTATION": {
+        if (!body.workspace_id) throw new Error("workspace_id is required.");
+        if (!body.overrides || typeof body.overrides !== "object") {
+          throw new Error("overrides must be an object.");
+        }
+
+        const { data: presentWs, error: presentWsErr } = await admin
+          .from("efs_reporting_workspaces")
+          .select("id")
+          .eq("id", body.workspace_id)
+          .eq("company_id", company_id)
+          .maybeSingle();
+        if (presentWsErr) throw presentWsErr;
+        if (!presentWs) throw new Error("Financial statements not found for this company.");
+
+        const { data: priorPresentation } = await admin
+          .from("efs_document_presentation")
+          .select("overrides")
+          .eq("company_id", company_id)
+          .eq("workspace_id", body.workspace_id)
+          .maybeSingle();
+
+        const { data: savedPresentation, error: presentErr } = await admin
+          .from("efs_document_presentation")
+          .upsert(
+            {
+              company_id,
+              workspace_id: body.workspace_id,
+              overrides: body.overrides,
+              updated_by: user.id,
+              updated_at: new Date().toISOString(),
+            },
+            { onConflict: "workspace_id" },
+          )
+          .select("overrides, updated_at, updated_by")
+          .single();
+        if (presentErr) throw presentErr;
+
+        await admin.from("efs_audit_events").insert({
+          company_id,
+          entity_type: "document_presentation",
+          entity_id: body.workspace_id,
+          action: "presentation.updated",
+          actor_user_id: user.id,
+          before_state: priorPresentation?.overrides ?? null,
+          after_state: savedPresentation.overrides,
+        });
+
+        result = savedPresentation;
+        break;
+      }
+
+      /**
        * Save a piece of the document that the framework generated.
        *
        * Generated narrative and tables have no row of their own: they are

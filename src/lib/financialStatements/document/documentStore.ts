@@ -1,16 +1,19 @@
 /**
- * AFS Document Workspace — client-side presentation state (V11.0).
+ * How a set of financial statements is presented.
  *
- * Persists the presentation choices that are NOT covered by the existing edge
- * APIs: per-node visibility (show/hide beyond the durable "superseded" status),
- * custom ordering, title overrides, and lightweight formatting. Content prose
- * (paragraphs, sections, tables, policy bodies) is persisted server-side via the
- * existing edit APIs and is intentionally NOT duplicated here.
+ * Which sections are shown, the order they appear in, any renamed heading. This
+ * is presentation, not accounting — no figure is changed here — but it decides
+ * what the printed document contains, so it belongs to the engagement rather
+ * than to whoever happened to open it.
  *
- * Storage is scoped per reporting workspace (engagement) in localStorage so the
- * enhancement stays fully additive — no database schema or edge API changes.
+ * It used to live in localStorage. That made it private to one browser profile
+ * on one machine: a reviewer opening the same engagement saw the default
+ * document, and the PDF they generated was not the one the preparer had been
+ * reading. It now persists server-side, attributably, and what any earlier
+ * browser stored is carried over the first time that workspace is opened.
  */
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { invokeFinancialStatements } from '../api';
 
 export type DocFormatting = {
   bold?: boolean;
@@ -27,11 +30,8 @@ export type DocOverrides = {
   updatedAt: string;
 };
 
-const STORAGE_PREFIX = 'efs.docws.v1.';
-
-function storageKey(workspaceId: string): string {
-  return `${STORAGE_PREFIX}${workspaceId}`;
-}
+/** Where presentation state used to be kept, read once to carry it over. */
+const LEGACY_PREFIX = 'efs.docws.v1.';
 
 export function emptyOverrides(): DocOverrides {
   return {
@@ -44,34 +44,42 @@ export function emptyOverrides(): DocOverrides {
   };
 }
 
-export function loadOverrides(workspaceId: string): DocOverrides {
-  if (typeof window === 'undefined' || !workspaceId) return emptyOverrides();
+function normalise(parsed: Partial<DocOverrides> | null | undefined): DocOverrides {
+  return {
+    ...emptyOverrides(),
+    ...(parsed || {}),
+    hidden: parsed?.hidden || {},
+    order: parsed?.order || {},
+    titleOverrides: parsed?.titleOverrides || {},
+    formatting: parsed?.formatting || {},
+  };
+}
+
+function hasAnyChoice(o: DocOverrides): boolean {
+  return (
+    Object.keys(o.hidden).length > 0 ||
+    Object.keys(o.order).length > 0 ||
+    Object.keys(o.titleOverrides).length > 0
+  );
+}
+
+/** Presentation state a previous version left in this browser, if any. */
+function readLegacy(workspaceId: string): DocOverrides | null {
+  if (typeof window === 'undefined' || !workspaceId) return null;
   try {
-    const raw = window.localStorage.getItem(storageKey(workspaceId));
-    if (!raw) return emptyOverrides();
-    const parsed = JSON.parse(raw) as Partial<DocOverrides>;
-    return {
-      ...emptyOverrides(),
-      ...parsed,
-      hidden: parsed.hidden || {},
-      order: parsed.order || {},
-      titleOverrides: parsed.titleOverrides || {},
-      formatting: parsed.formatting || {},
-    };
+    const raw = window.localStorage.getItem(`${LEGACY_PREFIX}${workspaceId}`);
+    if (!raw) return null;
+    return normalise(JSON.parse(raw) as Partial<DocOverrides>);
   } catch {
-    return emptyOverrides();
+    return null;
   }
 }
 
-export function saveOverrides(workspaceId: string, overrides: DocOverrides): void {
-  if (typeof window === 'undefined' || !workspaceId) return;
+function clearLegacy(workspaceId: string): void {
   try {
-    window.localStorage.setItem(
-      storageKey(workspaceId),
-      JSON.stringify({ ...overrides, updatedAt: new Date().toISOString() }),
-    );
+    window.localStorage.removeItem(`${LEGACY_PREFIX}${workspaceId}`);
   } catch {
-    /* best-effort persistence; quota / privacy modes are non-fatal */
+    /* private browsing and quota errors are not worth failing a save over */
   }
 }
 
@@ -89,26 +97,80 @@ export function resolvedTitle(
 }
 
 /**
- * React hook that exposes the workspace overrides plus persisting mutators.
- * Every mutation writes through to localStorage immediately so preview + PDF
- * always reflect the current presentation state.
+ * The workspace's presentation choices, with mutators that persist them.
+ *
+ * Changes apply on screen immediately and are written behind them; a failed
+ * write is surfaced rather than swallowed, because silently losing a reviewer's
+ * ordering is worse than telling them it did not save.
  */
-export function useDocumentOverrides(workspaceId: string) {
-  const [overrides, setOverrides] = useState<DocOverrides>(() => loadOverrides(workspaceId));
+export function useDocumentOverrides(workspaceId: string, companyId?: string) {
+  const [overrides, setOverrides] = useState<DocOverrides>(emptyOverrides);
+  const [error, setError] = useState<string | null>(null);
+  const loaded = useRef<string | null>(null);
 
   useEffect(() => {
-    setOverrides(loadOverrides(workspaceId));
-  }, [workspaceId]);
+    let cancelled = false;
+    if (!workspaceId || !companyId) return;
+
+    (async () => {
+      let server = emptyOverrides();
+      try {
+        const res = await invokeFinancialStatements<{ overrides?: Partial<DocOverrides> }>(
+          companyId,
+          'GET_DOCUMENT_PRESENTATION',
+          { workspace_id: workspaceId },
+        );
+        server = normalise(res?.overrides);
+      } catch {
+        // Fall through to whatever this browser has; the document still renders.
+      }
+      if (cancelled) return;
+
+      // Carry over work done before this was stored on the engagement, but
+      // never let a stale browser copy overwrite choices already saved.
+      const legacy = readLegacy(workspaceId);
+      if (legacy && hasAnyChoice(legacy) && !hasAnyChoice(server)) {
+        setOverrides(legacy);
+        loaded.current = workspaceId;
+        try {
+          await invokeFinancialStatements(companyId, 'SAVE_DOCUMENT_PRESENTATION', {
+            workspace_id: workspaceId,
+            overrides: legacy,
+          });
+          clearLegacy(workspaceId);
+        } catch {
+          /* it stays in the browser and will be offered again next time */
+        }
+        return;
+      }
+
+      setOverrides(server);
+      loaded.current = workspaceId;
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [workspaceId, companyId]);
 
   const mutate = useCallback(
     (updater: (prev: DocOverrides) => DocOverrides) => {
       setOverrides((prev) => {
-        const next = updater(prev);
-        saveOverrides(workspaceId, next);
+        const next = { ...updater(prev), updatedAt: new Date().toISOString() };
+        if (companyId && workspaceId && loaded.current === workspaceId) {
+          invokeFinancialStatements(companyId, 'SAVE_DOCUMENT_PRESENTATION', {
+            workspace_id: workspaceId,
+            overrides: next,
+          })
+            .then(() => setError(null))
+            .catch((e: unknown) =>
+              setError(e instanceof Error ? e.message : 'This change could not be saved.'),
+            );
+        }
         return next;
       });
     },
-    [workspaceId],
+    [workspaceId, companyId],
   );
 
   const setHidden = useCallback(
@@ -154,6 +216,7 @@ export function useDocumentOverrides(workspaceId: string) {
 
   return {
     overrides,
+    error,
     setHidden,
     toggleHidden,
     setOrder,

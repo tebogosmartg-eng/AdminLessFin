@@ -36,7 +36,7 @@ export default function FinaliseAndExport({
   generalInfo: EfsWorkspaceGeneralInformation | null;
 }) {
   const qc = useQueryClient();
-  const overridesApi = useDocumentOverrides(workspaceId);
+  const overridesApi = useDocumentOverrides(workspaceId, companyId);
   const modelQuery = useDocumentModel({
     companyId,
     companyName,

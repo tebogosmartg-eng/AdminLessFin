@@ -11,7 +11,7 @@
  */
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { test, expect, waitForRouteSettled, expectNoErrorBoundary } from './fixtures';
-import { loadE2EEnv } from './env';
+import { loadE2EEnv, STORAGE_STATE } from './env';
 import type { Page } from '@playwright/test';
 import { readFile } from 'node:fs/promises';
 
@@ -260,6 +260,52 @@ test('generated note wording can be edited and it persists', async ({ page }) =>
   });
   await page.screenshot({ path: 'tests/e2e/artifacts/after-13-authored-note.png', fullPage: true });
   await expectNoErrorBoundary(page);
+});
+
+test('presentation belongs to the engagement, not to one browser', async ({ page, browser }) => {
+  await page.goto('/financial-statements-workspace');
+  await waitForRouteSettled(page);
+  await waitForDocument(page);
+  const url = page.url();
+
+  // Hide a note, which used to be written only to this browser's localStorage.
+  const tree = page.getByRole('navigation', { name: /document structure/i });
+  const note = tree.getByRole('button', { name: /Note \d+\./ }).first();
+  // Hiding a note drops it from the numbering, so match on the title alone.
+  const title = (await note.innerText()).trim().replace(/^Note\s+\d+\.\s*/, '');
+  await note.hover();
+  await note.locator('xpath=following-sibling::button[1]').click();
+  await page.waitForTimeout(2500);
+  await expect(tree.getByRole('button', { name: title, exact: true })).toHaveClass(
+    /line-through/,
+    { timeout: 30_000 },
+  );
+
+  // A second browser context: a different storage partition entirely, standing
+  // in for the reviewer on another machine.
+  const other = await browser.newContext({ storageState: STORAGE_STATE });
+  const reviewer = await other.newPage();
+  try {
+    await reviewer.goto(url);
+    await waitForRouteSettled(reviewer);
+    await waitForDocument(reviewer);
+    const hiddenThere = reviewer
+      .getByRole('navigation', { name: /document structure/i })
+      .getByRole('button', { name: title, exact: true });
+    // The reviewer's own browser has never seen this choice, and yet.
+    await expect(hiddenThere).toHaveClass(/line-through/, { timeout: 45_000 });
+    await reviewer.screenshot({
+      path: 'tests/e2e/artifacts/after-15-presentation-shared.png',
+      fullPage: true,
+    });
+  } finally {
+    await other.close();
+  }
+
+  // Put it back so later tests and the artefacts see the full document.
+  await note.hover();
+  await note.locator('xpath=following-sibling::button[1]').click();
+  await page.waitForTimeout(2000);
 });
 
 test('a note table is edited as a table', async ({ page }) => {

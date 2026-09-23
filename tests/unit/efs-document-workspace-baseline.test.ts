@@ -19,8 +19,6 @@ import {
   emptyOverrides,
   isHidden,
   resolvedTitle,
-  loadOverrides,
-  saveOverrides,
   type DocOverrides,
 } from '../../src/lib/financialStatements/document/documentStore';
 import {
@@ -372,17 +370,24 @@ describe('Phase A — Presentation store baseline', () => {
     expect(resolvedTitle(o, 'x', 'Fallback')).toBe('Fallback');
   });
 
-  it('persists overrides scoped per workspace', () => {
+  // Presentation is no longer read from or written to this browser: it belongs
+  // to the engagement, so every reviewer opens the same document. What remains
+  // here is the shape the rest of the workspace reads.
+  it('applies hidden flags and title overrides to the document', () => {
     const o: DocOverrides = {
       ...emptyOverrides(),
       hidden: { 'note-revenue': true },
       titleOverrides: { 'note-basis': 'Custom Basis' },
     };
-    saveOverrides(WS, o);
-    const loaded = loadOverrides(WS);
-    expect(loaded.hidden['note-revenue']).toBe(true);
-    expect(resolvedTitle(loaded, 'note-basis', 'Basis')).toBe('Custom Basis');
-    expect(loadOverrides('other-ws').hidden['note-revenue']).toBeUndefined();
+    expect(isHidden(o, 'note-revenue')).toBe(true);
+    expect(isHidden(o, 'note-basis')).toBe(false);
+    expect(resolvedTitle(o, 'note-basis', 'Basis')).toBe('Custom Basis');
+    expect(resolvedTitle(o, 'note-revenue', 'Revenue')).toBe('Revenue');
+  });
+
+  it('ignores a blank title override rather than printing an empty heading', () => {
+    const o: DocOverrides = { ...emptyOverrides(), titleOverrides: { 'note-basis': '   ' } };
+    expect(resolvedTitle(o, 'note-basis', 'Basis of preparation')).toBe('Basis of preparation');
   });
 });
 
