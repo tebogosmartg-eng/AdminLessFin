@@ -32,12 +32,12 @@ async function ensureInvoicesReady(page: Page): Promise<boolean> {
   if (await ready()) return true;
 
   // Switch to the known invoice-ready company via the header company switcher.
-  const trigger = page.getByRole('banner').locator('button:has(svg.lucide-building)').first();
+  const trigger = page.getByTestId('company-switcher');
   await trigger.click();
-  const item = page.getByRole('menuitem', { name: READY_COMPANY, exact: true });
+  const item = page.locator('[data-testid="company-option"]').filter({ hasText: READY_COMPANY }).first();
   if (!(await item.isVisible().catch(() => false))) return false;
   await item.click();
-  await page.waitForTimeout(800);
+  await expect(trigger).toHaveAttribute('data-switching', 'false', { timeout: 45_000 });
   await page.goto('/invoices');
   await waitForRouteSettled(page);
   return ready();

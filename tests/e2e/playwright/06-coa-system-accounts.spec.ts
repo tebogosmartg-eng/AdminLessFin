@@ -174,10 +174,10 @@ test.describe('System accounts — UI protection', () => {
     await page.waitForLoadState('networkidle');
 
     // Switch tenant through the real Company Switcher (server active_company_id).
-    const switcher = page.getByRole('button').filter({ hasText: /PTY|CERT|Company|Spaceman|My's/i }).first();
+    const switcher = page.getByTestId('company-switcher');
     await expect(switcher).toBeVisible({ timeout: 20_000 });
     await switcher.click();
-    const certItem = page.getByRole('menuitem', { name: /CERT COA 1785230945189/i });
+    const certItem = page.locator('[data-testid="company-option"]').filter({ hasText: 'CERT COA 1785230945189' }).first();
     await expect(certItem).toBeVisible({ timeout: 10_000 });
     await Promise.all([
       page.waitForResponse(
@@ -186,8 +186,8 @@ test.describe('System accounts — UI protection', () => {
       ).catch(() => null),
       certItem.click(),
     ]);
-    // Allow AuthContext.refreshProfile to settle before navigating.
-    await page.waitForTimeout(2000);
+    // The header reports when the switch has settled.
+    await expect(switcher).toHaveAttribute('data-switching', 'false', { timeout: 45_000 });
     await page.goto('/chart-of-accounts');
     await page.waitForLoadState('networkidle');
 

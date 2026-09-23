@@ -31,19 +31,24 @@ async function invoiceReady(page: Page): Promise<boolean> {
 }
 
 async function listCompanies(page: Page): Promise<string[]> {
-  const trigger = page.getByRole('banner').locator('button:has(svg.lucide-building)').first();
+  const trigger = page.getByTestId('company-switcher');
   await trigger.click();
-  await page.getByRole('menu').waitFor({ timeout: 10_000 });
-  const items = await page.getByRole('menuitem').allInnerTexts();
+  const options = page.locator('[data-testid="company-option"]');
+  await options.first().waitFor({ timeout: 10_000 });
+  // Each option carries the name, then the identifier and role on a second line.
+  const items = await options.evaluateAll((els) =>
+    els.map((e) => (e.querySelector('.truncate')?.textContent || '').trim()),
+  );
   await page.keyboard.press('Escape');
-  return items.map((t) => t.trim()).filter((t) => t && !/create new company/i.test(t));
+  return items.filter((t) => t && !/create new company/i.test(t));
 }
 
 async function switchTo(page: Page, name: string): Promise<void> {
-  const trigger = page.getByRole('banner').locator('button:has(svg.lucide-building)').first();
+  const trigger = page.getByTestId('company-switcher');
   await trigger.click();
-  await page.getByRole('menuitem', { name, exact: true }).first().click();
-  await page.waitForTimeout(600); // let AuthContext apply the new active company
+  await page.locator('[data-testid="company-option"]').filter({ hasText: name }).first().click();
+  // The switch is finished when the header says so — no fixed wait needed.
+  await expect(trigger).toHaveAttribute('data-switching', 'false', { timeout: 45_000 });
 }
 
 /** Ensures an invoice-ready company is active; returns its name, or '' if none. */
