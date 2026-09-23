@@ -27,10 +27,9 @@ const ProtectedRoute = () => {
     return <Navigate to="/create-company" replace />;
   }
 
-  // If user has a company but is on the create-company page, redirect them.
-  if (activeCompany && location.pathname === '/create-company') {
-    return <Navigate to="/" replace />;
-  }
+  // A user who already has a company may still add another: the company
+  // switcher offers "Create new company", and bouncing that back to the
+  // dashboard made the only route to a second company a dead end.
 
   return <Layout />;
 };
