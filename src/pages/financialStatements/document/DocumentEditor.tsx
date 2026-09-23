@@ -19,6 +19,12 @@ import {
   saveNoteContent,
   type NoteContentKind,
 } from '../../../lib/financialStatements/document/authoring';
+import { asGeneratedTable } from '../../../lib/financialStatements/disclosures/assemble';
+import type {
+  Cell as DisclosureCell,
+  GeneratedTable,
+} from '../../../lib/financialStatements/disclosures/types';
+import SpreadsheetEditor from './SpreadsheetEditor';
 import { professionalStatementTitle } from '../../../lib/financialStatements/publication/afsProfessionalPdf';
 import { corporateDisplayFromModel } from '../../../lib/financialStatements/corporateInformation/accessors';
 import type { DocSelection } from '../experience/EngagementDocumentWorkspace';
@@ -806,6 +812,158 @@ function ManualFieldsNotice({ ctx, note }: { ctx: EditorContext; note: DocNoteNo
   );
 }
 
+/**
+ * A generated disclosure table, with the spreadsheet over it.
+ *
+ * The table arrives populated from the accounting records. Everything the
+ * preparer does to it — a row added, a caption reworded, a column formatted —
+ * is saved against the note, and the figures drawn from the ledger are refreshed
+ * underneath it the next time the statements are built.
+ */
+function DisclosureTableEditor({
+  ctx,
+  note,
+  table,
+}: {
+  ctx: EditorContext;
+  note: DocNoteNode;
+  table: DocTable;
+}) {
+  const initial = asGeneratedTable(table);
+  const [working, setWorking] = useState<GeneratedTable | null>(initial);
+  const [dirty, setDirty] = useState(false);
+  const [sourceCell, setSourceCell] = useState<DisclosureCell | null>(null);
+  useEffect(() => {
+    setWorking(asGeneratedTable(table));
+    setDirty(false);
+  }, [table.id, table.rows_json, table.columns_json, table.title]);
+
+  const save = useContentSave(ctx, note, 'table');
+  if (!working) return null;
+
+  return (
+    <div className="space-y-2 rounded-md border p-3">
+      <div className="flex items-center justify-between gap-2">
+        <Input
+          value={working.title}
+          readOnly={ctx.locked}
+          onChange={(e) => {
+            setWorking({ ...working, title: e.target.value });
+            setDirty(true);
+          }}
+          className="h-8 max-w-sm border-0 bg-transparent text-sm font-medium shadow-none focus-visible:ring-1"
+        />
+        <div className="flex items-center gap-2">
+          <ContentOriginBadge generated={!isStoredRow(table.id)} />
+          <Button
+            size="sm"
+            variant={dirty ? 'default' : 'outline'}
+            disabled={save.isPending || ctx.locked || !dirty}
+            data-testid="afs-table-save"
+            onClick={() =>
+              save.mutate(
+                {
+                  id: table.id,
+                  code: table.table_code,
+                  title: working.title,
+                  rows_json: working.rows as unknown[],
+                  columns_json: working.columns as unknown[],
+                  sortOrder: table.sort_order,
+                },
+                {
+                  onSuccess: () => {
+                    setDirty(false);
+                    showSuccess('Table saved');
+                  },
+                },
+              )
+            }
+          >
+            <Save className="mr-2 h-4 w-4" />
+            {save.isPending ? 'Saving…' : dirty ? 'Save table' : 'Saved'}
+          </Button>
+        </div>
+      </div>
+
+      <SpreadsheetEditor
+        table={working}
+        readOnly={ctx.locked}
+        onChange={(next) => {
+          setWorking(next);
+          setDirty(true);
+        }}
+        onViewSource={(c) => setSourceCell(c)}
+      />
+
+      {working.footnote && <p className="text-xs text-muted-foreground">{working.footnote}</p>}
+
+      <CellSourceDialog cell={sourceCell} model={ctx.model} onClose={() => setSourceCell(null)} />
+    </div>
+  );
+}
+
+/** The accounts behind one figure in a disclosure table. */
+function CellSourceDialog({
+  cell,
+  model,
+  onClose,
+}: {
+  cell: DisclosureCell | null;
+  model: DocumentModel;
+  onClose: () => void;
+}) {
+  const accounts = cell?.source?.accounts || [];
+  const basis = cell?.source?.basis;
+  const total = accounts.reduce((sum, a) => sum + Number(a.amount || 0), 0);
+  const period =
+    basis === 'prior'
+      ? 'the comparative period'
+      : basis === 'activity'
+        ? 'movement for the period'
+        : model.period?.label || 'the current period';
+
+  return (
+    <Dialog open={!!cell} onOpenChange={(open) => !open && onClose()}>
+      <DialogContent className="max-w-2xl">
+        <DialogHeader>
+          <DialogTitle>Where this figure comes from</DialogTitle>
+          <DialogDescription>
+            {model.companyName || 'This company'} · {period} · {accounts.length}{' '}
+            {accounts.length === 1 ? 'account' : 'accounts'}
+          </DialogDescription>
+        </DialogHeader>
+        <div className="max-h-[55vh] overflow-y-auto rounded-md border">
+          <table className="w-full text-sm">
+            <thead className="sticky top-0 bg-muted/60">
+              <tr className="border-b text-left">
+                <th className="px-3 py-2 font-medium">Account</th>
+                <th className="px-3 py-2 text-right font-medium">Amount</th>
+              </tr>
+            </thead>
+            <tbody>
+              {accounts.map((a, i) => (
+                <tr key={a.id || `${a.name}-${i}`} className="border-b last:border-0">
+                  <td className="px-3 py-2">
+                    {a.code ? (
+                      <span className="mr-2 text-xs text-muted-foreground tabular-nums">{a.code}</span>
+                    ) : null}
+                    {a.name}
+                  </td>
+                  <td className="px-3 py-2 text-right tabular-nums">{formatCurrency(a.amount)}</td>
+                </tr>
+              ))}
+              <tr className="bg-muted/30 font-semibold">
+                <td className="px-3 py-2">Total</td>
+                <td className="px-3 py-2 text-right tabular-nums">{formatCurrency(total)}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 function NoteEditor({ note, ctx }: { note: DocNoteNode; ctx: EditorContext }) {
   const addParagraph = useMutation({
     mutationFn: () =>
@@ -872,11 +1030,16 @@ function NoteEditor({ note, ctx }: { note: DocNoteNode; ctx: EditorContext }) {
         </div>
 
         {note.tables.length > 0 && (
-          <div className="space-y-2">
-            <Label>Tables</Label>
-            {note.tables.map((table) => (
-              <TableEditor key={table.id} ctx={ctx} note={note} table={table} />
-            ))}
+          <div className="space-y-4">
+            {note.tables.map((table) =>
+              // A table the disclosure engine built is edited as a spreadsheet;
+              // anything older keeps the plain editor until it is regenerated.
+              asGeneratedTable(table) ? (
+                <DisclosureTableEditor key={table.id} ctx={ctx} note={note} table={table} />
+              ) : (
+                <TableEditor key={table.id} ctx={ctx} note={note} table={table} />
+              ),
+            )}
           </div>
         )}
       </CardContent>

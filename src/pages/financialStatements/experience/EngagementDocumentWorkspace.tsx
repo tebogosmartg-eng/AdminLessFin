@@ -116,7 +116,7 @@ export default function WorkspaceDocumentWorkspace({
         </p>
       )}
 
-      <div className="grid gap-4 lg:grid-cols-[260px_minmax(0,1fr)_320px]">
+      <div className="grid gap-4 lg:grid-cols-[220px_minmax(0,1fr)_260px]">
         <div className="rounded-md border bg-card">
           <DocumentTree
             model={model}

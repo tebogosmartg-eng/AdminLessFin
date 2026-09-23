@@ -25,6 +25,8 @@ import {
 } from '../framework/frameworkContentEngine';
 import { inferDisclosureConditions } from '../framework/frameworkContent';
 import type { ManualField } from '../framework/trialBalanceDisclosureMapping';
+import { applyGeneratedDisclosures } from '../disclosures/assemble';
+import type { FinancialFacts } from '../disclosures/accountIndex';
 
 export type { DocSignatureNode } from './signatureModel';
 export type { OptionalDisclosureStatus } from '../framework/frameworkContentEngine';
@@ -157,6 +159,10 @@ export type DocumentModel = {
   optionalDisclosures?: OptionalDisclosureStatus[];
   /** Manual-completion fields in generated tables where no fact source exists. */
   manualFields?: ManualField[];
+  /** Disclosure codes the engine populated from the accounting records. */
+  generatedDisclosures?: string[];
+  /** Why each generated disclosure was included. */
+  disclosureReasons?: Record<string, string>;
 };
 
 /** Lightweight mirror of disclosure-platform cross-reference rows (read-only). */
@@ -380,7 +386,12 @@ export async function loadDocumentModel(params: {
     frameworkKey ||
     'IFRS for SMEs';
 
-  const [statementsRes, disclosuresRes, policySetsRes, disclosureDashRes] = await Promise.all([
+  // The sealed facts the statements were built from. The disclosure engine
+  // generates every note the company's accounts support out of these, so a note
+  // can never disagree with the statement it supports.
+  const snapshotVersionId = dashboard.snapshot?.currentVersion?.id ?? null;
+
+  const [statementsRes, disclosuresRes, policySetsRes, disclosureDashRes, factsRes] = await Promise.all([
     invokeFinancialStatements<{ statements: EfsStatementInstance[] }>(
       companyId,
       'GET_STATEMENTS',
@@ -404,6 +415,12 @@ export async function loadDocumentModel(params: {
     }>(companyId, 'GET_DISCLOSURE_DASHBOARD', { workspace_id: workspaceId }).catch(() => ({
       cross_references: [] as DocCrossReference[],
     })),
+    snapshotVersionId
+      ? invokeFinancialStatements<FinancialFacts>(companyId, 'GET_FINANCIAL_FACTS', {
+          snapshot_version_id: snapshotVersionId,
+          workspace_id: workspaceId,
+        }).catch(() => null)
+      : Promise.resolve(null),
   ]);
 
   const statementInstances = statementsRes?.statements || [];
@@ -426,7 +443,21 @@ export async function loadDocumentModel(params: {
     serverPolicySets,
     context: { conditions: inferDisclosureConditions(statements) },
   });
-  const notes = assembled.notes;
+  // Every disclosure the accounting data supports, populated. A note the
+  // preparer has already worked on keeps what they wrote; only its linked
+  // figures are brought up to date.
+  const periodLabel =
+    dashboard.reportingPeriod?.year_code ||
+    dashboard.reportingPeriod?.period_key ||
+    dashboard.reportingPeriod?.label ||
+    'Current year';
+  const generated = applyGeneratedDisclosures(assembled.notes, {
+    facts: factsRes,
+    currentLabel: periodLabel,
+    priorLabel: priorPeriodLabel(periodLabel),
+  });
+
+  const notes = generated.notes;
   const policySets = assembled.policySets;
   const crossReferences: DocCrossReference[] = (disclosureDashRes?.cross_references || []).map(
     (x) => ({
@@ -466,8 +497,30 @@ export async function loadDocumentModel(params: {
     signatures: assembleSignatures(generalInfo),
     trialBalanceCaptured: statements.some((s) => s.populated),
     optionalDisclosures: assembled.optionalDisclosures,
-    manualFields: assembled.manualFields,
+    // The framework library reports a manual field for every row it could not
+    // fill. Where the disclosure engine has since built that note from the
+    // ledger, those reports are about a table that is no longer on the page.
+    manualFields: (assembled.manualFields || []).filter(
+      (f) =>
+        !generated.generatedCodes.some(
+          (code) => code.toUpperCase() === String(f.noteCode).toUpperCase(),
+        ),
+    ),
+    generatedDisclosures: generated.generatedCodes,
+    disclosureReasons: generated.reasons,
   };
+}
+
+/**
+ * The caption for the comparative column.
+ *
+ * A year code counts back by one ("FY2026" becomes "FY2025"); anything else is
+ * called what it is, because guessing a label is worse than not offering one.
+ */
+function priorPeriodLabel(current: string): string {
+  const match = /(\d{4})/.exec(current);
+  if (!match) return 'Prior year';
+  return current.replace(match[1], String(Number(match[1]) - 1));
 }
 
 /** Codes that identify the "Significant Accounting Policies" note. */
