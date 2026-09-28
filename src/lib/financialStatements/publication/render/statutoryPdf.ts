@@ -20,9 +20,19 @@ import {
 } from './pdfKit';
 import { LayoutEngine, TYPE, type DocMeta } from './layoutEngine';
 import { renderFinancialTable } from './tableEngine';
-import { formatAmount, professionalLineLabel } from '../afsProfessionalPdf';
+import { professionalLineLabel } from '../afsProfessionalPdf';
+import {
+  documentHasComparatives,
+  formatStatementFigure,
+  isTotalRole,
+  lineIndent,
+  lineRole,
+  reportingYears,
+  type LineRole,
+} from '../statementPresentation';
 import type {
   CanonicalDocumentView,
+  CanonicalNote,
   CanonicalSignature,
   CanonicalStatement,
 } from '../canonicalDocumentView';
@@ -42,55 +52,34 @@ const POLICIES_SECTION_TITLE = 'Significant Accounting Policies';
 
 type TocEntry = { label: string; bodyIndex: number; page: number; indent?: number };
 
-type StatementLine = EfsStatementLine & {
-  is_header?: boolean;
-  is_subheader?: boolean;
-  is_grand_total?: boolean;
-  prior_amount?: number | null;
-  note_ref?: string | number | null;
-};
+type StatementLine = EfsStatementLine;
 
-function fiscalYear(view: CanonicalDocumentView, offset = 0): string {
-  const end = view.period?.end_date;
-  if (end && /^\d{4}/.test(end)) return String(Number(end.slice(0, 4)) + offset);
-  const m = String(view.presentation.reportingPeriodLabel || view.presentation.financialYearLabel || '').match(/(\d{4})/);
-  if (m) return String(Number(m[1]) + offset);
-  return offset === 0 ? '' : '';
+/** The notes' anchor names, shared by the heading and every link to it. */
+export function noteAnchor(noteNumber: number | string): string {
+  return `note-${noteNumber}`;
 }
 
-function priorFiscalYear(view: CanonicalDocumentView): string {
-  return fiscalYear(view, -1);
+function sectionAnchor(index: number): string {
+  return `section-${index}`;
 }
 
-function isHeaderLine(line: StatementLine): boolean {
-  return !!(line.is_header || line.is_subheader);
-}
-
-function isGrandTotal(line: StatementLine): boolean {
-  return !!(line.is_grand_total || (line.is_total && /total (assets|equity and liabilities|comprehensive income)/i.test(line.label)));
-}
-
-/** Format an amount for statement presentation; blank for headers, em-dash for nil. */
-function statementAmount(line: StatementLine, value: number | null | undefined): string {
-  if (isHeaderLine(line)) return '';
-  if (value == null || (Number(value) === 0 && !line.is_total)) return '—';
-  return formatAmount(value);
-}
-
-function noteRefDisplay(line: StatementLine): string {
-  if (isHeaderLine(line) || line.is_total) return '';
-  if (line.note_ref == null || line.note_ref === '') return '';
-  return String(line.note_ref);
-}
-
-function hasComparatives(stmt: CanonicalStatement): boolean {
-  return stmt.lines.some((l) => {
-    const line = l as StatementLine;
-    return line.prior_amount != null && !isHeaderLine(line);
-  });
-}
-
-function renderStatement(engine: LayoutEngine, stmt: CanonicalStatement, view: CanonicalDocumentView): void {
+/**
+ * One primary statement, laid out as an annual financial statement is:
+ *
+ *   label ............................ Notes     2026          2025
+ *                                                   R             R
+ *
+ * The current year sits immediately after the notes and the comparative at
+ * the margin. Totals carry a rule above their figures and the figure the
+ * statement exists to state is double-ruled beneath. A note number is a link
+ * to the note it names.
+ */
+function renderStatement(
+  engine: LayoutEngine,
+  stmt: CanonicalStatement,
+  view: CanonicalDocumentView,
+  showComp: boolean,
+): void {
   engine.statementTitleBlock(stmt.title, stmt.periodCaption);
   engine.paragraph(view.currencyLabel, { size: TYPE.caption, font: 'oblique', gray: 0.4, spacingAfter: 8 });
 
@@ -103,95 +92,93 @@ function renderStatement(engine: LayoutEngine, stmt: CanonicalStatement, view: C
   }
 
   const size = 9.5;
-  const leading = size * 1.55;
-  const showComp = hasComparatives(stmt);
-  const amountColW = 100;
-  const noteColW = 34;
-  const year = fiscalYear(view);
-  const priorYear = priorFiscalYear(view);
-  const amountRight = CONTENT_R;
-  const priorRight = showComp ? CONTENT_R - amountColW - 6 : CONTENT_R;
-  const noteRight = (showComp ? priorRight : amountRight) - amountColW - 6;
-  const labelRight = noteRight - noteColW - 6;
-
-  // Column header band.
-  engine.ensure(leading * 2.2);
-  engine.page.textRight(noteRight, engine.y, 'Notes', {
-    size: TYPE.caption,
-    font: 'bold',
-    gray: 0.4,
-  });
-  if (showComp) {
-    engine.page.textRight(priorRight, engine.y, priorYear || 'Prior', {
-      size: TYPE.caption,
-      font: 'bold',
+  const leading = size * 1.6;
+  const amountColW = 88;
+  const colGap = 14;
+  const noteColW = 30;
+  const years = reportingYears(view.period ?? { label: view.presentation.reportingPeriodLabel });
+  const comparativeRight = CONTENT_R;
+  const currentRight = showComp ? CONTENT_R - amountColW - colGap : CONTENT_R;
+  const noteCenter = currentRight - amountColW - colGap - noteColW / 2;
+  const labelRight = noteCenter - noteColW / 2 - 6;
+  const figureColumns = showComp ? [currentRight, comparativeRight] : [currentRight];
+  // Rules sit under the figures only, and only where there is a figure: a
+  // rule over a blank reads as a total of nothing.
+  const ruleUnder = (y: number, width: number, line: StatementLine, gray = 0.12) => {
+    const values = showComp ? [line.amount, line.prior_amount] : [line.amount];
+    figureColumns.forEach((right, i) => {
+      if (values[i] == null) return;
+      engine.page.line(right - amountColW + 12, y, right, y, width, gray);
     });
-  }
-  engine.page.textRight(amountRight, engine.y, year || 'Current', { size: TYPE.caption, font: 'bold' });
-  engine.y -= TYPE.caption * 1.05;
-  if (showComp) {
-    engine.page.textRight(priorRight, engine.y, 'R', { size: TYPE.small, font: 'oblique', gray: 0.45 });
-  }
-  engine.page.textRight(amountRight, engine.y, 'R', { size: TYPE.small, font: 'oblique', gray: 0.45 });
-  engine.y -= TYPE.small * 0.85;
-  engine.page.line(CONTENT_L, engine.y + 2, CONTENT_R, engine.y + 2, 0.9, 0.18);
-  engine.y -= 7;
+  };
 
+  // Column headings: Notes, then the current year, then the comparative.
+  engine.ensure(leading * 2.4);
+  engine.page.textCenter(noteCenter, engine.y, 'Notes', { size: TYPE.caption, font: 'bold', gray: 0.35 });
+  engine.page.textRight(currentRight, engine.y, years.current, { size: TYPE.caption, font: 'bold' });
+  if (showComp) {
+    engine.page.textRight(comparativeRight, engine.y, years.comparative, { size: TYPE.caption, font: 'bold' });
+  }
+  engine.y -= TYPE.caption * 1.15;
+  for (const right of figureColumns) {
+    engine.page.textRight(right, engine.y, 'R', { size: TYPE.small, font: 'oblique', gray: 0.45 });
+  }
+  engine.y -= TYPE.small * 0.9;
+  engine.page.line(CONTENT_L, engine.y + 2, CONTENT_R, engine.y + 2, 0.8, 0.2);
+  engine.y -= 9;
+
+  let previous: LineRole | null = null;
   for (const raw of stmt.lines) {
     const line = raw as StatementLine;
-    const header = isHeaderLine(line);
-    const total = !!line.is_total && !header;
-    const grand = isGrandTotal(line);
-    const font = header || total ? 'bold' : 'regular';
+    const role = lineRole(line);
+    const heading = role === 'heading';
+    const totalled = isTotalRole(role);
+    const font = heading || totalled ? 'bold' : 'regular';
+    const indent = heading ? 0 : lineIndent(line, role) * 12;
     const label = professionalLineLabel(line.label);
-    const indent = header ? (line.is_subheader ? 4 : 0) : total ? 0 : 12;
-    const labelMax = labelRight - CONTENT_L - indent;
-    const lines = wrapText(label, Math.max(80, labelMax), size, font);
+    const lines = wrapText(label, Math.max(80, labelRight - CONTENT_L - indent), size, font);
     const rowH = Math.max(1, lines.length) * leading;
-    engine.ensure(rowH + (total ? 10 : header ? 4 : 0));
 
-    if (total) {
-      // Single rule above totals (amount columns only for a cleaner look).
-      engine.page.line(labelRight, engine.y + leading * 0.38, CONTENT_R, engine.y + leading * 0.38, 0.55, 0.35);
-      engine.y -= 2;
-    } else if (header && line.is_header) {
-      engine.spacer(3);
-    }
+    // A section heading opens with air above it, except at the top.
+    const before = heading && previous != null ? leading * 0.45 : totalled ? 3 : 0;
+    engine.ensure(rowH + before + (role === 'grand_total' ? 8 : 0));
+    engine.y -= before;
+
+    if (totalled) ruleUnder(engine.y + size * 1.05, 0.6, line, 0.3);
 
     const firstY = engine.y;
     lines.forEach((ln, i) => {
       engine.page.text(CONTENT_L + indent, firstY - i * leading, ln, { size, font });
     });
 
-    if (!header) {
-      const note = noteRefDisplay(line);
-      if (note) {
-        engine.page.textRight(noteRight, firstY, note, { size, gray: 0.35 });
+    if (!heading) {
+      const noteRef =
+        role === 'item' && line.note_ref != null && line.note_ref !== '' ? String(line.note_ref) : '';
+      if (noteRef) {
+        engine.page.textCenter(noteCenter, firstY, noteRef, { size, gray: 0.2 });
+        // The number is the link: a reader clicks "5" and lands on Note 5.
+        const w = Math.max(14, textWidth(noteRef, size) + 8);
+        engine.page.link(noteCenter - w / 2, firstY - 3, noteCenter + w / 2, firstY + size, noteAnchor(noteRef));
       }
+      engine.page.textRight(currentRight, firstY, formatStatementFigure(line.amount, role), { size, font });
       if (showComp) {
-        engine.page.textRight(priorRight, firstY, statementAmount(line, line.prior_amount), { size, font });
+        engine.page.textRight(comparativeRight, firstY, formatStatementFigure(line.prior_amount, role), {
+          size,
+          font,
+        });
       }
-      engine.page.textRight(amountRight, firstY, statementAmount(line, line.amount), { size, font });
     }
 
     engine.y -= rowH;
-
-    if (total) {
-      engine.page.line(labelRight, engine.y + leading * 0.5, CONTENT_R, engine.y + leading * 0.5, grand ? 1.35 : 1.05, 0.12);
-      if (grand) {
-        engine.page.line(
-          labelRight,
-          engine.y + leading * 0.5 - 2.2,
-          CONTENT_R,
-          engine.y + leading * 0.5 - 2.2,
-          0.55,
-          0.12,
-        );
-      }
-      engine.y -= grand ? 6 : 4;
-    } else if (header && line.is_header) {
-      engine.y -= 2;
+    if (role === 'grand_total') {
+      const y = engine.y + leading * 0.52;
+      ruleUnder(y, 0.8, line);
+      ruleUnder(y - 2.2, 0.8, line);
+      engine.y -= 8;
+    } else if (totalled) {
+      engine.y -= 3;
     }
+    previous = role;
   }
 }
 
@@ -296,6 +283,8 @@ function buildContents(entries: TocEntry[], pageCount: number, accent?: [number,
     const pageW = textWidth(pageStr, 10, 'regular');
     page.text(CONTENT_L + indent, y, label, { size: 10, font: indent ? 'regular' : 'bold' });
     page.textRight(CONTENT_R, y, pageStr, { size: 10 });
+    // Each line of the contents takes the reader to the page it names.
+    page.link(CONTENT_L, y - 4, CONTENT_R, y + 11, sectionAnchor(idx));
     const leaderStart = CONTENT_L + indent + labelW + 6;
     const leaderEnd = CONTENT_R - pageW - 6;
     if (leaderEnd > leaderStart) {
@@ -334,6 +323,7 @@ export function renderStatutoryPdf(view: CanonicalDocumentView): string {
   const engine = new LayoutEngine(meta);
   const toc: TocEntry[] = [];
   const mark = (label: string, indent = 0) => {
+    engine.anchor(sectionAnchor(toc.length));
     toc.push({ label, bodyIndex: engine.pageIndex, page: 0, indent });
   };
   const accent = brand.accentColor;
@@ -385,11 +375,13 @@ export function renderStatutoryPdf(view: CanonicalDocumentView): string {
 
   // ── Primary statements (Phase 2 — each on its own page) ───────────────────
   const hints = view.composition?.publicationHints;
+  // Every statement carries the same two columns, decided once for the set.
+  const showComp = documentHasComparatives(view.statements);
   for (const stmt of view.statements) {
     if (hints?.pageBreaks.eachPrimaryStatement !== false) engine.newPage();
     engine.setSection(stmt.title);
     mark(stmt.title);
-    renderStatement(engine, stmt, view);
+    renderStatement(engine, stmt, view, showComp);
     engine.spacer(hints ? spacingAfterPx(hints, 'statement') : 8);
   }
 
@@ -409,11 +401,17 @@ export function renderStatutoryPdf(view: CanonicalDocumentView): string {
       { spacingAfter: 8 },
     );
   } else {
+    const policySpacing = hints ? spacingAfterPx(hints, 'policy') : 10;
     for (const policy of policies) {
+      // A policy short enough for one page is kept on one page.
+      engine.keepTogether(
+        engine.measure((e) => {
+          e.subHeading(policy.title);
+          e.paragraph(policy.body, { spacingAfter: policySpacing });
+        }),
+      );
       engine.subHeading(policy.title);
-      engine.paragraph(policy.body, {
-        spacingAfter: hints ? spacingAfterPx(hints, 'policy') : 10,
-      });
+      engine.paragraph(policy.body, { spacingAfter: policySpacing });
     }
   }
 
@@ -422,17 +420,47 @@ export function renderStatutoryPdf(view: CanonicalDocumentView): string {
   engine.setSection(NOTES_SECTION_TITLE);
   mark(NOTES_SECTION_TITLE);
   engine.sectionTitleBlock(NOTES_SECTION_TITLE, accent);
-  for (const note of view.notes) {
-    engine.setContinuation(note.heading);
-    engine.noteHeading(note.heading);
-    for (const block of note.blocks) {
-      if (block.type === 'paragraph') {
-        engine.paragraph(block.text, { font: block.bold ? 'bold' : 'regular', spacingAfter: 6 });
-      } else {
-        if (block.title) engine.subHeading(block.title);
-        renderFinancialTable(engine, block.rows, { headerTint: brand.accentTint });
-      }
+  // Each note is measured before it is placed, so the page breaks fall where
+  // a reader expects them rather than wherever the space ran out:
+  //   - a note that fits on a page is never split: it moves to the next page;
+  //   - a longer note starts here only if its heading and first block fit;
+  //   - a table that fits on a page is never split, and a longer one repeats
+  //     its header row under a "(continued)" line;
+  //   - a note the preparer asked to start on a new page does, and no note
+  //     ever leaves a blank page behind it.
+  const tableTint = { headerTint: brand.accentTint };
+  const renderBlock = (e: LayoutEngine, block: CanonicalNote['blocks'][number]) => {
+    if (block.type === 'paragraph') {
+      e.paragraph(block.text, { font: block.bold ? 'bold' : 'regular', spacingAfter: 6 });
+    } else {
+      if (block.title) e.subHeading(block.title);
+      renderFinancialTable(e, block.rows, tableTint);
     }
+  };
+  for (const note of view.notes) {
+    const whole = engine.measure((e) => {
+      e.noteHeading(note.heading);
+      note.blocks.forEach((b) => renderBlock(e, b));
+    });
+    if (note.pageBreakBefore && !engine.atPageTop) {
+      engine.newPage();
+    } else if (whole <= engine.pageCapacity) {
+      engine.keepTogether(whole);
+    } else {
+      const lead = engine.measure((e) => {
+        e.noteHeading(note.heading);
+        if (note.blocks[0]) renderBlock(e, note.blocks[0]);
+      });
+      engine.keepTogether(lead);
+    }
+
+    engine.noteHeading(note.heading, noteAnchor(note.noteNumber));
+    // Only once the heading is down does a new page need a "(continued)" line.
+    engine.setContinuation(note.heading);
+    note.blocks.forEach((block) => {
+      if (block.type === 'table') engine.keepTogether(engine.measure((e) => renderBlock(e, block)));
+      renderBlock(engine, block);
+    });
     engine.setContinuation(null);
     engine.spacer(hints ? spacingAfterPx(hints, 'note') : 12);
   }

@@ -1,6 +1,6 @@
 # V15.0 Composition Engine Evidence
 
-Generated: 2026-09-04T13:09:42.768Z
+Generated: 2026-09-28T13:06:21.830Z
 Decision: READY FOR CERTIFICATION
 Entity: AdminLess Composition Demo (Pty) Ltd
 
@@ -53,7 +53,7 @@ Entity: AdminLess Composition Demo (Pty) Ltd
 - pdfGenerated: PASS
 - docxGenerated: PASS
 
-PDF: 134772 bytes
-DOCX: 300884 bytes
+PDF: 81963 bytes
+DOCX: 102664 bytes
 
 Artifacts: `AFS_V15_Composition_Demo.pdf`, `AFS_V15_Composition_Demo.docx`

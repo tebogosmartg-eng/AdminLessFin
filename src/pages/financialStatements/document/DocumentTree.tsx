@@ -1,4 +1,4 @@
-import { computeNoteNumbering } from '../../../lib/financialStatements/document/renumber';
+import type { NoteRegister } from '../../../lib/financialStatements/document/noteRegister';
 import {
   isHidden,
   resolvedTitle,
@@ -19,6 +19,8 @@ function TreeRow({
   hideable,
   hidden,
   testId,
+  noteNumber,
+  title,
   onSelect,
   onToggleHidden,
 }: {
@@ -31,6 +33,10 @@ function TreeRow({
   hidden?: boolean;
   /** Names the kind of row, so a test can tell a note from a policy of the same title. */
   testId?: string;
+  /** The number the note prints with, for a note that is printed. */
+  noteNumber?: number;
+  /** Why the row reads as it does, where the label alone does not say. */
+  title?: string;
   onSelect: () => void;
   onToggleHidden?: () => void;
 }) {
@@ -45,13 +51,14 @@ function TreeRow({
         type="button"
         onClick={onSelect}
         data-testid={testId}
+        data-note-number={noteNumber}
         style={{ paddingLeft: 8 + depth * 14 }}
         className={cn(
           'flex-1 truncate py-1.5 pr-2 text-left text-sm',
           muted && 'text-muted-foreground line-through',
           active && 'font-medium',
         )}
-        title={label}
+        title={title || label}
       >
         {label}
         {badge ? <span className="ml-2 text-xs text-muted-foreground">{badge}</span> : null}
@@ -86,16 +93,26 @@ export default function DocumentTree({
   onSelect,
   onToggleHidden,
   onAddDisclosure,
+  register,
 }: {
   model: DocumentModel;
   overrides: DocOverrides;
+  /** The printed numbering — the same one the statements and the PDF use. */
+  register: NoteRegister | null;
   selection: DocSelection;
   onSelect: (selection: DocSelection) => void;
   onToggleHidden: (nodeId: string) => void;
   onAddDisclosure?: () => void;
 }) {
-  const { visible } = computeNoteNumbering(model.notes, overrides);
-  const numberById = new Map(visible.map((v) => [v.note.id, v.noteNumber]));
+  // Notes are listed in the order they print, each with the number it prints
+  // with. Notes that do not print follow, unnumbered, in their own order.
+  const printed = register?.notes ?? [];
+  const numberById = new Map(printed.map((n) => [n.id, n.noteNumber]));
+  const position = new Map(printed.map((n, i) => [n.id, i]));
+  const notes = [...model.notes].sort(
+    (a, b) =>
+      (position.get(a.id) ?? Number.MAX_SAFE_INTEGER) - (position.get(b.id) ?? Number.MAX_SAFE_INTEGER),
+  );
   const isActive = (kind: string, id: string) =>
     (selection as { kind: string; id: string }).kind === kind && selection.id === id;
 
@@ -189,16 +206,22 @@ export default function DocumentTree({
       {model.notes.length === 0 ? (
         <p className="px-2 py-1 text-xs text-muted-foreground">No notes yet.</p>
       ) : (
-        model.notes.map((n) => {
+        notes.map((n) => {
           const hidden = isHidden(overrides, n.id) || n.status === 'superseded';
           const number = numberById.get(n.id);
           const title = resolvedTitle(overrides, n.id, n.title);
+          // Left out by the reporting engine, not by the preparer, and the
+          // engine's own reason says why.
+          const withheld = !number && !hidden ? register?.withheld.get(n.id) : undefined;
           return (
             <TreeRow
               key={n.id}
               label={number ? `Note ${number}. ${title}` : title}
               depth={1}
               testId="afs-tree-note"
+              noteNumber={number}
+              badge={withheld ? 'not printed' : undefined}
+              title={withheld ? `${title} — not printed: ${withheld}` : undefined}
               active={isActive('note', n.id)}
               muted={hidden}
               hideable={n.status !== 'superseded'}

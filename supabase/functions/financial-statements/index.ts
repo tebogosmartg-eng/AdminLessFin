@@ -2059,6 +2059,109 @@ serve(withEnterprisePlatform("financial-statements", "tenant", async (req, _ctx)
           content_hash = await sha256Hex(dataset);
         }
 
+        // The comparative year, sealed with the current one.
+        //
+        // Balances at the end of last year are already here, but last year's
+        // revenue, expenses and cash flows are movements, and a movement needs
+        // the balances at both ends of the year. Without the start of last year
+        // the statements could not show a comparative profit, and the notes
+        // were reading a running balance as if it were last year's figure.
+        // Sealed here, both read the same numbers. If the ledger cannot answer,
+        // the seal still completes and the comparatives stay blank — never
+        // estimated.
+        let priorOpeningBalances = null;
+        let priorCashFlowRpc = null;
+        const priorStartDate = (() => {
+          const d = new Date(`${start_date}T00:00:00Z`);
+          d.setUTCFullYear(d.getUTCFullYear() - 1);
+          return d.toISOString().slice(0, 10);
+        })();
+        const prior_opening_as_of = (() => {
+          const d = new Date(`${priorStartDate}T00:00:00Z`);
+          d.setUTCDate(d.getUTCDate() - 1);
+          return d.toISOString().slice(0, 10);
+        })();
+        extractStep("STEP 9c Comparative year", { prior_start: priorStartDate, prior_opening_as_of });
+        {
+          const { data, error: poErr } = await admin.rpc("get_balances_as_of_date", {
+            p_end_date: prior_opening_as_of,
+            p_company_id: company_id,
+          });
+          if (poErr) {
+            console.warn(JSON.stringify({ level: "warn", event: "EXTRACT_FACT_SNAPSHOT.prior_opening_unavailable", message: poErr.message }));
+          } else {
+            priorOpeningBalances = data || [];
+            source_rpc_refs.push({
+              rpc: "get_balances_as_of_date",
+              args: { p_end_date: prior_opening_as_of, p_company_id: company_id },
+              role: "prior_opening_as_of",
+            });
+          }
+        }
+        {
+          const { data, error: pcfErr } = await admin.rpc("get_cash_flow_statement", {
+            p_start_date: priorStartDate,
+            p_end_date: prior_as_of,
+            p_company_id: company_id,
+          });
+          if (pcfErr) {
+            console.warn(JSON.stringify({ level: "warn", event: "EXTRACT_FACT_SNAPSHOT.prior_cash_flow_unavailable", message: pcfErr.message }));
+          } else {
+            priorCashFlowRpc = data || [];
+            source_rpc_refs.push({
+              rpc: "get_cash_flow_statement",
+              args: { p_start_date: priorStartDate, p_end_date: prior_as_of, p_company_id: company_id },
+              role: "prior_period",
+            });
+          }
+        }
+        if (priorOpeningBalances) {
+          const priorEndRows =
+            dataset.balances_prior_as_of?.accounts ?? dataset.balances_prior_as_of ?? openingBalances ?? [];
+          const startById = new Map(priorOpeningBalances.map((a) => [a.id, Number(a.balance || 0)]));
+          const endById = new Map(priorEndRows.map((a) => [a.id, a]));
+          const ids = new Set([...endById.keys(), ...startById.keys()]);
+          const describe = new Map([...priorOpeningBalances, ...priorEndRows].map((a) => [a.id, a]));
+          dataset.period = {
+            ...(dataset.period || {}),
+            prior_start_date: priorStartDate,
+            prior_opening_as_of,
+          };
+          dataset.balances_prior_opening_as_of = {
+            as_of: prior_opening_as_of,
+            accounts: priorOpeningBalances.map((a) => ({
+              id: a.id,
+              account_number: a.account_number,
+              name: a.name,
+              type: a.type,
+              balance: round2(a.balance),
+            })),
+          };
+          dataset.prior_period_activity = [...ids].map((id) => {
+            const a = describe.get(id);
+            const open = round2(startById.get(id) || 0);
+            const close = round2(Number(endById.get(id)?.balance || 0));
+            return {
+              id,
+              account_number: a?.account_number,
+              name: a?.name,
+              type: a?.type,
+              opening_balance: open,
+              closing_balance: close,
+              period_activity: round2(close - open),
+              activity: round2(close - open),
+            };
+          });
+        }
+        if (priorCashFlowRpc) {
+          dataset.prior_cash_flow = priorCashFlowRpc.map((c) => ({
+            section: c.section,
+            category: c.category,
+            amount: round2(c.amount),
+          }));
+        }
+        dataset.source_rpc_refs = source_rpc_refs;
+
         // Seal Canonical Financial Aggregation once — Statement Engine must consume, not recalculate.
         {
           const { data: coaMeta } = await admin
@@ -2099,6 +2202,14 @@ serve(withEnterprisePlatform("financial-statements", "tenant", async (req, _ctx)
           if (Array.isArray(dataset.period_activity)) {
             dataset.period_activity = stampClassification(dataset.period_activity);
           }
+          if (dataset.balances_prior_opening_as_of?.accounts) {
+            dataset.balances_prior_opening_as_of.accounts = stampClassification(
+              dataset.balances_prior_opening_as_of.accounts,
+            );
+          }
+          if (Array.isArray(dataset.prior_period_activity)) {
+            dataset.prior_period_activity = stampClassification(dataset.prior_period_activity);
+          }
 
           const closingAccounts =
             dataset.balances_as_of?.accounts ?? dataset.balances_as_of ?? closingBalances ?? [];
@@ -2120,6 +2231,24 @@ serve(withEnterprisePlatform("financial-statements", "tenant", async (req, _ctx)
               .filter((r) => r.account_role === "retained_earnings")
               .map((r) => r.id),
           });
+          // The comparative year's totals, by the same rules as this year's.
+          if (Array.isArray(dataset.prior_period_activity)) {
+            dataset.prior_canonical_aggregation = buildCanonicalFinancialAggregation({
+              balancesAsOf: openingAccounts,
+              openingBalances: dataset.balances_prior_opening_as_of?.accounts ?? [],
+              periodActivity: dataset.prior_period_activity.map((a) => ({
+                id: a.id,
+                name: a.name,
+                type: a.type,
+                activity: Number(a.period_activity ?? 0),
+              })),
+              cashFlowData: dataset.prior_cash_flow ?? [],
+              accountMeta: coaMeta || [],
+              retainedEarningsAccountIds: (coaMeta || [])
+                .filter((r) => r.account_role === "retained_earnings")
+                .map((r) => r.id),
+            });
+          }
           content_hash = await sha256Hex(dataset);
         }
 
@@ -2419,6 +2548,9 @@ serve(withEnterprisePlatform("financial-statements", "tenant", async (req, _ctx)
           balances_prior_as_of: facts.balances_prior_as_of,
           period_activity: facts.period_activity,
           cash_flow: facts.cash_flow,
+          balances_prior_opening_as_of: facts.balances_prior_opening_as_of,
+          prior_period_activity: facts.prior_period_activity,
+          prior_cash_flow: facts.prior_cash_flow,
           source_rpc_refs: facts.source_rpc_refs,
           version_status: version.status,
           live_gl: false,
@@ -3771,7 +3903,11 @@ serve(withEnterprisePlatform("financial-statements", "tenant", async (req, _ctx)
           }
           const { data, error } = await admin
             .from("efs_disclosure_paragraphs")
-            .update({ body: body.body ?? para.body })
+            .update({
+              body: body.body ?? para.body,
+              // Reordering a note is an edit like any other.
+              sort_order: body.sort_order ?? para.sort_order,
+            })
             .eq("id", body.paragraph_id)
             .select()
             .single();
@@ -3825,6 +3961,7 @@ serve(withEnterprisePlatform("financial-statements", "tenant", async (req, _ctx)
               columns_json: body.columns_json ?? tbl.columns_json,
               rows_json: body.rows_json ?? tbl.rows_json,
               snapshot_version_id: body.snapshot_version_id ?? tbl.snapshot_version_id,
+              sort_order: body.sort_order ?? tbl.sort_order,
             })
             .eq("id", body.table_id)
             .select()
@@ -3938,6 +4075,67 @@ serve(withEnterprisePlatform("financial-statements", "tenant", async (req, _ctx)
        * The split is the point: untouched content keeps refreshing with the
        * ledger, authored content is left alone when the statements are rebuilt.
        */
+      /**
+       * Removing a paragraph or a table the preparer authored.
+       *
+       * Only ever a row that exists. Generated wording has no row, and is
+       * withheld through the document's presentation instead — deleting it here
+       * would be deleting nothing and it would return at the next rebuild.
+       *
+       * What was there is kept in the audit trail, because a disclosure that
+       * disappeared from a set of financial statements is exactly the kind of
+       * change a reviewer comes back to ask about.
+       */
+      case "DELETE_DISCLOSURE_PARAGRAPH":
+      case "DELETE_DISCLOSURE_TABLE": {
+        const deletingTable = method === "DELETE_DISCLOSURE_TABLE";
+        const deleteId = deletingTable ? body.table_id : body.paragraph_id;
+        if (!deleteId) {
+          throw new Error(`${deletingTable ? "table_id" : "paragraph_id"} is required.`);
+        }
+        const deleteTable = deletingTable
+          ? "efs_disclosure_tables"
+          : "efs_disclosure_paragraphs";
+
+        const { data: doomed, error: doomedErr } = await admin
+          .from(deleteTable)
+          .select("*, efs_disclosure_instances!inner(id, status)")
+          .eq("id", deleteId)
+          .eq("company_id", company_id)
+          .maybeSingle();
+        if (doomedErr) throw doomedErr;
+        if (!doomed) throw new Error(`${deletingTable ? "Table" : "Paragraph"} not found.`);
+        if (doomed.efs_disclosure_instances.status === "superseded") {
+          throw new Error(
+            "This note belongs to a previous reporting framework and can no longer be edited.",
+          );
+        }
+
+        const { error: delErr } = await admin
+          .from(deleteTable)
+          .delete()
+          .eq("id", deleteId)
+          .eq("company_id", company_id);
+        if (delErr) throw delErr;
+
+        await admin.from("efs_disclosure_instances").update({
+          updated_at: new Date().toISOString(),
+        }).eq("id", doomed.disclosure_instance_id);
+
+        await admin.from("efs_audit_events").insert({
+          company_id,
+          entity_type: `disclosure_${deletingTable ? "table" : "paragraph"}`,
+          entity_id: deleteId,
+          action: "authored.deleted",
+          actor_user_id: user.id,
+          before_state: doomed,
+          after_state: null,
+        });
+
+        result = { deleted: true, id: deleteId };
+        break;
+      }
+
       case "SAVE_AUTHORED_CONTENT": {
         if (!body.workspace_id) throw new Error("workspace_id is required.");
         if (!body.disclosure_code) throw new Error("disclosure_code is required.");
@@ -4073,6 +4271,12 @@ serve(withEnterprisePlatform("financial-statements", "tenant", async (req, _ctx)
           };
         } else {
           authoredPatch = { body: body.body ?? existingChild?.body ?? "" };
+        }
+
+        // Where it sits is part of what is being saved, so a note that has been
+        // reordered keeps its order the next time it is opened.
+        if (body.sort_order != null) {
+          authoredPatch = { ...authoredPatch, sort_order: body.sort_order };
         }
 
         let authoredRow;

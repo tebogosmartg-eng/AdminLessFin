@@ -5,6 +5,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import {
+  buildEquityLines,
   buildPositionLines,
   buildPerformanceLines,
   hasClassification,
@@ -177,15 +178,47 @@ describe('detailed statement lines — presentation from the chart of accounts',
     expect(find(lines, 'sfp.ppe')?.prior_amount).toBe(100_000);
   });
 
-  it('presents retained earnings separately from the period result', () => {
+  it("states retained earnings including the year profit, as a balance sheet does", () => {
     const lines = buildPositionLines({
       closing,
       prior,
       canonical: { ...canonical, netProfit: 12_000, equity: 232_100 },
       presentation: DEFAULT_PRESENTATION,
     }) as Line[];
-    expect(find(lines, 'sfp.equity.retained_earnings')?.amount).toBe(220_000);
-    expect(find(lines, 'sfp.equity.current_result')?.amount).toBe(12_000);
+    // The retained earnings account (220 000) plus the year's profit (12 000).
+    expect(find(lines, 'sfp.equity.retained_earnings')?.amount).toBe(232_000);
+    // The year's profit is not printed a second time on the balance sheet.
+    expect(find(lines, 'sfp.equity.current_result')).toBeUndefined();
+  });
+
+  it("carries an earlier year unclosed profit, so both years balance", () => {
+    // The demo company: FY2025's profit was never closed into retained earnings.
+    const rows = (sales: number, costs: number, extra: Array<Record<string, unknown>> = []) => [
+      { id: 'a', type: 'Asset', category: 'Current Assets', subcategory: 'Cash and Cash Equivalents', balance: 0 },
+      { id: 'cap', type: 'Equity', category: 'Equity', subcategory: 'Issued Capital', balance: 900_000 },
+      { id: 'sales', type: 'Income', category: 'Revenue', balance: sales },
+      { id: 'costs', type: 'Expense', category: 'Operating Expenses', balance: costs },
+      ...extra,
+    ];
+    const lines = buildPositionLines({
+      closing: rows(5_571_000, 2_126_250),
+      prior: rows(2_150_000, 861_200),
+      canonical: {
+        assets: 3_929_900,
+        liabilities: -414_850,
+        equity: 4_344_750,
+        liabilitiesAndEquity: 3_929_900,
+        netProfit: 2_155_950,
+        unclosedPriorEarnings: 1_288_800,
+      },
+      presentation: DEFAULT_PRESENTATION,
+    }) as Line[];
+    const re = find(lines, 'sfp.equity.retained_earnings')!;
+    expect(re.amount).toBe(3_444_750);
+    expect(re.prior_amount).toBe(1_288_800);
+    expect(find(lines, 'sfp.total_equity')?.amount).toBe(4_344_750);
+    expect(find(lines, 'sfp.total_equity')?.prior_amount).toBe(2_188_800);
+    expect(find(lines, 'sfp.equity.unreconciled')).toBeUndefined();
   });
 });
 
@@ -247,5 +280,43 @@ describe('snapshots sealed before classification existed', () => {
     expect(hasClassification([{ id: 'x', name: 'Bank', type: 'Asset', balance: 1 }])).toBe(false);
     expect(hasClassification(closing)).toBe(true);
     expect(hasClassification([])).toBe(false);
+  });
+});
+
+describe('comparatives from the sealed comparative year', () => {
+  const activity = [
+    { id: 'sales', type: 'Income', category: 'Revenue', period_activity: 3_421_000 },
+    { id: 'wages', type: 'Expense', category: 'Operating Expenses', subcategory: 'Employee Costs', period_activity: 853_450 },
+  ];
+  const priorActivity = [
+    { id: 'sales', type: 'Income', category: 'Revenue', period_activity: 2_150_000 },
+    { id: 'wages', type: 'Expense', category: 'Operating Expenses', subcategory: 'Employee Costs', period_activity: 626_200 },
+  ];
+  const canonical = { totalIncome: 3_421_000, totalExpenses: 853_450, netProfit: 2_567_550 };
+  const priorCanonical = { totalIncome: 2_150_000, totalExpenses: 626_200, netProfit: 1_523_800 };
+
+  it('prints last year beside this year when the seal carries last year', () => {
+    const lines = buildPerformanceLines({ activity, canonical, presentation: DEFAULT_PRESENTATION, priorActivity, priorCanonical }) as Line[];
+    expect(find(lines, 'perf.revenue')?.prior_amount).toBe(2_150_000);
+    expect(find(lines, 'perf.employee_costs')?.prior_amount).toBe(626_200);
+    expect(find(lines, 'perf.result')?.prior_amount).toBe(1_523_800);
+  });
+
+  it('leaves last year blank, not nil, when the seal does not carry it', () => {
+    const lines = buildPerformanceLines({ activity, canonical, presentation: DEFAULT_PRESENTATION }) as Line[];
+    expect(find(lines, 'perf.revenue')?.prior_amount).toBeNull();
+    expect(find(lines, 'perf.result')?.prior_amount).toBeNull();
+  });
+
+  it('states changes in equity for both years, closing on the balance sheet equity', () => {
+    const lines = buildEquityLines({
+      canonical: { openingEquity: 2_188_800, netProfit: 2_155_950, otherEquityMovements: 0, equity: 4_344_750 },
+      priorCanonical: { openingEquity: 900_000, netProfit: 1_288_800, otherEquityMovements: 0, equity: 2_188_800 },
+    }) as Line[];
+    expect(lines.map((l) => [l.line_code, l.amount, l.prior_amount])).toEqual([
+      ['eq.opening', 2_188_800, 900_000],
+      ['eq.period_result', 2_155_950, 1_288_800],
+      ['eq.closing', 4_344_750, 2_188_800],
+    ]);
   });
 });

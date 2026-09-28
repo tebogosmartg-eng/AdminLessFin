@@ -49,6 +49,12 @@ export type ImmutableFinancialFacts = {
   balances_prior_as_of: AccountFact[];
   period_activity: AccountFact[];
   cash_flow: CashFlowFact[];
+  /** Balances at the start of the comparative year (empty on older seals). */
+  balances_prior_opening_as_of: AccountFact[];
+  /** The comparative year's movement per account; null where not sealed. */
+  prior_period_activity: AccountFact[] | null;
+  /** The comparative year's cash flows; null where not sealed. */
+  prior_cash_flow: CashFlowFact[] | null;
   source_rpc_refs: unknown[];
   /** Framework-neutral account classification helpers (no amount mutation). */
   byType: (type: string, basis: "closing" | "opening" | "activity") => AccountFact[];
@@ -116,6 +122,29 @@ export function adaptFinancialFacts(factRow, snapshotVersionId) {
     balance: Number(a.balance ?? 0),
   }));
   const period_activity = normalizeActivity(ds.period_activity ?? ds.periodActivity);
+  // The comparative year's movements, where the seal carries them. A snapshot
+  // sealed before these were captured has none, and the comparatives that need
+  // them are left blank rather than estimated from a running balance.
+  const balances_prior_opening_as_of = asArray(
+    ds.balances_prior_opening_as_of?.accounts ?? ds.balances_prior_opening_as_of,
+  ).map((a) => ({
+    id: a.id,
+    account_number: a.account_number,
+    name: a.name,
+    type: a.type,
+    ...classification(a),
+    balance: Number(a.balance ?? 0),
+  }));
+  const prior_period_activity = Array.isArray(ds.prior_period_activity)
+    ? normalizeActivity(ds.prior_period_activity)
+    : null;
+  const prior_cash_flow = Array.isArray(ds.prior_cash_flow)
+    ? ds.prior_cash_flow.map((c) => ({
+        section: c.section,
+        category: c.category ?? c.name ?? "Other",
+        amount: Number(c.amount ?? 0),
+      }))
+    : null;
   const cash_flow = asArray(ds.cash_flow ?? ds.cashFlowData ?? ds.cash_flow_statement).map((c) => ({
     section: c.section,
     category: c.category ?? c.name ?? "Other",
@@ -133,11 +162,16 @@ export function adaptFinancialFacts(factRow, snapshotVersionId) {
       end_date: factRow.period_end || ds.period?.end_date,
       prior_as_of: factRow.prior_as_of || ds.period?.prior_as_of,
       period_key: ds.period?.period_key,
+      prior_start_date: ds.period?.prior_start_date,
+      prior_opening_as_of: ds.period?.prior_opening_as_of,
     },
     balances_as_of,
     balances_prior_as_of,
     period_activity,
     cash_flow,
+    balances_prior_opening_as_of,
+    prior_period_activity,
+    prior_cash_flow,
     source_rpc_refs: factRow.source_rpc_refs || ds.source_rpc_refs || [],
     byType(type, basis) {
       if (basis === "opening") return balances_prior_as_of.filter((a) => a.type === type);
@@ -155,6 +189,9 @@ export function adaptFinancialFacts(factRow, snapshotVersionId) {
   // Preserve sealed canonical aggregation (presentation consumers must not recalculate).
   if (ds.canonical_aggregation) {
     (facts as any).canonical_aggregation = Object.freeze({ ...ds.canonical_aggregation });
+  }
+  if (ds.prior_canonical_aggregation) {
+    (facts as any).prior_canonical_aggregation = Object.freeze({ ...ds.prior_canonical_aggregation });
   }
   Object.freeze(facts);
 

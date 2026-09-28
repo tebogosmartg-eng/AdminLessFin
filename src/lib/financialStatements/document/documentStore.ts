@@ -27,6 +27,13 @@ export type DocOverrides = {
   order: Record<string, number>;
   titleOverrides: Record<string, string>;
   formatting: Record<string, DocFormatting>;
+  /**
+   * Whether a note's table line prints, by line key. Absent means the default:
+   * it prints unless all it carries is placeholders waiting for figures.
+   */
+  lines: Record<string, boolean>;
+  /** Notes that begin on a new page, by note id. */
+  pageBreaks: Record<string, boolean>;
   updatedAt: string;
 };
 
@@ -40,6 +47,8 @@ export function emptyOverrides(): DocOverrides {
     order: {},
     titleOverrides: {},
     formatting: {},
+    lines: {},
+    pageBreaks: {},
     updatedAt: new Date().toISOString(),
   };
 }
@@ -52,6 +61,8 @@ function normalise(parsed: Partial<DocOverrides> | null | undefined): DocOverrid
     order: parsed?.order || {},
     titleOverrides: parsed?.titleOverrides || {},
     formatting: parsed?.formatting || {},
+    lines: parsed?.lines || {},
+    pageBreaks: parsed?.pageBreaks || {},
   };
 }
 
@@ -173,18 +184,26 @@ export function useDocumentOverrides(workspaceId: string, companyId?: string) {
     [workspaceId, companyId],
   );
 
+  /**
+   * Showing something again forgets that it was ever hidden, rather than
+   * recording that it is not. Writing `false` left an entry behind for every
+   * piece anyone had ever hidden and then restored, so the record of what this
+   * document withholds filled up with things it does not.
+   */
+  const withHidden = (prev: DocOverrides, nodeId: string, hidden: boolean): DocOverrides => {
+    const next = { ...prev.hidden };
+    if (hidden) next[nodeId] = true;
+    else delete next[nodeId];
+    return { ...prev, hidden: next };
+  };
+
   const setHidden = useCallback(
-    (nodeId: string, hidden: boolean) =>
-      mutate((prev) => ({ ...prev, hidden: { ...prev.hidden, [nodeId]: hidden } })),
+    (nodeId: string, hidden: boolean) => mutate((prev) => withHidden(prev, nodeId, hidden)),
     [mutate],
   );
 
   const toggleHidden = useCallback(
-    (nodeId: string) =>
-      mutate((prev) => ({
-        ...prev,
-        hidden: { ...prev.hidden, [nodeId]: !prev.hidden[nodeId] },
-      })),
+    (nodeId: string) => mutate((prev) => withHidden(prev, nodeId, !prev.hidden[nodeId])),
     [mutate],
   );
 
@@ -194,6 +213,17 @@ export function useDocumentOverrides(workspaceId: string, companyId?: string) {
     [mutate],
   );
 
+  /**
+   * Place several at once. Moving one paragraph within a note restates where
+   * every paragraph sits, and that is one change to the document, not five.
+   */
+  const setOrders = useCallback(
+    (placements: Record<string, number>) =>
+      mutate((prev) => ({ ...prev, order: { ...prev.order, ...placements } })),
+    [mutate],
+  );
+
+
   const setTitleOverride = useCallback(
     (nodeId: string, title: string) =>
       mutate((prev) => {
@@ -201,6 +231,35 @@ export function useDocumentOverrides(workspaceId: string, companyId?: string) {
         if (title && title.trim()) next[nodeId] = title;
         else delete next[nodeId];
         return { ...prev, titleOverrides: next };
+      }),
+    [mutate],
+  );
+
+  /**
+   * Forget everything recorded about a piece that no longer exists.
+   *
+   * Deleting a paragraph used to leave its placement behind for good. Nothing
+   * reads it, so nothing breaks — but the engagement's presentation grows by a
+   * dead key every time anyone tidies a note, and a reviewer reading the record
+   * of how this document was arranged finds entries for wording that was never
+   * in it.
+   */
+  const forget = useCallback(
+    (nodeId: string) =>
+      mutate((prev) => {
+        const drop = <T,>(map: Record<string, T>) => {
+          if (!(nodeId in map)) return map;
+          const next = { ...map };
+          delete next[nodeId];
+          return next;
+        };
+        return {
+          ...prev,
+          hidden: drop(prev.hidden),
+          order: drop(prev.order),
+          titleOverrides: drop(prev.titleOverrides),
+          formatting: drop(prev.formatting),
+        };
       }),
     [mutate],
   );
@@ -214,12 +273,43 @@ export function useDocumentOverrides(workspaceId: string, companyId?: string) {
     [mutate],
   );
 
+  /**
+   * Print a table line, or hold it back. Passing `null` forgets the choice,
+   * so the line goes back to the default rather than being pinned to it.
+   */
+  const setLine = useCallback(
+    (key: string, printed: boolean | null) =>
+      mutate((prev) => {
+        const next = { ...(prev.lines || {}) };
+        if (printed === null) delete next[key];
+        else next[key] = printed;
+        return { ...prev, lines: next };
+      }),
+    [mutate],
+  );
+
+  /** Start a note on a new page, or let it follow on. */
+  const setPageBreak = useCallback(
+    (noteId: string, breakBefore: boolean) =>
+      mutate((prev) => {
+        const next = { ...(prev.pageBreaks || {}) };
+        if (breakBefore) next[noteId] = true;
+        else delete next[noteId];
+        return { ...prev, pageBreaks: next };
+      }),
+    [mutate],
+  );
+
   return {
     overrides,
     error,
+    setLine,
+    setPageBreak,
     setHidden,
     toggleHidden,
     setOrder,
+    setOrders,
+    forget,
     setTitleOverride,
     setFormatting,
   };

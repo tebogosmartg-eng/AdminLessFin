@@ -17,6 +17,7 @@ import {
   label,
   MONEY,
   type Cell,
+  type CellSource,
   type DisclosureColumn,
   type DisclosureRow,
   type GeneratedDisclosure,
@@ -57,10 +58,17 @@ function linkedRow(
   ctx: BuildContext,
   text: string,
   filter: Parameters<AccountIndex['total']>[0],
-  opts: { indent?: number; sign?: 1 | -1; kind?: DisclosureRow['kind']; key?: string } = {},
+  opts: {
+    indent?: number;
+    sign?: 1 | -1;
+    kind?: DisclosureRow['kind'];
+    key?: string;
+    /** An income or expense line: this year's figure is the year's movement. */
+    flow?: boolean;
+  } = {},
 ): DisclosureRow {
   const sign = opts.sign ?? 1;
-  const current = ctx.index.total(filter, 'closing');
+  const current = ctx.index.total(filter, opts.flow ? 'period' : 'closing');
   const cells: Cell[] = [
     label(text, { indent: opts.indent }),
     {
@@ -71,8 +79,14 @@ function linkedRow(
     },
   ];
   if (ctx.withComparatives) {
-    const prior = ctx.index.total(filter, 'prior');
-    cells.push({ value: sign * prior.amount, origin: 'linked', format: MONEY, source: prior.source });
+    if (opts.flow && !ctx.index.hasPriorFlows) {
+      // Last year's revenue or expense is last year's movement. A seal without
+      // it leaves the figure blank; the running balance is not last year.
+      cells.push({ value: null, origin: 'linked', format: MONEY });
+    } else {
+      const prior = ctx.index.total(filter, opts.flow ? 'priorPeriod' : 'prior');
+      cells.push({ value: sign * prior.amount, origin: 'linked', format: MONEY, source: prior.source });
+    }
   }
   return { cells, kind: opts.kind, key: opts.key ?? text };
 }
@@ -100,10 +114,9 @@ function totalRow(
   const columnCount = ctx.withComparatives ? 2 : 1;
   const cells: Cell[] = [label(text, { bold: true })];
   for (let c = 1; c <= columnCount; c += 1) {
-    const sum = rows.reduce((acc, r) => {
-      const v = r.cells[c]?.value;
-      return acc + (typeof v === 'number' ? v : 0);
-    }, 0);
+    const figures = rows.map((r) => r.cells[c]?.value).filter((v): v is number => typeof v === 'number');
+    // A total of nothing stated is not stated either — never a nil.
+    const sum = figures.length ? figures.reduce((acc, v) => acc + v, 0) : null;
     cells.push({
       value: sum,
       origin: 'calculated',
@@ -471,7 +484,7 @@ const REVENUE: DisclosureDefinition = {
       .filter((a) => a.closing !== 0 || a.prior !== 0)
       .sort((a, b) => (a.account_number ?? 0) - (b.account_number ?? 0));
     const rows = accounts.map((a) =>
-      linkedRow(ctx, a.name, { category: 'Revenue', nameMatches: new RegExp(`^${escape(a.name)}$`, 'i') }, { indent: 1, key: `rev:${a.name}` }),
+      linkedRow(ctx, a.name, { category: 'Revenue', nameMatches: new RegExp(`^${escape(a.name)}$`, 'i') }, { indent: 1, key: `rev:${a.name}`, flow: true }),
     );
     return [
       {
@@ -496,7 +509,7 @@ const OTHER_INCOME: DisclosureDefinition = {
       .filter((a) => a.closing !== 0 || a.prior !== 0)
       .sort((a, b) => (a.account_number ?? 0) - (b.account_number ?? 0));
     const rows = accounts.map((a) =>
-      linkedRow(ctx, a.name, { category: 'Other Income', nameMatches: new RegExp(`^${escape(a.name)}$`, 'i') }, { indent: 1, key: `oi:${a.name}` }),
+      linkedRow(ctx, a.name, { category: 'Other Income', nameMatches: new RegExp(`^${escape(a.name)}$`, 'i') }, { indent: 1, key: `oi:${a.name}`, flow: true }),
     );
     return [
       {
@@ -523,7 +536,7 @@ const EMPLOYEE_COSTS: DisclosureDefinition = {
       .filter((a) => a.closing !== 0 || a.prior !== 0)
       .sort((a, b) => (a.account_number ?? 0) - (b.account_number ?? 0));
     const rows = accounts.map((a) =>
-      linkedRow(ctx, a.name, { subcategory: 'Employee Costs', nameMatches: new RegExp(`^${escape(a.name)}$`, 'i') }, { indent: 1, key: `emp:${a.name}` }),
+      linkedRow(ctx, a.name, { subcategory: 'Employee Costs', nameMatches: new RegExp(`^${escape(a.name)}$`, 'i') }, { indent: 1, key: `emp:${a.name}`, flow: true }),
     );
     return [
       {
@@ -554,7 +567,7 @@ const OPERATING_EXPENSES: DisclosureDefinition = {
       .filter((a) => (a.closing !== 0 || a.prior !== 0) && a.subcategory !== 'Employee Costs')
       .sort((a, b) => Math.abs(b.closing) - Math.abs(a.closing));
     const rows = accounts.map((a) =>
-      linkedRow(ctx, a.name, { category: 'Operating Expenses', nameMatches: new RegExp(`^${escape(a.name)}$`, 'i') }, { indent: 1, key: `opex:${a.name}` }),
+      linkedRow(ctx, a.name, { category: 'Operating Expenses', nameMatches: new RegExp(`^${escape(a.name)}$`, 'i') }, { indent: 1, key: `opex:${a.name}`, flow: true }),
     );
     return [
       {
@@ -579,7 +592,7 @@ const COST_OF_SALES: DisclosureDefinition = {
       .filter((a) => a.closing !== 0 || a.prior !== 0)
       .sort((a, b) => (a.account_number ?? 0) - (b.account_number ?? 0));
     const rows = accounts.map((a) =>
-      linkedRow(ctx, a.name, { category: 'Cost of Sales', nameMatches: new RegExp(`^${escape(a.name)}$`, 'i') }, { indent: 1, key: `cos:${a.name}` }),
+      linkedRow(ctx, a.name, { category: 'Cost of Sales', nameMatches: new RegExp(`^${escape(a.name)}$`, 'i') }, { indent: 1, key: `cos:${a.name}`, flow: true }),
     );
     return [
       {
@@ -628,17 +641,63 @@ const EQUITY: DisclosureDefinition = {
     const subs = ['Issued Capital', 'Reserves', 'Distributions'].filter((s) =>
       ctx.index.any({ subcategory: s }),
     );
-    const rows = subs.map((s) => linkedRow(ctx, s, { subcategory: s }, { indent: 1, key: `eq:${s}` }));
+    const rows = subs.map((s) =>
+      linkedRow(ctx, s, { subcategory: s, excludeRoles: ['retained_earnings'] }, { indent: 1, key: `eq:${s}` }),
+    );
+    const retained = retainedEarningsRow(ctx);
+    const all = retained ? [...rows, retained] : rows;
     return [
       {
         code: 'EQUITY.ANALYSIS',
         title: 'Share capital and reserves',
         columns: columns(ctx),
-        rows: [...rows, totalRow(ctx, 'Total equity', rows, 'Sum of issued capital, reserves and distributions')],
+        rows: [...all, totalRow(ctx, 'Total equity', all, 'Sum of issued capital, reserves and retained earnings')],
       },
     ];
   },
 };
+
+/**
+ * Retained earnings exactly as the balance sheet states them: the retained
+ * earnings account plus every period's profit still held in the income and
+ * expense accounts. Without it the note's "Total equity" was capital alone and
+ * disagreed with the balance sheet it explains.
+ */
+function retainedEarningsRow(ctx: BuildContext): DisclosureRow | null {
+  const reserve = ctx.index.rows.filter((a) => String(a.account_role || '').toLowerCase() === 'retained_earnings');
+  const income = ctx.index.find({ type: 'Income' });
+  const expense = ctx.index.find({ type: 'Expense' });
+  const figure = (basis: 'closing' | 'prior') => {
+    const accounts = [
+      ...reserve.map((a) => ({ a, v: a[basis] })),
+      ...income.map((a) => ({ a, v: a[basis] })),
+      ...expense.map((a) => ({ a, v: -a[basis] })),
+    ].filter((x) => x.v !== 0);
+    return {
+      value: accounts.reduce((sum, x) => sum + x.v, 0),
+      source: {
+        basis,
+        accounts: accounts.map(({ a, v }) => ({
+          id: a.id,
+          code: a.account_code ?? (a.account_number != null ? String(a.account_number) : null),
+          name: a.name,
+          amount: v,
+        })),
+      },
+    };
+  };
+  const now = figure('closing');
+  const then = figure('prior');
+  if (now.value === 0 && then.value === 0) return null;
+  const cells: Cell[] = [
+    label('Retained earnings', { indent: 1 }),
+    { value: now.value, origin: 'linked', format: MONEY, source: now.source as CellSource },
+  ];
+  if (ctx.withComparatives) {
+    cells.push({ value: then.value, origin: 'linked', format: MONEY, source: then.source as CellSource });
+  }
+  return { cells, key: 'eq:Retained earnings' };
+}
 
 /** Escape a ledger account name for use inside a RegExp. */
 function escape(text: string): string {

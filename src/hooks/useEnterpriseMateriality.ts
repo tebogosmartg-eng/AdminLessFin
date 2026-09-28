@@ -1,6 +1,7 @@
 /**
  * Enterprise materiality settings (G3.6C) — single SoT for FS / validation / reporting.
  */
+import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { accountingPoliciesService } from '@/governance/domains/accountingPolicies/service';
 import type { ReportingIntelligenceOptions } from '@/lib/financialStatements/reportingIntelligence/orchestrator';
@@ -14,9 +15,12 @@ export function useEnterpriseMateriality(companyId: string | undefined | null) {
   });
 
   const percentage = query.data?.percentageThreshold ?? null;
-  const options: ReportingIntelligenceOptions = {
-    companyMaterialityPercentage: percentage,
-  };
+  // Stable while the setting is unchanged: consumers memoise on it, and a new
+  // object every render made the Live Preview rebuild its PDF every render.
+  const options: ReportingIntelligenceOptions = useMemo(
+    () => ({ companyMaterialityPercentage: percentage }),
+    [percentage],
+  );
 
   return {
     percentageThreshold: percentage,

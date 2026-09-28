@@ -3,8 +3,10 @@ import type { DocumentModel } from '../../../lib/financialStatements/document/do
 import type { DocOverrides } from '../../../lib/financialStatements/document/documentStore';
 import {
   generateWorkspaceAfsPdf,
+  renderCanonicalPdf,
   workspacePdfToBytes,
 } from '../../../lib/financialStatements/publication/afsWorkspacePdf';
+import type { CanonicalDocumentView } from '../../../lib/financialStatements/publication/canonicalDocumentView';
 import { corporateFilenameSlug } from '../../../lib/financialStatements/corporateInformation/accessors';
 import { Button } from '../../../components/ui/button';
 import { showError, showSuccess } from '../../../utils/toast';
@@ -19,21 +21,24 @@ import { useEnterpriseMateriality } from '../../../hooks/useEnterpriseMaterialit
 export default function DocumentPreview({
   model,
   overrides,
+  view = null,
 }: {
   model: DocumentModel;
   overrides: DocOverrides;
+  /** The workspace's own preparation of the document, when it has one. */
+  view?: CanonicalDocumentView | null;
 }) {
   const { options: materialityOptions } = useEnterpriseMateriality(model.companyId);
   const pdfString = useMemo(() => {
     try {
-      return generateWorkspaceAfsPdf(model, overrides, materialityOptions);
+      return view ? renderCanonicalPdf(view) : generateWorkspaceAfsPdf(model, overrides, materialityOptions);
     } catch (e) {
       if (import.meta.env.DEV) {
         console.error('[efs] workspace preview build failed', e);
       }
       return null;
     }
-  }, [model, overrides, materialityOptions]);
+  }, [view, model, overrides, materialityOptions]);
 
   const [url, setUrl] = useState<string | null>(null);
 

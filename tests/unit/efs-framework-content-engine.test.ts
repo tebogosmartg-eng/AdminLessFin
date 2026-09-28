@@ -291,3 +291,118 @@ describe('Critical Gap 2 — Numbering, cross-references and Preview == Publishe
     );
   });
 });
+
+/**
+ * Saving one piece of a note must not delete the rest of it.
+ *
+ * A framework note has no row of its own until something in it is saved. The
+ * assembler used to ask "does this stored note have a body?" and, if it did,
+ * discard the framework's content entirely. One saved table was enough — so
+ * clicking Add table on Financial instruments deleted that note's standard
+ * table and both its paragraphs, leaving only the empty table just added.
+ */
+describe('a note that has been partly authored', () => {
+  const CODE = 'DISC.RELATED';
+  const INSTANCE = 'c0ffee00-0000-4000-8000-000000000001';
+
+  function assembleWith(serverNotes: DocNoteNode[]): FrameworkAssemblyResult {
+    return assembleFrameworkDocument({
+      frameworkKey: 'IFRS_SME',
+      statements: statements(true),
+      serverNotes,
+      serverPolicySets: [],
+    });
+  }
+
+  /** What the framework supplies for this note before anyone touches it. */
+  function standard() {
+    const note = assembleWith([]).notes.find((n) => n.disclosure_code === CODE);
+    expect(note, 'the framework defines this note').toBeDefined();
+    return note!;
+  }
+
+  it('keeps the standard wording and tables when one table is added', () => {
+    const before = standard();
+    expect(before.paragraphs.length + before.tables.length).toBeGreaterThan(1);
+
+    const stored: DocNoteNode = {
+      ...before,
+      id: INSTANCE,
+      // The engagement row holds only what was actually saved.
+      sections: [],
+      paragraphs: [],
+      tables: [
+        {
+          id: 'c0ffee00-0000-4000-8000-000000000002',
+          table_code: 'T1790000000000',
+          title: 'New table',
+          columns_json: [],
+          rows_json: [],
+          sort_order: 100,
+        },
+      ],
+    };
+
+    const after = assembleWith([stored]).notes.find((n) => n.disclosure_code === CODE)!;
+    expect(after.paragraphs).toHaveLength(before.paragraphs.length);
+    // The framework's own tables are still there, and the new one is with them.
+    for (const t of before.tables) {
+      expect(after.tables.some((x) => x.table_code === t.table_code)).toBe(true);
+    }
+    expect(after.tables.some((x) => x.title === 'New table')).toBe(true);
+    expect(after.tables).toHaveLength(before.tables.length + 1);
+  });
+
+  it('lets authored wording win over the standard wording of the same code', () => {
+    const before = standard();
+    const first = before.paragraphs[0];
+    expect(first, 'this note has standard wording').toBeDefined();
+
+    const stored: DocNoteNode = {
+      ...before,
+      id: INSTANCE,
+      sections: [],
+      tables: [],
+      paragraphs: [
+        {
+          id: 'c0ffee00-0000-4000-8000-000000000003',
+          section_id: null,
+          paragraph_code: first.paragraph_code,
+          body: 'Our own wording for this note.',
+          sort_order: 1,
+        },
+      ],
+    };
+
+    const after = assembleWith([stored]).notes.find((n) => n.disclosure_code === CODE)!;
+    const mine = after.paragraphs.find((p) => p.paragraph_code === first.paragraph_code);
+    expect(mine!.body).toBe('Our own wording for this note.');
+    // And it did not cost the note its other standard paragraphs.
+    expect(after.paragraphs).toHaveLength(before.paragraphs.length);
+  });
+
+  it('keeps an addition the framework does not define', () => {
+    const before = standard();
+    const stored: DocNoteNode = {
+      ...before,
+      id: INSTANCE,
+      sections: [],
+      tables: [],
+      paragraphs: [
+        {
+          id: 'c0ffee00-0000-4000-8000-000000000004',
+          section_id: null,
+          paragraph_code: 'P1790000000001',
+          body: 'A paragraph we added ourselves.',
+          sort_order: 900,
+        },
+      ],
+    };
+
+    const after = assembleWith([stored]).notes.find((n) => n.disclosure_code === CODE)!;
+    expect(after.paragraphs).toHaveLength(before.paragraphs.length + 1);
+    expect(after.paragraphs[after.paragraphs.length - 1].body).toBe(
+      'A paragraph we added ourselves.',
+    );
+  });
+});

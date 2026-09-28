@@ -104,9 +104,15 @@ export function buildInsertionOrder(
   overrides: DocOverrides,
   newNoteId: string,
   placement: DisclosurePlacement,
+  /**
+   * The notes in the order they print. The workspace passes its note register
+   * so a new note lands where the reader asked relative to what they can see.
+   */
+  printedOrder?: string[],
 ): Record<string, number> {
-  const { visible } = computeNoteNumbering(notes, overrides);
-  const orderedIds = visible.map((v) => v.note.id).filter((id) => id !== newNoteId);
+  const orderedIds = (printedOrder ?? computeNoteNumbering(notes, overrides).visible.map((v) => v.note.id)).filter(
+    (id) => id !== newNoteId,
+  );
 
   let index: number;
   if (placement.position === 'beginning') {

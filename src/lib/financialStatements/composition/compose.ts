@@ -82,14 +82,13 @@ function buildCompositionStatement(
 
   const lines: CompositionStatementLine[] = (stmt.lines || []).map((line) => {
     const links = resolveLineLinks(stmt.statement_type, line);
-    let noteRef: number | string | null =
-      line.note_ref != null && line.note_ref !== '' ? line.note_ref : null;
-    if (noteRef == null) {
-      const disc = disclosureCodeForLine(String(line.line_code || ''));
-      if (disc) {
-        const num = noteNumberByCode.get(disc);
-        if (num != null) noteRef = num;
-      }
+    // A statement never carries its own note number: it is looked up from the
+    // notes this document prints, so it follows them when they are renumbered.
+    let noteRef: number | string | null = null;
+    const disc = disclosureCodeForLine(String(line.line_code || ''), noteNumberByCode.keys());
+    if (disc) {
+      const num = noteNumberByCode.get(disc);
+      if (num != null) noteRef = num;
     }
     return {
       lineCode: String(line.line_code || ''),

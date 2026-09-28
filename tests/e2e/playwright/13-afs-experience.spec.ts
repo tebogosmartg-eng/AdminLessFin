@@ -124,7 +124,7 @@ test('7-9: the user can open an actual statement and see figures from the ledger
   })) as { statements: Array<{ statement_type: string; lines: Array<{ line_code: string; amount: number | null }> }> };
   const sfp = fromLedger.statements.find((s) => s.statement_type === 'financial_position');
   const totalAssets = sfp?.lines.find((l) => l.line_code === 'sfp.total_assets')?.amount ?? 0;
-  const shown = text.replace(/\s| /g, '');
+  const shown = text.replace(/\s|\u00a0/g, '');
   const formatted = Math.abs(totalAssets).toFixed(2).replace('.', ',');
   expect(shown).toContain(formatted.replace(/\B(?=(\d{3})+(?!\d))/g, ''));
 

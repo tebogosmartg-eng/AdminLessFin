@@ -201,3 +201,38 @@ describe('Canonical Financial Aggregation Engine', () => {
     expect(agg.netProfit).toBe(60);
   });
 });
+
+describe('profit of an earlier year that was never closed', () => {
+  // The demo company's own sealed figures: FY2025's profit of 1 288 800 was
+  // never closed into retained earnings, so it still sits in the income and
+  // expense accounts. Leaving it out put the balance sheet out by exactly that.
+  const agg = () =>
+    buildCanonicalFinancialAggregation({
+      balancesAsOf: [
+        { id: 'ppe', type: 'Asset', balance: 2_540_000 },
+        { id: 'other-assets', type: 'Asset', balance: 1_389_900 },
+        { id: 'loans', type: 'Liability', balance: 1_405_150 },
+        { id: 'accrued', type: 'Liability', balance: -1_820_000 },
+        { id: 'capital', type: 'Equity', balance: 900_000 },
+        { id: 'sales', type: 'Income', balance: 5_571_000 },
+        { id: 'costs', type: 'Expense', balance: 2_126_250 },
+      ],
+      periodActivity: [
+        { id: 'sales', type: 'Income', activity: 3_421_000 },
+        { id: 'costs', type: 'Expense', activity: 1_265_050 },
+      ],
+      openingBalances: [{ id: 'capital', type: 'Equity', balance: 900_000 }],
+    });
+
+  it('carries it in equity, so the balance sheet balances', () => {
+    const a = agg();
+    expect(a.netProfit).toBe(2_155_950);
+    expect(a.unclosedPriorEarnings).toBe(1_288_800);
+    expect(a.equity).toBe(4_344_750);
+    expect(a.assets).toBe(3_929_900);
+    expect(a.liabilitiesAndEquity).toBe(3_929_900);
+    expect(a.balanceSheetBalanced).toBe(true);
+    expect(a.openingEquity).toBe(2_188_800);
+    expect(a.equityIdentityHolds).toBe(true);
+  });
+});

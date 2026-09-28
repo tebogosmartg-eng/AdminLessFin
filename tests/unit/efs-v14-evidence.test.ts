@@ -218,7 +218,7 @@ describe('V14.0 — Enterprise Accounts Production evidence', () => {
 
   it('renders the primary statements and totals', () => {
     expect(pdfText).toContain('Statement of Financial Position');
-    expect(pdfText).toContain('12,160,910.00');
+    expect(pdfText).toContain('12 160 910,00');
     expect(pdfText).toContain('Total comprehensive income for the year');
   });
 
@@ -233,7 +233,17 @@ describe('V14.0 — Enterprise Accounts Production evidence', () => {
     expect(pdfText).toContain('2025');
     expect(pdfText).toContain('2026');
     expect(pdfText).toContain('Notes');
-    expect(pdfText).toMatch(/\(19,122,400\.00\)/); // negative as parentheses
+    expect(pdfText).toMatch(/\(19 122 400,00\)/); // negative as parentheses
+  });
+
+  it('prints the current year before the comparative on every statement', () => {
+    // Each statement's column band reads "Notes 2026 2025", current year first.
+    const bands = pdfText.match(/Notes\s+(\d{4})\s+(\d{4})/g) || [];
+    expect(bands.length).toBeGreaterThanOrEqual(4);
+    for (const band of bands) {
+      const [, current, comparative] = /Notes\s+(\d{4})\s+(\d{4})/.exec(band)!;
+      expect(Number(current)).toBe(Number(comparative) + 1);
+    }
   });
 
   it('uses professional statutory front matter (not template meta-language)', () => {

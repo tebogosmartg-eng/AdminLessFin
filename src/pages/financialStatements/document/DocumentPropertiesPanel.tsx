@@ -1,4 +1,4 @@
-import { computeNoteNumbering } from '../../../lib/financialStatements/document/renumber';
+import type { NoteRegister } from '../../../lib/financialStatements/document/noteRegister';
 import {
   isHidden,
   resolvedTitle,
@@ -48,10 +48,13 @@ export default function DocumentPropertiesPanel({
   model,
   selection,
   overridesApi,
+  register,
 }: {
   model: DocumentModel;
   selection: DocSelection;
   overridesApi: DocumentOverridesApi;
+  /** The printed numbering — the same one the statements and the PDF use. */
+  register: NoteRegister | null;
 }) {
   const { overrides } = overridesApi;
   const { node, kindLabel, note } = resolveHideable(model, selection);
@@ -85,13 +88,15 @@ export default function DocumentPropertiesPanel({
   const superseded = note?.status === 'superseded';
   const hidden = isHidden(overrides, node.id) || superseded;
 
-  // Reorder support for notes: reindex the visible notes and swap neighbours.
-  const { visible } = computeNoteNumbering(model.notes, overrides);
-  const orderedIds = visible.map((v) => v.note.id);
+  // Reordering works on the notes as they print: swap with the neighbour the
+  // reader can see, and restate the whole order as one change.
+  const orderedIds = (register?.notes ?? []).map((n) => n.id);
   const currentIndex = note ? orderedIds.indexOf(note.id) : -1;
+  const printedNumber = note ? register?.byId.get(note.id)?.noteNumber : undefined;
+  const withheld = note ? register?.withheld.get(note.id) : undefined;
 
   const applyOrder = (ids: string[]) => {
-    ids.forEach((id, idx) => overridesApi.setOrder(id, idx));
+    overridesApi.setOrders(Object.fromEntries(ids.map((id, idx) => [id, idx])));
   };
 
   const move = (direction: -1 | 1) => {
@@ -131,8 +136,15 @@ export default function DocumentPropertiesPanel({
             <div className="flex flex-wrap items-center gap-2 text-xs">
               <Badge variant="outline">{note.status}</Badge>
               <Badge variant="secondary">{note.requirement_level}</Badge>
-              {currentIndex >= 0 && <span className="text-muted-foreground">Note {currentIndex + 1}</span>}
+              {printedNumber != null && (
+                <span className="text-muted-foreground" data-testid="afs-properties-note-number">
+                  Note {printedNumber}
+                </span>
+              )}
             </div>
+            {withheld && !hidden && (
+              <p className="text-xs text-muted-foreground">Not printed: {withheld}</p>
+            )}
             <div className="space-y-1.5">
               <Label className="text-sm">Order</Label>
               <div className="flex gap-2">
@@ -158,6 +170,20 @@ export default function DocumentPropertiesPanel({
               <p className="text-xs text-muted-foreground">
                 Notes are renumbered automatically after reordering.
               </p>
+            </div>
+            <div className="flex items-center justify-between rounded-md border px-3 py-2">
+              <div>
+                <Label className="text-sm">Start on a new page</Label>
+                <p className="text-xs text-muted-foreground">
+                  Otherwise the note follows on, and moves to the next page by itself only when it
+                  would not fit.
+                </p>
+              </div>
+              <Switch
+                data-testid="afs-page-break"
+                checked={!!overrides.pageBreaks?.[note.id]}
+                onCheckedChange={(checked) => overridesApi.setPageBreak(note.id, checked)}
+              />
             </div>
           </>
         )}

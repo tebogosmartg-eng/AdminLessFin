@@ -20,6 +20,7 @@
  */
 import type { DocumentModel } from './document/documentModel';
 import type { EfsStatementLine } from './api';
+import { reconcileNotesToStatements } from './disclosures/reconciliation';
 
 export type ReadinessState = 'ready' | 'warning' | 'action_required' | 'blocked';
 
@@ -183,25 +184,62 @@ export function assessReadiness(model: DocumentModel): Readiness {
     });
   }
 
-  // ── The result has to be the same number in both statements ───────────────
-  if (position && performance) {
-    const resultInPerformance = amount(
-      lineBy(performance.lines, 'perf.net_result', 'perf.profit_for_period', 'perf.result'),
-    );
-    const resultInPosition = amount(lineBy(position.lines, 'sfp.equity.current_result'));
-    if (
-      resultInPerformance != null &&
-      resultInPosition != null &&
-      Math.abs(resultInPerformance - resultInPosition) > TOLERANCE
-    ) {
+  // ── The statements have to articulate, in both years ──────────────────────
+  // The year's profit is the same number in the income statement and in the
+  // statement of changes in equity, and the equity that statement closes on is
+  // the equity on the balance sheet.
+  const equityStatement = model.statements.find((s) => s.statement_type === 'changes_in_equity');
+  const articulation: Array<{
+    id: string;
+    title: string;
+    from: { statement?: typeof position; codes: string[]; name: string };
+    to: { statement?: typeof position; codes: string[]; name: string };
+  }> = [
+    {
+      id: 'result-mismatch',
+      title: 'The result for the year differs between statements',
+      from: {
+        statement: performance,
+        codes: ['perf.net_result', 'perf.profit_for_period', 'perf.result'],
+        name: 'the Statement of Profit or Loss',
+      },
+      to: { statement: equityStatement, codes: ['eq.period_result'], name: 'the Statement of Changes in Equity' },
+    },
+    {
+      id: 'equity-mismatch',
+      title: 'Closing equity differs between statements',
+      from: { statement: equityStatement, codes: ['eq.closing'], name: 'the Statement of Changes in Equity' },
+      to: { statement: position, codes: ['sfp.total_equity'], name: 'the Statement of Financial Position' },
+    },
+  ];
+  for (const check of articulation) {
+    if (!check.from.statement || !check.to.statement) continue;
+    const a = lineBy(check.from.statement.lines, ...check.from.codes);
+    const b = lineBy(check.to.statement.lines, ...check.to.codes);
+    for (const [year, x, y] of [
+      ['this year', a?.amount, b?.amount],
+      ['the comparative year', a?.prior_amount, b?.prior_amount],
+    ] as const) {
+      if (x == null || y == null || Math.abs(Number(x) - Number(y)) <= TOLERANCE) continue;
       issues.push({
-        id: 'result-mismatch',
+        id: `${check.id}-${year === 'this year' ? 'current' : 'prior'}`,
         state: 'blocked',
-        title: 'The result for the year differs between statements',
-        detail: `The Statement of Financial Performance reports a different figure from the one carried into equity, by ${formatGap(resultInPerformance - resultInPosition)}.`,
-        location: { kind: 'statement', id: performance.id },
+        title: check.title,
+        detail: `For ${year}, ${check.from.name} and ${check.to.name} differ by ${formatGap(Number(x) - Number(y))}.`,
+        location: { kind: 'statement', id: check.from.statement.id },
       });
     }
+  }
+
+  // ── Every note agrees with the statement line it explains ─────────────────
+  for (const d of reconcileNotesToStatements(model)) {
+    issues.push({
+      id: `note-disagrees-${d.disclosure}-${d.year}`,
+      state: 'blocked',
+      title: `${d.noteTitle} does not agree with the statements`,
+      detail: `For ${d.year === 'current' ? 'this year' : 'the comparative year'} the note totals ${formatGap(d.noteFigure)}, but "${d.statementLabel}" on the statement is ${formatGap(d.statementFigure)}.`,
+      location: { kind: 'note', id: d.noteId },
+    });
   }
 
   // ── Notes the framework asked for that are still blank ────────────────────

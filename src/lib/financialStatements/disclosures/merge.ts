@@ -80,10 +80,29 @@ export function mergeTable(
     ...generated,
     // Structure, headings and widths are the reader's.
     title: saved.title ?? generated.title,
-    columns: saved.columns?.length ? saved.columns : generated.columns,
+    columns: saved.columns?.length ? withCurrentYearHeadings(saved.columns, generated.columns) : generated.columns,
     rows: recalculate(rows),
     footnote: saved.footnote ?? generated.footnote,
   };
+}
+
+/** A heading that only names a year, which the reader did not write. */
+const YEAR_HEADING = /^(?:FY\s?)?\d{4}$|^(?:current|prior|comparative) (?:year|period)$/i;
+
+/**
+ * A figure column's heading names the year it reports, and that follows the
+ * reporting period: saved as "FY2026" last year, it reads "2027" this year.
+ * A heading the reader wrote themselves is theirs and is left as it is.
+ */
+function withCurrentYearHeadings(
+  saved: GeneratedTable['columns'],
+  generated: GeneratedTable['columns'],
+): GeneratedTable['columns'] {
+  return saved.map((column) => {
+    if (!column.basis || !YEAR_HEADING.test(String(column.label ?? '').trim())) return column;
+    const fresh = generated.find((g) => g.basis === column.basis);
+    return fresh ? { ...column, label: fresh.label } : column;
+  });
 }
 
 /** True when the saved copy carries work worth keeping. */

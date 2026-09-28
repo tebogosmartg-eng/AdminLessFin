@@ -125,9 +125,27 @@ export type TextOptions = {
   charSpacing?: number;
 };
 
+/** A place in the document a link can jump to, by name. */
+export type PdfAnchor = { name: string; y: number };
+
+/** A clickable area on a page that jumps to a named anchor. */
+export type PdfLink = { x1: number; y1: number; x2: number; y2: number; to: string };
+
 /** A single PDF page as an ordered list of content-stream operators. */
 export class PdfPage {
   ops: string[] = [];
+  anchors: PdfAnchor[] = [];
+  links: PdfLink[] = [];
+
+  /** Name this position on the page so a link elsewhere can reach it. */
+  anchor(name: string, y: number): void {
+    this.anchors.push({ name, y });
+  }
+
+  /** Make an area of this page a link to a named anchor. */
+  link(x1: number, y1: number, x2: number, y2: number, to: string): void {
+    this.links.push({ x1, y1, x2, y2, to });
+  }
 
   private emitText(x: number, y: number, text: string, o: TextOptions): void {
     const font = o.font || 'regular';
@@ -190,15 +208,41 @@ export function assemblePdf(pages: PdfPage[]): string {
   push('%PDF-1.4\n');
 
   // Fixed font objects: 3=Helvetica, 4=Helvetica-Bold, 5=Helvetica-Oblique.
-  const pageObjs: Array<{ id: number; contentId: number }> = [];
+  const pageObjs: Array<{ id: number; contentId: number; annotIds: number[] }> = [];
   const contentObjs: Array<{ id: number; stream: string }> = [];
   let nextId = 6;
   for (const page of pages) {
     const contentId = nextId++;
     const pageId = nextId++;
     contentObjs.push({ id: contentId, stream: page.ops.join('\n') });
-    pageObjs.push({ id: pageId, contentId });
+    pageObjs.push({ id: pageId, contentId, annotIds: [] });
   }
+
+  // Internal links. Anchors are resolved only now, once the page order is
+  // final, so a link cannot point at where a page was before the cover and
+  // contents were put in front of it. A link to a name that does not exist is
+  // dropped rather than written as a jump to nowhere.
+  const anchorAt = new Map<string, { pageId: number; y: number }>();
+  pages.forEach((page, i) => {
+    for (const a of page.anchors) {
+      if (!anchorAt.has(a.name)) anchorAt.set(a.name, { pageId: pageObjs[i].id, y: a.y });
+    }
+  });
+  const annotObjs: Array<{ id: number; body: string }> = [];
+  pages.forEach((page, i) => {
+    for (const l of page.links) {
+      const target = anchorAt.get(l.to);
+      if (!target) continue;
+      const id = nextId++;
+      const rect = [l.x1, l.y1, l.x2, l.y2].map((n) => n.toFixed(2)).join(' ');
+      const top = Math.min(PAGE_H, target.y + 24).toFixed(2);
+      annotObjs.push({
+        id,
+        body: `<< /Type /Annot /Subtype /Link /Rect [${rect}] /Border [0 0 0] /Dest [${target.pageId} 0 R /XYZ 0 ${top} null] >>`,
+      });
+      pageObjs[i].annotIds.push(id);
+    }
+  });
 
   const kids = pageObjs.map((p) => `${p.id} 0 R`).join(' ');
   addObj(1, '<< /Type /Catalog /Pages 2 0 R >>');
@@ -210,11 +254,13 @@ export function assemblePdf(pages: PdfPage[]): string {
     addObj(c.id, `<< /Length ${c.stream.length} >>\nstream\n${c.stream}\nendstream`);
   });
   pageObjs.forEach((p) => {
+    const annots = p.annotIds.length ? ` /Annots [${p.annotIds.map((id) => `${id} 0 R`).join(' ')}]` : '';
     addObj(
       p.id,
-      `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${PAGE_W} ${PAGE_H}] /Resources << /Font << /F1 3 0 R /F2 4 0 R /F3 5 0 R >> >> /Contents ${p.contentId} 0 R >>`,
+      `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${PAGE_W} ${PAGE_H}] /Resources << /Font << /F1 3 0 R /F2 4 0 R /F3 5 0 R >> >> /Contents ${p.contentId} 0 R${annots} >>`,
     );
   });
+  annotObjs.forEach((a) => addObj(a.id, a.body));
 
   const xrefPos = pos;
   const total = nextId;

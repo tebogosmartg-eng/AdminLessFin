@@ -27,6 +27,7 @@ import { inferDisclosureConditions } from '../framework/frameworkContent';
 import type { ManualField } from '../framework/trialBalanceDisclosureMapping';
 import { applyGeneratedDisclosures } from '../disclosures/assemble';
 import type { FinancialFacts } from '../disclosures/accountIndex';
+import { reportingYears } from '../publication/statementPresentation';
 
 export type { DocSignatureNode } from './signatureModel';
 export type { OptionalDisclosureStatus } from '../framework/frameworkContentEngine';
@@ -451,10 +452,13 @@ export async function loadDocumentModel(params: {
     dashboard.reportingPeriod?.period_key ||
     dashboard.reportingPeriod?.label ||
     'Current year';
+  // Note tables head their figure columns exactly as the statements do:
+  // the current year, then the comparative.
+  const years = reportingYears({ end_date: dashboard.reportingPeriod?.end_date, label: periodLabel });
   const generated = applyGeneratedDisclosures(assembled.notes, {
     facts: factsRes,
-    currentLabel: periodLabel,
-    priorLabel: priorPeriodLabel(periodLabel),
+    currentLabel: years.current,
+    priorLabel: years.comparative,
   });
 
   const notes = generated.notes;
@@ -509,18 +513,6 @@ export async function loadDocumentModel(params: {
     generatedDisclosures: generated.generatedCodes,
     disclosureReasons: generated.reasons,
   };
-}
-
-/**
- * The caption for the comparative column.
- *
- * A year code counts back by one ("FY2026" becomes "FY2025"); anything else is
- * called what it is, because guessing a label is worse than not offering one.
- */
-function priorPeriodLabel(current: string): string {
-  const match = /(\d{4})/.exec(current);
-  if (!match) return 'Prior year';
-  return current.replace(match[1], String(Number(match[1]) - 1));
 }
 
 /** Codes that identify the "Significant Accounting Policies" note. */

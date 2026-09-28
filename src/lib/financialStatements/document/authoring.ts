@@ -62,6 +62,33 @@ export type SaveNoteContentResult = {
   disclosureInstanceId?: string;
 };
 
+const DELETE_METHOD: Partial<Record<NoteContentKind, string>> = {
+  paragraph: 'DELETE_DISCLOSURE_PARAGRAPH',
+  table: 'DELETE_DISCLOSURE_TABLE',
+};
+
+/**
+ * Remove a paragraph or a table the preparer authored.
+ *
+ * Only authored content reaches here. Generated wording has no row to delete
+ * and is withheld through the document's presentation instead, which is also
+ * the only way to keep it withheld once the statements are rebuilt.
+ */
+export async function deleteNoteContent(params: {
+  companyId: string;
+  kind: NoteContentKind;
+  id: string;
+}): Promise<void> {
+  const method = DELETE_METHOD[params.kind];
+  if (!method) throw new Error('Only paragraphs and tables can be deleted.');
+  if (!isStoredRow(params.id)) {
+    throw new Error('This wording comes from the framework and has nothing to delete.');
+  }
+  await invokeFinancialStatements(params.companyId, method, {
+    [params.kind === 'table' ? 'table_id' : 'paragraph_id']: params.id,
+  });
+}
+
 export async function saveNoteContent(
   params: SaveNoteContentParams,
 ): Promise<SaveNoteContentResult> {

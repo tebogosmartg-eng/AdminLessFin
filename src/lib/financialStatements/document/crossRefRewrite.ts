@@ -45,12 +45,21 @@ export function computeStructuralBaseline(
  * Build the resolution map used by the renderer and advisory validation.
  * Current numbering applies the full presentation overrides (hide + order).
  */
+/** Numbers the notes for a given set of presentation choices. */
+export type NoteNumberer = (overrides: DocOverrides) => { visible: NumberedNote[] };
+
 export function buildNoteNumberResolution(
   notes: DocNoteNode[],
   overrides: DocOverrides,
+  /**
+   * The numbering to translate between. The printed document passes its note
+   * register, so a "Note N" in prose is rewritten to the number the note is
+   * actually printed with.
+   */
+  numberer: NoteNumberer = (o) => computeNoteNumbering(notes, o),
 ): NoteNumberResolution {
-  const baseline = computeStructuralBaseline(notes);
-  const current = computeNoteNumbering(notes, overrides);
+  const baseline = numberer(emptyOverrides());
+  const current = numberer(overrides);
 
   const noteIdToCurrent = new Map<string, number>();
   for (const n of current.visible) noteIdToCurrent.set(n.note.id, n.noteNumber);

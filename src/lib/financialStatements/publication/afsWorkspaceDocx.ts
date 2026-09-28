@@ -8,7 +8,16 @@
  * extra dependencies; edge functions unchanged).
  */
 import type { CanonicalDocumentView, CanonicalStatement } from './canonicalDocumentView';
-import { formatAmount, professionalLineLabel } from './afsProfessionalPdf';
+import { professionalLineLabel } from './afsProfessionalPdf';
+import {
+  documentHasComparatives,
+  formatStatementFigure,
+  isTotalRole,
+  lineIndent,
+  lineRole,
+  looksLikeFigure,
+  reportingYears,
+} from './statementPresentation';
 import {
   approvalIntro,
   auditorsReportParagraphs,
@@ -162,17 +171,42 @@ function para(text: string, o: ParaOpts = {}): string {
   return `<w:p>${pPr}${run(text, o)}</w:p>`;
 }
 
-function cellParagraph(text: string, o: ParaOpts = {}): string {
+function cellParagraph(text: string, o: ParaOpts & { keepNext?: boolean } = {}): string {
   let pPr = '<w:pPr>';
+  // Kept with the next row, so Word moves a table that fits on a page to the
+  // next page whole rather than splitting it.
+  if (o.keepNext) pPr += '<w:keepNext/>';
   if (o.align) pPr += `<w:jc w:val="${o.align}"/>`;
   pPr += '<w:spacing w:after="20"/></w:pPr>';
   return `<w:p>${pPr}${run(text, o)}</w:p>`;
 }
 
-const NUMERIC_RE = /^\(?-?[\d,]+\.\d{2}\)?$/;
 function looksNumeric(v: string): boolean {
   const t = v.trim();
-  return NUMERIC_RE.test(t) || t === '[ — ]' || /^[-–—]$/.test(t);
+  return looksLikeFigure(t) || t === '[ — ]' || /^[-–—]$/.test(t);
+}
+
+/** Bookmark names for notes, shared by the heading and every link to it. */
+function noteBookmark(noteNumber: number | string): string {
+  return `note_${noteNumber}`;
+}
+
+/** A heading paragraph that is also a bookmark a link can jump to. */
+function bookmarkedPara(
+  text: string,
+  name: string,
+  id: number,
+  o: ParaOpts & { pageBreakBefore?: boolean } = {},
+): string {
+  let pPr = '<w:pPr>';
+  if (o.style) pPr += `<w:pStyle w:val="${o.style}"/>`;
+  if (o.pageBreakBefore) pPr += '<w:pageBreakBefore/>';
+  pPr += `<w:spacing w:after="${o.after ?? 120}"/>`;
+  pPr += '</w:pPr>';
+  return (
+    `<w:p>${pPr}<w:bookmarkStart w:id="${id}" w:name="${escapeXml(name)}"/>` +
+    `${run(text, o)}<w:bookmarkEnd w:id="${id}"/></w:p>`
+  );
 }
 
 function tableXml(rows: string[][], opts: { boldRow?: (i: number) => boolean } = {}): string {
@@ -221,7 +255,8 @@ function tableXml(rows: string[][], opts: { boldRow?: (i: number) => boolean } =
     .map((r, i) => {
       const isHeader = i === 0;
       const bold = isHeader || (opts.boldRow ? opts.boldRow(i) : false);
-      const trPr = isHeader ? '<w:trPr><w:tblHeader/></w:trPr>' : '';
+      const trPr = `<w:trPr><w:cantSplit/>${isHeader ? '<w:tblHeader/>' : ''}</w:trPr>`;
+      const keepNext = i < norm.length - 1;
       const cells = r
         .map((cell, c) => {
           const align = c === 0 ? 'left' : numericCol[c] ? 'right' : 'left';
@@ -230,7 +265,7 @@ function tableXml(rows: string[][], opts: { boldRow?: (i: number) => boolean } =
           return (
             '<w:tc>' +
             `<w:tcPr><w:tcW w:w="${w}" w:type="dxa"/>${shd}</w:tcPr>` +
-            cellParagraph(cell, { align, bold, size: 9 }) +
+            cellParagraph(cell, { align, bold, size: 9, keepNext }) +
             '</w:tc>'
           );
         })
@@ -242,39 +277,95 @@ function tableXml(rows: string[][], opts: { boldRow?: (i: number) => boolean } =
   return `<w:tbl>${tblPr}${grid}${rowsXml}</w:tbl>`;
 }
 
-function statementTableXml(stmt: CanonicalStatement, view: CanonicalDocumentView): string {
-  type Line = EfsStatementLine & {
-    is_header?: boolean;
-    is_subheader?: boolean;
-    prior_amount?: number | null;
-    note_ref?: string | number | null;
+/**
+ * A primary statement as a Word table, laid out as the PDF lays it out:
+ * label, Notes, the current year, then the comparative. Totals are ruled above
+ * their figures, the statement's grand total double-ruled beneath, and a note
+ * number is a hyperlink to the note's heading.
+ */
+function statementTableXml(
+  stmt: CanonicalStatement,
+  view: CanonicalDocumentView,
+  showComp: boolean,
+): string {
+  const years = reportingYears(view.period ?? { label: view.presentation.reportingPeriodLabel });
+  const labelW = showComp ? 5226 : 6626;
+  const noteW = 800;
+  const figureW = 1500;
+  const widths = showComp ? [labelW, noteW, figureW, figureW] : [labelW, noteW, figureW];
+  const grid = `<w:tblGrid>${widths.map((w) => `<w:gridCol w:w="${w}"/>`).join('')}</w:tblGrid>`;
+  const tblPr =
+    '<w:tblPr><w:tblW w:w="0" w:type="auto"/>' +
+    '<w:tblLayout w:type="fixed"/>' +
+    '<w:tblCellMar><w:left w:w="60" w:type="dxa"/><w:right w:w="60" w:type="dxa"/></w:tblCellMar>' +
+    '</w:tblPr>';
+
+  const cell = (
+    width: number,
+    content: string,
+    o: { borders?: string; align?: 'left' | 'center' | 'right'; indent?: number } = {},
+  ) => {
+    const borders = o.borders ? `<w:tcBorders>${o.borders}</w:tcBorders>` : '';
+    let pPr = '<w:pPr>';
+    if (o.align) pPr += `<w:jc w:val="${o.align}"/>`;
+    if (o.indent) pPr += `<w:ind w:left="${o.indent}"/>`;
+    pPr += '<w:spacing w:after="20"/></w:pPr>';
+    return `<w:tc><w:tcPr><w:tcW w:w="${width}" w:type="dxa"/>${borders}</w:tcPr><w:p>${pPr}${content}</w:p></w:tc>`;
   };
-  const year = (view.period?.end_date || '').slice(0, 4) || 'Current';
-  const priorYear = year && /^\d{4}$/.test(year) ? String(Number(year) - 1) : 'Prior';
-  const lines = stmt.lines as Line[];
-  const showComp = lines.some((l) => l.prior_amount != null && !l.is_header && !l.is_subheader);
-  const header = showComp ? ['', 'Notes', `${priorYear} R`, `${year} R`] : ['', 'Notes', `${year} R`];
-  const rows: string[][] = [header];
-  for (const line of lines) {
-    const headerLine = !!(line.is_header || line.is_subheader);
+
+  const headerBorder = '<w:bottom w:val="single" w:sz="6" w:space="0" w:color="404040"/>';
+  const headerCells = [
+    cell(labelW, '', { borders: headerBorder }),
+    cell(noteW, run('Notes', { bold: true, size: 8, color: '595959' }), { borders: headerBorder, align: 'center' }),
+    cell(figureW, `${run(years.current, { bold: true, size: 9 })}<w:r><w:br/></w:r>${run('R', { italic: true, size: 8, color: '737373' })}`, {
+      borders: headerBorder,
+      align: 'right',
+    }),
+    ...(showComp
+      ? [
+          cell(figureW, `${run(years.comparative, { bold: true, size: 9 })}<w:r><w:br/></w:r>${run('R', { italic: true, size: 8, color: '737373' })}`, {
+            borders: headerBorder,
+            align: 'right',
+          }),
+        ]
+      : []),
+  ];
+  const rows: string[] = [`<w:tr><w:trPr><w:tblHeader/></w:trPr>${headerCells.join('')}</w:tr>`];
+
+  for (const line of stmt.lines) {
+    const role = lineRole(line);
+    const heading = role === 'heading';
+    const totalled = isTotalRole(role);
+    const bold = heading || totalled;
     const label = professionalLineLabel(line.label);
-    const note = headerLine || line.is_total || line.note_ref == null ? '' : String(line.note_ref);
-    const amt =
-      headerLine ? '' : line.amount === 0 && !line.is_total ? '—' : formatAmount(line.amount);
-    if (showComp) {
-      const prior =
-        headerLine
-          ? ''
-          : line.prior_amount == null || (line.prior_amount === 0 && !line.is_total)
-            ? '—'
-            : formatAmount(line.prior_amount);
-      rows.push([label, note, prior, amt]);
-    } else {
-      rows.push([label, note, amt]);
-    }
+    const ruleAbove = totalled ? '<w:top w:val="single" w:sz="4" w:space="0" w:color="595959"/>' : '';
+    const ruleBelow = role === 'grand_total' ? '<w:bottom w:val="double" w:sz="4" w:space="0" w:color="262626"/>' : '';
+    const bordersFor = (value: number | null | undefined) => (value == null ? '' : ruleAbove + ruleBelow);
+    const noteRef =
+      role === 'item' && line.note_ref != null && line.note_ref !== '' ? String(line.note_ref) : '';
+    const noteCell = noteRef
+      ? `<w:hyperlink w:anchor="${noteBookmark(noteRef)}" w:history="1">${run(noteRef, { size: 9, color: '1F4E3D' })}</w:hyperlink>`
+      : '';
+    const cells = [
+      cell(labelW, run(label, { bold, size: 9 }), { indent: heading ? 0 : lineIndent(line, role) * 240 }),
+      cell(noteW, noteCell, { align: 'center' }),
+      cell(figureW, run(formatStatementFigure(line.amount, role), { bold, size: 9 }), {
+        align: 'right',
+        borders: bordersFor(line.amount),
+      }),
+      ...(showComp
+        ? [
+            cell(figureW, run(formatStatementFigure(line.prior_amount, role), { bold, size: 9 }), {
+              align: 'right',
+              borders: bordersFor(line.prior_amount),
+            }),
+          ]
+        : []),
+    ];
+    rows.push(`<w:tr>${cells.join('')}</w:tr>`);
   }
-  const totalFlags = [false, ...lines.map((l) => !!l.is_total && !l.is_header && !l.is_subheader)];
-  return tableXml(rows, { boldRow: (i) => totalFlags[i] || !!(lines[i - 1] as Line | undefined)?.is_header });
+
+  return `<w:tbl>${tblPr}${grid}${rows.join('')}</w:tbl>`;
 }
 
 // ── Document assembly ────────────────────────────────────────────────────────
@@ -342,13 +433,14 @@ export function renderCanonicalDocx(view: CanonicalDocumentView): Uint8Array<Arr
     for (const n of corp.narratives) add(para(n.text));
   }
 
-  // Primary statements (Phase 2).
+  // Primary statements (Phase 2) — the same two columns on every statement.
+  const showComp = documentHasComparatives(view.statements);
   for (const statement of view.statements) {
     add(para(statement.title, { style: 'Heading1', bold: true, size: 12 }));
     add(para(statement.periodCaption, { italic: true, color: '595959', after: 40 }));
     add(para(view.currencyLabel, { italic: true, color: '595959', size: 8, after: 60 }));
     if (statement.lines.length) {
-      add(statementTableXml(statement, view));
+      add(statementTableXml(statement, view, showComp));
       add(para('', { after: 60 }));
     } else {
       add(
@@ -379,8 +471,15 @@ export function renderCanonicalDocx(view: CanonicalDocumentView): Uint8Array<Arr
 
   // Notes (Phase 4).
   add(para('Notes to the Financial Statements', { style: 'Heading1', bold: true, size: 13 }));
-  for (const note of view.notes) {
-    add(para(note.heading, { style: 'Heading2', bold: true, size: 10 }));
+  view.notes.forEach((note, i) => {
+    add(
+      bookmarkedPara(note.heading, noteBookmark(note.noteNumber), i + 1, {
+        style: 'Heading2',
+        bold: true,
+        size: 10,
+        pageBreakBefore: note.pageBreakBefore,
+      }),
+    );
     for (const block of note.blocks) {
       if (block.type === 'paragraph') {
         add(para(block.text, { bold: !!block.bold }));
@@ -390,7 +489,7 @@ export function renderCanonicalDocx(view: CanonicalDocumentView): Uint8Array<Arr
         add(para('', { after: 40 }));
       }
     }
-  }
+  });
 
   // Supplementary schedules.
   add(para('Supplementary Information', { style: 'Heading1', bold: true, size: 13 }));

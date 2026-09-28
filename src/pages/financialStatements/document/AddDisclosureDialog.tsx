@@ -14,7 +14,7 @@ import {
 import { showError, showSuccess } from '../../../utils/toast';
 import type { DocumentModel } from '../../../lib/financialStatements/document/documentModel';
 import type { DocumentOverridesApi } from '../../../lib/financialStatements/document/documentStore';
-import { computeNoteNumbering } from '../../../lib/financialStatements/document/renumber';
+import type { NoteRegister } from '../../../lib/financialStatements/document/noteRegister';
 import {
   buildInsertionOrder,
   createCompanyDisclosure,
@@ -48,6 +48,7 @@ export default function AddDisclosureDialog({
   overridesApi,
   frameworkPackId,
   onCreated,
+  register,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -56,6 +57,8 @@ export default function AddDisclosureDialog({
   model: DocumentModel;
   overridesApi: DocumentOverridesApi;
   frameworkPackId?: string | null;
+  /** The printed numbering, so "after Note N" names the note printed as N. */
+  register: NoteRegister | null;
   onCreated: (newNoteId: string) => void;
 }) {
   const [title, setTitle] = useState('');
@@ -63,8 +66,8 @@ export default function AddDisclosureDialog({
   const [placementValue, setPlacementValue] = useState('end');
 
   const visibleNotes = useMemo(
-    () => computeNoteNumbering(model.notes, overridesApi.overrides).visible,
-    [model.notes, overridesApi.overrides],
+    () => (register?.notes ?? []).map((n) => ({ note: { id: n.id }, noteNumber: n.noteNumber, title: n.title })),
+    [register],
   );
 
   const instancesQuery = useQuery({
@@ -111,8 +114,14 @@ export default function AddDisclosureDialog({
         disclosureKind: kind,
         frameworkPackId,
       });
-      const orderMap = buildInsertionOrder(model.notes, overridesApi.overrides, created.id, placement);
-      Object.entries(orderMap).forEach(([id, idx]) => overridesApi.setOrder(id, idx));
+      const orderMap = buildInsertionOrder(
+        model.notes,
+        overridesApi.overrides,
+        created.id,
+        placement,
+        visibleNotes.map((v) => v.note.id),
+      );
+      overridesApi.setOrders(orderMap);
       return created;
     },
     onSuccess: (created) => {

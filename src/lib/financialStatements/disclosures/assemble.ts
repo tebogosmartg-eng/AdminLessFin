@@ -13,19 +13,66 @@ import { generateDisclosures, type BuildContext } from './definitions';
 import { mergeTable } from './merge';
 import type { DisclosureColumn, DisclosureRow, GeneratedTable } from './types';
 
-/** Read a stored disclosure table back into the shape the engine works in. */
+function hasCells(row: unknown): row is DisclosureRow {
+  return !!row && typeof row === 'object' && Array.isArray((row as DisclosureRow).cells);
+}
+
+/** Column headings for a table stored before columns were recorded. */
+function inferColumns(stored: unknown, width: number): DisclosureColumn[] {
+  const given = (stored as DisclosureColumn[]) || [];
+  if (given.length >= width) return given;
+  const out = [...given];
+  for (let c = out.length; c < width; c += 1) {
+    out.push({ label: c === 0 ? 'Description' : '', align: c === 0 ? 'left' : 'right' });
+  }
+  return out;
+}
+
+/**
+ * Read a stored disclosure table back into the shape the engine works in.
+ *
+ * Two shapes are stored. Tables this engine wrote carry cells that know where
+ * their figures came from. Older ones are plain arrays of text, written before
+ * any of that existed, and they used to fall through to a much poorer editor —
+ * no formatting, no clipboard, no keyboard — so which editor an accountant got
+ * depended on which note they happened to open.
+ *
+ * An old table has no recorded link to the ledger, so every cell in it is the
+ * preparer's and is read as one. That is honest about what is known, and it
+ * means there is one table editor rather than two.
+ */
 export function asGeneratedTable(doc: DocTable): GeneratedTable | null {
-  const rows = doc.rows_json as unknown as DisclosureRow[] | undefined;
+  const rows = doc.rows_json as unknown[] | undefined;
   if (!Array.isArray(rows) || rows.length === 0) return null;
-  // Only tables written by this engine carry cells; older pipe-delimited rows
-  // are plain arrays and are left to the simple editor.
-  if (!rows.every((r) => r && Array.isArray((r as DisclosureRow).cells))) return null;
-  return {
-    code: doc.table_code,
-    title: doc.title,
-    columns: (doc.columns_json as unknown as DisclosureColumn[]) || [],
-    rows,
-  };
+
+  if (rows.every(hasCells)) {
+    return {
+      code: doc.table_code,
+      title: doc.title,
+      columns: (doc.columns_json as unknown as DisclosureColumn[]) || [],
+      rows: rows as DisclosureRow[],
+    };
+  }
+
+  if (rows.every((r) => Array.isArray(r))) {
+    const grid = rows as unknown[][];
+    const width = Math.max(...grid.map((r) => r.length), 1);
+    return {
+      code: doc.table_code,
+      title: doc.title,
+      columns: inferColumns(doc.columns_json, width),
+      rows: grid.map((cells, r) => ({
+        key: `stored-${r}`,
+        cells: Array.from({ length: width }, (_, c) => ({
+          value: (cells[c] ?? null) as string | number | null,
+          origin: 'manual' as const,
+          format: { align: c === 0 ? ('left' as const) : ('right' as const) },
+        })),
+      })),
+    };
+  }
+
+  return null;
 }
 
 /** Present a generated table as a document table the rest of the model speaks. */
@@ -40,6 +87,64 @@ export function asDocTable(noteId: string, table: GeneratedTable, sortOrder: num
     rows_json: table.rows as unknown[],
     sort_order: sortOrder,
   };
+}
+
+/**
+ * A real database row, as against generated content.
+ *
+ * Anchored at both ends on purpose. A generated piece's id is built from its
+ * note's id, so once a note is stored its generated children read
+ * "7b1f4c2e-…-8a3d5c6f1234:P2" — which a prefix test happily calls a stored
+ * row, and then generated content starts being treated as the preparer's.
+ */
+const STORED_ROW = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * The standard wording, and whatever the preparer has done to it.
+ *
+ * This used to be all or nothing: a note with any wording of its own kept only
+ * what was stored, and a note with none took only what was generated. Both ends
+ * were wrong. Rewriting one paragraph silently dropped every other paragraph
+ * the framework supplies, and adding a paragraph — which starts empty — left
+ * the note looking untouched, so Add paragraph appeared to do nothing at all.
+ *
+ * Paragraphs merge the way the tables already do: by the code each one carries.
+ * A generated paragraph the preparer has rewritten is theirs; one they have not
+ * is refreshed from the framework; and anything they have added of their own
+ * follows on the end.
+ */
+function mergeNarrative(
+  noteId: string,
+  narrative: string[],
+  existing: DocNoteNode['paragraphs'],
+): DocNoteNode['paragraphs'] {
+  // An empty paragraph with no row behind it is a leftover of the old
+  // assembly and says nothing; an empty one the preparer just added is a row,
+  // and is where they are about to write.
+  const saved = new Map(
+    existing
+      .filter((p) => p.body.trim() || STORED_ROW.test(p.id))
+      .map((p) => [p.paragraph_code, p]),
+  );
+
+  const merged = narrative.map((body, n) => {
+    const code = `P${n + 1}`;
+    const own = saved.get(code);
+    saved.delete(code);
+    return (
+      own ?? {
+        id: `${noteId}:${code}`,
+        section_id: null,
+        paragraph_code: code,
+        body,
+        sort_order: n + 1,
+      }
+    );
+  });
+
+  // The preparer's own additions keep the order they were given.
+  const extras = [...saved.values()].sort((a, b) => a.sort_order - b.sort_order);
+  return [...merged, ...extras];
 }
 
 export type AssembleOptions = {
@@ -103,31 +208,18 @@ export function applyGeneratedDisclosures(
     for (const [code, saved] of savedByCode) {
       if (disclosure.tables.some((t) => t.code === code)) continue;
       const hasRows = Array.isArray(saved.rows_json) && saved.rows_json.length > 0;
-      const isStoredRow = /^[0-9a-f]{8}-[0-9a-f]{4}-/i.test(saved.id);
-      if (hasRows && isStoredRow) tables.push(saved);
+      if (hasRows && STORED_ROW.test(saved.id)) tables.push(saved);
     }
 
     if (existing) {
       const i = out.indexOf(existing);
-      const hasOwnWords =
-        existing.paragraphs.some((p) => p.body.trim()) ||
-        existing.sections.some((s) => s.body.trim());
       out[i] = {
         ...existing,
         tables,
         // Sections the old assembly created with an empty body say nothing and
         // ask for nothing; the generated narrative below is the note now.
         sections: existing.sections.filter((s) => s.body.trim()),
-        // Standard wording only where nothing has been written.
-        paragraphs: hasOwnWords
-          ? existing.paragraphs
-          : disclosure.narrative.map((body, n) => ({
-              id: `${noteId}:P${n + 1}`,
-              section_id: null,
-              paragraph_code: `P${n + 1}`,
-              body,
-              sort_order: n + 1,
-            })),
+        paragraphs: mergeNarrative(noteId, disclosure.narrative, existing.paragraphs),
       };
     } else {
       out.push({

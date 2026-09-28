@@ -5,6 +5,8 @@
  * No disclosure is plain text — every block is a typed, metadata-driven component.
  */
 import type { DocNoteNode, DocParagraph, DocSection, DocTable } from '../document/documentModel';
+import { formatCellValue } from '../disclosures/format';
+import type { CellFormat } from '../disclosures/types';
 import type {
   CompositionNarrative,
   CompositionTable,
@@ -51,18 +53,45 @@ function stringifyCell(value: unknown): string {
   if (value == null) return '';
   if (typeof value === 'object') {
     const obj = value as Record<string, unknown>;
+    // A disclosure cell carries its own money formatting — brackets for a
+    // negative, a dash for a nil, thousands separated — and the printed
+    // statements must read the way the editor does, not as raw floats.
+    if ('origin' in obj && 'value' in obj) {
+      return formatCellValue(
+        obj.value as string | number | null,
+        obj.format as CellFormat | undefined,
+      );
+    }
     return String(obj.label ?? obj.value ?? obj.text ?? JSON.stringify(obj));
   }
   return String(value);
 }
 
+/**
+ * A stored note table, flattened to the rows every renderer prints.
+ *
+ * Every path to the page goes through here: the Live Preview, the workspace
+ * PDF, the published PDF and the DOCX. Three row shapes reach it — the bare
+ * arrays and label-keyed objects that predate the disclosure engine, and the
+ * `{ cells: [...] }` rows the engine produces now. Missing that last one is how
+ * a note came out populated in the editor and blank in the PDF.
+ */
 export function tableToCompositionRows(columns: unknown[], rows: unknown[]): string[][] {
   const out: string[][] = [];
   if (Array.isArray(columns) && columns.length) {
     out.push(columns.map(stringifyCell));
   }
   for (const row of rows || []) {
-    if (Array.isArray(row)) {
+    if (row && typeof row === 'object' && !Array.isArray(row) && Array.isArray((row as Record<string, unknown>).cells)) {
+      const cells = (row as Record<string, unknown>).cells as unknown[];
+      // A cell swallowed by a merge prints as a blank, keeping the columns lined up.
+      out.push(
+        cells.map((c) => {
+          const obj = c as Record<string, unknown> | null;
+          return obj && typeof obj === 'object' && obj.colSpan === 0 ? '' : stringifyCell(c);
+        }),
+      );
+    } else if (Array.isArray(row)) {
       out.push(row.map(stringifyCell));
     } else if (row && typeof row === 'object') {
       const obj = row as Record<string, unknown>;

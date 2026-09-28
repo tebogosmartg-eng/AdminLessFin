@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { invokeFinancialStatements } from '../../../lib/financialStatements/api';
 import { accountingPoliciesService } from '../../../governance/domains/accountingPolicies/service';
@@ -15,17 +15,42 @@ import type {
 import { resolvedTitle } from '../../../lib/financialStatements/document/documentStore';
 import type { DocumentOverridesApi } from '../../../lib/financialStatements/document/documentStore';
 import {
+  deleteNoteContent,
   isStoredRow,
   saveNoteContent,
   type NoteContentKind,
 } from '../../../lib/financialStatements/document/authoring';
+import {
+  isKeyHidden,
+  nextPlacement,
+  orderedParagraphs,
+  orderedTables,
+  paragraphKey,
+  reorderedPlacements,
+  tableKey,
+} from '../../../lib/financialStatements/document/noteContent';
 import { asGeneratedTable } from '../../../lib/financialStatements/disclosures/assemble';
 import type {
   Cell as DisclosureCell,
   GeneratedTable,
 } from '../../../lib/financialStatements/disclosures/types';
 import SpreadsheetEditor from './SpreadsheetEditor';
-import { professionalStatementTitle } from '../../../lib/financialStatements/publication/afsProfessionalPdf';
+import NoteLineItems from './NoteLineItems';
+import { reconcileNotesToStatements } from '../../../lib/financialStatements/disclosures/reconciliation';
+import type { NoteRegister } from '../../../lib/financialStatements/document/noteRegister';
+import type { CanonicalDocumentView } from '../../../lib/financialStatements/publication/canonicalDocumentView';
+import {
+  professionalStatementTitle,
+  statementPeriodCaption,
+} from '../../../lib/financialStatements/publication/afsProfessionalPdf';
+import {
+  documentHasComparatives,
+  formatStatementFigure,
+  isTotalRole,
+  lineIndent,
+  lineRole,
+  reportingYears,
+} from '../../../lib/financialStatements/publication/statementPresentation';
 import { corporateDisplayFromModel } from '../../../lib/financialStatements/corporateInformation/accessors';
 import type { DocSelection } from '../experience/EngagementDocumentWorkspace';
 import type {
@@ -55,7 +80,17 @@ import {
   SelectTrigger,
   SelectValue,
 } from '../../../components/ui/select';
-import { Loader2, Plus, Save, X } from 'lucide-react';
+import { ChevronDown, ChevronUp, EyeOff, Loader2, Plus, Save, Trash2, X } from 'lucide-react';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '../../../components/ui/alert-dialog';
 
 type EditorContext = {
   companyId: string;
@@ -67,6 +102,12 @@ type EditorContext = {
   onSaved: () => void;
   /** A generated note has just been stored and now has a real id. */
   onNoteStored?: (disclosureInstanceId: string) => void;
+  /** The printed note numbering, shared with the navigator and the PDF. */
+  register: NoteRegister | null;
+  /** The document as it will print, for what each note's tables print. */
+  view: CanonicalDocumentView | null;
+  /** Move the reader to another part of the document. */
+  onSelect: (selection: DocSelection) => void;
 };
 
 /**
@@ -268,6 +309,35 @@ function LineSourceDialog({
   );
 }
 
+/**
+ * A note number on a statement, which opens the note it names.
+ *
+ * The number is read from the note register, never from the statement, so it
+ * is always the number the note prints with and always a note that prints.
+ */
+function NoteReference({ line, ctx }: { line: EfsStatementLine; ctx: EditorContext }) {
+  const target = ctx.register?.forLine(line.line_code);
+  if (!target) return null;
+  return (
+    <button
+      type="button"
+      data-testid="afs-note-ref"
+      data-note-id={target.id}
+      data-note-number={target.noteNumber}
+      aria-label={`Open note ${target.noteNumber}, ${target.title}`}
+      title={`Note ${target.noteNumber}. ${target.title}`}
+      className="rounded px-1.5 font-medium text-emerald-700 underline decoration-emerald-600/40 underline-offset-2 hover:bg-emerald-500/10 hover:decoration-emerald-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 dark:text-emerald-400"
+      onClick={(e) => {
+        // The row itself opens the accounts behind the figure; the number opens the note.
+        e.stopPropagation();
+        ctx.onSelect({ kind: 'note', id: target.id });
+      }}
+    >
+      {target.noteNumber}
+    </button>
+  );
+}
+
 function StatementEditor({
   statement,
   ctx,
@@ -280,12 +350,14 @@ function StatementEditor({
     statement.statement_type,
     resolvedTitle(ctx.overridesApi.overrides, statement.id, statement.title),
   );
-  // A comparative column of blanks would read as "nil", which is a different
-  // claim, so it is shown only when there are prior figures to show.
-  const showComparatives = statement.lines.some(
-    (l) => l.prior_amount != null && Number(l.prior_amount) !== 0,
-  );
-  const currentColumn = ctx.model?.period?.label || 'Current year';
+  // The same two columns on every statement, current year first, decided once
+  // for the whole set — exactly as the Live Preview and the PDF print them.
+  const years = reportingYears(ctx.model.period);
+  const showComparatives = documentHasComparatives(ctx.model.statements);
+  const columns = showComparatives ? 4 : 3;
+  const entity = corporateDisplayFromModel(ctx.model).registeredName || ctx.model.companyName;
+  const figureCell = 'w-[7.5rem] pl-2 py-1.5 text-right tabular-nums whitespace-nowrap';
+
   return (
     <Card>
       <CardHeader>
@@ -295,7 +367,8 @@ function StatementEditor({
         </div>
         <CardDescription>
           These figures come from your ledger and cannot be typed over. Select a line to see the
-          accounts behind it. You can rename the heading and choose what appears.
+          accounts behind it, or a note number to open the note. You can rename the heading and
+          choose what appears.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -305,74 +378,213 @@ function StatementEditor({
           overridesApi={ctx.overridesApi}
           label="Statement heading"
         />
-        <div className="rounded-md border">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b bg-muted/40 text-left">
-                <th className="px-3 py-2 font-medium">&nbsp;</th>
-                <th className="px-3 py-2 text-right font-medium">{currentColumn}</th>
-                {showComparatives && (
-                  <th className="px-3 py-2 text-right font-medium text-muted-foreground">
-                    Prior year
-                  </th>
-                )}
-              </tr>
-            </thead>
-            <tbody>
-              {statement.lines.length === 0 ? (
-                <tr>
-                  <td className="px-3 py-3 text-muted-foreground" colSpan={showComparatives ? 3 : 2}>
-                    Amounts will appear once the statements have been built from your accounting
-                    records.
-                  </td>
-                </tr>
-              ) : (
-                statement.lines.map((ln, idx) => {
-                  const traceable = (ln.accounts?.length ?? 0) > 0;
-                  return (
-                  <tr
-                    key={`${ln.line_code}-${idx}`}
-                    className={cn(
-                      'border-b last:border-0',
-                      (ln.is_total || ln.is_grand_total) && 'bg-muted/20 font-semibold',
-                      ln.is_subtotal && 'font-medium',
-                      ln.is_header && 'font-medium text-muted-foreground',
-                      ln.is_reconciling && 'text-amber-800 dark:text-amber-300',
-                      traceable && 'cursor-pointer hover:bg-muted/30',
-                    )}
-                    onClick={traceable ? () => setSourceLine(ln) : undefined}
-                    data-testid={traceable ? 'afs-traceable-line' : undefined}
-                  >
-                    <td
-                      className="px-3 py-2"
-                      style={{ paddingLeft: `${0.75 + (ln.level ?? 0) * 1.25}rem` }}
-                    >
-                      {ln.label}
-                      {ln.is_reconciling && (
-                        <span className="ml-2 text-xs">
-                          — not yet classified in the chart of accounts
-                        </span>
-                      )}
-                    </td>
-                    {/* A heading carries no figure; formatCurrency(null) printed R 0,00. */}
-                    <td className="px-3 py-2 text-right tabular-nums">
-                      {ln.amount == null ? '' : formatCurrency(ln.amount)}
-                    </td>
-                    {showComparatives && (
-                      <td className="px-3 py-2 text-right tabular-nums text-muted-foreground">
-                        {ln.prior_amount == null ? '' : formatCurrency(ln.prior_amount)}
-                      </td>
-                    )}
-                  </tr>
-                  );
-                })
+        <div className="overflow-x-auto rounded-md border bg-background">
+          <div className="min-w-[30rem] px-4 py-4" data-testid="afs-statement">
+            <div className="mb-5 space-y-0.5">
+              {entity && (
+                <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                  {entity}
+                </p>
               )}
-            </tbody>
-          </table>
+              <h3 className="text-lg font-semibold tracking-tight">{displayTitle}</h3>
+              <p className="text-sm text-muted-foreground">
+                {statementPeriodCaption(statement.statement_type, ctx.model.period || {})}
+              </p>
+            </div>
+            <table className="w-full border-collapse text-sm">
+              <thead>
+                <tr className="border-b-2 border-foreground/70 align-bottom">
+                  <th className="py-1.5 pr-3 text-left font-medium">
+                    <span className="sr-only">Line item</span>
+                  </th>
+                  <th className="w-12 px-1 py-1.5 text-center text-xs font-semibold text-muted-foreground">
+                    Notes
+                  </th>
+                  <th className={cn(figureCell, 'font-semibold')} data-testid="afs-col-current">
+                    {years.current}
+                    <span className="block text-[11px] font-normal italic text-muted-foreground">R</span>
+                  </th>
+                  {showComparatives && (
+                    <th className={cn(figureCell, 'font-semibold')} data-testid="afs-col-comparative">
+                      {years.comparative}
+                      <span className="block text-[11px] font-normal italic text-muted-foreground">
+                        R
+                      </span>
+                    </th>
+                  )}
+                </tr>
+              </thead>
+              <tbody>
+                {statement.lines.length === 0 ? (
+                  <tr>
+                    <td className="py-3 text-muted-foreground" colSpan={columns}>
+                      Amounts will appear once the statements have been built from your accounting
+                      records.
+                    </td>
+                  </tr>
+                ) : (
+                  statement.lines.map((ln, idx) => {
+                    const role = lineRole(ln);
+                    const totalled = isTotalRole(role);
+                    const traceable = (ln.accounts?.length ?? 0) > 0;
+                    if (role === 'heading') {
+                      return (
+                        <tr key={`${ln.line_code}-${idx}`} data-role="heading">
+                          <td
+                            colSpan={columns}
+                            className={cn('pb-1 font-semibold', idx === 0 ? 'pt-1' : 'pt-5')}
+                          >
+                            {ln.label}
+                          </td>
+                        </tr>
+                      );
+                    }
+                    // Ruled only where there is a figure to rule.
+                    const figureRule = (value: number | null | undefined) =>
+                      value == null
+                        ? undefined
+                        : cn(
+                            totalled && 'border-t border-foreground/60',
+                            role === 'grand_total' && 'border-b-4 border-double border-foreground/80',
+                          );
+                    return (
+                      <tr
+                        key={`${ln.line_code}-${idx}`}
+                        data-role={role}
+                        data-line-code={ln.line_code}
+                        className={cn(
+                          totalled && 'font-semibold',
+                          ln.is_reconciling && 'text-amber-800 dark:text-amber-300',
+                          traceable && 'cursor-pointer hover:bg-muted/40',
+                        )}
+                        onClick={traceable ? () => setSourceLine(ln) : undefined}
+                        data-testid={traceable ? 'afs-traceable-line' : undefined}
+                      >
+                        <td
+                          className={cn('py-1.5 pr-3', totalled && 'pt-2')}
+                          style={{ paddingLeft: `${lineIndent(ln, role) * 1.25}rem` }}
+                        >
+                          {ln.label}
+                          {ln.is_reconciling && (
+                            <span className="ml-2 text-xs">
+                              — not yet classified in the chart of accounts
+                            </span>
+                          )}
+                        </td>
+                        <td className="w-12 px-1 py-1.5 text-center">
+                          {role === 'item' ? <NoteReference line={ln} ctx={ctx} /> : null}
+                        </td>
+                        <td className={cn(figureCell, figureRule(ln.amount), totalled && 'pt-2')} data-col="current">
+                          {formatStatementFigure(ln.amount, role)}
+                        </td>
+                        {showComparatives && (
+                          <td
+                            className={cn(figureCell, figureRule(ln.prior_amount), totalled && 'pt-2')}
+                            data-col="comparative"
+                          >
+                            {formatStatementFigure(ln.prior_amount, role)}
+                          </td>
+                        )}
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
         <LineSourceDialog line={sourceLine} model={ctx.model} onClose={() => setSourceLine(null)} />
       </CardContent>
     </Card>
+  );
+}
+
+/**
+ * Where a note is used on the face of the statements, and the accounts behind
+ * each figure — so the reader can follow a figure from the statement to its
+ * note and on to the ledger, and back again.
+ */
+/**
+ * Where this note's total disagrees with the statement line it explains. The
+ * statements and notes come from one sealed snapshot; a difference means one of
+ * them has been edited or built wrongly, and the reader is told here, on the
+ * note, rather than finding out from a reviewer.
+ */
+function NoteDisagreements({ note, ctx }: { note: DocNoteNode; ctx: EditorContext }) {
+  const found = useMemo(
+    () => reconcileNotesToStatements(ctx.model).filter((d) => d.noteId === note.id),
+    [ctx.model, note.id],
+  );
+  if (found.length === 0) return null;
+  return (
+    <div
+      role="alert"
+      data-testid="afs-note-disagreement"
+      className="rounded-md border border-destructive/40 bg-destructive/5 px-3 py-2.5 text-sm text-destructive"
+    >
+      {found.map((d) => (
+        <p key={`${d.line}:${d.year}`}>
+          {d.year === 'current' ? 'This year' : 'The comparative year'}: this note totals{' '}
+          <span className="tabular-nums">{formatStatementFigure(d.noteFigure, 'total')}</span>, but “
+          {d.statementLabel}” on the statement is{' '}
+          <span className="tabular-nums">{formatStatementFigure(d.statementFigure, 'total')}</span>.
+        </p>
+      ))}
+    </div>
+  );
+}
+
+function NoteReferencedFrom({ note, ctx }: { note: DocNoteNode; ctx: EditorContext }) {
+  const [sourceLine, setSourceLine] = useState<EfsStatementLine | null>(null);
+  const registered = ctx.register?.byId.get(note.id);
+  if (!registered) return null;
+  const uses = ctx.model.statements.flatMap((statement) =>
+    statement.lines
+      .filter((line) => lineRole(line) === 'item' && ctx.register?.forLine(line.line_code)?.id === note.id)
+      .map((line) => ({ statement, line })),
+  );
+  return (
+    <div className="rounded-md border bg-muted/20 px-3 py-2.5 text-sm" data-testid="afs-note-referenced-from">
+      {uses.length === 0 ? (
+        <p className="text-muted-foreground">
+          Note {registered.noteNumber} is not referred to from a line on the face of the statements.
+        </p>
+      ) : (
+        <>
+          <p className="mb-1.5 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+            Referred to from
+          </p>
+          <ul className="space-y-1">
+            {uses.map(({ statement, line }) => (
+              <li key={`${statement.id}:${line.line_code}`} className="flex flex-wrap items-baseline gap-x-2">
+                <button
+                  type="button"
+                  className="text-left text-emerald-700 underline decoration-emerald-600/40 underline-offset-2 hover:decoration-emerald-600 dark:text-emerald-400"
+                  data-testid="afs-note-backlink"
+                  onClick={() => ctx.onSelect({ kind: 'statement', id: statement.id })}
+                >
+                  {professionalStatementTitle(statement.statement_type, statement.title)} — {line.label}
+                </button>
+                <span className="tabular-nums text-muted-foreground">
+                  {formatStatementFigure(line.amount, 'item')}
+                </span>
+                {(line.accounts?.length ?? 0) > 0 && (
+                  <button
+                    type="button"
+                    className="text-xs text-muted-foreground underline underline-offset-2 hover:text-foreground"
+                    data-testid="afs-note-source"
+                    onClick={() => setSourceLine(line)}
+                  >
+                    {line.accounts!.length} {line.accounts!.length === 1 ? 'account' : 'accounts'}
+                  </button>
+                )}
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+      <LineSourceDialog line={sourceLine} model={ctx.model} onClose={() => setSourceLine(null)} />
+    </div>
   );
 }
 
@@ -456,27 +668,197 @@ function PolicySetEditor({ set }: { set: DocPolicySetNode }) {
   );
 }
 
+/**
+ * Move a piece of a note, and take it out again.
+ *
+ * Taking something out means two different things and the buttons say which.
+ * Wording the preparer authored is a row, and removing it deletes that row.
+ * Wording the framework generated has no row; it is withheld from this
+ * document and can be brought back, because deleting it would achieve nothing
+ * and it would reappear the next time the statements were rebuilt.
+ */
+function PieceControls({
+  ctx,
+  kind,
+  id,
+  pieceKey,
+  siblingKeys,
+  noun,
+}: {
+  ctx: EditorContext;
+  kind: NoteContentKind;
+  /** The row id, or a synthetic one for content the framework generated. */
+  id: string;
+  /** What this piece's placement is remembered against. */
+  pieceKey: string;
+  /** Every sibling's key, in the order they are shown. */
+  siblingKeys: string[];
+  noun: string;
+}) {
+  const [confirming, setConfirming] = useState(false);
+  const hidden = isKeyHidden(ctx.overridesApi.overrides, pieceKey);
+  const stored = isStoredRow(id);
+  const position = siblingKeys.indexOf(pieceKey);
+
+  const move = (direction: -1 | 1) => {
+    const placements = reorderedPlacements(siblingKeys, position, direction);
+    if (placements) ctx.overridesApi.setOrders(placements);
+  };
+
+  const remove = useMutation({
+    mutationFn: () => deleteNoteContent({ companyId: ctx.companyId, kind, id }),
+    onSuccess: () => {
+      setConfirming(false);
+      // Its placement goes with it: nothing should outlive what it describes.
+      ctx.overridesApi.forget(pieceKey);
+      showSuccess(`${noun} deleted`);
+      ctx.onSaved();
+    },
+    onError: (e: Error) => {
+      setConfirming(false);
+      showError(e.message);
+    },
+  });
+
+  if (hidden) {
+    return (
+      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+        <Badge variant="outline">Not in this document</Badge>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-7"
+          disabled={ctx.locked}
+          data-testid="afs-piece-restore"
+          onClick={() => ctx.overridesApi.setHidden(pieceKey, false)}
+        >
+          Bring back
+        </Button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex items-center gap-1">
+      {/* Most notes hold one paragraph and one table. Arrows that can never do
+          anything are not a disabled control, they are a control that looks
+          broken, so there is nothing to move until there is. */}
+      {siblingKeys.length > 1 && (
+        <>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-7 w-7 p-0"
+            aria-label={`Move ${noun.toLowerCase()} up`}
+            data-testid="afs-piece-up"
+            disabled={ctx.locked || position <= 0}
+            onClick={() => move(-1)}
+          >
+            <ChevronUp className="h-4 w-4" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-7 w-7 p-0"
+            aria-label={`Move ${noun.toLowerCase()} down`}
+            data-testid="afs-piece-down"
+            disabled={ctx.locked || position < 0 || position >= siblingKeys.length - 1}
+            onClick={() => move(1)}
+          >
+            <ChevronDown className="h-4 w-4" />
+          </Button>
+        </>
+      )}
+
+      {stored ? (
+        <>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-7 text-destructive hover:text-destructive"
+            data-testid="afs-piece-delete"
+            disabled={ctx.locked || remove.isPending}
+            onClick={() => setConfirming(true)}
+          >
+            <Trash2 className="mr-1.5 h-4 w-4" />
+            {remove.isPending ? 'Deleting…' : 'Delete'}
+          </Button>
+          <AlertDialog open={confirming} onOpenChange={setConfirming}>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Delete this {noun.toLowerCase()}?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  It was written for these financial statements and deleting it cannot be undone.
+                  The change is recorded against the engagement.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Keep it</AlertDialogCancel>
+                <AlertDialogAction
+                  data-testid="afs-piece-delete-confirm"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    remove.mutate();
+                  }}
+                >
+                  Delete
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        </>
+      ) : (
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-7"
+          data-testid="afs-piece-remove"
+          disabled={ctx.locked}
+          title="Standard wording — withheld from this document, not deleted"
+          onClick={() => ctx.overridesApi.setHidden(pieceKey, true)}
+        >
+          <EyeOff className="mr-1.5 h-4 w-4" />
+          Remove
+        </Button>
+      )}
+    </div>
+  );
+}
+
 function ParagraphEditor({
   ctx,
   note,
   paragraph,
+  siblings,
 }: {
   ctx: EditorContext;
   note: DocNoteNode;
   paragraph: DocParagraph;
+  siblings: DocParagraph[];
 }) {
   const [body, setBody] = useState(paragraph.body);
   useEffect(() => setBody(paragraph.body), [paragraph.id, paragraph.body]);
   const save = useContentSave(ctx, note, 'paragraph');
   const generated = !isStoredRow(paragraph.id);
+  const key = paragraphKey(note, paragraph);
+  const hidden = isKeyHidden(ctx.overridesApi.overrides, key);
   return (
-    <div className="space-y-2">
-      <Textarea rows={5} value={body} readOnly={ctx.locked} onChange={(e) => setBody(e.target.value)} />
-      <div className="flex items-center gap-2">
+    <div
+      className={cn('space-y-2 rounded-md', hidden && 'opacity-60')}
+      data-testid="afs-paragraph"
+      data-hidden={hidden ? 'true' : undefined}
+    >
+      <Textarea
+        rows={5}
+        value={body}
+        readOnly={ctx.locked || hidden}
+        onChange={(e) => setBody(e.target.value)}
+      />
+      <div className="flex flex-wrap items-center gap-2">
         <Button
           variant="outline"
           size="sm"
-          disabled={save.isPending || ctx.locked}
+          disabled={save.isPending || ctx.locked || hidden}
           onClick={() =>
             save.mutate(
               {
@@ -493,6 +875,16 @@ function ParagraphEditor({
           {save.isPending ? 'Saving...' : 'Save paragraph'}
         </Button>
         <ContentOriginBadge generated={generated} />
+        <div className="ml-auto">
+          <PieceControls
+            ctx={ctx}
+            kind="paragraph"
+            id={paragraph.id}
+            pieceKey={key}
+            siblingKeys={siblings.map((s) => paragraphKey(note, s))}
+            noun="Paragraph"
+          />
+        </div>
       </div>
     </div>
   );
@@ -632,22 +1024,33 @@ function TableEditor({
   ctx,
   note,
   table,
+  siblings,
 }: {
   ctx: EditorContext;
   note: DocNoteNode;
   table: DocTable;
+  siblings: DocTable[];
 }) {
   const [title, setTitle] = useState(table.title);
   const [grid, setGrid] = useState<string[][]>(() => toGrid(table.rows_json));
   const [headers, setHeaders] = useState<string[]>(() =>
     columnLabels(table.columns_json, toGrid(table.rows_json)),
   );
+  // Same rule as the spreadsheet above: compare what the table contains, not
+  // which array it arrived in, or a save elsewhere in the note wipes this one.
+  const signature = useMemo(
+    () => JSON.stringify([table.id, table.title, table.columns_json, table.rows_json]),
+    [table.id, table.title, table.columns_json, table.rows_json],
+  );
+  const applied = useRef(signature);
   useEffect(() => {
+    if (signature === applied.current) return;
+    applied.current = signature;
     const next = toGrid(table.rows_json);
     setTitle(table.title);
     setGrid(next);
     setHeaders(columnLabels(table.columns_json, next));
-  }, [table.id, table.title, table.rows_json, table.columns_json]);
+  }, [signature, table]);
 
   const save = useContentSave(ctx, note, 'table');
   const width = headers.length || 2;
@@ -668,7 +1071,24 @@ function TableEditor({
 
   return (
     <div className="space-y-2 rounded-md border p-3" data-testid="afs-table-editor">
-      <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Table title" />
+      <div className="flex flex-wrap items-center gap-2">
+        <Input
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          placeholder="Table title"
+          className="max-w-sm"
+        />
+        <div className="ml-auto">
+          <PieceControls
+            ctx={ctx}
+            kind="table"
+            id={table.id}
+            pieceKey={tableKey(note, table)}
+            siblingKeys={siblings.map((s) => tableKey(note, s))}
+            noun="Table"
+          />
+        </div>
+      </div>
 
       <div className="overflow-x-auto rounded-md border">
         <table className="w-full text-sm">
@@ -824,26 +1244,54 @@ function DisclosureTableEditor({
   ctx,
   note,
   table,
+  siblings,
 }: {
   ctx: EditorContext;
   note: DocNoteNode;
   table: DocTable;
+  siblings: DocTable[];
 }) {
   const initial = asGeneratedTable(table);
   const [working, setWorking] = useState<GeneratedTable | null>(initial);
   const [dirty, setDirty] = useState(false);
   const [sourceCell, setSourceCell] = useState<DisclosureCell | null>(null);
+
+  /**
+   * When to take the table back from the document, and when not to.
+   *
+   * This watched `table.rows_json` — an array, compared by identity. The
+   * document is rebuilt on every save anywhere in the note, and a rebuild makes
+   * new arrays even when nothing in this table changed, so adding a row here
+   * and then adding a paragraph over there silently threw the row away. Worse,
+   * it cleared the dirty flag too, so the Save button went quiet and there was
+   * nothing to say the work had gone.
+   *
+   * Two rules now. Compare what the table contains, not which array it is in;
+   * and never overwrite unsaved work — the reader's edit outranks a refresh.
+   */
+  const signature = useMemo(
+    () => JSON.stringify([table.id, table.title, table.columns_json, table.rows_json]),
+    [table.id, table.title, table.columns_json, table.rows_json],
+  );
+  const applied = useRef(signature);
   useEffect(() => {
+    if (dirty || signature === applied.current) return;
+    applied.current = signature;
     setWorking(asGeneratedTable(table));
-    setDirty(false);
-  }, [table.id, table.rows_json, table.columns_json, table.title]);
+  }, [signature, dirty, table]);
 
   const save = useContentSave(ctx, note, 'table');
+  const key = tableKey(note, table);
+  const hidden = isKeyHidden(ctx.overridesApi.overrides, key);
   if (!working) return null;
 
   return (
-    <div className="space-y-2 rounded-md border p-3">
-      <div className="flex items-center justify-between gap-2">
+    <div
+      className={cn('space-y-2 rounded-md border p-3', hidden && 'opacity-60')}
+      data-testid="afs-note-table"
+      data-hidden={hidden ? 'true' : undefined}
+    >
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <Input
           value={working.title}
           readOnly={ctx.locked}
@@ -882,18 +1330,28 @@ function DisclosureTableEditor({
             <Save className="mr-2 h-4 w-4" />
             {save.isPending ? 'Saving…' : dirty ? 'Save table' : 'Saved'}
           </Button>
+          <PieceControls
+            ctx={ctx}
+            kind="table"
+            id={table.id}
+            pieceKey={key}
+            siblingKeys={siblings.map((s) => tableKey(note, s))}
+            noun="Table"
+          />
         </div>
       </div>
 
-      <SpreadsheetEditor
-        table={working}
-        readOnly={ctx.locked}
-        onChange={(next) => {
-          setWorking(next);
-          setDirty(true);
-        }}
-        onViewSource={(c) => setSourceCell(c)}
-      />
+      {!hidden && (
+        <SpreadsheetEditor
+          table={working}
+          readOnly={ctx.locked}
+          onChange={(next) => {
+            setWorking(next);
+            setDirty(true);
+          }}
+          onViewSource={(c) => setSourceCell(c)}
+        />
+      )}
 
       {working.footnote && <p className="text-xs text-muted-foreground">{working.footnote}</p>}
 
@@ -964,16 +1422,90 @@ function CellSourceDialog({
   );
 }
 
+/** A new table opens in the spreadsheet, so it is created in its shape. */
+function starterTable(): { columns: unknown[]; rows: unknown[] } {
+  const money = { align: 'right', numberFormat: 'currency', decimals: 2, negativeParens: true };
+  const blankRow = (label: string) => ({
+    key: `row-${label}-${Math.random().toString(36).slice(2, 8)}`,
+    cells: [
+      { value: label, origin: 'manual', format: { align: 'left' } },
+      { value: null, origin: 'manual', format: money },
+    ],
+  });
+  return {
+    columns: [
+      { label: 'Description', width: 240, align: 'left' },
+      { label: 'Amount', width: 120, align: 'right' },
+    ],
+    rows: [blankRow(''), blankRow(''), blankRow('')],
+  };
+}
+
 function NoteEditor({ note, ctx }: { note: DocNoteNode; ctx: EditorContext }) {
+  const overrides = ctx.overridesApi.overrides;
+  const paragraphs = orderedParagraphs(note, overrides);
+  const tables = orderedTables(note, overrides);
+
+  /**
+   * Adding goes through the same route as every other edit.
+   *
+   * It used to insert straight into the paragraph table using the note's id,
+   * which works only for a note that already exists as a row. Most notes do
+   * not: the disclosure engine builds them and their id is a synthetic one like
+   * "fw:note:generated:DISC.PPE", which is not a uuid — so Add paragraph failed
+   * on exactly the notes the engine prepares. `saveNoteContent` creates the note
+   * row first where it has to.
+   */
   const addParagraph = useMutation({
     mutationFn: () =>
-      invokeFinancialStatements(ctx.companyId, 'UPDATE_DISCLOSURE_PARAGRAPH', {
-        disclosure_instance_id: note.id,
-        section_id: note.sections[0]?.id ?? null,
+      saveNoteContent({
+        companyId: ctx.companyId,
+        workspaceId: ctx.workspaceId,
+        frameworkPackId: ctx.model.frameworkPackId,
+        note,
+        kind: 'paragraph',
+        // A code of its own, so it is added rather than overwriting another.
+        id: `${note.id}:P-new-${Date.now()}`,
+        code: `P${Date.now()}`,
         body: '',
+        sortOrder: nextPlacement(
+          paragraphs.map((p) => paragraphKey(note, p)),
+          paragraphs.map((p) => p.sort_order),
+          overrides,
+        ),
       }),
-    onSuccess: () => {
+    onSuccess: (res) => {
       showSuccess('Paragraph added');
+      if (res.disclosureInstanceId) ctx.onNoteStored?.(res.disclosureInstanceId);
+      ctx.onSaved();
+    },
+    onError: (e: Error) => showError(e.message),
+  });
+
+  const addTable = useMutation({
+    mutationFn: () => {
+      const starter = starterTable();
+      return saveNoteContent({
+        companyId: ctx.companyId,
+        workspaceId: ctx.workspaceId,
+        frameworkPackId: ctx.model.frameworkPackId,
+        note,
+        kind: 'table',
+        id: `${note.id}:T-new-${Date.now()}`,
+        code: `T${Date.now()}`,
+        title: 'New table',
+        columns_json: starter.columns,
+        rows_json: starter.rows,
+        sortOrder: nextPlacement(
+          tables.map((t) => tableKey(note, t)),
+          tables.map((t) => t.sort_order),
+          overrides,
+        ),
+      });
+    },
+    onSuccess: (res) => {
+      showSuccess('Table added');
+      if (res.disclosureInstanceId) ctx.onNoteStored?.(res.disclosureInstanceId);
       ctx.onSaved();
     },
     onError: (e: Error) => showError(e.message),
@@ -982,15 +1514,22 @@ function NoteEditor({ note, ctx }: { note: DocNoteNode; ctx: EditorContext }) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-base">
+        <CardTitle className="text-base" data-testid="afs-note-heading">
+          {ctx.register?.byId.get(note.id) ? (
+            <span className="mr-1.5 text-muted-foreground">
+              Note {ctx.register.byId.get(note.id)!.noteNumber}.
+            </span>
+          ) : null}
           {resolvedTitle(ctx.overridesApi.overrides, note.id, note.title)}
         </CardTitle>
         <CardDescription>
-          Edit the note wording, headings and tables. Note numbers update automatically based on
-          which notes are visible.
+          Edit the note wording, headings and tables. Note numbers, and the references to them on
+          the statements, update automatically when notes are added, hidden or moved.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
+        <NoteDisagreements note={note} ctx={ctx} />
+        <NoteReferencedFrom note={note} ctx={ctx} />
         <NoteStatusControl note={note} ctx={ctx} />
         <TitleOverrideField
           nodeId={note.id}
@@ -1012,36 +1551,64 @@ function NoteEditor({ note, ctx }: { note: DocNoteNode; ctx: EditorContext }) {
 
         <div className="space-y-2">
           <Label>Paragraphs</Label>
-          {note.paragraphs.length === 0 ? (
+          {paragraphs.length === 0 ? (
             <p className="text-sm text-muted-foreground">No paragraphs yet.</p>
           ) : (
-            note.paragraphs.map((paragraph) => (
-              <ParagraphEditor key={paragraph.id} ctx={ctx} note={note} paragraph={paragraph} />
+            paragraphs.map((paragraph) => (
+              <ParagraphEditor
+                key={paragraph.id}
+                ctx={ctx}
+                note={note}
+                paragraph={paragraph}
+                siblings={paragraphs}
+              />
             ))
           )}
           <Button
             variant="outline"
             size="sm"
+            data-testid="afs-add-paragraph"
             onClick={() => addParagraph.mutate()}
-            disabled={addParagraph.isPending}
+            disabled={addParagraph.isPending || ctx.locked}
           >
-            Add paragraph
+            <Plus className="mr-2 h-4 w-4" />
+            {addParagraph.isPending ? 'Adding…' : 'Add paragraph'}
           </Button>
         </div>
 
-        {note.tables.length > 0 && (
-          <div className="space-y-4">
-            {note.tables.map((table) =>
-              // A table the disclosure engine built is edited as a spreadsheet;
-              // anything older keeps the plain editor until it is regenerated.
-              asGeneratedTable(table) ? (
-                <DisclosureTableEditor key={table.id} ctx={ctx} note={note} table={table} />
-              ) : (
-                <TableEditor key={table.id} ctx={ctx} note={note} table={table} />
-              ),
-            )}
-          </div>
-        )}
+        <div className="space-y-4">
+          {tables.map((table) =>
+            // A table the disclosure engine built is edited as a spreadsheet;
+            // anything older keeps the plain editor until it is regenerated.
+            asGeneratedTable(table) ? (
+              <DisclosureTableEditor
+                key={table.id}
+                ctx={ctx}
+                note={note}
+                table={table}
+                siblings={tables}
+              />
+            ) : (
+              <TableEditor key={table.id} ctx={ctx} note={note} table={table} siblings={tables} />
+            ),
+          )}
+          <Button
+            variant="outline"
+            size="sm"
+            data-testid="afs-add-table"
+            onClick={() => addTable.mutate()}
+            disabled={addTable.isPending || ctx.locked}
+          >
+            <Plus className="mr-2 h-4 w-4" />
+            {addTable.isPending ? 'Adding…' : 'Add table'}
+          </Button>
+        </div>
+
+        <NoteLineItems
+          items={ctx.view?.notes.find((n) => n.id === note.id)?.lineItems ?? []}
+          overridesApi={ctx.overridesApi}
+          locked={ctx.locked}
+        />
       </CardContent>
     </Card>
   );
@@ -1295,6 +1862,9 @@ export default function DocumentEditor({
   locked = false,
   onSaved,
   onNoteStored,
+  register = null,
+  view = null,
+  onSelect = () => {},
 }: {
   companyId: string;
   workspaceId: string;
@@ -1305,6 +1875,9 @@ export default function DocumentEditor({
   locked?: boolean;
   onSaved: () => void;
   onNoteStored?: (disclosureInstanceId: string) => void;
+  register?: NoteRegister | null;
+  view?: CanonicalDocumentView | null;
+  onSelect?: (selection: DocSelection) => void;
 }) {
   const ctx: EditorContext = {
     companyId,
@@ -1314,6 +1887,9 @@ export default function DocumentEditor({
     locked,
     onSaved,
     onNoteStored,
+    register,
+    view,
+    onSelect,
   };
   const kind = selection.kind;
 

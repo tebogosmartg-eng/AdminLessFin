@@ -11,6 +11,7 @@ import { AccountIndex, type FinancialFacts } from '../../src/lib/financialStatem
 import { generateDisclosures, type BuildContext } from '../../src/lib/financialStatements/disclosures/definitions';
 import { mergeTable, recalculate } from '../../src/lib/financialStatements/disclosures/merge';
 import { formatCellValue, parseCellValue } from '../../src/lib/financialStatements/disclosures/format';
+import { applyGeneratedDisclosures, asGeneratedTable } from '../../src/lib/financialStatements/disclosures/assemble';
 import type { GeneratedTable } from '../../src/lib/financialStatements/disclosures/types';
 
 function account(
@@ -224,5 +225,163 @@ describe('how a figure reads', () => {
     expect(parseCellValue('R 900')).toBe(900);
     expect(parseCellValue('')).toBeNull();
     expect(parseCellValue('Assets under construction')).toBe('Assets under construction');
+  });
+});
+
+/**
+ * The standard wording and the preparer's own, in one note.
+ *
+ * This used to be all or nothing, and both ends were wrong: rewriting a single
+ * paragraph silently dropped every other paragraph the framework supplies, and
+ * adding a paragraph — which starts empty — left the note looking untouched, so
+ * Add paragraph appeared to do nothing at all.
+ */
+describe('merging narrative when the statements are rebuilt', () => {
+  const NOTE_ID = '7b1f4c2e-0c1a-4f6d-9e2b-8a3d5c6f1234';
+  const STORED = 'a1b2c3d4-0000-4000-8000-000000000001';
+
+  function noteWith(paragraphs: Array<Record<string, unknown>>) {
+    return {
+      id: NOTE_ID,
+      kind: 'note' as const,
+      disclosure_code: 'DISC.PPE',
+      title: 'Property, plant and equipment',
+      status: 'in_progress',
+      requirement_level: 'required',
+      sort_order: 30,
+      sections: [],
+      paragraphs,
+      tables: [],
+    };
+  }
+
+  function rebuild(note: ReturnType<typeof noteWith>) {
+    return applyGeneratedDisclosures([note] as never, {
+      facts: facts(),
+      currentLabel: 'FY2026',
+      priorLabel: 'FY2025',
+    }).notes.find((n) => n.disclosure_code === 'DISC.PPE')!;
+  }
+
+  it('keeps the framework wording the preparer has not touched', () => {
+    const rebuilt = rebuild(noteWith([]));
+    expect(rebuilt.paragraphs.length).toBeGreaterThan(0);
+    expect(rebuilt.paragraphs.every((p) => p.body.trim())).toBe(true);
+  });
+
+  it('keeps a paragraph the preparer added, even before they have written in it', () => {
+    // The defect: an empty paragraph meant "this note has no wording of its
+    // own", so the whole note was replaced and the new paragraph disappeared.
+    const rebuilt = rebuild(
+      noteWith([{ id: STORED, section_id: null, paragraph_code: 'P900', body: '', sort_order: 900 }]),
+    );
+    expect(rebuilt.paragraphs.some((p) => p.paragraph_code === 'P900')).toBe(true);
+  });
+
+  it('does not drop the rest of the framework wording when one paragraph is rewritten', () => {
+    const generated = rebuild(noteWith([]));
+    expect(generated.paragraphs.length).toBeGreaterThan(1);
+
+    const rewritten = rebuild(
+      noteWith([
+        { id: STORED, section_id: null, paragraph_code: 'P1', body: 'Our own first sentence.', sort_order: 1 },
+      ]),
+    );
+    expect(rewritten.paragraphs).toHaveLength(generated.paragraphs.length);
+    expect(rewritten.paragraphs[0].body).toBe('Our own first sentence.');
+    expect(rewritten.paragraphs[1].body).toBe(generated.paragraphs[1].body);
+  });
+
+  it('puts the preparer\u2019s own additions after the standard wording', () => {
+    const rebuilt = rebuild(
+      noteWith([
+        { id: STORED, section_id: null, paragraph_code: 'P900', body: 'Added by us.', sort_order: 900 },
+      ]),
+    );
+    expect(rebuilt.paragraphs[rebuilt.paragraphs.length - 1].paragraph_code).toBe('P900');
+  });
+
+  it('drops an empty paragraph that has no row behind it', () => {
+    // A leftover of the old assembly: it says nothing and asks for nothing.
+    const rebuilt = rebuild(
+      noteWith([
+        { id: `${NOTE_ID}:P900`, section_id: null, paragraph_code: 'P900', body: '', sort_order: 900 },
+      ]),
+    );
+    expect(rebuilt.paragraphs.some((p) => p.paragraph_code === 'P900')).toBe(false);
+  });
+});
+
+/**
+ * One table editor, not two.
+ *
+ * Tables written before the disclosure engine store a row as a plain array of
+ * text. They used to fall through to a far poorer editor — no formatting, no
+ * clipboard, no keyboard — so which editor an accountant got depended on which
+ * note they opened. They are now read into the same shape as everything else.
+ */
+describe('a table stored before the disclosure engine', () => {
+  const legacy = {
+    id: 'a1b2c3d4-0000-4000-8000-00000000000a',
+    table_code: 'T.CATEGORIES',
+    title: 'Categories of financial instruments',
+    columns_json: [{ label: 'Category' }, { label: 'FY2026' }],
+    rows_json: [
+      ['Loans and receivables', '500 000,00'],
+      ['Financial liabilities at amortised cost', '320 000,00'],
+    ],
+    sort_order: 10,
+  };
+
+  it('opens in the spreadsheet rather than falling back', () => {
+    const table = asGeneratedTable(legacy as never);
+    expect(table).not.toBeNull();
+    expect(table!.rows).toHaveLength(2);
+    expect(table!.rows[0].cells[0].value).toBe('Loans and receivables');
+  });
+
+  it('is read as the preparer\u2019s own, because nothing records a link to the ledger', () => {
+    const table = asGeneratedTable(legacy as never)!;
+    expect(table.rows.flatMap((r) => r.cells).every((c) => c.origin === 'manual')).toBe(true);
+  });
+
+  it('keeps the headings it was stored with', () => {
+    const table = asGeneratedTable(legacy as never)!;
+    expect(table.columns.map((c) => c.label)).toEqual(['Category', 'FY2026']);
+  });
+
+  it('invents headings only where none were stored', () => {
+    const table = asGeneratedTable({ ...legacy, columns_json: [] } as never)!;
+    expect(table.columns).toHaveLength(2);
+    expect(table.columns[0].label).toBe('Description');
+  });
+
+  it('still refuses a shape it cannot read', () => {
+    expect(asGeneratedTable({ ...legacy, rows_json: [{ a: 1 }] } as never)).toBeNull();
+    expect(asGeneratedTable({ ...legacy, rows_json: [] } as never)).toBeNull();
+  });
+});
+
+describe('an income or expense note reports the year, not the running balance', () => {
+  const sales = { id: '4010', name: 'Sales - Goods', type: 'Income', category: 'Revenue', subcategory: null, account_number: 4010 };
+  const build = (withActivity: boolean) => {
+    const index = new AccountIndex({
+      balances_as_of: [{ ...sales, balance: 5_571_000 }],
+      balances_prior_as_of: [{ ...sales, balance: 2_150_000 }],
+      period_activity: withActivity ? [{ ...sales, period_activity: 3_421_000 }] : [],
+    });
+    const ctx: BuildContext = { index, currentLabel: '2026', priorLabel: '2025', withComparatives: index.hasComparatives };
+    const revenue = generateDisclosures(ctx).find((d) => d.code === 'DISC.REVENUE')!;
+    const table = revenue.tables.find((t) => t.code === 'REVENUE.DISAGGREGATION')!;
+    return table.rows.find((r) => r.cells[0].value === 'Total revenue')!.cells[1].value;
+  };
+
+  it("takes this year's figure from the year's movement, which is what the statement shows", () => {
+    // The closing balance of 5 571 000 carries last year's 2 150 000 with it.
+    expect(build(true)).toBe(3_421_000);
+  });
+
+  it('falls back to the closing balance where the snapshot carries no movement', () => {
+    expect(build(false)).toBe(5_571_000);
   });
 });

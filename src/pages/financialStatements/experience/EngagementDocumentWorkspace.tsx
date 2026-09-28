@@ -5,6 +5,7 @@ import type {
 } from '../../../lib/financialStatements/api';
 import { useDocumentModel } from '../../../lib/financialStatements/document/useDocumentModel';
 import { useDocumentOverrides } from '../../../lib/financialStatements/document/documentStore';
+import { usePreparedDocument } from '../../../lib/financialStatements/document/useNoteRegister';
 import DocumentTree from '../document/DocumentTree';
 import DocumentEditor from '../document/DocumentEditor';
 import DocumentPreview from '../document/DocumentPreview';
@@ -74,6 +75,10 @@ export default function WorkspaceDocumentWorkspace({
   });
 
   const invalidateModel = modelQuery.reload;
+  // The document as it will print, prepared once: the navigator, the Editor,
+  // the properties and the Live Preview all read this one preparation.
+  const prepared = usePreparedDocument(modelQuery.data, overridesApi.overrides);
+  const register = prepared?.register ?? null;
 
   if (modelQuery.isLoading) {
     return (
@@ -129,6 +134,7 @@ export default function WorkspaceDocumentWorkspace({
             onSelect={setSelection}
             onToggleHidden={overridesApi.toggleHidden}
             onAddDisclosure={() => setAddDisclosureOpen(true)}
+            register={register}
           />
         </div>
 
@@ -149,10 +155,17 @@ export default function WorkspaceDocumentWorkspace({
                 locked={locked}
                 onSaved={invalidateModel}
                 onNoteStored={(id) => setSelection({ kind: 'note', id })}
+                register={register}
+                view={prepared?.view ?? null}
+                onSelect={setSelection}
               />
             </TabsContent>
             <TabsContent value="preview" className="mt-0">
-              <DocumentPreview model={model} overrides={overridesApi.overrides} />
+              <DocumentPreview
+                model={model}
+                overrides={overridesApi.overrides}
+                view={prepared?.view ?? null}
+              />
             </TabsContent>
           </Tabs>
         </div>
@@ -168,6 +181,7 @@ export default function WorkspaceDocumentWorkspace({
                 model={model}
                 selection={selection}
                 overridesApi={overridesApi}
+                register={register}
               />
             </TabsContent>
             <TabsContent value="validation" className="mt-0">
@@ -187,6 +201,7 @@ export default function WorkspaceDocumentWorkspace({
         model={model}
         overridesApi={overridesApi}
         frameworkPackId={dashboard.framework?.id ?? null}
+        register={register}
         onCreated={(newNoteId) => {
           setSelection({ kind: 'note', id: newNoteId });
           invalidateModel();

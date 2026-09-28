@@ -64,13 +64,15 @@ export const LINE_DISCLOSURE_LINK_RULES: LineLinkRule[] = [
   },
   {
     lineCodePatterns: ['sfp.cash'],
-    disclosureCodes: ['DISC.CASHFLOW'],
+    // The balance is explained by the cash note; the statement of cash flows
+    // note is the fallback where a framework has no cash note of its own.
+    disclosureCodes: ['DISC.CASH', 'DISC.CASHFLOW'],
     policyCodes: ['POL.CASH'],
     frameworkSections: ['IFRS_SME.7'],
     accountCategories: ['current_assets'],
   },
   {
-    lineCodePatterns: ['sfp.share_capital'],
+    lineCodePatterns: ['sfp.share_capital', 'sfp.issued_capital'],
     disclosureCodes: ['DISC.SHARECAPITAL'],
     policyCodes: ['POL.EQUITY'],
     frameworkSections: ['IFRS_SME.22'],
@@ -152,6 +154,24 @@ export const LINE_DISCLOSURE_LINK_RULES: LineLinkRule[] = [
     policyCodes: ['POL.REVENUE'],
     frameworkSections: ['IFRS_SME.23'],
     accountCategories: ['revenue'],
+  },
+  {
+    lineCodePatterns: ['perf.cost_of_sales'],
+    disclosureCodes: ['DISC.COSTOFSALES'],
+    policyCodes: ['POL.INVENTORIES'],
+    accountCategories: ['cost_of_sales'],
+  },
+  {
+    lineCodePatterns: ['perf.other_income'],
+    disclosureCodes: ['DISC.OTHERINCOME'],
+    policyCodes: ['POL.REVENUE'],
+    accountCategories: ['other_income'],
+  },
+  {
+    lineCodePatterns: ['perf.operating_expenses'],
+    disclosureCodes: ['DISC.OPERATINGEXPENSES'],
+    policyCodes: [],
+    accountCategories: ['operating_expenses'],
   },
   {
     lineCodePatterns: ['perf.government', 'perf.grants'],
@@ -274,13 +294,28 @@ export function linksForDisclosure(
   };
 }
 
-/** Primary map used by face-statement note referencing. */
-export function disclosureCodeForLine(lineCode: string): string | null {
+/**
+ * The note a statement line refers to.
+ *
+ * Given the notes the document actually contains, the answer is the first
+ * supporting disclosure that exists — so a line never points at a note that
+ * was not printed, and a line whose preferred note is absent falls back to the
+ * next one that explains it rather than to nothing. Without that list it
+ * answers with the preferred disclosure, which is all the rules can say.
+ */
+export function disclosureCodeForLine(
+  lineCode: string,
+  available?: Iterable<string>,
+): string | null {
   const code = lineCode.toLowerCase();
+  const present = available
+    ? new Set([...available].map((c) => String(c).toUpperCase()))
+    : null;
   for (const rule of LINE_DISCLOSURE_LINK_RULES) {
-    if (rule.lineCodePatterns.some((p) => code.includes(p.toLowerCase()))) {
-      return rule.disclosureCodes[0] || null;
-    }
+    if (!rule.lineCodePatterns.some((p) => code.includes(p.toLowerCase()))) continue;
+    if (!present) return rule.disclosureCodes[0] || null;
+    const found = rule.disclosureCodes.find((c) => present.has(c.toUpperCase()));
+    if (found) return found.toUpperCase();
   }
   return null;
 }

@@ -65,6 +65,14 @@ export class LayoutEngine {
   private continuation: string | null = null;
   /** Pages flagged as front matter (cover) receive no running header. */
   private noHeaderPages = new Set<number>();
+  /**
+   * A measuring engine lays content out on one endless page and draws nothing
+   * that is kept: it exists to learn how tall something will be before it is
+   * placed for real.
+   */
+  private measuring = false;
+  /** Where the writing starts on the current page, below any continuation line. */
+  private pageStartY = CONTENT_TOP;
 
   constructor(meta: DocMeta) {
     this.meta = meta;
@@ -92,12 +100,46 @@ export class LayoutEngine {
       });
       this.y -= TYPE.subHeading * 1.55;
     }
+    this.pageStartY = this.y;
     return p;
   }
 
   /** Force a fresh page (used to start each major statutory section cleanly). */
   newPage(): void {
+    if (this.measuring) return;
     this.pushPage();
+  }
+
+  /** Nothing has been written on this page yet. */
+  get atPageTop(): boolean {
+    return this.y >= this.pageStartY - 0.5;
+  }
+
+  /** The height a full page offers, below a continuation line. */
+  get pageCapacity(): number {
+    return CONTENT_TOP - CONTENT_BOTTOM - TYPE.subHeading * 1.55;
+  }
+
+  /**
+   * How tall something will be once laid out, without laying it out here.
+   * The content is rendered into a measuring engine that never breaks a page.
+   */
+  measure(render: (engine: LayoutEngine) => void): number {
+    const probe = new LayoutEngine(this.meta);
+    probe.measuring = true;
+    const start = probe.y;
+    render(probe);
+    return start - probe.y;
+  }
+
+  /**
+   * Keep a block together: if it will not fit in what is left of this page but
+   * would fit on a page of its own, start it on the next page. A block taller
+   * than a page is left to flow, since moving it would only add a blank gap.
+   */
+  keepTogether(height: number): void {
+    if (this.measuring || this.atPageTop) return;
+    if (height > this.remaining && height <= this.pageCapacity) this.pushPage();
   }
 
   /** Start a page that carries no running header (cover). */
@@ -116,6 +158,7 @@ export class LayoutEngine {
   }
 
   ensure(needed: number): void {
+    if (this.measuring) return;
     if (this.y - needed < CONTENT_BOTTOM) this.pushPage();
   }
 
@@ -125,7 +168,7 @@ export class LayoutEngine {
 
   /** Remaining vertical space on the current page. */
   get remaining(): number {
-    return this.y - CONTENT_BOTTOM;
+    return this.measuring ? Number.POSITIVE_INFINITY : this.y - CONTENT_BOTTOM;
   }
 
   // ── Typography helpers ────────────────────────────────────────────────────
@@ -159,9 +202,18 @@ export class LayoutEngine {
     }
   }
 
+  /**
+   * Name the current position so a link can jump to it. Call after any
+   * `ensure` that may start a new page, so the name lands where the text does.
+   */
+  anchor(name: string): void {
+    this.page.anchor(name, this.y + TYPE.body);
+  }
+
   /** Note heading (kept with at least the first following line). */
-  noteHeading(heading: string): void {
+  noteHeading(heading: string, anchor?: string): void {
     this.ensure(TYPE.noteHeading * 1.6 + TYPE.body * 1.4);
+    if (anchor) this.anchor(anchor);
     this.page.text(CONTENT_L, this.y, asciiOnly(heading), { size: TYPE.noteHeading, font: 'bold' });
     this.y -= TYPE.noteHeading * 1.5;
   }

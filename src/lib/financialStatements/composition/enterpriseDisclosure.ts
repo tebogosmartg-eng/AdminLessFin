@@ -22,6 +22,7 @@ import {
   resolveMovementSchedules,
 } from './movementScheduleEngine';
 import { validateEnterpriseDisclosure } from './disclosureValidation';
+import { formatStatementFigure, parseFigure } from '../publication/statementPresentation';
 import type {
   AccountingEstimateBlock,
   DisclosureCategoryMeta,
@@ -73,7 +74,9 @@ function buildReconciliations(
     const rows = tableToCompositionRows(table.columns_json, table.rows_json);
     const items = rows.slice(1).map((r, i) => ({
       label: r[0] || `Item ${i + 1}`,
-      amount: parseFloat(String(r[1] || '').replace(/[^\d.-]/g, '')) || null,
+      // Read as the figure it is: stripping everything but digits turned
+      // "2 540 000,00" into 254 000 000.
+      amount: parseFigure(r[1]),
     }));
     reconciliations.push({
       id: `recon:${table.id}`,
@@ -274,13 +277,23 @@ export function enterpriseDisclosureToBlocks(
     });
   }
 
+  // A reconciliation is read from one of the note's own tables. Where that
+  // table is already in the note, printing a summary of it again under the
+  // same title only says the closing balance twice.
+  const tableTitles = new Set(
+    blocks.filter((b) => b.type === 'table').map((b) => (b as { title: string }).title.trim().toLowerCase()),
+  );
   for (const recon of disclosure.reconciliations) {
+    if (tableTitles.has(recon.title.trim().toLowerCase())) continue;
     const rows: string[][] = [
       ['', 'Amount'],
-      ...recon.reconcilingItems.map((i) => [i.label, String(i.amount ?? '[ — ]')]),
+      ...recon.reconcilingItems.map((i) => [
+        i.label,
+        i.amount == null ? '[ — ]' : formatStatementFigure(i.amount, 'item'),
+      ]),
     ];
     if (recon.closingBalance != null) {
-      rows.push(['Closing balance', String(recon.closingBalance)]);
+      rows.push(['Closing balance', formatStatementFigure(recon.closingBalance, 'total')]);
     }
     blocks.push({
       type: 'table',
@@ -293,7 +306,14 @@ export function enterpriseDisclosureToBlocks(
   for (const n of disclosure.comparatives.comparativeNarratives) {
     blocks.push({ type: 'paragraph', text: n.text, bold: n.bold, componentKind: 'narrative' });
   }
+  // A comparative table that repeats, figure for figure, a table already in
+  // the note says nothing new — its comparatives are that table's prior-year
+  // column — and printing it made every note read twice.
+  const printed = new Set(
+    blocks.filter((b) => b.type === 'table').map((b) => JSON.stringify((b as { rows: string[][] }).rows)),
+  );
   for (const t of disclosure.comparatives.comparativeTables) {
+    if (printed.has(JSON.stringify(t.rows))) continue;
     blocks.push({
       type: 'table',
       title: t.title,
@@ -302,7 +322,15 @@ export function enterpriseDisclosureToBlocks(
     });
   }
 
+  // An estimate or judgement drawn from wording the note already prints is not
+  // printed a second time under a label.
+  const said = new Set(
+    blocks
+      .filter((b) => b.type === 'paragraph')
+      .map((b) => (b as { text: string }).text.trim()),
+  );
   for (const est of disclosure.accountingEstimates) {
+    if (said.has(est.narrative.trim())) continue;
     blocks.push({
       type: 'paragraph',
       text: `${est.label}: ${est.narrative}`,
@@ -311,6 +339,7 @@ export function enterpriseDisclosureToBlocks(
   }
 
   for (const jud of disclosure.judgements) {
+    if (said.has(jud.narrative.trim())) continue;
     blocks.push({
       type: 'paragraph',
       text: `${jud.label}: ${jud.narrative}`,

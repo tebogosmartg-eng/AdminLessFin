@@ -87,12 +87,81 @@ describe('AFS readiness', () => {
     expect(issue!.location).toEqual({ kind: 'statement', id: 'financial_position' });
   });
 
+  const equityStatement = (period: number, closing: number, priorPeriod: number | null = null) => ({
+    id: 'changes_in_equity',
+    kind: 'statement' as const,
+    statement_type: 'changes_in_equity',
+    title: 'Statement of Changes in Equity',
+    populated: true,
+    lines: [
+      line({ line_code: 'eq.period_result', amount: period, prior_amount: priorPeriod }),
+      line({ line_code: 'eq.closing', amount: closing }),
+    ],
+  });
+
   it('blocks when the result differs between the two statements', () => {
     const m = model();
+    m.statements.push(equityStatement(120, 0));
     m.statements[1].lines = [line({ line_code: 'perf.net_result', amount: 95, prior_amount: 90 })];
     const r = assessReadiness(m);
     expect(r.state).toBe('blocked');
-    expect(r.issues.some((i) => i.id === 'result-mismatch')).toBe(true);
+    expect(r.issues.some((i) => i.id === 'result-mismatch-current')).toBe(true);
+  });
+
+  it('checks the comparative year as well as this one', () => {
+    const m = model();
+    m.statements.push(equityStatement(120, 0, 80));
+    const r = assessReadiness(m);
+    expect(r.issues.some((i) => i.id === 'result-mismatch-prior')).toBe(true);
+    expect(r.issues.some((i) => i.id === 'result-mismatch-current')).toBe(false);
+  });
+
+  it('blocks when closing equity is not the balance sheet equity', () => {
+    const m = model();
+    m.statements[0].lines.push(line({ line_code: 'sfp.total_equity', amount: 4_344_750 }));
+    m.statements.push(equityStatement(120, 3_055_950));
+    const r = assessReadiness(m);
+    const issue = r.issues.find((i) => i.id === 'equity-mismatch-current');
+    expect(issue).toBeDefined();
+    expect(issue!.state).toBe('blocked');
+  });
+
+  it('blocks when a note does not agree with the line it explains', () => {
+    const m = model();
+    m.statements[1].lines.push(line({ line_code: 'perf.revenue', label: 'Revenue', amount: 3_421_000 }));
+    m.notes = [
+      {
+        id: 'rev',
+        kind: 'note',
+        disclosure_code: 'DISC.REVENUE',
+        title: 'Revenue',
+        status: 'draft',
+        requirement_level: 'required',
+        sort_order: 10,
+        sections: [],
+        paragraphs: [],
+        tables: [
+          {
+            id: 'rev:t',
+            table_code: 'REVENUE.DISAGGREGATION',
+            title: 'Revenue',
+            columns_json: [{ label: '' }, { label: '2026' }],
+            rows_json: [
+              { key: 'Total revenue', cells: [{ value: 'Total revenue', origin: 'manual' }, { value: 5_571_000, origin: 'calculated' }] },
+            ],
+            sort_order: 10,
+          },
+        ],
+      },
+    ];
+    const r = assessReadiness(m);
+    const issue = r.issues.find((i) => i.id === 'note-disagrees-DISC.REVENUE-current');
+    expect(issue).toBeDefined();
+    expect(issue!.location).toEqual({ kind: 'note', id: 'rev' });
+
+    // Put the note right and the finding goes.
+    (m.notes[0].tables[0].rows_json[0] as { cells: Array<{ value: unknown }> }).cells[1].value = 3_421_000;
+    expect(assessReadiness(m).issues.some((i) => i.id.startsWith('note-disagrees'))).toBe(false);
   });
 
   it('asks for action when accounts are not classified', () => {

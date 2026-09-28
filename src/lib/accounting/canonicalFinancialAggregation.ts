@@ -82,6 +82,10 @@ export type CanonicalFinancialAggregation = {
   openingRetainedEarnings: number;
   closingRetainedEarningsPresented: number;
   openingStoredEquity: number;
+  /** Profit of earlier periods still held in income and expense accounts (not yet closed). */
+  unclosedPriorEarnings: number;
+  /** Equity at the start of the period: stored equity plus unclosed earlier profit. */
+  openingEquity: number;
   otherEquityMovements: number;
 
   // Position KPIs from TB + roles
@@ -376,14 +380,31 @@ export function buildCanonicalFinancialAggregation(input: {
   const assets = sumBalancesByType(balances, 'Asset');
   const liabilities = sumBalancesByType(balances, 'Liability');
   const storedEquity = sumBalancesByType(balances, 'Equity');
-  const equity = round2(storedEquity + netProfit);
+  // Profit of earlier periods that has not been closed into retained earnings.
+  // Income and expense balances run on from year to year until a year-end
+  // close sweeps them into retained earnings; before that, last year's profit
+  // sits in those accounts and nowhere else. Counting only this period's
+  // profit left it out of equity, and the balance sheet failed to balance by
+  // exactly that amount. After a close the income and expense balances hold
+  // only this period, so this is nil and nothing changes. Where the balances
+  // carry no income or expense accounts at all, it is nil too — never inferred.
+  const carriesProfitAccounts = balances.some((r) => r.type === 'Income' || r.type === 'Expense');
+  const unclosedPriorEarnings = carriesProfitAccounts
+    ? round2(
+        sumBalancesByType(balances, 'Income') - sumBalancesByType(balances, 'Expense') - netProfit,
+      )
+    : 0;
+  const equity = round2(storedEquity + unclosedPriorEarnings + netProfit);
   const liabilitiesAndEquity = round2(liabilities + equity);
 
   const retainedEarnings = retainedEarningsBalance(balances);
   const openingRetainedEarnings = retainedEarningsBalance(opening);
   const openingStoredEquity = sumBalancesByType(opening, 'Equity');
   const otherEquityMovements = round2(storedEquity - openingStoredEquity);
-  const closingRetainedEarningsPresented = round2(openingRetainedEarnings + netProfit);
+  const closingRetainedEarningsPresented = round2(
+    openingRetainedEarnings + unclosedPriorEarnings + netProfit,
+  );
+  const openingEquity = round2(openingStoredEquity + unclosedPriorEarnings);
 
   let cash = sumBalancesByPred(balances, isCashBalanceAccount);
   if (bankIds.size > 0) {
@@ -404,7 +425,7 @@ export function buildCanonicalFinancialAggregation(input: {
   const cashFlow = cashSectionTotals(input.cashFlowData);
 
   const equityIdentityHolds =
-    Math.abs(openingStoredEquity + netProfit + otherEquityMovements - equity) < 0.015;
+    Math.abs(openingEquity + netProfit + otherEquityMovements - equity) < 0.015;
 
   return {
     schema_version: '1.0.0',
@@ -429,6 +450,8 @@ export function buildCanonicalFinancialAggregation(input: {
     openingRetainedEarnings,
     closingRetainedEarningsPresented,
     openingStoredEquity,
+    unclosedPriorEarnings,
+    openingEquity,
     otherEquityMovements,
     cash,
     receivables,

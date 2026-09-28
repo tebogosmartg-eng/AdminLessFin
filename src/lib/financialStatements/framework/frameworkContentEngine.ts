@@ -67,12 +67,58 @@ function codeKey(code: string): string {
   return String(code || '').trim().toUpperCase();
 }
 
-function noteHasBody(note: DocNoteNode): boolean {
-  return (
-    (note.paragraphs && note.paragraphs.length > 0) ||
-    (note.sections && note.sections.length > 0) ||
-    (note.tables && note.tables.length > 0)
-  );
+/**
+ * The framework's content for a note, with whatever has been authored over it.
+ *
+ * A note starts out supplied entirely by the framework and has no row of its
+ * own. Saving any one piece of it — a table, a sentence — creates that row, and
+ * the row holds only the piece that was saved. So the two have to be merged, or
+ * the act of adding a table to a note deletes everything else in it.
+ *
+ * Merging is by the code each piece carries, which is stable across both
+ * regeneration and the note being stored for the first time. A piece the
+ * preparer has written wins; a piece they have not is the framework's and is
+ * refreshed; anything they have added that the framework does not define
+ * follows on the end.
+ */
+function mergeFrameworkNote(serverNote: DocNoteNode, enriched: DocNoteNode): DocNoteNode {
+  const merge = <T,>(
+    standard: T[],
+    authored: T[],
+    codeOf: (item: T) => string,
+    reId: (item: T) => T,
+  ): T[] => {
+    const own = new Map(authored.map((item) => [codeOf(item), item]));
+    const out = standard.map((item) => {
+      const code = codeOf(item);
+      const mine = own.get(code);
+      own.delete(code);
+      return mine ?? reId(item);
+    });
+    return [...out, ...own.values()];
+  };
+
+  return {
+    ...serverNote,
+    sections: merge(
+      enriched.sections || [],
+      serverNote.sections || [],
+      (s) => s.section_code,
+      (s) => ({ ...s, id: `${serverNote.id}:${s.section_code}` }),
+    ),
+    paragraphs: merge(
+      enriched.paragraphs || [],
+      serverNote.paragraphs || [],
+      (p) => p.paragraph_code,
+      (p) => ({ ...p, id: `${serverNote.id}:${p.paragraph_code}` }),
+    ),
+    tables: merge(
+      enriched.tables || [],
+      serverNote.tables || [],
+      (t) => t.table_code,
+      (t) => ({ ...t, id: `${serverNote.id}:${t.table_code}` }),
+    ),
+  };
 }
 
 function buildFrameworkPolicySet(
@@ -226,18 +272,18 @@ export function assembleFrameworkDocument(input: FrameworkAssemblyInput): Framew
 
     if (serverNote) {
       consumedServer.add(key);
-      // Enrich an empty engagement instance with the standard narrative/table,
-      // without overriding accountant-authored content.
-      if (!noteHasBody(serverNote)) {
-        const enriched = buildFrameworkNote(frameworkKey, noteDef, serverNote.sort_order || sort, facts, manualFields);
-        notes.push({
-          ...serverNote,
-          paragraphs: enriched.paragraphs.map((p) => ({ ...p, id: `${serverNote.id}:${p.paragraph_code}` })),
-          tables: enriched.tables.map((t) => ({ ...t, id: `${serverNote.id}:${t.table_code}` })),
-        });
-      } else {
-        notes.push(serverNote);
-      }
+      // The standard narrative and tables, with whatever has been authored over
+      // the top of them. This used to be all or nothing — one stored table made
+      // the note "have a body" and the entire framework content was discarded —
+      // so adding a table to a note wiped its wording and its standard table.
+      const enriched = buildFrameworkNote(
+        frameworkKey,
+        noteDef,
+        serverNote.sort_order || sort,
+        facts,
+        manualFields,
+      );
+      notes.push(mergeFrameworkNote(serverNote, enriched));
     } else {
       notes.push(buildFrameworkNote(frameworkKey, noteDef, sort, facts, manualFields));
     }

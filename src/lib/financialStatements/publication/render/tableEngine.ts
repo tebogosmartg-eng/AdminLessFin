@@ -8,15 +8,15 @@
  */
 import { CONTENT_L, CONTENT_R, CONTENT_W, ellipsize, textWidth, wrapText } from './pdfKit';
 import { LayoutEngine, TYPE } from './layoutEngine';
+import { looksLikeFigure } from '../statementPresentation';
 
-const NUMERIC_RE = /^\(?-?[\d,]+\.\d{2}\)?$/;
 const DASH_RE = /^[-–—\s]*$/;
 export const TABLE_MANUAL_TOKENS = ['[ — ]', '[—]', '[ - ]'];
 
 function isNumericCell(value: string): boolean {
   const v = value.trim();
   if (!v) return false;
-  if (NUMERIC_RE.test(v)) return true;
+  if (looksLikeFigure(v)) return true;
   if (DASH_RE.test(v)) return true;
   if (TABLE_MANUAL_TOKENS.includes(v)) return true;
   return false;
@@ -108,9 +108,11 @@ export function renderFinancialTable(
         font: 'bold',
       });
     }
-    engine.y -= leading;
-    engine.page.line(CONTENT_L, engine.y + leading * 0.2, CONTENT_R, engine.y + leading * 0.2, 0.8, 0.15);
-    engine.y -= 3;
+    // The rule closes the header band; the first row starts a full line
+    // below it, so the rule never runs through the row's lettering.
+    const ruleY = engine.y - size * 0.32;
+    engine.page.line(CONTENT_L, ruleY, CONTENT_R, ruleY, 0.8, 0.15);
+    engine.y = ruleY - size * 1.25;
   };
 
   drawHeaderRow();
@@ -127,8 +129,9 @@ export function renderFinancialTable(
     }
 
     if (total) {
-      engine.page.line(CONTENT_L, engine.y + leading * 0.28, CONTENT_R, engine.y + leading * 0.28, 0.6, 0.3);
-      engine.y -= 2;
+      // Above the capitals of the total row, not through them.
+      engine.y -= 3;
+      engine.page.line(CONTENT_L, engine.y + size * 1.05, CONTENT_R, engine.y + size * 1.05, 0.6, 0.3);
     }
 
     const firstY = engine.y;

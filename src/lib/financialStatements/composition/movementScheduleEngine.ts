@@ -5,6 +5,7 @@
  * intangibles, biological assets, goodwill, equity, borrowings, lease
  * liabilities, deferred tax, inventory, and future frameworks.
  */
+import { formatStatementFigure } from '../publication/statementPresentation';
 import type {
   MovementColumnRole,
   MovementSchedule,
@@ -258,7 +259,8 @@ function formatColumnLabel(role: MovementColumnRole): string {
 
 function formatMovementValue(value: number | null | undefined): string {
   if (value == null) return '[ — ]';
-  return value.toLocaleString('en-ZA', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+  // Written as every other figure in the document is.
+  return formatStatementFigure(value, 'item');
 }
 
 export function findMovementDefinition(scheduleCode: string): MovementScheduleDefinition | undefined {

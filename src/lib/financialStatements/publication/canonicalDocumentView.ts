@@ -21,8 +21,12 @@ import type { DocumentModel, DocNoteNode, DocStatementNode } from '../document/d
 import {
   buildNoteNumberResolution,
   rewriteCrossReferenceText,
+  type NoteNumberer,
 } from '../document/crossRefRewrite';
+import { buildNoteRegister, registerFromComposition } from '../document/noteRegister';
+import type { NumberedNote } from '../document/renumber';
 import { isHidden, resolvedTitle, type DocOverrides } from '../document/documentStore';
+import { resolveNoteContent } from '../document/noteContent';
 import {
   displaySignatureField,
   SIGNATURE_PLACEHOLDERS,
@@ -36,6 +40,9 @@ import type { CorporateInformationModel } from '../corporateInformation';
 import { produceReportingPackage, type ReportingIntelligenceOptions } from '../reportingIntelligence/orchestrator';
 import type { ReportingPackage } from '../reportingIntelligence/types';
 import { enterpriseDisclosureToBlocks } from '../composition/enterpriseDisclosure';
+import { tableToCompositionRows } from '../composition/disclosureComponents';
+import { presentTableRows, reportingYears } from './statementPresentation';
+import { applyLineChoices, type LineItem } from './lineItems';
 
 export type CanonicalTextBlock =
   | { type: 'paragraph'; text: string; bold?: boolean }
@@ -55,7 +62,13 @@ export type CanonicalNote = {
   noteNumber: number;
   title: string;
   heading: string;
+  /** What prints, after the preparer's line choices. */
   blocks: CanonicalTextBlock[];
+  disclosureCode: string;
+  /** Every table line, printed or not, with what was decided for it. */
+  lineItems: LineItem[];
+  /** The preparer asked for this note to start on a new page. */
+  pageBreakBefore: boolean;
 };
 
 export type CanonicalSignature = {
@@ -140,51 +153,22 @@ export type CanonicalPresentationMeta = {
   businessAddress: string | null;
 };
 
-function stringifyCell(value: unknown): string {
-  if (value == null) return '';
-  if (typeof value === 'object') {
-    const obj = value as Record<string, unknown>;
-    return String(obj.label ?? obj.value ?? obj.text ?? JSON.stringify(obj));
-  }
-  return String(value);
-}
-
-function tableToRows(columns: unknown[], rows: unknown[]): string[][] {
-  const out: string[][] = [];
-  if (Array.isArray(columns) && columns.length) {
-    out.push(columns.map(stringifyCell));
-  }
-  for (const row of rows || []) {
-    if (Array.isArray(row)) {
-      out.push(row.map(stringifyCell));
-    } else if (row && typeof row === 'object') {
-      const obj = row as Record<string, unknown>;
-      const keys =
-        Array.isArray(columns) && columns.length
-          ? columns.map((c) =>
-              typeof c === 'object' && c
-                ? String(
-                    (c as Record<string, unknown>).key ??
-                      (c as Record<string, unknown>).label ??
-                      '',
-                  )
-                : String(c),
-            )
-          : Object.keys(obj);
-      out.push(keys.map((k) => stringifyCell(obj[k])));
-    }
-  }
-  return out;
-}
+/**
+ * One flattener, shared with the composition engine.
+ *
+ * There were two copies of this, character for character, and the PDF happened
+ * to go through the other one — so fixing this file alone left the printed
+ * statements blank. Keeping a single implementation is what stops the editor
+ * and the page disagreeing again.
+ */
+const tableToRows = tableToCompositionRows;
 
 function buildNoteBlocks(
   note: DocNoteNode,
-  model: DocumentModel,
   overrides: DocOverrides,
   frameworkLabel: string,
+  rewrite: (text: string) => string,
 ): CanonicalTextBlock[] {
-  const resolution = buildNoteNumberResolution(model.notes, overrides);
-  const rewrite = (text: string) => rewriteCrossReferenceText(text, resolution, model.notes);
   const blocks: CanonicalTextBlock[] = [];
 
   for (const section of note.sections) {
@@ -271,10 +255,17 @@ function fingerprintView(parts: {
  * Prepare the one canonical document view used by every output format.
  */
 export function prepareCanonicalDocumentView(
-  model: DocumentModel,
+  rawModel: DocumentModel,
   overrides: DocOverrides,
   options?: ReportingIntelligenceOptions,
 ): CanonicalDocumentView {
+  // What the preparer ordered and what they withheld is settled once, here,
+  // before anything downstream reads a note. The composition engine, the PDF,
+  // the DOCX and the preview then all print the note the Editor shows.
+  const model: DocumentModel = {
+    ...rawModel,
+    notes: rawModel.notes.map((note) => resolveNoteContent(note, overrides)),
+  };
   const reportingPackage = produceReportingPackage(model, overrides, options);
   const composition = reportingPackage.composition;
 
@@ -287,17 +278,13 @@ export function prepareCanonicalDocumentView(
     : corporateDisplayFromModel(model).reportingCurrency;
   const endLong = formatLongDate(model.period?.end_date);
 
-  const composedLineNoteRef = new Map<string, number | string>();
-  for (const phase of composition.phases) {
-    if (phase.id !== 'primary_statements') continue;
-    for (const section of phase.sections) {
-      for (const line of section.statement?.lines || []) {
-        if (line.noteRef != null && line.lineCode) {
-          composedLineNoteRef.set(line.lineCode.toLowerCase(), line.noteRef);
-        }
-      }
-    }
-  }
+  // Every note number on every statement comes from the one register, which
+  // holds only the notes this document prints.
+  const register = registerFromComposition(composition);
+  const withNoteRef = (line: DocStatementNode['lines'][number]) => ({
+    ...line,
+    note_ref: register.forLine(line.line_code)?.noteNumber ?? null,
+  });
 
   const primarySections =
     composition.phases
@@ -314,11 +301,7 @@ export function prepareCanonicalDocumentView(
             statement_type: cs.statementType,
             title: cs.title,
             periodCaption: cs.periodCaption,
-            lines: (source?.lines || []).map((line) => {
-              if (line.note_ref != null && line.note_ref !== '') return line;
-              const ref = composedLineNoteRef.get(String(line.line_code || '').toLowerCase());
-              return ref != null ? { ...line, note_ref: ref } : line;
-            }),
+            lines: (source?.lines || []).map(withNoteRef),
             populated: cs.populated,
           };
         })
@@ -332,18 +315,32 @@ export function prepareCanonicalDocumentView(
               resolvedTitle(overrides, s.id, s.title),
             ),
             periodCaption: statementPeriodCaption(s.statement_type, model.period || {}),
-            lines: s.lines.map((line) => {
-              if (line.note_ref != null && line.note_ref !== '') return line;
-              const ref = composedLineNoteRef.get(String(line.line_code || '').toLowerCase());
-              return ref != null ? { ...line, note_ref: ref } : line;
-            }),
+            lines: s.lines.map(withNoteRef),
             populated: s.populated,
           }));
 
-  const noteResolution = buildNoteNumberResolution(model.notes, overrides);
+  // "Note N" written in the notes is translated between the numbering the
+  // document has with no presentation choices applied and the numbering it is
+  // printed with — both read from the register, so prose, statements and
+  // headings all quote the same number.
+  const numberer: NoteNumberer = (o) => {
+    const reg = o === overrides ? register : buildNoteRegister(rawModel, o, options);
+    const visible: NumberedNote[] = [];
+    for (const entry of reg.notes) {
+      const note = model.notes.find((n) => n.id === entry.id);
+      if (note) visible.push({ note, noteNumber: entry.noteNumber, title: entry.title, heading: entry.heading });
+    }
+    return { visible };
+  };
+  const noteResolution = buildNoteNumberResolution(model.notes, overrides, numberer);
   const rewrite = (text: string) => rewriteCrossReferenceText(text, noteResolution, model.notes);
+  // Every note table prints its years and figures the way the statements do.
+  const years = reportingYears(model.period);
+  const present = (block: CanonicalTextBlock): CanonicalTextBlock =>
+    block.type === 'table' ? { ...block, rows: presentTableRows(block.rows, years) } : block;
 
-  const notes: CanonicalNote[] = composition.numberedNotes.map((n) => {
+  type ComposedNote = Omit<CanonicalNote, 'lineItems' | 'disclosureCode' | 'pageBreakBefore'>;
+  const composedNotes: ComposedNote[] = composition.numberedNotes.map((n) => {
     const enterprise = composition.enterpriseDisclosures.find(
       (ed) => ed.id === n.id || ed.disclosureCode === n.disclosureCode,
     );
@@ -362,7 +359,7 @@ export function prepareCanonicalDocumentView(
         noteNumber: n.noteNumber!,
         title: n.title,
         heading: n.heading || `Note ${n.noteNumber}. ${n.title}`,
-        blocks: blocks.length ? blocks : buildNoteBlocks(
+        blocks: (blocks.length ? blocks : buildNoteBlocks(
           model.notes.find((m) => m.id === n.id) || {
             id: n.id,
             kind: 'note',
@@ -375,10 +372,10 @@ export function prepareCanonicalDocumentView(
             paragraphs: [],
             tables: [],
           },
-          model,
           overrides,
           frameworkLabel,
-        ),
+          rewrite,
+        )).map(present),
       };
     }
     const source = model.notes.find((m) => m.id === n.id);
@@ -399,7 +396,31 @@ export function prepareCanonicalDocumentView(
       noteNumber: n.noteNumber!,
       title: n.title,
       heading: n.heading || `Note ${n.noteNumber}. ${n.title}`,
-      blocks: buildNoteBlocks(source || emptyNote, model, overrides, frameworkLabel),
+      blocks: buildNoteBlocks(source || emptyNote, overrides, frameworkLabel, rewrite).map(present),
+    };
+  });
+
+  // Which table lines print: the preparer's choice, or the default that holds
+  // back a line of nothing but placeholders.
+  const notes: CanonicalNote[] = composedNotes.map((n) => {
+    const disclosureCode = String(
+      composition.numberedNotes.find((x) => x.id === n.id)?.disclosureCode || '',
+    ).toUpperCase();
+    const chosen = applyLineChoices(disclosureCode, n.blocks, overrides.lines);
+    const blocks: CanonicalTextBlock[] = chosen.blocks.length
+      ? chosen.blocks
+      : [
+          {
+            type: 'paragraph',
+            text: `Disclosures relating to ${n.title.toLowerCase()} are presented in accordance with ${frameworkLabel}.`,
+          },
+        ];
+    return {
+      ...n,
+      blocks,
+      disclosureCode,
+      lineItems: chosen.items,
+      pageBreakBefore: !!overrides.pageBreaks?.[n.id],
     };
   });
 

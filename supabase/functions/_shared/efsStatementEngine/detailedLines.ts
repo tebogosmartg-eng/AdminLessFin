@@ -184,7 +184,7 @@ function isRetainedEarnings(row) {
  * accounts printed directly above them, which is what makes the section add up
  * on the page; the SECTION total still comes from the canonical scalar.
  */
-function sectionLines({ prefix, section, groups, priors, level = 0, flatten = false }) {
+function sectionLines({ prefix, section, groups, priors, level = 0, flatten = false, priorKnown = true }) {
   const lines = [];
   let index = 0;
   const byCategory = new Map();
@@ -226,7 +226,9 @@ function sectionLines({ prefix, section, groups, priors, level = 0, flatten = fa
         section,
         level: level + 1,
         amount: round2(g.amount),
-        prior_amount: round2(prior),
+        // Unknown is not nil: without the comparative year's movements the
+        // figure is left blank rather than printed as a dash.
+        prior_amount: priorKnown ? round2(prior) : null,
         accounts: g.accounts,
       });
     }
@@ -253,7 +255,7 @@ function sectionLines({ prefix, section, groups, priors, level = 0, flatten = fa
         level,
         is_subtotal: true,
         amount: round2(categoryTotal),
-        prior_amount: round2(categoryPrior),
+        prior_amount: priorKnown ? round2(categoryPrior) : null,
         accounts: [],
       });
     } else {
@@ -357,10 +359,31 @@ export function buildPositionLines({ closing, prior, canonical, presentation }) 
       flatten: true,
     }),
   );
+  // Retained earnings as a balance sheet states them: the retained earnings
+  // account plus every period's profit still held in the income and expense
+  // accounts — this year's and any earlier year's not yet closed off. It used
+  // to add only this year's profit, which left last year's out of equity and
+  // put the statement out of balance by exactly that amount.
   const retainedGroups = group(closing, "Equity", balanceOf, isRetainedEarnings);
   const retainedPriors = priorLookup(prior, "Equity", balanceOf, isRetainedEarnings);
-  const retainedAmount = groupsTotal(retainedGroups);
-  const retainedPrior = groupsPriorTotal(retainedGroups, retainedPriors);
+  const profitAccounts = (rows) =>
+    (rows || [])
+      .filter((r) => r.type === "Income" || r.type === "Expense")
+      .map((r) => ({
+        id: r.id,
+        name: r.name,
+        account_code: r.account_code ?? r.account_number ?? null,
+        amount: round2((r.type === "Income" ? 1 : -1) * n(balanceOf(r))),
+      }));
+  const profitNow = profitAccounts(closing);
+  const profitThen = profitAccounts(prior);
+  // This year's figure is taken from the canonical scalars, so it holds even
+  // where the balances carry no income or expense accounts; the accounts are
+  // listed alongside only to trace it.
+  const retainedAmount =
+    groupsTotal(retainedGroups) + n(canonical.unclosedPriorEarnings) + n(canonical.netProfit);
+  const retainedPrior =
+    groupsPriorTotal(retainedGroups, retainedPriors) + profitThen.reduce((a, r) => a + r.amount, 0);
   if (Math.abs(retainedAmount) >= 0.005 || Math.abs(retainedPrior) >= 0.005) {
     lines.push({
       line_code: "sfp.equity.retained_earnings",
@@ -369,19 +392,10 @@ export function buildPositionLines({ closing, prior, canonical, presentation }) 
       level: 1,
       amount: round2(retainedAmount),
       prior_amount: round2(retainedPrior),
-      accounts: retainedGroups.flatMap((g) => g.accounts),
+      accounts: [...retainedGroups.flatMap((g) => g.accounts), ...profitNow.filter((a) => a.amount !== 0)],
     });
   }
-  lines.push({
-    line_code: "sfp.equity.current_result",
-    label: p.result_label,
-    section: "equity",
-    level: 1,
-    amount: round2(canonical.netProfit),
-    prior_amount: null,
-    accounts: [],
-  });
-  const equityDetail = groupsTotal(equityGroups) + groupsTotal(retainedGroups) + n(canonical.netProfit);
+  const equityDetail = groupsTotal(equityGroups) + retainedAmount;
   const equityRecon = reconcilingLine({
     code: "sfp.equity.unreconciled",
     section: "equity",
@@ -391,6 +405,7 @@ export function buildPositionLines({ closing, prior, canonical, presentation }) 
     label: "Equity not reconciled to the ledger",
   });
   if (equityRecon) lines.push(equityRecon);
+  const equityPrior = groupsPriorTotal(equityGroups, equityPriors) + retainedPrior;
   lines.push({
     line_code: "sfp.total_equity",
     label: `Total ${p.equity_label}`,
@@ -398,7 +413,7 @@ export function buildPositionLines({ closing, prior, canonical, presentation }) 
     level: 0,
     is_subtotal: true,
     amount: round2(canonical.equity),
-    prior_amount: null,
+    prior_amount: round2(equityPrior),
     accounts: [],
   });
 
@@ -425,6 +440,7 @@ export function buildPositionLines({ closing, prior, canonical, presentation }) 
     label: "Liabilities not reconciled to the ledger",
   });
   if (liabilityRecon) lines.push(liabilityRecon);
+  const liabilitiesPrior = groupsPriorTotal(liabilityGroups, liabilityPriors);
   lines.push({
     line_code: "sfp.total_liabilities",
     label: p.total_liabilities_label,
@@ -432,7 +448,7 @@ export function buildPositionLines({ closing, prior, canonical, presentation }) 
     level: 0,
     is_subtotal: true,
     amount: round2(canonical.liabilities),
-    prior_amount: round2(groupsPriorTotal(liabilityGroups, liabilityPriors)),
+    prior_amount: round2(liabilitiesPrior),
     accounts: [],
   });
 
@@ -443,23 +459,29 @@ export function buildPositionLines({ closing, prior, canonical, presentation }) 
     level: 0,
     is_grand_total: true,
     amount: round2(canonical.liabilitiesAndEquity),
-    prior_amount: null,
+    prior_amount: round2(liabilitiesPrior + equityPrior),
     accounts: [],
   });
 
   return lines;
 }
 
-export function buildPerformanceLines({ activity, canonical, presentation }) {
+export function buildPerformanceLines({ activity, canonical, presentation, priorActivity = null, priorCanonical = null }) {
   const p = presentation || DEFAULT_PRESENTATION;
   const lines = [];
   const activityOf = (row) => row.period_activity ?? row.activity ?? 0;
+  // Last year's revenue and expenses are last year's movements, sealed with
+  // this year's. A seal without them leaves the comparatives blank.
+  const priorKnown = Array.isArray(priorActivity) && priorCanonical != null;
+  const incomePriors = priorKnown ? priorLookup(priorActivity, "Income", activityOf) : new Map();
+  const expensePriors = priorKnown ? priorLookup(priorActivity, "Expense", activityOf) : new Map();
+  const priorOf = (key) => (priorKnown ? round2(priorCanonical[key]) : null);
 
   // Income, split by the ledger's own categories, totalling to the canonical
   // income figure.
   const incomeGroups = sortGroups(group(activity, "Income", activityOf), ["Revenue", "Other Income"]);
   lines.push(
-    ...sectionLines({ prefix: "perf.income", section: "revenue", groups: incomeGroups, priors: new Map() }),
+    ...sectionLines({ prefix: "perf.income", section: "revenue", groups: incomeGroups, priors: incomePriors, priorKnown }),
   );
   const incomeRecon = reconcilingLine({
     code: "perf.income.unreconciled",
@@ -477,7 +499,7 @@ export function buildPerformanceLines({ activity, canonical, presentation }) {
     level: 0,
     is_subtotal: true,
     amount: round2(canonical.totalIncome),
-    prior_amount: null,
+    prior_amount: priorOf("totalIncome"),
     accounts: [],
   });
 
@@ -487,7 +509,7 @@ export function buildPerformanceLines({ activity, canonical, presentation }) {
     "Other Expenses",
   ]);
   lines.push(
-    ...sectionLines({ prefix: "perf.expenses", section: "expenses", groups: expenseGroups, priors: new Map() }),
+    ...sectionLines({ prefix: "perf.expenses", section: "expenses", groups: expenseGroups, priors: expensePriors, priorKnown }),
   );
   const expenseRecon = reconcilingLine({
     code: "perf.expenses.unreconciled",
@@ -505,7 +527,7 @@ export function buildPerformanceLines({ activity, canonical, presentation }) {
     level: 0,
     is_subtotal: true,
     amount: round2(canonical.totalExpenses),
-    prior_amount: null,
+    prior_amount: priorOf("totalExpenses"),
     accounts: [],
   });
 
@@ -516,10 +538,65 @@ export function buildPerformanceLines({ activity, canonical, presentation }) {
     level: 0,
     is_grand_total: true,
     amount: round2(canonical.netProfit),
-    prior_amount: null,
+    prior_amount: priorOf("netProfit"),
     accounts: [],
   });
 
+  return lines;
+}
+
+/**
+ * The Statement of Changes in Equity for both years: equity at the start of
+ * the year, the year's profit, any other movement, and equity at the end —
+ * which is the equity on the balance sheet. Every figure is a canonical scalar.
+ */
+export function buildEquityLines({ canonical, priorCanonical = null }) {
+  const has = (agg, key) => agg != null && agg[key] != null;
+  const prior = (key) => (has(priorCanonical, key) ? round2(priorCanonical[key]) : null);
+  const lines = [
+    {
+      line_code: "eq.opening",
+      label: "Balance at the beginning of the year",
+      section: "opening",
+      level: 0,
+      is_total: true,
+      amount: round2(canonical.openingEquity ?? canonical.openingStoredEquity),
+      prior_amount: prior("openingEquity"),
+      accounts: [],
+    },
+    {
+      line_code: "eq.period_result",
+      label: "Profit / (loss) for the year",
+      section: "movements",
+      level: 1,
+      amount: round2(canonical.netProfit),
+      prior_amount: prior("netProfit"),
+      accounts: [],
+    },
+  ];
+  const otherNow = round2(canonical.otherEquityMovements);
+  const otherThen = prior("otherEquityMovements");
+  if (Math.abs(otherNow) >= 0.005 || Math.abs(otherThen ?? 0) >= 0.005) {
+    lines.push({
+      line_code: "eq.other_movements",
+      label: "Other movements in equity",
+      section: "movements",
+      level: 1,
+      amount: otherNow,
+      prior_amount: otherThen,
+      accounts: [],
+    });
+  }
+  lines.push({
+    line_code: "eq.closing",
+    label: "Balance at the end of the year",
+    section: "closing",
+    level: 0,
+    is_grand_total: true,
+    amount: round2(canonical.equity),
+    prior_amount: prior("equity"),
+    accounts: [],
+  });
   return lines;
 }
 

@@ -193,7 +193,8 @@ describe('V13.0 — Professional statutory PDF', () => {
   it('renders every statement professionally with Note column, figures and totals', () => {
     expect(pdfText).toContain('Statement of Financial Position');
     expect(pdfText).toContain('Notes'); // column header
-    expect(pdfText).toContain('2,300.00'); // total figure
+    // Figures are written as the notes write them: 2 300,00, not 2,300.00.
+    expect(pdfText).toContain('2 300,00'); // total figure
     expect(pdfText).toContain('Total assets');
     // Empty statements show the professional placeholder.
     expect(pdfText).toMatch(/Figures will be presented in this statement once the trial\s+balance/);
@@ -201,9 +202,12 @@ describe('V13.0 — Professional statutory PDF', () => {
 
   it('renders notes and professional disclosure tables', () => {
     expect(pdfText).toContain('Property, plant and equipment');
-    expect(pdfText).toContain('Current year');
-    expect(pdfText).toContain('Prior year');
-    expect(pdfText).toContain('1,500.00');
+    // A note table is headed by the years, current first, and writes its
+    // figures as the statements do — not "Current year" and "1,500.00".
+    expect(pdfText).toMatch(/Description\s+2026\s+2025/);
+    expect(pdfText).not.toContain('Current year');
+    expect(pdfText).toContain('1 500,00');
+    expect(pdfText).not.toContain('1,500.00');
     expect(pdfText).toContain('Total movement');
   });
 
@@ -246,8 +250,9 @@ describe('V13.0 — Preview == PDF == DOCX', () => {
     expect(docxText).toContain('Approval of Annual Financial Statements');
     expect(docxText).toContain('AdminLess Fin');
     // Table content is present in DOCX.
-    expect(docxText).toContain('Current year');
-    expect(docxText).toContain('1,500.00');
+    expect(docxText).toContain('2026');
+    // Word keeps the non-breaking thousands separator; compare like for like.
+    expect(docxText.replace(/\u00a0/g, ' ')).toContain('1 500,00');
     // Every note heading appears.
     for (const note of pkg.view.notes) expect(docxText).toContain(note.heading);
   });

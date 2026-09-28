@@ -152,16 +152,25 @@ function applyDisclosureOrdering(
 ): CompositionDocument {
   const orderMap = new Map(orderedCodes.map((code, idx) => [code, (idx + 1) * 10]));
 
+  const renumberedNotes = [...composition.numberedNotes].sort((a, b) => {
+    const orderA = orderMap.get(a.disclosureCode) ?? a.sortOrder + 10000;
+    const orderB = orderMap.get(b.disclosureCode) ?? b.sortOrder + 10000;
+    return orderA - orderB;
+  });
+  // The sections that print the notes follow the notes, rather than being
+  // sorted by a rule of their own that could put them in a different order.
+  const position = new Map(renumberedNotes.map((n, idx) => [n.id, idx]));
+
   const phases = composition.phases.map((phase) => {
     if (phase.id !== 'notes') return phase;
     const header = phase.sections.find((s) => s.id === 'notes:header');
     const noteSections = phase.sections
       .filter((s) => s.kind === 'disclosure_note' && s.note)
-      .sort((a, b) => {
-        const orderA = orderMap.get(a.note!.disclosureCode) ?? a.sortOrder + 10000;
-        const orderB = orderMap.get(b.note!.disclosureCode) ?? b.sortOrder + 10000;
-        return orderA - orderB;
-      })
+      .sort(
+        (a, b) =>
+          (position.get(a.note!.id) ?? Number.MAX_SAFE_INTEGER) -
+          (position.get(b.note!.id) ?? Number.MAX_SAFE_INTEGER),
+      )
       .map((s, idx) => ({ ...s, sortOrder: 10 + idx }));
 
     const other = phase.sections.filter((s) => s.kind !== 'disclosure_note' || !s.note);
@@ -171,25 +180,52 @@ function applyDisclosureOrdering(
     };
   });
 
-  const renumberedNotes = [...composition.numberedNotes].sort((a, b) => {
-    const orderA = orderMap.get(a.disclosureCode) ?? a.sortOrder;
-    const orderB = orderMap.get(b.disclosureCode) ?? b.sortOrder;
-    return orderA - orderB;
-  });
-
-  const noteNumberByCode: Record<string, number> = {};
-  renumberedNotes.forEach((n, idx) => {
-    noteNumberByCode[n.disclosureCode] = idx + 1;
-    n.noteNumber = idx + 1;
-    n.heading = `Note ${idx + 1}. ${n.title}`;
-  });
-
   return {
     ...composition,
     phases,
     numberedNotes: renumberedNotes,
-    noteNumberByCode,
   };
+}
+
+/**
+ * Number the notes that will be printed, 1 to N, in the order they print.
+ *
+ * This is the one place a note gets its number. It runs after suppression and
+ * ordering, so a note the engine withheld leaves no gap and cannot be
+ * referred to, and every copy of the number — the note, its section, its
+ * heading, the enterprise disclosure and the code lookup the statements use —
+ * is written here together, so none of them can disagree.
+ */
+function renumberPrintedNotes(composition: CompositionDocument): CompositionDocument {
+  const noteNumberByCode: Record<string, number> = {};
+  const assigned = new Map<string, { noteNumber: number; heading: string }>();
+  const numberedNotes = composition.numberedNotes.map((n, idx) => {
+    const noteNumber = idx + 1;
+    const heading = `Note ${noteNumber}. ${n.title}`;
+    const code = String(n.disclosureCode || '').toUpperCase();
+    if (code && noteNumberByCode[code] == null) noteNumberByCode[code] = noteNumber;
+    assigned.set(n.id, { noteNumber, heading });
+    return { ...n, noteNumber, heading };
+  });
+
+  const phases = composition.phases.map((phase) => {
+    if (phase.id !== 'notes') return phase;
+    return {
+      ...phase,
+      sections: phase.sections.map((section) => {
+        const given = section.note ? assigned.get(section.note.id) : undefined;
+        if (!section.note || !given) return section;
+        return { ...section, title: given.heading, note: { ...section.note, ...given } };
+      }),
+    };
+  });
+
+  const enterpriseDisclosures = composition.enterpriseDisclosures.map((ed) => {
+    const given = assigned.get(ed.id);
+    return given ? { ...ed, ...given } : ed;
+  });
+
+  return { ...composition, phases, numberedNotes, enterpriseDisclosures, noteNumberByCode };
 }
 
 function remapStatementNoteRefs(composition: CompositionDocument): CompositionDocument {
@@ -204,13 +240,13 @@ function remapStatementNoteRefs(composition: CompositionDocument): CompositionDo
           statement: {
             ...section.statement,
             lines: section.statement.lines.map((line) => {
-              const disc = disclosureCodeForLine(line.lineCode);
-              if (!disc) return line;
-              const newNum = composition.noteNumberByCode[disc];
-              if (newNum == null) {
-                return { ...line, noteRef: null };
-              }
-              return { ...line, noteRef: newNum };
+              // Only notes that are printed can be referred to.
+              const disc = disclosureCodeForLine(
+                line.lineCode,
+                Object.keys(composition.noteNumberByCode),
+              );
+              const newNum = disc ? composition.noteNumberByCode[disc] : null;
+              return { ...line, noteRef: newNum ?? null };
             }),
           },
         };
@@ -242,10 +278,15 @@ export function applyIntelligenceToComposition(
   // User order overrides take absolute precedence over intelligence ordering.
   // When any explicit user positions exist, skip intelligence reordering so
   // the user's arrangement (set via DocOverrides.order) is preserved.
-  const hasUserOrder = userOrderOverride != null && Object.keys(userOrderOverride).length > 0;
+  // The order map also holds where paragraphs and tables sit inside a note;
+  // only a position given to a note itself is an arrangement of the notes.
+  const noteIds = new Set(composition.numberedNotes.map((n) => n.id));
+  const hasUserOrder =
+    userOrderOverride != null && Object.keys(userOrderOverride).some((key) => noteIds.has(key));
   if (!hasUserOrder) {
     result = applyDisclosureOrdering(result, orderedCodes);
   }
+  result = renumberPrintedNotes(result);
   result = remapStatementNoteRefs(result);
   result = resequenceSections(result);
   return result;

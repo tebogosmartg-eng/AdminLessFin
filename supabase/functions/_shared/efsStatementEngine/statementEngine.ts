@@ -6,6 +6,7 @@
 // @ts-nocheck
 import { classifyFactsToTaxonomy, buildTypeMap } from "./frameworkMapping.ts";
 import {
+  buildEquityLines,
   buildPerformanceLines,
   buildPositionLines,
   hasClassification,
@@ -16,7 +17,6 @@ import {
   canonicalToPerformanceLines,
   canonicalToPositionLines,
   canonicalToCashFlowLines,
-  canonicalToEquityLines,
 } from "../canonicalFinancialAggregation.ts";
 
 function round2(n) {
@@ -31,8 +31,17 @@ function labelMap(taxonomyLines) {
   return map;
 }
 
+/**
+ * A sealed aggregation from before equity carried unclosed earlier profit is
+ * computed afresh from the same sealed facts — still no live ledger — so an
+ * older seal is not printed with an equity figure now known to be incomplete.
+ */
+function isCurrentAggregation(agg) {
+  return agg != null && agg.unclosedPriorEarnings !== undefined;
+}
+
 function factsToCanonical(facts) {
-  if (facts?.canonical_aggregation) {
+  if (isCurrentAggregation(facts?.canonical_aggregation)) {
     return facts.canonical_aggregation;
   }
   return buildCanonicalFinancialAggregation({
@@ -51,6 +60,30 @@ function factsToCanonical(facts) {
     })),
     cashFlowData: facts.cash_flow,
     openingBalances: facts.balances_prior_as_of,
+  });
+}
+
+/**
+ * The comparative year's aggregation, from the comparative year's sealed
+ * movements. Null for a seal that predates them: its comparatives stay blank.
+ */
+function priorCanonicalOf(facts) {
+  if (isCurrentAggregation(facts?.prior_canonical_aggregation)) return facts.prior_canonical_aggregation;
+  if (!Array.isArray(facts?.prior_period_activity)) return null;
+  return buildCanonicalFinancialAggregation({
+    balancesAsOf: facts.balances_prior_as_of,
+    openingBalances: facts.balances_prior_opening_as_of || [],
+    periodActivity: facts.prior_period_activity.map((a) => ({
+      id: a.id,
+      name: a.name,
+      type: a.type,
+      activity: Number(a.period_activity ?? a.activity ?? 0),
+      account_role: a.account_role,
+      category: a.category,
+      subcategory: a.subcategory,
+      account_code: a.account_code != null ? String(a.account_code) : null,
+    })),
+    cashFlowData: facts.prior_cash_flow || [],
   });
 }
 
@@ -81,6 +114,8 @@ export function generateFinancialPerformance(facts, taxonomyLines, _buckets, agg
       activity: facts.period_activity,
       canonical,
       presentation: presentationFor(frameworkPack),
+      priorActivity: facts.prior_period_activity,
+      priorCanonical: priorCanonicalOf(facts),
     });
   }
   return canonicalToPerformanceLines(canonical, labelMap(taxonomyLines)).map((ln) => ({
@@ -102,20 +137,62 @@ export function generateCashFlows(facts, taxonomyLines, _buckets, agg) {
       netCashFlow: canonical.netProfit,
     };
   }
-  return canonicalToCashFlowLines(canonical, labelMap(taxonomyLines)).map((ln) => ({
+  const prior = Array.isArray(facts.prior_cash_flow) ? priorCanonicalOf(facts) : null;
+  const priorFor = {
+    "cf.operating": "cashOperating",
+    "cf.investing": "cashInvesting",
+    "cf.financing": "cashFinancing",
+    "cf.net_change": "netCashFlow",
+  };
+  const flows = canonicalToCashFlowLines(canonical, labelMap(taxonomyLines)).map((ln) => ({
     ...ln,
     amount: round2(ln.amount),
+    prior_amount: prior && priorFor[ln.line_code] ? round2(prior[priorFor[ln.line_code]]) : null,
     accounts: ln.accounts || [],
   }));
+  // A statement of cash flows closes by reconciling to the cash on the
+  // balance sheet: cash at the start of the year, the year's net movement,
+  // cash at the end.
+  const cashIn = (rows) =>
+    round2(
+      (rows || [])
+        .filter((r) => {
+          if (r.type !== "Asset") return false;
+          const role = String(r.account_role || "").toLowerCase();
+          return role === "bank" || role === "cash" || String(r.subcategory || "") === "Cash and Cash Equivalents";
+        })
+        .reduce((sum, r) => sum + Number(r.balance ?? 0), 0),
+    );
+  const hasCash = [...(facts.balances_as_of || []), ...(facts.balances_prior_as_of || [])].some(
+    (r) => r.subcategory === "Cash and Cash Equivalents" || ["bank", "cash"].includes(String(r.account_role || "").toLowerCase()),
+  );
+  if (!hasCash) return flows;
+  const priorOpening = Array.isArray(facts.prior_period_activity) ? cashIn(facts.balances_prior_opening_as_of) : null;
+  return [
+    ...flows,
+    {
+      line_code: "cf.cash_opening",
+      label: "Cash and cash equivalents at the beginning of the year",
+      section: "totals",
+      amount: cashIn(facts.balances_prior_as_of),
+      prior_amount: priorOpening,
+      accounts: [],
+    },
+    {
+      line_code: "cf.cash_closing",
+      label: "Cash and cash equivalents at the end of the year",
+      section: "totals",
+      is_grand_total: true,
+      amount: cashIn(facts.balances_as_of),
+      prior_amount: Array.isArray(facts.prior_period_activity) ? cashIn(facts.balances_prior_as_of) : null,
+      accounts: [],
+    },
+  ];
 }
 
-export function generateChangesInEquity(facts, taxonomyLines, _buckets, agg) {
+export function generateChangesInEquity(facts, _taxonomyLines, _buckets, agg) {
   const canonical = agg || factsToCanonical(facts);
-  return canonicalToEquityLines(canonical, labelMap(taxonomyLines)).map((ln) => ({
-    ...ln,
-    amount: round2(ln.amount),
-    accounts: ln.accounts || [],
-  }));
+  return buildEquityLines({ canonical, priorCanonical: priorCanonicalOf(facts) });
 }
 
 /**
@@ -135,7 +212,7 @@ export function runStatementEngine({
 
   const typeMap = buildTypeMap(defaultTypeMaps);
   const buckets = classifyFactsToTaxonomy(facts, taxonomyLines, typeMap, tenantMappingLines);
-  const agg = canonicalAggregation || factsToCanonical(facts);
+  const agg = isCurrentAggregation(canonicalAggregation) ? canonicalAggregation : factsToCanonical(facts);
 
   const generators = {
     financial_position: generateFinancialPosition,

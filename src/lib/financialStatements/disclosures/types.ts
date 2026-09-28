@@ -23,6 +23,9 @@ export type CellFormat = {
   bold?: boolean;
   italic?: boolean;
   underline?: boolean;
+  /** Typeface and size, for a heading or a footnote within a table. */
+  fontFamily?: string;
+  fontSize?: number;
   align?: 'left' | 'center' | 'right';
   numberFormat?: NumberFormat;
   decimals?: number;
