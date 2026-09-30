@@ -270,6 +270,9 @@ serve(withEnterprisePlatform('invoices', 'tenant', async (req, _ctx) => {
             p_notes: notes || null,
             p_quote_id: null,
             p_actor_user_id: user.id,
+            // A retried submission returns the invoice the first attempt
+            // created instead of posting a second one.
+            p_idempotency_key: body.idempotency_key || rpcParams.idempotency_key || null,
         });
 
         if (rpcError) throw rpcError;

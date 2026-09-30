@@ -131,6 +131,9 @@ const FixedAssets = () => {
   const [isAssetFormOpen, setIsAssetFormOpen] = useState(false);
   const [isDisposalFormOpen, setIsDisposalFormOpen] = useState(false);
   const [selectedAsset, setSelectedAsset] = useState<EnterpriseFixedAsset | undefined>();
+  // Separate from selectedAsset (the dispose target) so dispose state never
+  // leaks into the edit dialog.
+  const [editAssetId, setEditAssetId] = useState<string | undefined>();
   const [panelAssetId, setPanelAssetId] = useState<string | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [filters, setFilters] = useState<AssetRegisterFilters>(DEFAULT_ASSET_FILTERS);
@@ -265,7 +268,12 @@ const FixedAssets = () => {
   };
 
   const handleAddNew = () => {
-    setSelectedAsset(undefined);
+    setEditAssetId(undefined);
+    setIsAssetFormOpen(true);
+  };
+
+  const handleEditDetails = (asset: EnterpriseFixedAsset) => {
+    setEditAssetId(asset.id);
     setIsAssetFormOpen(true);
   };
 
@@ -715,6 +723,12 @@ const FixedAssets = () => {
                               Open workspace
                             </DropdownMenuItem>
                             <DropdownMenuItem
+                              onClick={() => handleEditDetails(asset)}
+                              disabled={asset.status === 'disposed'}
+                            >
+                              Edit details
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
                               onClick={() => handleDispose(asset)}
                               className="text-red-600"
                               disabled={asset.status === 'disposed'}
@@ -840,7 +854,7 @@ const FixedAssets = () => {
       <AssetForm
         isOpen={isAssetFormOpen}
         setIsOpen={setIsAssetFormOpen}
-        assetId={selectedAsset?.id}
+        assetId={editAssetId}
       />
       {selectedAsset && (
         <AssetDisposalForm

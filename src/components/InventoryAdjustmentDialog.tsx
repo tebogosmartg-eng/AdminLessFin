@@ -19,6 +19,7 @@ import { format } from 'date-fns';
 import { accountsQuery } from '../lib/queries';
 import { invokeInventory } from '../lib/inventory/client';
 import { resolveControlAccounts } from '../lib/accounting/accountRoles';
+import { useDialogFormReset } from '../hooks/useDialogFormReset';
 
 const adjustmentSchema = z.object({
   new_quantity: z.coerce.number().min(0, 'Quantity cannot be negative.'),
@@ -58,20 +59,31 @@ const InventoryAdjustmentDialog = ({ isOpen, setIsOpen, product }: InventoryAdju
   const assetAccounts = accounts?.filter(a => a.type === 'Asset');
   const expenseAccounts = accounts?.filter(a => a.type === 'Expense' || a.type === 'Income'); // Can be income (gain) or expense (loss)
 
-  // Auto-select inventory + COGS/adjustment accounts via account_role
+  // Reset on the open edge (per product) only — an accounts refetch landing
+  // mid-edit must not wipe the typed quantity and reason.
+  useDialogFormReset(isOpen, product.id, () => {
+    form.reset({
+      new_quantity: product.quantity_on_hand,
+      inventory_account_id: '',
+      adjustment_account_id: '',
+      reason: '',
+      date: format(new Date(), 'yyyy-MM-dd'),
+    });
+  });
+
+  // Auto-select inventory + COGS/adjustment accounts via account_role — but
+  // never over a choice the user already made.
   useEffect(() => {
-    if (isOpen && accounts) {
-      const controls = resolveControlAccounts(accounts);
-      
-      form.reset({
-        new_quantity: product.quantity_on_hand,
-        inventory_account_id: controls.inventory?.id || '',
-        adjustment_account_id: controls.cogs?.id || (product.cogs_account_id || ''),
-        reason: '',
-        date: format(new Date(), 'yyyy-MM-dd'),
-      });
+    if (!isOpen || !accounts) return;
+    const controls = resolveControlAccounts(accounts);
+    if (controls.inventory && !form.getFieldState('inventory_account_id').isDirty && !form.getValues('inventory_account_id')) {
+      form.setValue('inventory_account_id', controls.inventory.id);
     }
-  }, [isOpen, product, accounts, form]);
+    const adjustment = controls.cogs?.id || product.cogs_account_id || '';
+    if (adjustment && !form.getFieldState('adjustment_account_id').isDirty && !form.getValues('adjustment_account_id')) {
+      form.setValue('adjustment_account_id', adjustment);
+    }
+  }, [isOpen, accounts, product, form]);
 
   const mutation = useMutation({
     mutationFn: async (values: AdjustmentFormValues) => {

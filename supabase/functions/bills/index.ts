@@ -196,22 +196,16 @@ serve(withEnterprisePlatform('bills', 'tenant', async (req, _ctx) => {
           p_tax_receivable_account_id: billData.tax_receivable_account_id || null,
           p_description: billData.description,
           p_items: itemsWithProjectAndTax,
+          // A retried submission returns the bill the first attempt created
+          // instead of recording a second bill and a second AP journal.
+          p_idempotency_key: body.idempotency_key || billData.idempotency_key || null,
         }));
-        
-        if (!error && billData.attachment_url) {
-             const { data: newBill } = await supabaseAdmin
-                .from('bills')
-                .select('id')
-                .eq('company_id', company_id)
-                .eq('bill_number', billData.bill_number)
-                .eq('vendor_id', billData.vendor_id)
-                .order('created_at', { ascending: false })
-                .limit(1)
-                .single();
-             
-             if (newBill) {
-                 await supabaseAdmin.from('bills').update({ attachment_url: billData.attachment_url }).eq('id', newBill.id);
-             }
+
+        // The RPC now returns {bill_id, journal_id, posting_status} — attach
+        // by id instead of re-finding the bill by number (which picked the
+        // wrong row the moment a number repeated).
+        if (!error && billData.attachment_url && data?.bill_id) {
+             await supabaseAdmin.from('bills').update({ attachment_url: billData.attachment_url }).eq('id', data.bill_id).eq('company_id', company_id);
         }
         break;
 

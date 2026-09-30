@@ -2,8 +2,9 @@
  * V16.1 — Enterprise master data maintenance modules.
  * Each module is the single source of truth for its domain.
  */
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useServerDraft } from '../../../../hooks/useServerDraft';
 import { Button } from '../../../../components/ui/button';
 import { Input } from '../../../../components/ui/input';
 import { Label } from '../../../../components/ui/label';
@@ -52,34 +53,6 @@ function Field({
   );
 }
 
-
-/**
- * A module's local draft of a shared server record.
- *
- * Every module here reads the same master-data query, and saving any one of
- * them invalidates it. The old pattern — an effect copying query data into
- * local state on every arrival — meant that saving the directors wiped the
- * unsaved changes in addresses, tax registrations and every other open
- * module. The draft now follows the server only while the user has not
- * edited it; after this module's own save, `saved()` lets the next server
- * copy through again.
- */
-function useServerDraft<T>(server: T | undefined, fallback: T) {
-  const [draft, setDraft] = useState<T>(server ?? fallback);
-  const dirty = useRef(false);
-  useEffect(() => {
-    if (server !== undefined && !dirty.current) setDraft(server ?? fallback);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [server]);
-  const update: typeof setDraft = (value) => {
-    dirty.current = true;
-    setDraft(value);
-  };
-  const saved = () => {
-    dirty.current = false;
-  };
-  return [draft, update, saved] as const;
-}
 
 function useMasterData(companyId: string, workspaceId: string) {
   const qc = useQueryClient();

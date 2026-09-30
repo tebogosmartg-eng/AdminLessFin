@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useServerDraft } from '../../hooks/useServerDraft';
 import { useAuth } from '../../contexts/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../ui/card';
 import { Button } from '../ui/button';
@@ -244,7 +245,6 @@ function RulesContent({
 const PayrollRunRulesPanel = ({ runId, runStatus, onSaved }: Props) => {
   const { activeCompany } = useAuth();
   const queryClient = useQueryClient();
-  const [overrides, setOverrides] = useState<RuleConfig>({});
   const [panelExpanded, setPanelExpanded] = useState(false);
   const [shouldRenderRules, setShouldRenderRules] = useState(false);
   const isEditable = runStatus === 'draft';
@@ -254,17 +254,19 @@ const PayrollRunRulesPanel = ({ runId, runStatus, onSaved }: Props) => {
     enabled: !!activeCompany && !!runId,
   });
 
+  // A refetch (including this panel's own save invalidation landing while the
+  // user keeps toggling) must not overwrite unsaved overrides.
+  const [overrides, setOverrides, overridesSaved] = useServerDraft<RuleConfig>(
+    data ? (data.run?.rule_config?.rules ?? data.run?.rule_config ?? {}) : undefined,
+    {},
+  );
+
   const catalog = useMemo<CatalogRule[]>(() => {
     if (data?.catalog?.length) return data.catalog;
     return fallbackCatalog;
   }, [data?.catalog]);
 
   const companyDefaults = useMemo<RuleConfig>(() => data?.company_defaults ?? {}, [data?.company_defaults]);
-
-  useEffect(() => {
-    const runConfig = data?.run?.rule_config?.rules ?? data?.run?.rule_config ?? {};
-    setOverrides(runConfig);
-  }, [data]);
 
   const displayRules = useMemo(() => {
     const effectiveRules: RuleConfig = data?.effective_rules ?? {};
@@ -301,6 +303,7 @@ const PayrollRunRulesPanel = ({ runId, runStatus, onSaved }: Props) => {
       });
     },
     onSuccess: () => {
+      overridesSaved();
       queryClient.invalidateQueries({ queryKey: ['payroll_run_rule_config', runId] });
       showSuccess('Payroll run rule configuration saved.');
       onSaved?.();

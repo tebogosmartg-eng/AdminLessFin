@@ -41,6 +41,8 @@ export interface TemplateAccount {
   control_account?: boolean;
   /** Ring-fenced system account. */
   system_account?: boolean;
+  /** Deliberately carries the opposite of its type's normal balance. */
+  is_contra?: boolean;
   /** Defaults true; headers and control accounts set this false. */
   allow_manual_posting?: boolean;
   /** Blocks ALL postings (used for structural headers). */

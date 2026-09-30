@@ -40,6 +40,53 @@ type FormValues = z.infer<typeof schema>;
 
 const NONE = '__none__';
 
+// Defined at module level: a component created inside render gets a new
+// identity every render, so React remounted every account select (and its
+// open dropdown) on each keystroke elsewhere in the form.
+const AccountSelect = ({
+  control,
+  name,
+  label,
+  options,
+  hint,
+}: {
+  control: ReturnType<typeof useForm<FormValues>>['control'];
+  name: keyof FormValues;
+  label: string;
+  options: Account[];
+  hint?: string;
+}) => (
+  <FormField
+    control={control}
+    name={name}
+    render={({ field }) => (
+      <FormItem>
+        <FormLabel>{label}</FormLabel>
+        <Select
+          value={(field.value as string) || NONE}
+          onValueChange={(v) => field.onChange(v === NONE ? null : v)}
+        >
+          <FormControl>
+            <SelectTrigger>
+              <SelectValue placeholder="Select account" />
+            </SelectTrigger>
+          </FormControl>
+          <SelectContent>
+            <SelectItem value={NONE}>None (use asset-level)</SelectItem>
+            {options.map((acc) => (
+              <SelectItem key={acc.id} value={acc.id}>
+                {acc.account_number} · {acc.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        {hint && <p className="text-xs text-muted-foreground">{hint}</p>}
+        <FormMessage />
+      </FormItem>
+    )}
+  />
+);
+
 const AssetCategoryWorkspace = () => {
   const { id } = useParams();
   const { activeCompany } = useAuth();
@@ -81,6 +128,9 @@ const AssetCategoryWorkspace = () => {
 
   useEffect(() => {
     if (!category) return;
+    // Never over unsaved typing: the category row comes from the shared list
+    // query, which refetches on saves elsewhere, reconnects and invalidations.
+    if (form.formState.isDirty) return;
     form.reset({
       name: category.name,
       useful_life_years: category.useful_life_years ?? 5,
@@ -121,54 +171,14 @@ const AssetCategoryWorkspace = () => {
       });
       if (error) throw error;
     },
-    onSuccess: () => {
+    onSuccess: (_data, values) => {
+      // Rebase on the saved values so the refetch may land cleanly.
+      form.reset(values);
       queryClient.invalidateQueries({ queryKey: ['asset_categories', activeCompany?.id] });
       showSuccess('Category intelligence updated.');
     },
     onError: (e: Error) => showError(e.message),
   });
-
-  const AccountSelect = ({
-    name,
-    label,
-    options,
-    hint,
-  }: {
-    name: keyof FormValues;
-    label: string;
-    options: Account[];
-    hint?: string;
-  }) => (
-    <FormField
-      control={form.control}
-      name={name}
-      render={({ field }) => (
-        <FormItem>
-          <FormLabel>{label}</FormLabel>
-          <Select
-            value={(field.value as string) || NONE}
-            onValueChange={(v) => field.onChange(v === NONE ? null : v)}
-          >
-            <FormControl>
-              <SelectTrigger>
-                <SelectValue placeholder="Select account" />
-              </SelectTrigger>
-            </FormControl>
-            <SelectContent>
-              <SelectItem value={NONE}>None (use asset-level)</SelectItem>
-              {options.map((acc) => (
-                <SelectItem key={acc.id} value={acc.id}>
-                  {acc.account_number} · {acc.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          {hint && <p className="text-xs text-muted-foreground">{hint}</p>}
-          <FormMessage />
-        </FormItem>
-      )}
-    />
-  );
 
   if (isLoading) {
     return <Skeleton className="h-96 w-full" />;
@@ -320,31 +330,37 @@ const AssetCategoryWorkspace = () => {
                 <h3 className="text-sm font-semibold mb-3">Default GL accounts</h3>
                 <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                   <AccountSelect
+                    control={form.control}
                     name="gl_asset_account_id"
                     label="Asset account"
                     options={assetAccounts}
                   />
                   <AccountSelect
+                    control={form.control}
                     name="accumulated_depreciation_account_id"
                     label="Accumulated depreciation"
                     options={assetAccounts}
                   />
                   <AccountSelect
+                    control={form.control}
                     name="depreciation_expense_account_id"
                     label="Depreciation expense"
                     options={expenseAccounts}
                   />
                   <AccountSelect
+                    control={form.control}
                     name="disposal_account_id"
                     label="Disposal / gain-loss"
                     options={incomeExpense}
                   />
                   <AccountSelect
+                    control={form.control}
                     name="revaluation_reserve_account_id"
                     label="Revaluation reserve"
                     options={equityAccounts}
                   />
                   <AccountSelect
+                    control={form.control}
                     name="impairment_account_id"
                     label="Impairment"
                     options={expenseAccounts}

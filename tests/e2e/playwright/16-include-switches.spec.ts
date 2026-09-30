@@ -68,9 +68,16 @@ test('a note the engine left out can be switched on, and back to the default', a
   // An optional note the books give no occasion for: contingencies.
   const row = tree.getByTestId('afs-tree-note').filter({ hasText: /Contingen/i }).first();
   await expect(row).toBeVisible();
-  await expect(row).not.toHaveAttribute('data-note-number', /\d/);
   await row.click();
-  await expect(page.getByTestId('afs-editor-include-state')).toHaveText(/Off by default/);
+  // Self-heal: an interrupted earlier run may have left its override behind,
+  // and this test's whole premise is the engine's default.
+  const includeState = page.getByTestId('afs-editor-include-state');
+  await expect(includeState).toBeVisible({ timeout: 60_000 });
+  if (/by you/.test((await includeState.textContent()) ?? '')) {
+    await page.getByRole('button', { name: "Use the engine's default" }).first().click();
+  }
+  await expect(includeState).toHaveText(/Off by default/, { timeout: 60_000 });
+  await expect(row).not.toHaveAttribute('data-note-number', /\d/, { timeout: 60_000 });
 
   await page.getByTestId('afs-editor-include-switch').click();
   await expect(page.getByTestId('afs-editor-include-state')).toHaveText(/switched on by you/, {
@@ -92,6 +99,15 @@ test('a printed note can be switched off from the tree, then restored', async ({
   await openEditable(page);
   const tree = nav(page);
   const row = tree.getByTestId('afs-tree-note').filter({ hasText: /Share capital/i }).first();
+  await expect(row).toBeVisible({ timeout: 60_000 });
+  // Self-heal: an interrupted earlier run may have left this note switched
+  // off; the test is about flipping it from the engine's default.
+  await row.click();
+  const includeState = page.getByTestId('afs-editor-include-state');
+  await expect(includeState).toBeVisible({ timeout: 60_000 });
+  if (/by you/.test((await includeState.textContent()) ?? '')) {
+    await page.getByRole('button', { name: "Use the engine's default" }).first().click();
+  }
   await expect(row).toHaveAttribute('data-note-number', /\d+/, { timeout: 60_000 });
   await flip(row);
   await expect(row).not.toHaveAttribute('data-note-number', /\d/, { timeout: 60_000 });
@@ -108,7 +124,13 @@ test('every framework policy is available; one can be switched on', async ({ pag
   const row = tree.getByTestId('afs-tree-policy').filter({ hasText: /Investment property/i }).first();
   await expect(row).toBeVisible({ timeout: 60_000 });
   await row.click();
-  await expect(page.getByTestId('afs-editor-include-state')).toHaveText(/Off by default/);
+  // Self-heal: an interrupted earlier run may have left its override behind.
+  const policyState = page.getByTestId('afs-editor-include-state');
+  await expect(policyState).toBeVisible({ timeout: 60_000 });
+  if (/by you/.test((await policyState.textContent()) ?? '')) {
+    await page.getByRole('button', { name: "Use the engine's default" }).first().click();
+  }
+  await expect(policyState).toHaveText(/Off by default/, { timeout: 60_000 });
   await expect(page.getByTestId('afs-editor-include')).toContainText('Why it is off: The books do not indicate investment property');
   await page.getByTestId('afs-editor-include-switch').click();
   await expect(page.getByTestId('afs-editor-include-state')).toHaveText(/switched on by you/, {
@@ -161,6 +183,13 @@ test('reports and the Detailed Income Statement can be switched off and renamed'
   await expect(dis).toBeVisible({ timeout: 60_000 });
   await dis.click();
   await expect(page.getByTestId('afs-schedule-lines')).toBeVisible();
+  // Self-heal: an interrupted earlier run may have left this switched off;
+  // the flip below must start from the printed default.
+  const disState = page.getByTestId('afs-editor-include-state');
+  if (/by you/.test((await disState.textContent().catch(() => '')) ?? '')) {
+    await page.getByRole('button', { name: "Use the engine's default" }).first().click();
+    await expect(dis).not.toContainText(/\boff\b/, { timeout: 30_000 });
+  }
   await page.getByTestId('afs-editor-include-switch').click();
   await expect(dis).toContainText('off', { timeout: 30_000 });
   await page.getByRole('button', { name: "Use the engine's default" }).first().click();
@@ -168,6 +197,12 @@ test('reports and the Detailed Income Statement can be switched off and renamed'
 
   const report = tree.getByTestId('afs-tree-front').filter({ hasText: "Directors' Report" }).first();
   await report.click();
+  // Self-heal: same rule as above — the flip must start from the default.
+  const reportState = page.getByTestId('afs-editor-include-state');
+  if (/by you/.test((await reportState.textContent().catch(() => '')) ?? '')) {
+    await page.getByRole('button', { name: "Use the engine's default" }).first().click();
+    await expect(report).not.toContainText(/\boff\b/, { timeout: 30_000 });
+  }
   await page.getByTestId('afs-editor-include-switch').click();
   await expect(report).toContainText('off', { timeout: 30_000 });
   await page.screenshot({ path: `${SHOTS}/incl-5-report-off.png`, fullPage: true });

@@ -79,8 +79,13 @@ test('the company logo is uploaded on the cover and prints above the name', asyn
   // Read and embedded: the switch is live and on.
   const sw = page.getByTestId('afs-cover-logo-switch');
   await expect(sw).toBeEnabled({ timeout: 120_000 });
-  await expect(sw).toHaveAttribute('data-state', 'checked');
-  await expect(control).toContainText('Printed centred above the company name');
+  // Self-heal: an interrupted earlier run may have left the logo switched off
+  // for this engagement, and a fresh upload does not overrule that choice.
+  if ((await sw.getAttribute('data-state')) !== 'checked') {
+    await sw.click();
+  }
+  await expect(sw).toHaveAttribute('data-state', 'checked', { timeout: 30_000 });
+  await expect(control).toContainText('Printed centred above the company name', { timeout: 30_000 });
   await page.screenshot({ path: 'tests/e2e/artifacts/logo-1-cover-editor.png', fullPage: true });
 
   // Off for this set, then back on.

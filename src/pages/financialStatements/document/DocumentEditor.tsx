@@ -920,12 +920,17 @@ function PolicyPartsEditor({ policy, ctx }: { policy: DocPolicyNode; ctx: Editor
   const [rows, setRows] = useState<string[][]>(table ?? []);
   const [after, setAfter] = useState(bodyAfter);
   const [dirty, setDirty] = useState(false);
+  const loadedPolicy = useRef(policy.id);
   useEffect(() => {
+    // Moving to another policy always reloads; within the same policy the
+    // engine-composed table must not replace unsaved rows.
+    if (dirty && loadedPolicy.current === policy.id) return;
+    loadedPolicy.current = policy.id;
     setRows(table ?? []);
     setAfter(bodyAfter);
     setDirty(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [policy.id, JSON.stringify(table), bodyAfter]);
+  }, [policy.id, JSON.stringify(table), bodyAfter, dirty]);
 
   const width = Math.max(2, ...rows.map((r) => r.length));
   const setCell = (r: number, c: number, v: string) => {
@@ -1029,6 +1034,7 @@ function PolicyPartsEditor({ policy, ctx }: { policy: DocPolicyNode; ctx: Editor
           onClick={() => {
             ctx.overridesApi.setPolicyPart(code, 'table', undefined);
             ctx.overridesApi.setPolicyPart(code, 'bodyAfter', undefined);
+            setDirty(false);
             showSuccess("Returned to the engine's version from the register");
           }}
         >
@@ -1157,13 +1163,16 @@ function FrontSectionEditor({ sectionId, ctx }: { sectionId: string; ctx: Editor
   useEffect(() => {
     // Reload when the reader moves to another section, or when a save or a
     // reset lands (the resolved wording then matches what should be shown) —
-    // but never over unsaved typing.
+    // but never over unsaved typing: regenerated wording (a model reload, a
+    // save elsewhere, a general-information change) waits until this
+    // section's own edits are saved or abandoned.
     const fingerprint = `${sectionId}::${JSON.stringify(resolvedBlocks)}`;
     if (loadedFor.current === fingerprint) return;
+    if (dirty && loadedFor.current.startsWith(`${sectionId}::`)) return;
     loadedFor.current = fingerprint;
     setBlocks(resolvedBlocks);
     setDirty(false);
-  }, [sectionId, resolvedBlocks]);
+  }, [sectionId, resolvedBlocks, dirty]);
 
   if (!section) {
     return (
@@ -1656,28 +1665,42 @@ function TableEditor({
     [table.id, table.title, table.columns_json, table.rows_json],
   );
   const applied = useRef(signature);
+  const [dirty, setDirty] = useState(false);
   useEffect(() => {
     if (signature === applied.current) return;
+    // Never over unsaved typing — a concurrent save elsewhere in the note
+    // waits until this table's own edits are saved or abandoned.
+    if (dirty) return;
     applied.current = signature;
     const next = toGrid(table.rows_json);
     setTitle(table.title);
     setGrid(next);
     setHeaders(columnLabels(table.columns_json, next));
-  }, [signature, table]);
+  }, [signature, table, dirty]);
 
   const save = useContentSave(ctx, note, 'table');
   const width = headers.length || 2;
 
-  const setCell = (r: number, c: number, v: string) =>
+  const setCell = (r: number, c: number, v: string) => {
+    setDirty(true);
     setGrid((prev) => prev.map((row, ri) => (ri === r ? row.map((cell, ci) => (ci === c ? v : cell)) : row)));
+  };
 
-  const addRow = () => setGrid((prev) => [...prev, Array.from({ length: width }, () => '')]);
-  const removeRow = (r: number) => setGrid((prev) => prev.filter((_, ri) => ri !== r));
+  const addRow = () => {
+    setDirty(true);
+    setGrid((prev) => [...prev, Array.from({ length: width }, () => '')]);
+  };
+  const removeRow = (r: number) => {
+    setDirty(true);
+    setGrid((prev) => prev.filter((_, ri) => ri !== r));
+  };
   const addColumn = () => {
+    setDirty(true);
     setHeaders((prev) => [...prev, '']);
     setGrid((prev) => prev.map((row) => [...row, '']));
   };
   const removeColumn = (c: number) => {
+    setDirty(true);
     setHeaders((prev) => prev.filter((_, ci) => ci !== c));
     setGrid((prev) => prev.map((row) => row.filter((_, ci) => ci !== c)));
   };
@@ -1687,7 +1710,10 @@ function TableEditor({
       <div className="flex flex-wrap items-center gap-2">
         <Input
           value={title}
-          onChange={(e) => setTitle(e.target.value)}
+          onChange={(e) => {
+            setDirty(true);
+            setTitle(e.target.value);
+          }}
           placeholder="Table title"
           className="max-w-sm"
         />
@@ -1714,9 +1740,10 @@ function TableEditor({
                       value={h}
                       placeholder={`Column ${c + 1}`}
                       className="h-8 border-0 bg-transparent font-medium shadow-none focus-visible:ring-1"
-                      onChange={(e) =>
-                        setHeaders((prev) => prev.map((x, ci) => (ci === c ? e.target.value : x)))
-                      }
+                      onChange={(e) => {
+                        setDirty(true);
+                        setHeaders((prev) => prev.map((x, ci) => (ci === c ? e.target.value : x)));
+                      }}
                     />
                     <button
                       type="button"
@@ -1796,7 +1823,12 @@ function TableEditor({
                   columns_json: headers,
                   sortOrder: table.sort_order,
                 },
-                { onSuccess: () => showSuccess('Table saved') },
+                {
+                  onSuccess: () => {
+                    setDirty(false);
+                    showSuccess('Table saved');
+                  },
+                },
               )
             }
           >

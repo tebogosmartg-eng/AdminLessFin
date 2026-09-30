@@ -1,4 +1,3 @@
-import { useEffect } from 'react';
 import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -18,6 +17,7 @@ import { Account } from '../pages/ChartOfAccounts';
 import { Trash2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { accountsQuery, productsQuery, vendorsQuery } from '../lib/queries';
+import { useDialogFormReset } from '../hooks/useDialogFormReset';
 
 const itemSchema = z.object({
   product_id: z.string().optional(),
@@ -74,34 +74,40 @@ const RecurringBillForm = ({ isOpen, setIsOpen, billId }: Props) => {
     enabled: isEditing && isOpen && !!activeCompany,
   });
 
-  useEffect(() => {
-    if (isEditing && existingData) {
-      form.reset({
-        profile_name: existingData.profile_name,
-        vendor_id: existingData.vendor_id,
-        frequency: existingData.frequency,
-        start_date: existingData.start_date,
-        end_date: existingData.end_date || '',
-        status: existingData.status,
-        items: existingData.recurring_bill_items.map((i: any) => ({
-          product_id: i.product_id || undefined,
-          description: i.description,
-          quantity: i.quantity,
-          unit_cost: i.unit_cost,
-          expense_account_id: i.expense_account_id,
-        })),
-      });
-    } else if (!isEditing) {
-      form.reset({
-        profile_name: '',
-        vendor_id: '',
-        frequency: 'monthly',
-        start_date: format(new Date(), 'yyyy-MM-dd'),
-        status: 'active',
-        items: [{ description: '', quantity: 1, unit_cost: 0, expense_account_id: '' }],
-      });
-    }
-  }, [existingData, isEditing, isOpen, form]);
+  // Reset only when the dialog opens or the record it edits changes — never
+  // because the edit query refetched while the user is typing.
+  useDialogFormReset(
+    isOpen,
+    existingData ? `edit:${billId}` : isEditing ? `pending:${billId}` : 'new',
+    () => {
+      if (isEditing && existingData) {
+        form.reset({
+          profile_name: existingData.profile_name,
+          vendor_id: existingData.vendor_id,
+          frequency: existingData.frequency,
+          start_date: existingData.start_date,
+          end_date: existingData.end_date || '',
+          status: existingData.status,
+          items: existingData.recurring_bill_items.map((i: any) => ({
+            product_id: i.product_id || undefined,
+            description: i.description,
+            quantity: i.quantity,
+            unit_cost: i.unit_cost,
+            expense_account_id: i.expense_account_id,
+          })),
+        });
+      } else if (!isEditing) {
+        form.reset({
+          profile_name: '',
+          vendor_id: '',
+          frequency: 'monthly',
+          start_date: format(new Date(), 'yyyy-MM-dd'),
+          status: 'active',
+          items: [{ description: '', quantity: 1, unit_cost: 0, expense_account_id: '' }],
+        });
+      }
+    },
+  );
 
   const { fields, append, remove } = useFieldArray({ control: form.control, name: "items" });
 
@@ -137,6 +143,8 @@ const RecurringBillForm = ({ isOpen, setIsOpen, billId }: Props) => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['recurring_bills', activeCompany?.id] });
+      // The edit query must not serve the pre-save record on the next open.
+      if (isEditing) queryClient.invalidateQueries({ queryKey: ['recurring_bill_edit', billId] });
       showSuccess(`Recurring bill ${isEditing ? 'updated' : 'created'}.`);
       setIsOpen(false);
     },

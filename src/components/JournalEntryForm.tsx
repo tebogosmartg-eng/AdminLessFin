@@ -130,7 +130,12 @@ const JournalEntryForm = ({ isOpen, setIsOpen, entryId }: JournalEntryFormProps)
       : `pending:${entryId}`
     : 'new';
 
+  // One idempotency key per submission (see onSubmit); a fresh open is a
+  // fresh submission.
+  const submissionKey = useRef('');
+
   useDialogFormReset(isOpen, formResetKey, () => {
+    submissionKey.current = '';
     if (isEditing && entryToEdit) {
       form.reset({
         entry_date: entryToEdit.entry_date,
@@ -239,6 +244,10 @@ const JournalEntryForm = ({ isOpen, setIsOpen, entryId }: JournalEntryFormProps)
         company_id: activeCompany.id,
         entryData: { ...values, attachment_url: finalAttachmentUrl },
         ...(isEditing && { entryId: entryId }),
+        // One key per submission, kept across retries of the same submission:
+        // if the first attempt committed but the response was lost, the retry
+        // returns that journal instead of posting a second one.
+        ...(!isEditing && { idempotency_key: submissionKey.current }),
       };
 
       const { data: fnData, error } = await supabase.functions.invoke('journal-entries', { body });
@@ -254,6 +263,7 @@ const JournalEntryForm = ({ isOpen, setIsOpen, entryId }: JournalEntryFormProps)
       }
     },
     onSuccess: () => {
+      submissionKey.current = '';
       draft.clear();
       queryClient.invalidateQueries({ queryKey: ['journal_entries'] });
       queryClient.invalidateQueries({ queryKey: ['journal_entry_detail', entryId] });
@@ -274,6 +284,7 @@ const JournalEntryForm = ({ isOpen, setIsOpen, entryId }: JournalEntryFormProps)
   const onSubmit = (values: JournalEntryFormValues) => {
     if (submitLock.current) return;
     submitLock.current = true;
+    if (!submissionKey.current) submissionKey.current = crypto.randomUUID();
     mutation.mutate(values, { onSettled: () => { submitLock.current = false; } });
   };
 

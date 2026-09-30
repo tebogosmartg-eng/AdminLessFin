@@ -250,6 +250,7 @@ const InvoiceForm = ({ isOpen, setIsOpen, invoiceId, duplicateFromId, initialCus
     isOpen,
     sourceInvoice ? `src:${sourceId}` : 'new',
     () => {
+      submissionKey.current = '';
       if (!sourceInvoice) {
         // A fresh invoice starts fresh: values from the last edit or
         // duplicate must not leak into it.
@@ -369,6 +370,10 @@ const InvoiceForm = ({ isOpen, setIsOpen, invoiceId, duplicateFromId, initialCus
         invoiceId,
         invoiceData: { ...values, p_items },
         timesheetIds: isEditing ? [] : timesheetIds,
+        // One key per submission, kept across retries: if the first attempt
+        // committed but the response was lost, the retry returns that invoice
+        // instead of creating another.
+        ...(!isEditing && { idempotency_key: submissionKey.current }),
       };
 
       const invokeInvoice = async () => {
@@ -398,6 +403,7 @@ const InvoiceForm = ({ isOpen, setIsOpen, invoiceId, duplicateFromId, initialCus
       return { path: 'boe', invalidationKeys: result.dashboardRefreshKeys };
     },
     onSuccess: (outcome) => {
+      submissionKey.current = '';
       draft.clear();
       if (outcome.path === 'boe') {
         for (const queryKey of outcome.invalidationKeys) {
@@ -418,11 +424,14 @@ const InvoiceForm = ({ isOpen, setIsOpen, invoiceId, duplicateFromId, initialCus
   });
 
   const submitLock = useRef(false);
+  // One idempotency key per submission; a fresh submission gets a fresh key.
+  const submissionKey = useRef('');
   // Two rapid clicks can both pass async validation before isPending
   // re-renders; the ref closes that window so one submit posts one document.
   const onSubmit = (values: InvoiceFormValues) => {
     if (submitLock.current) return;
     submitLock.current = true;
+    if (!submissionKey.current) submissionKey.current = crypto.randomUUID();
     mutation.mutate(values, { onSettled: () => { submitLock.current = false; } });
   };
 

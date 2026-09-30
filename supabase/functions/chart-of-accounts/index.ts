@@ -329,6 +329,7 @@ serve(withEnterprisePlatform('chart-of-accounts', 'tenant', async (req, _ctx) =>
           account_role: a.account_role ?? null,
           control_account: a.control_account ?? false,
           system_account: a.system_account ?? false,
+          is_contra: a.is_contra ?? false,
           allow_manual_posting: a.allow_manual_posting ?? true,
           posting_blocked: a.posting_blocked ?? false,
           is_active: true,

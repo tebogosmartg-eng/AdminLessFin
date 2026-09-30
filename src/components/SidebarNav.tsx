@@ -186,7 +186,9 @@ export const SidebarNav = ({ className, onNavigate }: SidebarNavProps) => {
     { to: '/accounting/audit-trail', label: 'Audit Trail', icon: Shield, prefetch: () => {} },
     { to: '/recurring-entries', label: 'Recurring Entries', icon: Repeat, prefetch: () => prefetch(queries.recurringEntriesQuery) },
     { to: '/reconciliation', label: 'Reconcile', icon: ArrowLeftRight, prefetch: () => prefetch(queries.accountsQuery) },
-    { to: '/tax-rates', label: 'Tax Rates', icon: Percent, prefetch: () => prefetch(queries.taxRatesQuery) },
+    // /tax-rates is admin-gated; showing the link to everyone silently
+    // bounced non-admins to the dashboard.
+    ...(isAdmin ? [{ to: '/tax-rates', label: 'Tax Rates', icon: Percent, prefetch: () => prefetch(queries.taxRatesQuery) }] : []),
   ];
 
   const assetsLinks = [
@@ -422,10 +424,14 @@ export const SidebarNav = ({ className, onNavigate }: SidebarNavProps) => {
         onNavigate={onNavigate}
       />
       
-      <NavLink to="/import" className={navLinkClasses} onClick={onNavigate}>
-        <Upload className="mr-3 h-5 w-5" />
-        Import Data
-      </NavLink>
+      {/* /import is admin-gated; showing the link to everyone silently
+          bounced non-admins to the dashboard. */}
+      {isAdmin && (
+        <NavLink to="/import" className={navLinkClasses} onClick={onNavigate}>
+          <Upload className="mr-3 h-5 w-5" />
+          Import Data
+        </NavLink>
+      )}
       
       <div className="pt-4 mt-auto space-y-1">
         {isBetaAnalyticsAdmin(user?.email) && (

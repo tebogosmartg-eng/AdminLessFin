@@ -1,11 +1,12 @@
-import { useEffect } from 'react';
 import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { invokePayroll } from '../lib/payrollOperations';
 import { Button } from './ui/button';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from './ui/dialog';
+import { DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription, DialogClose } from './ui/dialog';
+import { FormDialog } from './ui/form-dialog';
+import { useDialogFormReset } from '../hooks/useDialogFormReset';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from './ui/form';
 import { Input } from './ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
@@ -60,13 +61,16 @@ const PayslipDialog = ({ isOpen, setIsOpen, payslipId }: PayslipDialogProps) => 
     enabled: isOpen && !!activeCompany,
   });
 
-  useEffect(() => {
+  // Reset when the dialog opens for a payslip and when its record first
+  // arrives — never because a refetch landed mid-edit, and always fresh on
+  // reopen (the dialog stays mounted in PayrollRunDetail).
+  useDialogFormReset(isOpen, payslipData ? `edit:${payslipId}` : `pending:${payslipId}`, () => {
     if (payslipData) {
       form.reset({
         items: payslipData.payslip_items.map(({ description, type, amount }) => ({ description, type, amount })),
       });
     }
-  }, [payslipData, form]);
+  });
 
   const { fields, append, remove } = useFieldArray({ control: form.control, name: "items" });
 
@@ -97,7 +101,7 @@ const PayslipDialog = ({ isOpen, setIsOpen, payslipId }: PayslipDialogProps) => 
   const netPay = totalEarnings - totalDeductions;
 
   return (
-    <Dialog open={isOpen} onOpenChange={setIsOpen}>
+    <FormDialog open={isOpen} onOpenChange={setIsOpen} dirty={form.formState.isDirty || mutation.isPending}>
       <DialogContent className="sm:max-w-2xl">
         <DialogHeader>
           {isLoading ? <Skeleton className="h-6 w-1/2" /> : (
@@ -137,14 +141,16 @@ const PayslipDialog = ({ isOpen, setIsOpen, payslipId }: PayslipDialogProps) => 
               </div>
 
               <DialogFooter>
-                <Button type="button" variant="outline" onClick={() => setIsOpen(false)}>Cancel</Button>
+                <DialogClose asChild>
+                  <Button type="button" variant="outline">Cancel</Button>
+                </DialogClose>
                 <Button type="submit" disabled={mutation.isPending}>{mutation.isPending ? 'Saving...' : 'Save Changes'}</Button>
               </DialogFooter>
             </form>
           </Form>
         )}
       </DialogContent>
-    </Dialog>
+    </FormDialog>
   );
 };
 

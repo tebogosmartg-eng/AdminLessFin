@@ -172,6 +172,10 @@ serve(withEnterprisePlatform('journal-entries', 'tenant', async (req, _ctx) => {
 
         // Single gateway into the GL (ERP V2.0 Phase 2 Posting Engine) — no
         // more direct journal_entries/journal_entry_items inserts here.
+        // The client's per-submission key rides the engine's dedupe: a retry
+        // after an ambiguous failure returns the committed journal instead of
+        // posting a second one. Prefixed because the key space is shared by
+        // every module in the company.
         const { data: postingResult, error: postError } = await supabaseAdmin.rpc('posting_engine_submit', {
           p_request: {
             company_id,
@@ -183,6 +187,7 @@ serve(withEnterprisePlatform('journal-entries', 'tenant', async (req, _ctx) => {
             customer_id: customer_id || null,
             attachment_url: attachment_url || null,
             created_by: user.id,
+            idempotency_key: body.idempotency_key ? `manual_journal:ui:${body.idempotency_key}` : undefined,
             lines: postItems.map((item: JournalEntryItemInput) => ({
               account_id: item.account_id,
               debit: item.type === 'debit' ? item.amount : 0,
@@ -193,7 +198,11 @@ serve(withEnterprisePlatform('journal-entries', 'tenant', async (req, _ctx) => {
           p_mode: 'commit',
         });
         if (postError) throw postError;
-        data = { id: postingResult.journal_id };
+        data = {
+          id: postingResult.journal_id,
+          journal_number: postingResult.journal_number,
+          posting_status: postingResult.posting_status,
+        };
         break;
       }
 

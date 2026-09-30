@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useServerDraft } from '../hooks/useServerDraft';
 import { useAuth } from '../contexts/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from './ui/card';
 import { Button } from './ui/button';
@@ -35,12 +36,18 @@ const CATEGORY_LABELS: Record<string, string> = {
 const PayrollSettings = () => {
   const { activeCompany } = useAuth();
   const queryClient = useQueryClient();
-  const [localRules, setLocalRules] = useState<EffectiveRules>({});
 
   const { data, isLoading } = useQuery({
     ...payrollSettingsQuery(activeCompany?.id ?? ''),
     enabled: !!activeCompany,
   });
+
+  // A refetch (stale re-observe, reconnect, another screen's invalidation)
+  // must not overwrite toggles the user has not saved yet.
+  const [localRules, setLocalRules, rulesSaved] = useServerDraft<EffectiveRules>(
+    data?.effective_rules,
+    {},
+  );
 
   const catalog: CatalogRule[] = useMemo(() => {
     if (data?.catalog?.length) return data.catalog;
@@ -53,12 +60,6 @@ const PayrollSettings = () => {
       payslip_label: r.payslipLabel,
       description: r.description,
     }));
-  }, [data]);
-
-  useEffect(() => {
-    if (data?.effective_rules) {
-      setLocalRules(data.effective_rules);
-    }
   }, [data]);
 
   const saveMutation = useMutation({
@@ -78,6 +79,7 @@ const PayrollSettings = () => {
       });
     },
     onSuccess: () => {
+      rulesSaved();
       queryClient.invalidateQueries({ queryKey: ['payroll_settings', activeCompany?.id] });
       showSuccess('Payroll rule settings saved.');
     },

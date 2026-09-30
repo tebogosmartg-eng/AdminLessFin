@@ -30,26 +30,48 @@ import {
   nextVerificationDueFromFrequency,
 } from '../lib/assets/categoryDefaults';
 import type { AssetCategoryIntelligence } from '../lib/assets/eamTypes';
+import { SmartSelect, type SmartSelectOption } from './cotf/SmartSelect';
+import { assetCategoryCreateConfig } from './cotf/entityCreateConfigs';
 
-const assetSchema = z.object({
-  asset_code: z.string().optional(),
-  description: z.string().min(1, 'Description is required.'),
-  category_id: z.string().min(1, 'Category is required.'),
-  purchase_date: z.string().min(1, 'Purchase date is required.'),
-  purchase_cost: z.coerce.number().min(0.01, 'Cost must be positive.'),
-  vendor_id: z.string().optional(),
-  location: z.string().optional(),
-  assigned_to_employee_id: z.string().optional(),
-  serial_number: z.string().optional(),
-  asset_account_id: z.string().min(1, 'Asset account is required.'),
-  payment_account_id: z.string().min(1, 'Payment account is required.'),
-  depreciation_method: z.enum(['straight-line', 'reducing-balance']).optional(),
-  useful_life_years: z.coerce.number().int().min(1).optional(),
-  residual_value: z.coerce.number().min(0).optional(),
-  accumulated_depreciation_account_id: z.string().optional(),
-  depreciation_expense_account_id: z.string().optional(),
-  next_verification_due: z.string().optional(),
-});
+const assetSchema = z
+  .object({
+    // 'edit' updates the descriptive fields of an existing asset; the
+    // acquisition fields (cost, dates, accounts) belong to the posted
+    // acquisition journal and are not editable here.
+    mode: z.enum(['new', 'edit']).default('new'),
+    asset_code: z.string().optional(),
+    description: z.string().min(1, 'Description is required.'),
+    category_id: z.string().min(1, 'Category is required.'),
+    purchase_date: z.string().optional(),
+    purchase_cost: z.coerce.number().optional(),
+    vendor_id: z.string().optional(),
+    location: z.string().optional(),
+    assigned_to_employee_id: z.string().optional(),
+    serial_number: z.string().optional(),
+    asset_account_id: z.string().optional(),
+    payment_account_id: z.string().optional(),
+    depreciation_method: z.enum(['straight-line', 'reducing-balance']).optional(),
+    useful_life_years: z.coerce.number().int().min(1).optional(),
+    residual_value: z.coerce.number().min(0).optional(),
+    accumulated_depreciation_account_id: z.string().optional(),
+    depreciation_expense_account_id: z.string().optional(),
+    next_verification_due: z.string().optional(),
+  })
+  .superRefine((v, ctx) => {
+    if (v.mode === 'edit') return;
+    if (!v.purchase_date) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['purchase_date'], message: 'Purchase date is required.' });
+    }
+    if (!v.purchase_cost || v.purchase_cost < 0.01) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['purchase_cost'], message: 'Cost must be positive.' });
+    }
+    if (!v.asset_account_id) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['asset_account_id'], message: 'Asset account is required.' });
+    }
+    if (!v.payment_account_id) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['payment_account_id'], message: 'Payment account is required.' });
+    }
+  });
 
 type AssetFormValues = z.infer<typeof assetSchema>;
 
@@ -73,6 +95,7 @@ const AssetForm = ({ isOpen, setIsOpen, assetId }: AssetFormProps) => {
   const form = useForm<AssetFormValues>({
     resolver: zodResolver(assetSchema),
     defaultValues: {
+      mode: 'new',
       purchase_date: new Date().toISOString().split('T')[0],
       residual_value: 0,
     },
@@ -80,10 +103,40 @@ const AssetForm = ({ isOpen, setIsOpen, assetId }: AssetFormProps) => {
 
   const [categoryIntel, setCategoryIntel] = useState<CategoryIntelState>({});
 
-  useDialogFormReset(isOpen, isEditing ? 'edit' : 'new', () => {
-    form.reset({ purchase_date: new Date().toISOString().split('T')[0], residual_value: 0 });
-    setCategoryIntel({});
+  // Editing loads the asset it edits; nothing here ever POSTs twice.
+  const { data: existingAsset } = useQuery({
+    queryKey: ['fixed_asset_edit', assetId],
+    queryFn: async () => {
+      const { data, error } = await supabase.functions.invoke('fixed-assets', {
+        body: { method: 'GET_ONE', company_id: activeCompany!.id, assetId },
+      });
+      if (error) throw error;
+      return data;
+    },
+    enabled: isEditing && isOpen && !!activeCompany,
   });
+
+  useDialogFormReset(
+    isOpen,
+    existingAsset ? `edit:${assetId}` : isEditing ? `pending:${assetId}` : 'new',
+    () => {
+      if (isEditing && existingAsset) {
+        form.reset({
+          mode: 'edit',
+          asset_code: existingAsset.asset_code ?? '',
+          description: existingAsset.description ?? '',
+          category_id: existingAsset.category_id ?? '',
+          location: existingAsset.location ?? '',
+          serial_number: existingAsset.serial_number ?? '',
+          assigned_to_employee_id: existingAsset.assigned_to_employee_id ?? '',
+        });
+        setCategoryIntel({});
+      } else if (!isEditing) {
+        form.reset({ mode: 'new', purchase_date: new Date().toISOString().split('T')[0], residual_value: 0 });
+        setCategoryIntel({});
+      }
+    },
+  );
 
   // Typed work on a NEW asset survives refresh, crash and company switch.
   const draft = useFormPersistence(form, {
@@ -113,6 +166,15 @@ const AssetForm = ({ isOpen, setIsOpen, assetId }: AssetFormProps) => {
     categories?.forEach((c) => map.set(c.id, c));
     return map;
   }, [categories]);
+
+  // Create-on-the-Fly: a company with no asset categories is no longer a
+  // dead-end — the category can be created right here.
+  const companyId = activeCompany?.id ?? '';
+  const categoryOptions = useMemo<SmartSelectOption[]>(
+    () => (categories ?? []).map((c) => ({ value: c.id, label: c.name })),
+    [categories],
+  );
+  const categoryCreate = useMemo(() => assetCategoryCreateConfig({ companyId }), [companyId]);
 
   const applyCategoryDefaults = (categoryId: string) => {
     const cat = categoryById.get(categoryId);
@@ -167,7 +229,28 @@ const AssetForm = ({ isOpen, setIsOpen, assetId }: AssetFormProps) => {
   const mutation = useMutation({
     mutationFn: async (values: AssetFormValues) => {
       if (!user || !activeCompany) throw new Error('User not authenticated or no active company');
-      const { asset_code: _omit, ...rest } = values;
+
+      if (isEditing && assetId) {
+        // Descriptive update only — the acquisition journal is untouched.
+        const { error } = await supabase.functions.invoke('fixed-assets', {
+          body: {
+            method: 'PATCH_METADATA',
+            company_id: activeCompany.id,
+            assetId,
+            patch: {
+              description: values.description,
+              category_id: values.category_id,
+              location: values.location || null,
+              serial_number: values.serial_number || null,
+              assigned_to_employee_id: values.assigned_to_employee_id || null,
+            },
+          },
+        });
+        if (error) throw error;
+        return;
+      }
+
+      const { asset_code: _omit, mode: _mode, ...rest } = values;
       const payload = {
         ...rest,
         ...(values.asset_code?.trim() ? { asset_code: values.asset_code.trim() } : {}),
@@ -188,6 +271,7 @@ const AssetForm = ({ isOpen, setIsOpen, assetId }: AssetFormProps) => {
       queryClient.invalidateQueries({ queryKey: ['asset_register'] });
       queryClient.invalidateQueries({ queryKey: ['asset_register_facets'] });
       queryClient.invalidateQueries({ queryKey: ['journal_entries'] });
+      if (isEditing) queryClient.invalidateQueries({ queryKey: ['fixed_asset_edit', assetId] });
       showSuccess(`Asset ${isEditing ? 'updated' : 'acquired'} successfully.`);
       setIsOpen(false);
     },
@@ -225,8 +309,8 @@ const AssetForm = ({ isOpen, setIsOpen, assetId }: AssetFormProps) => {
                         {...field}
                         value={field.value ?? ''}
                         placeholder={nextCode || 'Auto-generated on save'}
-                        readOnly={!isEditing}
-                        className={!isEditing ? 'bg-muted font-mono' : 'font-mono'}
+                        readOnly
+                        className="bg-muted font-mono"
                       />
                     </FormControl>
                     {!isEditing && (
@@ -245,26 +329,18 @@ const AssetForm = ({ isOpen, setIsOpen, assetId }: AssetFormProps) => {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Category</FormLabel>
-                    <Select
-                      onValueChange={(v) => {
+                    <SmartSelect
+                      entityLabel="asset category"
+                      options={categoryOptions}
+                      value={field.value}
+                      onChange={(v) => {
                         field.onChange(v);
                         applyCategoryDefaults(v);
                       }}
-                      value={field.value}
-                    >
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select..." />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {categories?.map((c) => (
-                          <SelectItem key={c.id} value={c.id}>
-                            {c.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                      recentScope={`asset-category:${companyId}`}
+                      createConfig={categoryCreate}
+                      invalidateKeys={[['asset_categories', companyId]]}
+                    />
                     {categoryIntel.capitalisation_threshold != null && (
                       <FormDescription className="text-xs">
                         Capitalisation threshold: {categoryIntel.capitalisation_threshold}
@@ -295,6 +371,7 @@ const AssetForm = ({ isOpen, setIsOpen, assetId }: AssetFormProps) => {
               )} />
             </fieldset>
 
+            {!isEditing && (
             <fieldset className="grid grid-cols-1 md:grid-cols-3 gap-4 border p-4 rounded-md">
               <legend className="text-sm font-medium px-1 -mb-2">Acquisition & Accounting</legend>
               <FormField control={form.control} name="purchase_date" render={({ field }) => (<FormItem><FormLabel>Purchase Date</FormLabel><FormControl><Input type="date" {...field} /></FormControl><FormMessage /></FormItem>)} />
@@ -303,7 +380,9 @@ const AssetForm = ({ isOpen, setIsOpen, assetId }: AssetFormProps) => {
               <FormField control={form.control} name="asset_account_id" render={({ field }) => (<FormItem><FormLabel>Asset Account (Debit)</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select..." /></SelectTrigger></FormControl><SelectContent>{assetAccounts?.map(a => <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem>)} />
               <FormField control={form.control} name="payment_account_id" render={({ field }) => (<FormItem><FormLabel>Paid From (Credit)</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select Bank or A/P..." /></SelectTrigger></FormControl><SelectContent>{paymentAccounts?.map(a => <SelectItem key={a.id} value={a.id}>{a.name} ({a.type})</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem>)} />
             </fieldset>
+            )}
 
+            {!isEditing && (
             <fieldset className="grid grid-cols-1 md:grid-cols-3 gap-4 border p-4 rounded-md">
               <legend className="text-sm font-medium px-1 -mb-2">Depreciation Details (Optional)</legend>
               <FormField control={form.control} name="depreciation_method" render={({ field }) => (<FormItem><FormLabel>Method</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select..." /></SelectTrigger></FormControl><SelectContent><SelectItem value="straight-line">Straight-Line</SelectItem><SelectItem value="reducing-balance">Reducing Balance</SelectItem></SelectContent></Select><FormMessage /></FormItem>)} />
@@ -312,6 +391,14 @@ const AssetForm = ({ isOpen, setIsOpen, assetId }: AssetFormProps) => {
               <FormField control={form.control} name="accumulated_depreciation_account_id" render={({ field }) => (<FormItem><FormLabel>Accum. Depr. Account</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select..." /></SelectTrigger></FormControl><SelectContent>{assetAccounts?.map(a => <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem>)} />
               <FormField control={form.control} name="depreciation_expense_account_id" render={({ field }) => (<FormItem><FormLabel>Depr. Expense Account</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select..." /></SelectTrigger></FormControl><SelectContent>{expenseAccounts?.map(a => <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem>)} />
             </fieldset>
+            )}
+
+            {isEditing && (
+              <p className="text-xs text-muted-foreground">
+                Cost, dates and accounts come from the posted acquisition journal and cannot be
+                changed here. To correct them, dispose the asset or post a correcting journal.
+              </p>
+            )}
 
             <DialogFooter className="pt-4">
               <DialogClose asChild><Button type="button" variant="outline">Cancel</Button></DialogClose>

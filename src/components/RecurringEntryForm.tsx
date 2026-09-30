@@ -1,4 +1,3 @@
-import { useEffect } from 'react';
 import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -17,6 +16,7 @@ import { Account } from '../pages/ChartOfAccounts';
 import { Trash2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { formatCurrency } from '../lib/utils';
+import { useDialogFormReset } from '../hooks/useDialogFormReset';
 
 const recurringItemSchema = z.object({
   account_id: z.string().min(1, "Account is required."),
@@ -82,28 +82,35 @@ const RecurringEntryForm = ({ isOpen, setIsOpen, entryId }: RecurringEntryFormPr
     enabled: isEditing && isOpen && !!activeCompany,
   });
 
-  useEffect(() => {
-    if (isEditing && entryToEdit) {
-      form.reset({
-        description: entryToEdit.description,
-        frequency: entryToEdit.frequency as any,
-        start_date: entryToEdit.start_date,
-        end_date: entryToEdit.end_date || '',
-        items: entryToEdit.recurring_journal_entry_items.map(({ account_id, type, amount }: any) => ({ account_id, type, amount })),
-      });
-    } else {
-      form.reset({
-        description: '',
-        frequency: 'monthly',
-        start_date: format(new Date(), 'yyyy-MM-dd'),
-        end_date: '',
-        items: [
-          { account_id: '', type: 'debit', amount: 0 },
-          { account_id: '', type: 'credit', amount: 0 },
-        ],
-      });
-    }
-  }, [entryToEdit, isEditing, isOpen, form]);
+  // Reset only when the dialog opens or the record it edits changes — never
+  // because the edit query refetched while the user is typing, and never to
+  // blank while the edit record is still loading.
+  useDialogFormReset(
+    isOpen,
+    entryToEdit ? `edit:${entryId}` : isEditing ? `pending:${entryId}` : 'new',
+    () => {
+      if (isEditing && entryToEdit) {
+        form.reset({
+          description: entryToEdit.description,
+          frequency: entryToEdit.frequency as any,
+          start_date: entryToEdit.start_date,
+          end_date: entryToEdit.end_date || '',
+          items: entryToEdit.recurring_journal_entry_items.map(({ account_id, type, amount }: any) => ({ account_id, type, amount })),
+        });
+      } else if (!isEditing) {
+        form.reset({
+          description: '',
+          frequency: 'monthly',
+          start_date: format(new Date(), 'yyyy-MM-dd'),
+          end_date: '',
+          items: [
+            { account_id: '', type: 'debit', amount: 0 },
+            { account_id: '', type: 'credit', amount: 0 },
+          ],
+        });
+      }
+    },
+  );
 
   const { fields, append, remove } = useFieldArray({ control: form.control, name: "items" });
   const { data: accounts } = useQuery<Account[]>({ 
@@ -147,6 +154,8 @@ const RecurringEntryForm = ({ isOpen, setIsOpen, entryId }: RecurringEntryFormPr
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['recurring_entries', activeCompany?.id] });
+      // The edit query must not serve the pre-save record on the next open.
+      if (isEditing) queryClient.invalidateQueries({ queryKey: ['recurring_entry_edit', entryId] });
       showSuccess(`Recurring entry ${isEditing ? 'updated' : 'created'}.`);
       setIsOpen(false);
     },

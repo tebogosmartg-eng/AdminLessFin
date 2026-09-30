@@ -53,7 +53,10 @@ function SwitchingCompany({ name }: { name: string }) {
 }
 
 const Layout = () => {
-  const { signOut, profile, activeCompany, switchingTo } = useAuth();
+  const { signOut, profile, activeCompany, switchingTo, role } = useAuth();
+  // /settings is admin-gated; showing the link to everyone silently bounced
+  // non-admins to the dashboard.
+  const canOpenSettings = role === 'owner' || role === 'admin';
   const location = useLocation();
   const isMobile = useIsMobile();
 
@@ -74,10 +77,12 @@ const Layout = () => {
         <AppSidebarLogo />
         <SidebarNav className="overflow-y-auto pr-1" />
         <div className="mt-auto">
-           <NavLink to="/settings" className={navLinkClasses}>
-             <Settings className="mr-3 h-5 w-5" />
-             Settings
-           </NavLink>
+           {canOpenSettings && (
+             <NavLink to="/settings" className={navLinkClasses}>
+               <Settings className="mr-3 h-5 w-5" />
+               Settings
+             </NavLink>
+           )}
            <Button onClick={signOut} variant="ghost" className="w-full justify-start mt-2 text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground">
              <LogOut className="mr-3 h-5 w-5" />
              Sign Out
@@ -137,13 +142,17 @@ const Layout = () => {
                   </div>
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem asChild>
-                  <NavLink to="/settings" className="w-full">
-                    <Settings className="mr-2 h-4 w-4" />
-                    <span>Settings</span>
-                  </NavLink>
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
+                {canOpenSettings && (
+                  <>
+                    <DropdownMenuItem asChild>
+                      <NavLink to="/settings" className="w-full">
+                        <Settings className="mr-2 h-4 w-4" />
+                        <span>Settings</span>
+                      </NavLink>
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                  </>
+                )}
                 <DropdownMenuItem onClick={signOut}>
                   <LogOut className="mr-2 h-4 w-4" />
                   <span>Log out</span>

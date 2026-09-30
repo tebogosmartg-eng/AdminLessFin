@@ -1,4 +1,3 @@
-import { useEffect } from 'react';
 import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -20,6 +19,7 @@ import { Trash2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { formatCurrency } from '../lib/utils';
 import { taxRatesQuery, accountsQuery, customersQuery, productsQuery } from '../lib/queries';
+import { useDialogFormReset } from '../hooks/useDialogFormReset';
 
 const itemSchema = z.object({
   product_id: z.string().optional(),
@@ -77,35 +77,41 @@ const RecurringInvoiceForm = ({ isOpen, setIsOpen, invoiceId }: Props) => {
     enabled: isEditing && isOpen && !!activeCompany,
   });
 
-  useEffect(() => {
-    if (isEditing && existingData) {
-      form.reset({
-        profile_name: existingData.profile_name,
-        customer_id: existingData.customer_id,
-        frequency: existingData.frequency,
-        start_date: existingData.start_date,
-        end_date: existingData.end_date || '',
-        status: existingData.status,
-        items: existingData.recurring_invoice_items.map((i: any) => ({
-          product_id: i.product_id || undefined,
-          description: i.description,
-          quantity: i.quantity,
-          unit_price: i.unit_price,
-          income_account_id: i.income_account_id,
-          tax_rate_id: i.tax_rate_id || undefined,
-        })),
-      });
-    } else if (!isEditing) {
-      form.reset({
-        profile_name: '',
-        customer_id: '',
-        frequency: 'monthly',
-        start_date: format(new Date(), 'yyyy-MM-dd'),
-        status: 'active',
-        items: [{ description: '', quantity: 1, unit_price: 0, income_account_id: '' }],
-      });
-    }
-  }, [existingData, isEditing, isOpen, form]);
+  // Reset only when the dialog opens or the record it edits changes — never
+  // because the edit query refetched while the user is typing.
+  useDialogFormReset(
+    isOpen,
+    existingData ? `edit:${invoiceId}` : isEditing ? `pending:${invoiceId}` : 'new',
+    () => {
+      if (isEditing && existingData) {
+        form.reset({
+          profile_name: existingData.profile_name,
+          customer_id: existingData.customer_id,
+          frequency: existingData.frequency,
+          start_date: existingData.start_date,
+          end_date: existingData.end_date || '',
+          status: existingData.status,
+          items: existingData.recurring_invoice_items.map((i: any) => ({
+            product_id: i.product_id || undefined,
+            description: i.description,
+            quantity: i.quantity,
+            unit_price: i.unit_price,
+            income_account_id: i.income_account_id,
+            tax_rate_id: i.tax_rate_id || undefined,
+          })),
+        });
+      } else if (!isEditing) {
+        form.reset({
+          profile_name: '',
+          customer_id: '',
+          frequency: 'monthly',
+          start_date: format(new Date(), 'yyyy-MM-dd'),
+          status: 'active',
+          items: [{ description: '', quantity: 1, unit_price: 0, income_account_id: '' }],
+        });
+      }
+    },
+  );
 
   const { fields, append, remove } = useFieldArray({ control: form.control, name: "items" });
 
@@ -142,6 +148,8 @@ const RecurringInvoiceForm = ({ isOpen, setIsOpen, invoiceId }: Props) => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['recurring_invoices', activeCompany?.id] });
+      // The edit query must not serve the pre-save record on the next open.
+      if (isEditing) queryClient.invalidateQueries({ queryKey: ['recurring_invoice_edit', invoiceId] });
       showSuccess(`Recurring invoice ${isEditing ? 'updated' : 'created'}.`);
       setIsOpen(false);
     },

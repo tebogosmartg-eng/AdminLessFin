@@ -221,6 +221,7 @@ const BillForm = ({ isOpen, setIsOpen, billId, duplicateFromId, initialData, onS
   });
 
   useDialogFormReset(isOpen, sourceBill ? `dup:${duplicateFromId}` : 'new', () => {
+    submissionKey.current = '';
     if (!isDuplicating || !sourceBill) return;
 
     const debitItems =
@@ -350,6 +351,10 @@ const BillForm = ({ isOpen, setIsOpen, billId, duplicateFromId, initialData, onS
           method: 'POST',
           company_id: activeCompany.id,
           billData: billData,
+          // One key per submission, kept across retries: if the first attempt
+          // committed but the response was lost, the retry returns that bill
+          // instead of recording a second bill and a second AP journal.
+          idempotency_key: submissionKey.current,
         },
       });
 
@@ -360,6 +365,7 @@ const BillForm = ({ isOpen, setIsOpen, billId, duplicateFromId, initialData, onS
       if (error) throw new Error(await edgeErrorMessage(error, 'The bill could not be recorded.'));
     },
     onSuccess: () => {
+      submissionKey.current = '';
       draft.clear();
       queryClient.invalidateQueries({ queryKey: ['bills', activeCompany?.id] });
       queryClient.invalidateQueries({ queryKey: ['journal_entries', activeCompany?.id] });
@@ -375,11 +381,14 @@ const BillForm = ({ isOpen, setIsOpen, billId, duplicateFromId, initialData, onS
   });
 
   const submitLock = useRef(false);
+  // One idempotency key per submission; a fresh submission gets a fresh key.
+  const submissionKey = useRef('');
   // Two rapid clicks can both pass async validation before isPending
   // re-renders; the ref closes that window so one submit posts one document.
   const onSubmit = (values: BillFormValues) => {
     if (submitLock.current) return;
     submitLock.current = true;
+    if (!submissionKey.current) submissionKey.current = crypto.randomUUID();
     mutation.mutate(values, { onSettled: () => { submitLock.current = false; } });
   };
 

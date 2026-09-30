@@ -184,6 +184,37 @@ export function taxRateCreateConfig({ companyId }: BaseCtx): QuickCreateConfig {
   };
 }
 
+export function assetCategoryCreateConfig({ companyId }: BaseCtx): QuickCreateConfig {
+  return {
+    title: 'New Asset Category',
+    description:
+      'Creates a category with standard straight-line defaults. Refine depreciation and GL mapping later under Assets → Asset Categories.',
+    fields: [
+      { name: 'name', label: 'Category name', type: 'text', required: true, prefillFromSearch: true },
+      { name: 'useful_life_years', label: 'Useful life (years)', type: 'number', placeholder: '5' },
+    ],
+    submitLabel: 'Create category',
+    create: async (values) => {
+      const row = await invokeCreate('asset-categories', {
+        method: 'POST',
+        company_id: companyId,
+        // Mirrors AssetCategoryForm's defaults so the depreciation engine sees a
+        // fully-formed category from day one.
+        categoryData: {
+          name: values.name.trim(),
+          useful_life_years: values.useful_life_years ? Number(values.useful_life_years) : 5,
+          residual_value_pct: 0,
+          depreciation_method: 'straight-line',
+          capitalisation_threshold: 0,
+          component_accounting_enabled: false,
+          default_verification_frequency_months: 12,
+        },
+      });
+      return toOption(row, row.name ?? values.name.trim());
+    },
+  };
+}
+
 export function projectCreateConfig({ companyId }: BaseCtx): QuickCreateConfig {
   return {
     title: 'New Project',

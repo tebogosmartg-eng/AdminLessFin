@@ -320,7 +320,10 @@ serve(withEnterprisePlatform('payments', 'tenant', async (req, _ctx) => {
         if (!body.asset_account_id) throw new Error("asset_account_id is required.");
         if (!body.ar_account_id) throw new Error("ar_account_id is required.");
         if (typeof body.amount !== 'number') throw new Error("amount is required.");
-        ({ data, error } = await userSupabase.rpc('record_invoice_payment', {
+        // Admin client: record_invoice_payment is service-role-only now that
+        // the write RPCs are revoked from authenticated. The membership and
+        // invoice-ownership checks above are the authorisation.
+        ({ data, error } = await supabaseAdmin.rpc('record_invoice_payment', {
           p_invoice_id: body.invoice_id,
           p_payment_date: body.payment_date,
           p_asset_account_id: body.asset_account_id,

@@ -51,8 +51,8 @@ const UserManual = () => {
               <h2 className="text-2xl font-bold">2. Getting Started — Accounting Setup</h2>
               <p>
                 Before you can invoice, post journals, or generate financial statements, you must
-                complete <strong>Accounting Setup</strong>. Open it from the dashboard or navigate
-                to Accounting Setup in the sidebar.
+                complete <strong>Accounting Setup</strong>. Open it from the dashboard, or follow
+                the link in the Onboarding Guide.
               </p>
               <h3 className="text-lg font-semibold">Setup steps (in order)</h3>
               <ol className="list-decimal pl-6 space-y-2">

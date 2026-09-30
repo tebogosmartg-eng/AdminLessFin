@@ -532,7 +532,7 @@ const PayrollRunDetail = () => {
         )}
 
         {run.status === 'draft' && id && (
-          <PayrollRunRulesPanel runId={id} runStatus={run.status} onSaved={invalidateRun} />
+          <PayrollRunRulesPanel key={id} runId={id} runStatus={run.status} onSaved={invalidateRun} />
         )}
 
         {currentStep === 'validate' && (

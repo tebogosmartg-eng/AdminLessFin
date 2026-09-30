@@ -55,6 +55,9 @@ function expand(specs: Spec[]): TemplateAccount[] {
     name: s.name,
     type: s.type,
     normal_balance: s.nb ?? normalBalanceFor(s.type),
+    // An explicit nb override opposite to the type default IS the contra
+    // declaration — recorded so integrity checks never have to infer it.
+    is_contra: s.nb !== undefined && s.nb !== normalBalanceFor(s.type),
     category: s.cat,
     subcategory: s.sub,
     financial_statement: s.fs ?? statementFor(s.type),

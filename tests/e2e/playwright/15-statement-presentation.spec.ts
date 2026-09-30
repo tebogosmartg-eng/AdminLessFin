@@ -223,6 +223,24 @@ test('the statements and notes tell one story, and unfilled lines do not print',
   const printedLabel = (label: string) =>
     `(${label.replace(/[\u2013\u2014]/g, '-').replace(/[()\\]/g, (c) => `\\${c}`)})`;
 
+  // Self-heal: an interrupted earlier run may have left line choices behind
+  // (the per-line Default button renders only while an override exists), and
+  // this test's whole premise is the engine's defaults.
+  {
+    const allNotes = nav.getByTestId('afs-tree-note');
+    const noteCount = await allNotes.count();
+    for (let i = 0; i < noteCount; i++) {
+      await allNotes.nth(i).click();
+      const defaults = page
+        .locator('[data-testid="afs-line-item"]')
+        .getByRole('button', { name: 'Default' });
+      for (let guard = 0; guard < 20 && (await defaults.count()) > 0; guard++) {
+        await defaults.first().click();
+        await page.waitForTimeout(150);
+      }
+    }
+  }
+
   const before = await pdf();
   expect(before, 'no placeholder prints by default').not.toMatch(/\(\[ ?-? ?\]\) Tj/);
 

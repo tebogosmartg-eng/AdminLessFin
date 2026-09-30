@@ -1,4 +1,3 @@
-import { useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -18,6 +17,7 @@ import { Button } from './ui/button';
 import { Switch } from './ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { showSuccess, showPlatformError } from '../utils/toast';
+import { useDialogFormReset } from '../hooks/useDialogFormReset';
 
 const bankAccountSchema = z.object({
   name: z.string().min(1, 'Account name is required.'),
@@ -65,9 +65,11 @@ const BankAccountForm = ({ isOpen, setIsOpen, account }: BankAccountFormProps) =
     },
   });
 
-  useEffect(() => {
-    if (isOpen) {
-      form.reset(account ? {
+  // Reset on the open edge (per account) only — BankAccountDetail passes a
+  // row from the live list query, so a refetch that changes the row's
+  // identity mid-edit must not wipe the user's typing.
+  useDialogFormReset(isOpen, account?.id ?? 'new', () => {
+    form.reset(account ? {
         name: account.name,
         account_type: account.account_type,
         account_number: account.account_number ?? '',
@@ -84,8 +86,7 @@ const BankAccountForm = ({ isOpen, setIsOpen, account }: BankAccountFormProps) =
         currency: 'ZAR', chart_of_account_id: '', is_default: false, opening_balance: 0,
         opening_balance_date: new Date().toISOString().split('T')[0], opening_balance_contra_account_id: '',
       });
-    }
-  }, [isOpen, account, form]);
+  });
 
   const invalidate = () => {
     queryClient.invalidateQueries({ queryKey: ['bank_accounts', activeCompany?.id] });
