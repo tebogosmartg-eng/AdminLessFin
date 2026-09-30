@@ -9,7 +9,7 @@
  */
 import type { DocNoteNode, DocTable } from '../document/documentModel';
 import { AccountIndex, type FinancialFacts } from './accountIndex';
-import { generateDisclosures, type BuildContext } from './definitions';
+import { generateDisclosures, type BuildContext, type EntityParticulars } from './definitions';
 import { mergeTable } from './merge';
 import type { DisclosureColumn, DisclosureRow, GeneratedTable } from './types';
 
@@ -117,13 +117,16 @@ function mergeNarrative(
   noteId: string,
   narrative: string[],
   existing: DocNoteNode['paragraphs'],
+  owns = false,
 ): DocNoteNode['paragraphs'] {
   // An empty paragraph with no row behind it is a leftover of the old
   // assembly and says nothing; an empty one the preparer just added is a row,
-  // and is where they are about to write.
+  // and is where they are about to write. Where the engine states the note
+  // from the company's own data, the framework's generic wording gives way to
+  // it; the preparer's stored wording still wins over both.
   const saved = new Map(
     existing
-      .filter((p) => p.body.trim() || STORED_ROW.test(p.id))
+      .filter((p) => STORED_ROW.test(p.id) || (narrative.length === 0 && !owns && p.body.trim()))
       .map((p) => [p.paragraph_code, p]),
   );
 
@@ -147,10 +150,15 @@ function mergeNarrative(
   return [...merged, ...extras];
 }
 
+/** Table codes earlier versions of the engine produced and no longer do. */
+const RETIRED_ENGINE_TABLES = new Set(['PPE.CARRYING', 'PPE.MOVEMENT', 'EQUITY.ANALYSIS']);
+
 export type AssembleOptions = {
   facts: FinancialFacts | null | undefined;
   currentLabel: string;
   priorLabel: string;
+  /** What the engagement records about the entity, for the notes that state it. */
+  entity?: EntityParticulars | null;
 };
 
 /**
@@ -169,6 +177,7 @@ export function applyGeneratedDisclosures(
     currentLabel: options.currentLabel,
     priorLabel: options.priorLabel,
     withComparatives: index.hasComparatives,
+    entity: options.entity ?? null,
   };
 
   const generated = generateDisclosures(ctx);
@@ -207,6 +216,10 @@ export function applyGeneratedDisclosures(
     // the same thing with the numbers in it.
     for (const [code, saved] of savedByCode) {
       if (disclosure.tables.some((t) => t.code === code)) continue;
+      // A table an earlier version of the engine produced, stored when the
+      // preparer worked on it, is superseded by what the engine states now —
+      // it is not the preparer's own, and printing both says it twice.
+      if (RETIRED_ENGINE_TABLES.has(code)) continue;
       const hasRows = Array.isArray(saved.rows_json) && saved.rows_json.length > 0;
       if (hasRows && STORED_ROW.test(saved.id)) tables.push(saved);
     }
@@ -215,11 +228,20 @@ export function applyGeneratedDisclosures(
       const i = out.indexOf(existing);
       out[i] = {
         ...existing,
+        // The engine owns what its notes are called; a preparer's own title is
+        // a presentation override and still wins at print.
+        title: disclosure.title,
         tables,
         // Sections the old assembly created with an empty body say nothing and
         // ask for nothing; the generated narrative below is the note now.
-        sections: existing.sections.filter((s) => s.body.trim()),
-        paragraphs: mergeNarrative(noteId, disclosure.narrative, existing.paragraphs),
+        // Where the engine states the note, the framework's generic sections
+        // give way to it too; sections the preparer wrote are kept.
+        sections: existing.sections.filter(
+          (s) =>
+            s.body.trim() &&
+            (STORED_ROW.test(s.id) || (disclosure.narrative.length === 0 && !disclosure.ownsNarrative)),
+        ),
+        paragraphs: mergeNarrative(noteId, disclosure.narrative, existing.paragraphs, disclosure.ownsNarrative),
       };
     } else {
       out.push({

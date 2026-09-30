@@ -90,6 +90,8 @@ export type GeneratedTable = {
 };
 
 export type GeneratedDisclosure = {
+  /** The framework's generic wording gives way entirely to the engine's. */
+  ownsNarrative?: boolean;
   code: string;
   title: string;
   /** Standard wording, before the preparer touches it. */

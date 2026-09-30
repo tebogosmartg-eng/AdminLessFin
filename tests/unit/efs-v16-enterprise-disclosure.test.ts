@@ -221,9 +221,10 @@ describe('V16.0 — Publication from Metadata', () => {
     expect(pkg.structureFingerprint).toBe(view.structureFingerprint);
 
     const pdfText = decodePdfText(pkg.pdfBytes);
-    expect(pdfText).toContain('Significant Accounting Policies');
-    expect(pdfText).toContain('Notes to the Financial Statements');
-    expect(pdfText).toMatch(/Note \d+\./);
+    expect(pdfText).toContain('Accounting Policies');
+    expect(pdfText).toContain('Notes to the Annual Financial Statements');
+    // Notes are numbered from 2 and headed the published way: "2. Revenue".
+    expect(pdfText).toMatch(/(^|\n)[2-9]\d?\. /);
     expect(pdfText).toContain('Meridian Enterprise Disclosure');
   });
 

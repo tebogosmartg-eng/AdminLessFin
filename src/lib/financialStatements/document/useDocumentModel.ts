@@ -59,8 +59,13 @@ export function useDocumentModel(params: {
   const generalInfoReady = params.generalInfoReady ?? true;
   const qc = useQueryClient();
 
+  // The model is built from one sealed version's facts. Keyed to that version
+  // and its content, a new seal (an update from accounting, a reopen) is a new
+  // model — never a refetch that still carries the previous version's id.
+  const version = dashboard.snapshot?.currentVersion;
+  const sealKey = `${version?.id ?? 'none'}:${version?.status ?? ''}:${version?.content_hash ?? ''}`;
   const query = useQuery<DocumentModel>({
-    queryKey: [...documentModelKey(companyId, workspaceId), entityFingerprint(generalInfo)],
+    queryKey: [...documentModelKey(companyId, workspaceId), entityFingerprint(generalInfo), sealKey],
     enabled: !!companyId && !!workspaceId && generalInfoReady,
     queryFn: async () => {
       await ensureGenericDocument({

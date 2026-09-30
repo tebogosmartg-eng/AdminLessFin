@@ -170,13 +170,14 @@ describe('V12.2 — Insertion position and numbering', () => {
     expect(afterFirst[ids[0]]).toBe(0);
   });
 
-  it('numbers the company note as Note 1 when inserted at the beginning', () => {
+  it('numbers the company note as the first note when inserted at the beginning', () => {
     const model = modelWith([companyNote('srv-new', 'Directors emoluments', 'Body.')]);
     const orderMap = buildInsertionOrder(model.notes, emptyOverrides(), 'srv-new', { position: 'beginning' });
     const overrides: DocOverrides = { ...emptyOverrides(), order: orderMap };
     const view = prepareCanonicalDocumentView(model, overrides);
     expect(view.notes[0].id).toBe('srv-new');
-    expect(view.notes.find((n) => n.id === 'srv-new')?.noteNumber).toBe(1);
+    // The accounting policies are note 1; the first disclosure note is 2.
+    expect(view.notes.find((n) => n.id === 'srv-new')?.noteNumber).toBe(2);
   });
 });
 

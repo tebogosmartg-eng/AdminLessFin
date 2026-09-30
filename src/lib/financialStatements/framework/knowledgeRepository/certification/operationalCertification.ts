@@ -244,7 +244,7 @@ export const CERTIFICATION_SCENARIOS: ScenarioDef[] = [
     extraLines: [
       { statement: 'financial_position', line_code: 'sfp.investments_subsidiaries', label: 'Investments in subsidiaries', amount: 8500000 },
     ],
-    conditionOverrides: { hasSubsidiariesOrSeparateFs: true },
+    conditionOverrides: { hasSubsidiariesOrSeparateFs: true, hasBusinessCombination: true },
     expectDisclosures: ['DISC.CONSOLIDATION', 'DISC.SHARECAPITAL'],
   },
   {
@@ -316,6 +316,7 @@ export const CERTIFICATION_SCENARIOS: ScenarioDef[] = [
     extraLines: [
       { statement: 'financial_performance', line_code: 'perf.forex', label: 'Net foreign exchange loss', amount: -125000 },
     ],
+    conditionOverrides: { hasHyperinflation: true },
     expectDisclosures: ['DISC.FOREX'],
   },
   {
@@ -378,6 +379,7 @@ export const CERTIFICATION_SCENARIOS: ScenarioDef[] = [
     entityName: 'ScaleUp Commerce (Pty) Ltd',
     nature: 'high-growth e-commerce distributor',
     extraLines: [],
+    conditionOverrides: { hasShareBasedPayment: true },
     expectDisclosures: ['DISC.REVENUE', 'DISC.RECEIVABLES', 'DISC.CASHFLOW'],
   },
   {
@@ -388,6 +390,7 @@ export const CERTIFICATION_SCENARIOS: ScenarioDef[] = [
     extraLines: [
       { statement: 'financial_position', line_code: 'sfp.intangibles', label: 'Intangible assets', amount: 880000 },
     ],
+    conditionOverrides: { hasInvestmentProperty: true },
     expectDisclosures: ['DISC.PPE', 'DISC.INTANGIBLES'],
   },
   {
@@ -577,10 +580,14 @@ export function runScenario(scenario: ScenarioDef): ScenarioResult {
   const docxText = extractDocxPlainText(pkg.docxBytes);
   const pageCount = (pkg.pdfString.match(/\/MediaBox/g) || []).length;
 
-  const pdfHasPolicies = /Significant accounting policies/i.test(pdfText);
-  const pdfHasNotes = /Note \d+\./.test(pdfText);
-  const docxHasPolicies = /Significant accounting policies/i.test(docxText);
-  const docxHasNotes = /Note \d+\./.test(docxText);
+  const pdfHasPolicies = /significant accounting policies/i.test(pdfText);
+  // Notes are numbered from 2 — the accounting policies are note 1 — and
+  // headed the way a published set heads them: "2. Property, plant and equipment".
+  const hasNumberedNotes = (text: string) =>
+    /Notes to the Annual Financial Statements/.test(text) && /(^|\n)[2-9]\d?\. \S/.test(text);
+  const pdfHasNotes = hasNumberedNotes(pdfText);
+  const docxHasPolicies = /significant accounting policies/i.test(docxText);
+  const docxHasNotes = hasNumberedNotes(docxText);
 
   if (!pdfHasPolicies) failures.push('PDF missing accounting policies heading');
   if (!pdfHasNotes) failures.push('PDF missing numbered notes');

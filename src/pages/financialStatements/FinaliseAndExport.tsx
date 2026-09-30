@@ -1,5 +1,6 @@
-import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { Lock, LockOpen } from 'lucide-react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { Check, Lock, LockOpen } from 'lucide-react';
+import { cn } from '../../lib/utils';
 import {
   invokeFinancialStatements,
   type EfsDashboard,
@@ -52,6 +53,32 @@ export default function FinaliseAndExport({
   const version = dashboard.snapshot?.currentVersion ?? null;
   const locked = version?.status === 'frozen' || version?.status === 'publication_bound';
 
+  // The engagement's review workflow decides when a set may be finalised:
+  // a draft becomes final only once the partner has approved it.
+  const reviewQuery = useQuery({
+    queryKey: ['efs_review_dash', companyId, workspaceId],
+    queryFn: () =>
+      invokeFinancialStatements<{ stage?: string; review?: { stage?: string } }>(
+        companyId,
+        'GET_REVIEW_DASHBOARD',
+        { workspace_id: workspaceId },
+      ),
+  });
+  const stage = reviewQuery.data?.stage || reviewQuery.data?.review?.stage || 'draft';
+  const STAGE_RANK: Record<string, number> = {
+    draft: 0,
+    rejected: 0,
+    corrections: 1,
+    validation_complete: 1,
+    manager_review: 2,
+    manager_approved: 3,
+    partner_review: 4,
+    partner_approved: 5,
+    publication_ready: 6,
+  };
+  const rank = STAGE_RANK[stage] ?? 0;
+  const approved = rank >= 5;
+
   const refresh = () =>
     qc.invalidateQueries({ queryKey: ['efs_dashboard', companyId, workspaceId] });
 
@@ -91,8 +118,42 @@ export default function FinaliseAndExport({
   const readiness = assessReadiness(modelQuery.data);
   const blocked = readiness.state === 'blocked';
 
+  // The engagement's path, in the words the profession uses for it.
+  const ladder: Array<{ label: string; done: boolean; current: boolean }> = (() => {
+    const steps = [
+      { label: 'Draft', done: true },
+      { label: 'Prepared', done: rank >= 1 },
+      { label: 'Reviewed', done: rank >= 3 },
+      { label: 'Approved', done: approved },
+      { label: 'Finalised', done: locked },
+    ];
+    const firstOpen = steps.findIndex((s) => !s.done);
+    return steps.map((s, i) => ({ ...s, current: i === (firstOpen === -1 ? steps.length - 1 : firstOpen) }));
+  })();
+
   return (
     <div className="space-y-4" data-testid="afs-finalise">
+      <ol className="flex flex-wrap items-center gap-1 rounded-md border p-3" data-testid="afs-status-ladder">
+        {ladder.map((step, i) => (
+          <li key={step.label} className="flex items-center gap-1">
+            {i > 0 && <span className="mx-1 text-muted-foreground">→</span>}
+            <span
+              className={cn(
+                'inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-xs font-medium',
+                step.done
+                  ? 'border-primary/30 bg-primary/10 text-primary'
+                  : step.current
+                    ? 'border-foreground/30 text-foreground'
+                    : 'border-muted text-muted-foreground',
+              )}
+            >
+              {step.done && <Check className="h-3 w-3" />}
+              {step.label}
+            </span>
+          </li>
+        ))}
+      </ol>
+
       <div className="flex flex-col gap-3 rounded-md border p-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="min-w-0">
           <p className="flex items-center gap-2 text-sm font-medium" data-testid="afs-final-state">
@@ -113,7 +174,9 @@ export default function FinaliseAndExport({
               ? 'The accounting behind these statements is frozen. Reopening keeps this version and starts a new one.'
               : blocked
                 ? 'These cannot be marked final while the Review tab reports a blocking problem.'
-                : 'Marking these final freezes the accounting they were built from, so they can be reproduced exactly.'}
+                : !approved
+                  ? 'These can be marked final once the partner has approved them on the Review tab.'
+                  : 'Marking these final freezes the accounting they were built from, so they can be reproduced exactly.'}
           </p>
         </div>
         {locked ? (
@@ -129,7 +192,7 @@ export default function FinaliseAndExport({
         ) : (
           <Button
             onClick={() => finalise.mutate()}
-            disabled={finalise.isPending || blocked || !version}
+            disabled={finalise.isPending || blocked || !version || !approved}
             data-testid="afs-finalise-action"
           >
             <Lock className="mr-2 h-4 w-4" />

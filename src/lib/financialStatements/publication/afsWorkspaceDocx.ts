@@ -12,6 +12,7 @@ import { professionalLineLabel } from './afsProfessionalPdf';
 import {
   documentHasComparatives,
   formatStatementFigure,
+  lineNegatesFigure,
   isTotalRole,
   lineIndent,
   lineRole,
@@ -19,11 +20,8 @@ import {
   reportingYears,
 } from './statementPresentation';
 import {
-  approvalIntro,
-  auditorsReportParagraphs,
-  directorsReportParagraphs,
-  directorsResponsibilitiesParagraphs,
-  supplementaryScheduleParagraphs,
+  practitionerFirmLines,
+  SUPPLEMENTARY_DISCLAIMER,
 } from './statutoryFrontMatter';
 import { renderCorporateInformationPresentationDocx } from './corporateInformationDocx';
 import type { EfsStatementLine } from '../api';
@@ -277,6 +275,80 @@ function tableXml(rows: string[][], opts: { boldRow?: (i: number) => boolean } =
   return `<w:tbl>${tblPr}${grid}${rowsXml}</w:tbl>`;
 }
 
+type EquityDocxLine = EfsStatementLine & {
+  columns?: { capital?: number | null; retained?: number | null; total?: number | null };
+};
+
+/**
+ * The Statement of Changes in Equity as a Word table: one column per
+ * component of equity, both years' movements as rows — exactly as the PDF
+ * prints it.
+ */
+function equityMatrixTableXml(stmt: CanonicalStatement): string {
+  const lines = stmt.lines as EquityDocxLine[];
+  const hasCapital = lines.some((l) => l.columns && l.columns.capital != null);
+  const components: Array<{ key: 'capital' | 'retained' | 'total'; label: string }> = [
+    ...(hasCapital ? [{ key: 'capital' as const, label: 'Share capital' }] : []),
+    { key: 'retained' as const, label: 'Retained earnings' },
+    { key: 'total' as const, label: 'Total equity' },
+  ];
+  const figureW = 1500;
+  const labelW = 9026 - components.length * figureW;
+  const grid =
+    '<w:tblGrid>' +
+    `<w:gridCol w:w="${labelW}"/>` +
+    components.map(() => `<w:gridCol w:w="${figureW}"/>`).join('') +
+    '</w:tblGrid>';
+  const tblPr =
+    '<w:tblPr><w:tblW w:w="0" w:type="auto"/>' +
+    '<w:tblLayout w:type="fixed"/>' +
+    '<w:tblCellMar><w:left w:w="60" w:type="dxa"/><w:right w:w="60" w:type="dxa"/></w:tblCellMar>' +
+    '</w:tblPr>';
+  const cell = (
+    width: number,
+    content: string,
+    o: { borders?: string; align?: 'left' | 'center' | 'right'; indent?: number } = {},
+  ) => {
+    const borders = o.borders ? `<w:tcBorders>${o.borders}</w:tcBorders>` : '';
+    let pPr = '<w:pPr>';
+    if (o.align) pPr += `<w:jc w:val="${o.align}"/>`;
+    if (o.indent) pPr += `<w:ind w:left="${o.indent}"/>`;
+    pPr += '<w:spacing w:after="20"/></w:pPr>';
+    return `<w:tc><w:tcPr><w:tcW w:w="${width}" w:type="dxa"/>${borders}</w:tcPr><w:p>${pPr}${content}</w:p></w:tc>`;
+  };
+  const headerBorder = '<w:bottom w:val="single" w:sz="6" w:space="0" w:color="404040"/>';
+  const rows: string[] = [
+    `<w:tr><w:trPr><w:tblHeader/></w:trPr>` +
+      cell(labelW, run('Figures in Rand', { size: 8, color: '595959' }), { borders: headerBorder }) +
+      components
+        .map((c) => cell(figureW, run(c.label, { bold: true, size: 9 }), { borders: headerBorder, align: 'right' }))
+        .join('') +
+      '</w:tr>',
+  ];
+  for (const line of lines) {
+    const role = lineRole(line);
+    const totalled = isTotalRole(role);
+    const bold = totalled;
+    const ruleAbove = totalled ? '<w:top w:val="single" w:sz="4" w:space="0" w:color="595959"/>' : '';
+    const ruleBelow =
+      role === 'grand_total' ? '<w:bottom w:val="double" w:sz="4" w:space="0" w:color="262626"/>' : '';
+    const cells = [
+      cell(labelW, run(professionalLineLabel(line.label), { bold, size: 9 }), {
+        indent: lineIndent(line, role) * 240,
+      }),
+      ...components.map((c) => {
+        const value = line.columns ? line.columns[c.key] : c.key === 'total' ? line.amount : null;
+        return cell(figureW, run(formatStatementFigure(value, role), { bold, size: 9 }), {
+          align: 'right',
+          borders: value == null ? '' : ruleAbove + ruleBelow,
+        });
+      }),
+    ];
+    rows.push(`<w:tr>${cells.join('')}</w:tr>`);
+  }
+  return `<w:tbl>${tblPr}${grid}${rows.join('')}</w:tbl>`;
+}
+
 /**
  * A primary statement as a Word table, laid out as the PDF lays it out:
  * label, Notes, the current year, then the comparative. Totals are ruled above
@@ -315,7 +387,7 @@ function statementTableXml(
 
   const headerBorder = '<w:bottom w:val="single" w:sz="6" w:space="0" w:color="404040"/>';
   const headerCells = [
-    cell(labelW, '', { borders: headerBorder }),
+    cell(labelW, run('Figures in Rand', { size: 8, color: '595959' }), { borders: headerBorder }),
     cell(noteW, run('Notes', { bold: true, size: 8, color: '595959' }), { borders: headerBorder, align: 'center' }),
     cell(figureW, `${run(years.current, { bold: true, size: 9 })}<w:r><w:br/></w:r>${run('R', { italic: true, size: 8, color: '737373' })}`, {
       borders: headerBorder,
@@ -343,19 +415,20 @@ function statementTableXml(
     const bordersFor = (value: number | null | undefined) => (value == null ? '' : ruleAbove + ruleBelow);
     const noteRef =
       role === 'item' && line.note_ref != null && line.note_ref !== '' ? String(line.note_ref) : '';
+    const negate = lineNegatesFigure(stmt.statement_type, line);
     const noteCell = noteRef
       ? `<w:hyperlink w:anchor="${noteBookmark(noteRef)}" w:history="1">${run(noteRef, { size: 9, color: '1F4E3D' })}</w:hyperlink>`
       : '';
     const cells = [
       cell(labelW, run(label, { bold, size: 9 }), { indent: heading ? 0 : lineIndent(line, role) * 240 }),
       cell(noteW, noteCell, { align: 'center' }),
-      cell(figureW, run(formatStatementFigure(line.amount, role), { bold, size: 9 }), {
+      cell(figureW, run(formatStatementFigure(line.amount, role, { negate }), { bold, size: 9 }), {
         align: 'right',
         borders: bordersFor(line.amount),
       }),
       ...(showComp
         ? [
-            cell(figureW, run(formatStatementFigure(line.prior_amount, role), { bold, size: 9 }), {
+            cell(figureW, run(formatStatementFigure(line.prior_amount, role, { negate }), { bold, size: 9 }), {
               align: 'right',
               borders: bordersFor(line.prior_amount),
             }),
@@ -374,72 +447,91 @@ function statementTableXml(
 export function renderCanonicalDocx(view: CanonicalDocumentView): Uint8Array<ArrayBuffer> {
   const body: string[] = [];
   const add = (xml: string) => body.push(xml);
-  const brand = view.presentation.branding;
 
-  // Cover.
-  add(para(view.companyName, { style: 'Title', bold: true, size: 22, align: 'center', color: brand.primaryHex, after: 80 }));
+  // Cover — unbranded: the entity, what the document is, the practitioner.
+  add(para(view.companyName.toUpperCase(), { style: 'Title', bold: true, size: 16, align: 'center', after: 80 }));
   if (view.presentation.registrationNumber) {
-    add(para(`Registration number ${view.presentation.registrationNumber}`, { align: 'center', color: '595959', after: 40 }));
+    add(para(`(Registration number ${view.presentation.registrationNumber})`, { align: 'center', after: 40 }));
   }
   if (view.presentation.tradingName) {
     add(para(`Trading as ${view.presentation.tradingName}`, { align: 'center', color: '595959', after: 40 }));
   }
-  add(para(view.presentation.documentTitle, { bold: true, size: 14, align: 'center', color: brand.primaryHex, after: 40 }));
-  add(para(view.presentation.coverTitle, { align: 'center', after: 40 }));
-  add(para(`Prepared in accordance with ${view.frameworkLabel}`, { align: 'center', after: 20 }));
-  add(para(view.currencyLabel, { align: 'center', color: '595959', after: 120 }));
-  add(para(brand.brandName, { align: 'center', bold: true, size: 9, color: brand.primaryHex, after: 20 }));
-  if (brand.tagline) add(para(brand.tagline, { align: 'center', size: 8, color: '595959', after: 200 }));
-
-  // Contents — driven by composition publication metadata when available.
-  add(para('Contents', { style: 'Heading1', bold: true, size: 13 }));
-  const tocLabels =
-    view.composition?.publicationHints.contentsEntries.map((e) => e.label) ||
-    [
-      "Directors' Responsibilities and Approval",
-      "Directors' Report",
-      "Independent Auditor's Report",
-      'Corporate Information',
-      ...view.statements.map((s) => s.title),
-      'Significant Accounting Policies',
-      'Notes to the Financial Statements',
-      'Supplementary Information',
-      ...(view.signatures.length ? ['Approval of Annual Financial Statements'] : []),
-    ];
-  for (const label of tocLabels) {
-    if (label === 'Cover' || label === 'Contents') continue;
-    add(para(label, { after: 40 }));
+  add(para(view.presentation.documentTitle.toUpperCase(), { bold: true, size: 13, align: 'center', after: 40 }));
+  add(para(view.presentation.coverTitle, { align: 'center', after: 200 }));
+  for (const line of practitionerFirmLines(view)) {
+    add(para(line, { align: 'center', size: 9, after: 20 }));
   }
 
-  // Statutory front sections.
-  add(para("Directors' Responsibilities and Approval", { style: 'Heading1', bold: true, size: 13 }));
-  for (const p of directorsResponsibilitiesParagraphs(view)) add(para(p));
-
-  add(para("Directors' Report", { style: 'Heading1', bold: true, size: 13 }));
-  for (const block of directorsReportParagraphs(view)) {
-    if (block.heading) add(para(block.heading, { bold: true, size: 10, after: 40 }));
-    add(para(block.body));
-  }
-
-  add(para("Independent Auditor's Report", { style: 'Heading1', bold: true, size: 13 }));
-  for (const p of auditorsReportParagraphs(view)) add(para(p));
-
-  // Corporate Information (Phase 1).
+  // General Information — the first page of a bound set.
   const corp = view.composition?.sequencedSections.find((s) => s.kind === 'corporate_information');
   if (corp?.corporatePresentation?.rows?.length) {
     renderCorporateInformationPresentationDocx(corp.corporatePresentation, add, para, tableXml);
   } else if (corp?.narratives?.length) {
-    add(para('Corporate Information', { style: 'Heading1', bold: true, size: 13 }));
+    add(para('General Information', { style: 'Heading1', bold: true, size: 13 }));
     for (const n of corp.narratives) add(para(n.text));
+  }
+
+  // Index.
+  add(para('Index', { style: 'Heading1', bold: true, size: 13 }));
+  add(
+    para(
+      'The reports and statements set out below comprise the annual financial statements presented to the shareholders:',
+    ),
+  );
+  const tocLabels = [
+    view.frontMatter.responsibilities.title,
+    view.frontMatter.directorsReport.title,
+    view.frontMatter.practitionerReport.title,
+    ...view.statements.map((s) => s.title),
+    'Accounting Policies',
+    'Notes to the Annual Financial Statements',
+    ...(view.composition?.supplementarySchedules || []).map((s) => s.title),
+  ];
+  for (const label of tocLabels) add(para(label, { after: 40 }));
+
+  // Statutory front sections — the wording the preparation engine resolved:
+  // authored where the preparer wrote it, generated text otherwise.
+  add(para(view.frontMatter.responsibilities.title, { style: 'Heading1', bold: true, size: 13 }));
+  for (const block of view.frontMatter.responsibilities.blocks) {
+    if (block.heading) add(para(block.heading, { bold: true, size: 10, after: 40 }));
+    if (block.body) add(para(block.body));
+  }
+  for (const block of view.frontMatter.approval.blocks) {
+    if (block.heading) add(para(block.heading, { bold: true, size: 10, after: 40 }));
+    if (block.body) add(para(block.body));
+  }
+  if (view.presentation.directors.length) {
+    for (const name of view.presentation.directors) {
+      add(para('______________________________', { after: 20 }));
+      add(para(name, { after: 10 }));
+      add(para('Director', { color: '595959', after: 120 }));
+    }
+  }
+
+  add(para(view.frontMatter.directorsReport.title, { style: 'Heading1', bold: true, size: 13 }));
+  for (const block of view.frontMatter.directorsReport.blocks) {
+    if (block.heading) add(para(block.heading, { bold: true, size: 10, after: 40 }));
+    if (block.body) add(para(block.body));
+  }
+
+  add(para(view.frontMatter.practitionerReport.title, { style: 'Heading1', bold: true, size: 13 }));
+  for (const block of view.frontMatter.practitionerReport.blocks) {
+    if (block.heading) add(para(block.heading, { bold: true, size: 10, after: 40 }));
+    if (block.body) add(para(block.body));
   }
 
   // Primary statements (Phase 2) — the same two columns on every statement.
   const showComp = documentHasComparatives(view.statements);
   for (const statement of view.statements) {
     add(para(statement.title, { style: 'Heading1', bold: true, size: 12 }));
-    add(para(statement.periodCaption, { italic: true, color: '595959', after: 40 }));
-    add(para(view.currencyLabel, { italic: true, color: '595959', size: 8, after: 60 }));
-    if (statement.lines.length) {
+    add(para(statement.periodCaption, { italic: true, color: '595959', after: 60 }));
+    const matrix =
+      statement.statement_type === 'changes_in_equity' &&
+      (statement.lines as EquityDocxLine[]).some((l) => l.columns != null);
+    if (statement.lines.length && matrix) {
+      add(equityMatrixTableXml(statement));
+      add(para('', { after: 60 }));
+    } else if (statement.lines.length) {
       add(statementTableXml(statement, view, showComp));
       add(para('', { after: 60 }));
     } else {
@@ -453,24 +545,29 @@ export function renderCanonicalDocx(view: CanonicalDocumentView): Uint8Array<Arr
   }
 
   // Accounting Policies (Phase 3) — separate from disclosure notes.
-  add(para('Significant Accounting Policies', { style: 'Heading1', bold: true, size: 13 }));
-  add(
-    para(
-      `The following accounting policies are consistent with ${view.frameworkLabel} and have been applied in preparing these annual financial statements.`,
-    ),
-  );
+  add(para('Accounting Policies', { style: 'Heading1', bold: true, size: 13 }));
   const policies = view.accountingPolicies || [];
   if (!policies.length) {
     add(para(`Significant accounting policies are applied in accordance with ${view.frameworkLabel}.`));
   } else {
+    const paragraphsOf = (text: string | undefined) =>
+      String(text || '')
+        .split(/\n\s*\n/)
+        .map((t) => t.trim())
+        .filter(Boolean);
     for (const policy of policies) {
       add(para(policy.title, { style: 'Heading2', bold: true, size: 10 }));
-      add(para(policy.body));
+      for (const text of paragraphsOf(policy.body)) add(para(text));
+      if (policy.table?.length) {
+        add(tableXml(policy.table, { boldRow: (i) => i === 0 }));
+        add(para('', { after: 40 }));
+      }
+      for (const text of paragraphsOf(policy.bodyAfter)) add(para(text));
     }
   }
 
   // Notes (Phase 4).
-  add(para('Notes to the Financial Statements', { style: 'Heading1', bold: true, size: 13 }));
+  add(para('Notes to the Annual Financial Statements', { style: 'Heading1', bold: true, size: 13 }));
   view.notes.forEach((note, i) => {
     add(
       bookmarkedPara(note.heading, noteBookmark(note.noteNumber), i + 1, {
@@ -491,22 +588,15 @@ export function renderCanonicalDocx(view: CanonicalDocumentView): Uint8Array<Arr
     }
   });
 
-  // Supplementary schedules.
-  add(para('Supplementary Information', { style: 'Heading1', bold: true, size: 13 }));
-  for (const p of supplementaryScheduleParagraphs()) add(para(p, { color: '595959' }));
-
-  // Signatures.
-  if (view.signatures.length) {
-    add(para('Approval of Annual Financial Statements', { style: 'Heading1', bold: true, size: 13 }));
-    add(para(approvalIntro()));
-    for (const sig of view.signatures) {
-      add(para(sig.label, { bold: true, size: 10, after: 80 }));
-      add(para('______________________________', { after: 20 }));
-      add(para(sig.signatureDisplay, { color: '595959', after: 20 }));
-      add(para(sig.nameDisplay, { after: 20 }));
-      add(para(sig.positionDisplay, { color: '595959', after: 20 }));
-      add(para(sig.dateDisplay, { color: '595959', after: 120 }));
-    }
+  // Supplementary schedules — behind their own disclaimer.
+  for (const schedule of view.composition?.supplementarySchedules || []) {
+    add(para(schedule.title, { style: 'Heading1', bold: true, size: 13 }));
+    add(para(SUPPLEMENTARY_DISCLAIMER, { italic: true, color: '595959', size: 8 }));
+    add(
+      tableXml(schedule.rows, {
+        boldRow: (i) => /total|profit/i.test(String(schedule.rows[i]?.[0] || '')),
+      }),
+    );
   }
 
   const sectPr =
@@ -523,31 +613,28 @@ export function renderCanonicalDocx(view: CanonicalDocumentView): Uint8Array<Arr
     `xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">` +
     `<w:body>${body.join('')}${sectPr}</w:body></w:document>`;
 
+  const documentLine = `${view.presentation.documentTitle} for the ${view.presentation.reportingPeriodLabel.charAt(0).toLowerCase()}${view.presentation.reportingPeriodLabel.slice(1)}`;
   const headerParts =
     `${run(view.companyName, { bold: true, size: 9 })}` +
     (view.presentation.registrationNumber
-      ? `<w:r><w:br/></w:r>${run(`Registration number: ${view.presentation.registrationNumber}`, { size: 8, color: '595959' })}`
-      : '');
+      ? `<w:r><w:br/></w:r>${run(`(Registration number: ${view.presentation.registrationNumber})`, { size: 8, color: '595959' })}`
+      : '') +
+    `<w:r><w:br/></w:r>${run(documentLine, { size: 8, color: '595959' })}`;
   const headerXml =
     `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>` +
     `<w:hdr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">` +
-    `<w:p><w:pPr><w:pBdr><w:bottom w:val="single" w:sz="4" w:space="1" w:color="${brand.accentHex}"/></w:pBdr></w:pPr>` +
+    `<w:p><w:pPr><w:pBdr><w:bottom w:val="single" w:sz="4" w:space="1" w:color="9A9A9A"/></w:pBdr></w:pPr>` +
     `${headerParts}</w:p></w:hdr>`;
 
+  // The footer of a statutory document carries the page number and nothing
+  // else — software does not sign financial statements.
   const footerXml =
     `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>` +
     `<w:ftr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">` +
-    `<w:p><w:pPr><w:jc w:val="center"/><w:pBdr><w:top w:val="single" w:sz="4" w:space="1" w:color="C8D0CC"/></w:pBdr></w:pPr>` +
-    `${run(brand.footer.creditLine + '   ', { size: 8, color: '595959' })}` +
-    `${run('Page ', { size: 8, color: '595959' })}` +
+    `<w:p><w:pPr><w:jc w:val="center"/><w:pBdr><w:top w:val="single" w:sz="4" w:space="1" w:color="C8C8C8"/></w:pBdr></w:pPr>` +
     `<w:r><w:rPr><w:sz w:val="16"/></w:rPr><w:fldChar w:fldCharType="begin"/></w:r>` +
     `<w:r><w:instrText xml:space="preserve"> PAGE </w:instrText></w:r>` +
     `<w:r><w:fldChar w:fldCharType="end"/></w:r>` +
-    `${run(' / ', { size: 8, color: '595959' })}` +
-    `<w:r><w:rPr><w:sz w:val="16"/></w:rPr><w:fldChar w:fldCharType="begin"/></w:r>` +
-    `<w:r><w:instrText xml:space="preserve"> NUMPAGES </w:instrText></w:r>` +
-    `<w:r><w:fldChar w:fldCharType="end"/></w:r>` +
-    (view.presentation.issueDateLong ? run(`   ${view.presentation.issueDateLong}`, { size: 8, color: '595959' }) : '') +
     `</w:p></w:ftr>`;
 
   const stylesXml =

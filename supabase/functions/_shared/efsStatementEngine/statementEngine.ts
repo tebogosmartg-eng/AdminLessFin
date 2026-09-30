@@ -125,6 +125,137 @@ export function generateFinancialPerformance(facts, taxonomyLines, _buckets, agg
   }));
 }
 
+/** A liability that holds income tax owed to the revenue authority. */
+const INCOME_TAX_PAYABLE = /income tax|current tax|provisional tax/i;
+
+/**
+ * The cash flow statement as a published set states it: each activity headed,
+ * its main classes of cash flow listed, and the net cash from the activity as
+ * the subtotal. The sealed cash flow facts attribute every cash movement to
+ * the account on the other side of it; those are grouped here into the
+ * classes the standard names (purchase of property, plant and equipment,
+ * repayment of borrowings, dividends paid, ...). The subtotals remain the
+ * sealed section totals, so nothing is recomputed.
+ */
+function withCashFlowDetail(sectionLines, facts) {
+  const accounts = new Map();
+  for (const r of [...(facts.balances_as_of || []), ...(facts.balances_prior_as_of || [])]) {
+    if (r?.name && !accounts.has(r.name)) accounts.set(r.name, r);
+  }
+  const classify = (section, name, amount) => {
+    const a = accounts.get(name) || {};
+    const sub = String(a.subcategory || "");
+    const cat = String(a.category || "");
+    if (section === "Operating") {
+      if (a.type === "Liability" && INCOME_TAX_PAYABLE.test(name)) return "Tax paid";
+      return "Cash generated from operations";
+    }
+    if (section === "Investing") {
+      if (sub === "Property, Plant and Equipment") {
+        return amount < 0
+          ? "Purchase of property, plant and equipment"
+          : "Proceeds on disposal of property, plant and equipment";
+      }
+      if (sub === "Intangible Assets") {
+        return amount < 0 ? "Purchase of intangible assets" : "Proceeds on disposal of intangible assets";
+      }
+      if (a.type === "Income") return cat === "Other Income" ? "Interest received" : "Investment income received";
+      return name;
+    }
+    if (sub === "Interest-bearing Borrowings") return amount < 0 ? "Repayment of borrowings" : "Proceeds from borrowings";
+    if (sub === "Related-party Payables") return "Movement in loans from related parties";
+    if (cat === "Finance Costs") return "Finance costs paid";
+    if (sub === "Distributions") return "Dividends paid";
+    if (sub === "Issued Capital") return "Proceeds on share issue";
+    return name;
+  };
+  const group = (items) => {
+    const out = new Map();
+    for (const it of items || []) {
+      const section = String(it.section || "");
+      const label = classify(section, it.category, Number(it.amount || 0));
+      const key = `${section}||${label}`;
+      out.set(key, round2((out.get(key) || 0) + Number(it.amount || 0)));
+    }
+    return out;
+  };
+  const now = group(facts.cash_flow);
+  const priorKnown = Array.isArray(facts.prior_cash_flow);
+  const then = priorKnown ? group(facts.prior_cash_flow) : new Map();
+
+  const sectionOf = { "cf.operating": "Operating", "cf.investing": "Investing", "cf.financing": "Financing" };
+  const headings = {
+    Operating: ["Cash flows from operating activities", "Net cash from operating activities"],
+    Investing: ["Cash flows from investing activities", "Net cash from investing activities"],
+    Financing: ["Cash flows from financing activities", "Net cash from financing activities"],
+  };
+  const order = [
+    "Cash generated from operations",
+    "Tax paid",
+    "Purchase of property, plant and equipment",
+    "Proceeds on disposal of property, plant and equipment",
+    "Purchase of intangible assets",
+    "Proceeds on disposal of intangible assets",
+    "Interest received",
+    "Proceeds on share issue",
+    "Proceeds from borrowings",
+    "Repayment of borrowings",
+    "Movement in loans from related parties",
+    "Finance costs paid",
+    "Dividends paid",
+  ];
+  const rank = (label) => {
+    const i = order.indexOf(label);
+    return i === -1 ? order.length : i;
+  };
+
+  const out = [];
+  for (const line of sectionLines) {
+    const section = sectionOf[line.line_code];
+    if (!section) {
+      out.push(line.line_code === "cf.net_change" ? { ...line, label: "Total cash movement for the year" } : line);
+      continue;
+    }
+    const labels = new Set();
+    for (const key of [...now.keys(), ...then.keys()]) {
+      const [s, label] = key.split("||");
+      if (s === section) labels.add(label);
+    }
+    const details = [...labels]
+      .map((label) => ({
+        label,
+        amount: now.get(`${section}||${label}`) ?? 0,
+        prior: priorKnown ? then.get(`${section}||${label}`) ?? 0 : null,
+      }))
+      .filter((d) => Math.abs(d.amount) >= 0.005 || (d.prior != null && Math.abs(d.prior) >= 0.005))
+      .sort((a, b) => rank(a.label) - rank(b.label));
+    const slug = section.toLowerCase();
+    out.push({
+      line_code: `cf.${slug}.header`,
+      label: headings[section][0],
+      section: slug,
+      level: 0,
+      is_header: true,
+      amount: null,
+      prior_amount: null,
+      accounts: [],
+    });
+    details.forEach((d, i) => {
+      out.push({
+        line_code: d.label === "Cash generated from operations" ? "cf.operating.cash_generated" : `cf.${slug}.${i}`,
+        label: d.label,
+        section: slug,
+        level: 1,
+        amount: d.amount,
+        prior_amount: d.prior,
+        accounts: [],
+      });
+    });
+    out.push({ ...line, label: headings[section][1], is_subtotal: true, level: 0 });
+  }
+  return out;
+}
+
 export function generateCashFlows(facts, taxonomyLines, _buckets, agg) {
   let canonical = agg || factsToCanonical(facts);
   // If seal lacked cash-flow RPC facts, operating ≈ period NI (still from canonical).
@@ -144,12 +275,13 @@ export function generateCashFlows(facts, taxonomyLines, _buckets, agg) {
     "cf.financing": "cashFinancing",
     "cf.net_change": "netCashFlow",
   };
-  const flows = canonicalToCashFlowLines(canonical, labelMap(taxonomyLines)).map((ln) => ({
+  const sectionLines = canonicalToCashFlowLines(canonical, labelMap(taxonomyLines)).map((ln) => ({
     ...ln,
     amount: round2(ln.amount),
     prior_amount: prior && priorFor[ln.line_code] ? round2(prior[priorFor[ln.line_code]]) : null,
     accounts: ln.accounts || [],
   }));
+  const flows = withCashFlowDetail(sectionLines, facts);
   // A statement of cash flows closes by reconciling to the cash on the
   // balance sheet: cash at the start of the year, the year's net movement,
   // cash at the end.
@@ -192,7 +324,14 @@ export function generateCashFlows(facts, taxonomyLines, _buckets, agg) {
 
 export function generateChangesInEquity(facts, _taxonomyLines, _buckets, agg) {
   const canonical = agg || factsToCanonical(facts);
-  return buildEquityLines({ canonical, priorCanonical: priorCanonicalOf(facts) });
+  return buildEquityLines({
+    canonical,
+    priorCanonical: priorCanonicalOf(facts),
+    closing: facts.balances_as_of || [],
+    prior: facts.balances_prior_as_of || [],
+    priorOpening: facts.balances_prior_opening_as_of || [],
+    period: facts.period || {},
+  });
 }
 
 /**

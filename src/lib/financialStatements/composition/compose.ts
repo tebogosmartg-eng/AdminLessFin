@@ -174,14 +174,16 @@ export function composeDocument(
 
   // ── Phase 1: Front Matter ───────────────────────────────────────────────
   const front = phaseById('front_matter');
+  // The order a bound set reads in: the cover, general information as page 1,
+  // the index, then the directors' pages and the practitioner's report.
   const frontSections: Array<{ kind: CompositionSection['kind']; title: string; indent?: number }> =
     [
       { kind: 'cover', title: 'Cover' },
-      { kind: 'contents', title: 'Contents' },
+      { kind: 'corporate_information', title: 'General Information' },
+      { kind: 'contents', title: 'Index' },
       { kind: 'directors_responsibilities', title: "Directors' Responsibilities and Approval" },
       { kind: 'directors_report', title: "Directors' Report" },
       { kind: 'independent_auditor', title: "Independent Auditor's Report" },
-      { kind: 'corporate_information', title: 'Corporate Information' },
     ];
   front.sections = frontSections.map((s, idx) => ({
     id: `front:${s.kind}`,
@@ -409,6 +411,7 @@ export function composeDocument(
     numberedNotes,
     enterpriseDisclosures,
     accountingPolicies,
+    supplementarySchedules: model.detailedIncomeStatement ? [model.detailedIncomeStatement] : [],
     disclosureLinks,
     noteNumberByCode,
     conditionalActivation: {

@@ -45,6 +45,7 @@ import {
 } from '../../../lib/financialStatements/publication/afsProfessionalPdf';
 import {
   documentHasComparatives,
+  lineNegatesFigure,
   formatStatementFigure,
   isTotalRole,
   lineIndent,
@@ -196,11 +197,14 @@ function TitleOverrideField({
   currentTitle,
   overridesApi,
   label = 'Displayed title',
+  locked = false,
 }: {
   nodeId: string;
   currentTitle: string;
   overridesApi: DocumentOverridesApi;
   label?: string;
+  /** Final statements keep their titles until they are reopened. */
+  locked?: boolean;
 }) {
   const [value, setValue] = useState(currentTitle);
   useEffect(() => setValue(currentTitle), [currentTitle, nodeId]);
@@ -208,9 +212,10 @@ function TitleOverrideField({
     <div className="space-y-1.5">
       <Label>{label}</Label>
       <div className="flex gap-2">
-        <Input value={value} onChange={(e) => setValue(e.target.value)} />
+        <Input value={value} disabled={locked} onChange={(e) => setValue(e.target.value)} />
         <Button
           variant="outline"
+          disabled={locked}
           onClick={() => {
             overridesApi.setTitleOverride(nodeId, value);
             showSuccess('Title updated');
@@ -357,6 +362,16 @@ function StatementEditor({
   const columns = showComparatives ? 4 : 3;
   const entity = corporateDisplayFromModel(ctx.model).registeredName || ctx.model.companyName;
   const figureCell = 'w-[7.5rem] pl-2 py-1.5 text-right tabular-nums whitespace-nowrap';
+  // The Statement of Changes in Equity is a matrix — one column per component
+  // of equity, both years' movements as rows — exactly as it prints.
+  const equityLines = statement.lines.filter((l) => l.columns != null);
+  const isEquityMatrix = statement.statement_type === 'changes_in_equity' && equityLines.length > 0;
+  const hasCapitalCol = equityLines.some((l) => l.columns?.capital != null);
+  const equityComponents: Array<{ key: 'capital' | 'retained' | 'total'; label: string }> = [
+    ...(hasCapitalCol ? [{ key: 'capital' as const, label: 'Share capital' }] : []),
+    { key: 'retained' as const, label: 'Retained earnings' },
+    { key: 'total' as const, label: 'Total equity' },
+  ];
 
   return (
     <Card>
@@ -377,6 +392,7 @@ function StatementEditor({
           currentTitle={statement.title}
           overridesApi={ctx.overridesApi}
           label="Statement heading"
+          locked={ctx.locked}
         />
         <div className="overflow-x-auto rounded-md border bg-background">
           <div className="min-w-[30rem] px-4 py-4" data-testid="afs-statement">
@@ -391,6 +407,70 @@ function StatementEditor({
                 {statementPeriodCaption(statement.statement_type, ctx.model.period || {})}
               </p>
             </div>
+            {isEquityMatrix ? (
+              <table className="w-full border-collapse text-sm">
+                <thead>
+                  <tr className="border-b-2 border-foreground/70 align-bottom">
+                    <th className="py-1.5 pr-3 text-left font-medium">
+                      <span className="sr-only">Movement</span>
+                    </th>
+                    {equityComponents.map((c) => (
+                      <th key={c.key} className={cn(figureCell, 'font-semibold')} data-col-head={c.key}>
+                        {c.label}
+                        <span className="block text-[11px] font-normal italic text-muted-foreground">
+                          R
+                        </span>
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {statement.lines.map((ln, idx) => {
+                    const role = lineRole(ln);
+                    const totalled = isTotalRole(role);
+                    const rule = (value: number | null | undefined) =>
+                      value == null
+                        ? undefined
+                        : cn(
+                            totalled && 'border-t border-foreground/60',
+                            role === 'grand_total' &&
+                              'border-b-4 border-double border-foreground/80',
+                          );
+                    return (
+                      <tr
+                        key={`${ln.line_code}-${idx}`}
+                        data-role={role}
+                        data-line-code={ln.line_code}
+                        className={cn(totalled && 'font-semibold')}
+                      >
+                        <td
+                          className={cn('py-1.5 pr-3', totalled && 'pt-2')}
+                          style={{ paddingLeft: `${lineIndent(ln, role) * 1.25}rem` }}
+                        >
+                          {ln.label}
+                        </td>
+                        {equityComponents.map((c) => {
+                          const value = ln.columns
+                            ? ln.columns[c.key]
+                            : c.key === 'total'
+                              ? ln.amount
+                              : null;
+                          return (
+                            <td
+                              key={c.key}
+                              className={cn(figureCell, rule(value), totalled && 'pt-2')}
+                              data-col={c.key}
+                            >
+                              {formatStatementFigure(value, role)}
+                            </td>
+                          );
+                        })}
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            ) : (
             <table className="w-full border-collapse text-sm">
               <thead>
                 <tr className="border-b-2 border-foreground/70 align-bottom">
@@ -426,6 +506,7 @@ function StatementEditor({
                   statement.lines.map((ln, idx) => {
                     const role = lineRole(ln);
                     const totalled = isTotalRole(role);
+                    const negate = lineNegatesFigure(statement.statement_type, ln);
                     const traceable = (ln.accounts?.length ?? 0) > 0;
                     if (role === 'heading') {
                       return (
@@ -475,14 +556,14 @@ function StatementEditor({
                           {role === 'item' ? <NoteReference line={ln} ctx={ctx} /> : null}
                         </td>
                         <td className={cn(figureCell, figureRule(ln.amount), totalled && 'pt-2')} data-col="current">
-                          {formatStatementFigure(ln.amount, role)}
+                          {formatStatementFigure(ln.amount, role, { negate })}
                         </td>
                         {showComparatives && (
                           <td
                             className={cn(figureCell, figureRule(ln.prior_amount), totalled && 'pt-2')}
                             data-col="comparative"
                           >
-                            {formatStatementFigure(ln.prior_amount, role)}
+                            {formatStatementFigure(ln.prior_amount, role, { negate })}
                           </td>
                         )}
                       </tr>
@@ -491,6 +572,7 @@ function StatementEditor({
                 )}
               </tbody>
             </table>
+            )}
           </div>
         </div>
         <LineSourceDialog line={sourceLine} model={ctx.model} onClose={() => setSourceLine(null)} />
@@ -631,13 +713,13 @@ function PolicyEditor({
       <CardContent className="space-y-4">
         <div className="space-y-1.5">
           <Label>Policy title</Label>
-          <Input value={title} onChange={(e) => setTitle(e.target.value)} />
+          <Input value={title} disabled={ctx.locked} onChange={(e) => setTitle(e.target.value)} />
         </div>
         <div className="space-y-1.5">
           <Label>Policy wording</Label>
-          <Textarea rows={10} value={body} onChange={(e) => setBody(e.target.value)} />
+          <Textarea rows={10} value={body} disabled={ctx.locked} onChange={(e) => setBody(e.target.value)} />
         </div>
-        <Button onClick={() => save.mutate()} disabled={save.isPending}>
+        <Button onClick={() => save.mutate()} disabled={save.isPending || ctx.locked}>
           <Save className="mr-2 h-4 w-4" />
           {save.isPending ? 'Saving...' : 'Save policy'}
         </Button>
@@ -662,6 +744,140 @@ function PolicySetEditor({ set }: { set: DocPolicySetNode }) {
           <span className="text-muted-foreground">
             {set.policies.length} {set.policies.length === 1 ? 'policy' : 'policies'}
           </span>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+/**
+ * Where the accountant writes the narrative front matter: the directors'
+ * report, the directors' responsibilities statement, the practitioner's
+ * report and the approval wording. The generated statutory text is the
+ * starting point; saving stores the practice's own wording on the
+ * engagement, and reset returns the section to the generated text. Both
+ * the preview and the exported PDF and Word documents print exactly what
+ * is saved here.
+ */
+function FrontSectionEditor({ sectionId, ctx }: { sectionId: string; ctx: EditorContext }) {
+  const fm = ctx.view?.frontMatter;
+  const section = fm
+    ? [fm.responsibilities, fm.directorsReport, fm.practitionerReport, fm.approval].find(
+        (s) => s.id === sectionId,
+      ) ?? null
+    : null;
+  const resolvedBlocks = useMemo(
+    () => (section?.blocks ?? []).map((b) => ({ heading: b.heading ?? '', body: b.body })),
+    [section],
+  );
+  const [blocks, setBlocks] = useState(resolvedBlocks);
+  const [dirty, setDirty] = useState(false);
+  const loadedFor = useRef('');
+  useEffect(() => {
+    // Reload when the reader moves to another section, or when a save or a
+    // reset lands (the resolved wording then matches what should be shown) —
+    // but never over unsaved typing.
+    const fingerprint = `${sectionId}::${JSON.stringify(resolvedBlocks)}`;
+    if (loadedFor.current === fingerprint) return;
+    loadedFor.current = fingerprint;
+    setBlocks(resolvedBlocks);
+    setDirty(false);
+  }, [sectionId, resolvedBlocks]);
+
+  if (!section) {
+    return (
+      <Card>
+        <CardContent className="py-6 text-sm text-muted-foreground">
+          This section appears once the document has been prepared.
+        </CardContent>
+      </Card>
+    );
+  }
+
+  const change = (idx: number, patch: Partial<{ heading: string; body: string }>) => {
+    setBlocks((prev) => prev.map((b, i) => (i === idx ? { ...b, ...patch } : b)));
+    setDirty(true);
+  };
+  const removeBlock = (idx: number) => {
+    setBlocks((prev) => prev.filter((_, i) => i !== idx));
+    setDirty(true);
+  };
+  const addBlock = () => {
+    setBlocks((prev) => [...prev, { heading: '', body: '' }]);
+    setDirty(true);
+  };
+  const save = () => {
+    ctx.overridesApi.setNarrative(
+      sectionId,
+      blocks.map((b) => ({ heading: b.heading.trim() || undefined, body: b.body })),
+    );
+    setDirty(false);
+    showSuccess('Wording saved to the engagement');
+  };
+  const reset = () => {
+    ctx.overridesApi.setNarrative(sectionId, null);
+    setDirty(false);
+    showSuccess('Section returned to the generated wording');
+  };
+
+  return (
+    <Card>
+      <CardHeader>
+        <div className="flex items-center justify-between gap-2">
+          <CardTitle className="text-base">{section.title}</CardTitle>
+          <Badge variant={section.authored ? 'default' : 'outline'} data-testid="front-authored-badge">
+            {section.authored ? 'Edited by the practice' : 'Generated wording'}
+          </Badge>
+        </div>
+        <CardDescription>
+          {ctx.locked
+            ? 'These statements are final: the wording is fixed until they are reopened.'
+            : 'Edit the wording below. It prints exactly as saved, in the preview, the PDF and the Word document.'}
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {blocks.map((block, idx) => (
+          <div key={idx} className="space-y-1.5 rounded-md border p-3">
+            <div className="flex items-center gap-2">
+              <Input
+                placeholder="Heading (optional)"
+                value={block.heading}
+                disabled={ctx.locked}
+                onChange={(e) => change(idx, { heading: e.target.value })}
+              />
+              <Button
+                variant="ghost"
+                size="icon"
+                aria-label="Remove paragraph"
+                disabled={ctx.locked || blocks.length <= 1}
+                onClick={() => removeBlock(idx)}
+              >
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            </div>
+            <Textarea
+              rows={Math.min(10, Math.max(3, Math.ceil(block.body.length / 90)))}
+              value={block.body}
+              disabled={ctx.locked}
+              onChange={(e) => change(idx, { body: e.target.value })}
+            />
+          </div>
+        ))}
+        <div className="flex flex-wrap items-center gap-2">
+          <Button variant="outline" size="sm" onClick={addBlock} disabled={ctx.locked}>
+            <Plus className="mr-1 h-4 w-4" /> Add paragraph
+          </Button>
+          <Button size="sm" onClick={save} disabled={ctx.locked || !dirty}>
+            <Save className="mr-1 h-4 w-4" /> Save wording
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={reset}
+            disabled={ctx.locked || (!section.authored && !dirty)}
+          >
+            Reset to generated wording
+          </Button>
         </div>
       </CardContent>
     </Card>
@@ -980,7 +1196,7 @@ function NoteStatusControl({ note, ctx }: { note: DocNoteNode; ctx: EditorContex
             variant="outline"
             size="sm"
             onClick={() => transition.mutate(s)}
-            disabled={transition.isPending}
+            disabled={transition.isPending || ctx.locked}
           >
             {STATUS_ACTION_LABEL[s] || s}
           </Button>
@@ -1536,6 +1752,7 @@ function NoteEditor({ note, ctx }: { note: DocNoteNode; ctx: EditorContext }) {
           currentTitle={note.title}
           overridesApi={ctx.overridesApi}
           label="Note title"
+          locked={ctx.locked}
         />
 
         <ManualFieldsNotice ctx={ctx} note={note} />
@@ -1908,7 +2125,16 @@ export default function DocumentEditor({
     );
   }
   if (kind === 'contents') return <ContentsInfo />;
-  if (kind === 'signature') return <SignatureEditor model={model} selectionId={selection.id} />;
+  if (kind === 'front')
+    return <FrontSectionEditor key={selection.id} sectionId={selection.id} ctx={ctx} />;
+  if (kind === 'signature')
+    return (
+      <div className="space-y-4">
+        <SignatureEditor model={model} selectionId={selection.id} />
+        {/* The wording above the signatures is part of the document too. */}
+        <FrontSectionEditor sectionId="front:approval" ctx={ctx} />
+      </div>
+    );
 
   if (selection.kind === 'statement') {
     const statement = model.statements.find((s) => s.id === selection.id);

@@ -283,7 +283,9 @@ describe('V15.0 — Disclosure Linking Engine', () => {
   it('links statement lines to disclosures automatically', () => {
     expect(disclosureCodeForLine('sfp.ppe')).toBe('DISC.PPE');
     expect(disclosureCodeForLine('perf.revenue')).toBe('DISC.REVENUE');
-    expect(disclosureCodeForLine('cf.operating')).toBe('DISC.CASHFLOW');
+    // Only cash generated from operations has a note of its own.
+    expect(disclosureCodeForLine('cf.operating.cash_generated')).toBe('DISC.CASHFLOW');
+    expect(disclosureCodeForLine('cf.investing')).toBeNull();
   });
 
   it('injects automatic note references onto face statements', () => {
@@ -318,10 +320,11 @@ describe('V15.0 — Document Sequencing + Publication', () => {
     expect(pkg.docxBytes.length).toBeGreaterThan(1000);
 
     const pdfText = decodePdfText(pkg.pdfBytes);
-    expect(pdfText).toContain('Significant Accounting Policies');
-    expect(pdfText).toContain('Notes to the Financial Statements');
-    expect(pdfText).toContain('Corporate Information');
-    expect(pdfText).toMatch(/Note \d+\./);
+    expect(pdfText).toContain('Accounting Policies');
+    expect(pdfText).toContain('Notes to the Annual Financial Statements');
+    expect(pdfText).toContain('General Information');
+    // Notes are numbered from 2 and headed the published way: "2. Revenue".
+    expect(pdfText).toMatch(/(^|\n)[2-9]\d?\. /);
     expect(pdfText).toContain('Meridian Composition Holdings');
   });
 

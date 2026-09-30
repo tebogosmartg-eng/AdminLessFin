@@ -168,7 +168,7 @@ describe('EFS Publication canonical pack', () => {
 
 describe('V6.10.3 professional AFS presentation', () => {
   it('maps IFRS captions and numbered notes without DISC codes', () => {
-    expect(professionalStatementTitle('financial_performance')).toContain('Profit or Loss');
+    expect(professionalStatementTitle('financial_performance')).toBe('Statement of Comprehensive Income');
     expect(humanFrameworkLabel(samplePack)).toBe('IFRS for SMEs');
     const notes = numberDisclosures(samplePack.disclosures);
     expect(notes[0].heading).toBe('Note 1. Basis of Preparation');

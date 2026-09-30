@@ -102,13 +102,15 @@ test('1-8: the property note arrives populated from the ledger, with comparative
   expect(text).toMatch(/Land and Buildings/i);
   expect(text).toMatch(/Motor Vehicles/i);
   expect(text).toMatch(/Computer Equipment/i);
-  expect(text).toMatch(/Accumulated depreciation/i);
-  expect(text).toMatch(/Carrying amount/i);
 
-  // The figures, and last year beside them.
+  // Cost, accumulated depreciation (from the asset register's recorded
+  // depreciation runs, reconciled to the ledger) and carrying value, for
+  // this year and last.
   expect(text).toContain('1 200 000,00');
   expect(text).toContain('2 540 000,00');
   expect(text).toContain('2 015 000,00');
+  expect(text).toContain('525 350,00');
+  expect(text).toContain('2 014 650,00');
 
   // Against the ledger itself, not just against the screen.
   const facts = await edge('financial-statements', {
@@ -119,7 +121,7 @@ test('1-8: the property note arrives populated from the ledger, with comparative
   const sfp = (facts as { statements: Array<{ statement_type: string; lines: Array<{ line_code: string; amount: number | null }> }> })
     .statements.find((s) => s.statement_type === 'financial_position');
   const ppe = sfp?.lines.find((l) => l.line_code === 'sfp.ppe')?.amount ?? 0;
-  expect(Math.round(ppe)).toBe(2_540_000);
+  expect(Math.round(ppe)).toBe(2_014_650);
 
   // Cells say where they came from.
   await expect(grid.locator('[data-origin="linked"]').first()).toBeVisible();
@@ -230,11 +232,11 @@ test('14-15: other disclosures are populated too', async ({ page }) => {
   await openDocument(page);
 
   for (const [title, expected] of [
-    // A generated disclosure keeps the framework's title where the framework
-    // already names that note.
-    [/^Note \d+\. Borrowings$/, /Long-term Loans/i],
+    // The engine names the notes it states (a preparer's title override
+    // still wins at print).
+    [/Interest-bearing borrowings/i, /Long-term Loans/i],
     [/Cash and cash equivalents/i, /Bank - Current Account/i],
-    [/Share capital and equity/i, /Issued Capital/i],
+    [/Share capital/i, /ordinary shares/i],
   ] as Array<[RegExp, RegExp]>) {
     await openNote(page, title);
     const grid = page.getByTestId('afs-spreadsheet').first();
@@ -531,7 +533,7 @@ async function restoreParagraphOrder(page: Page, wanted: string[]) {
 
 test('Editor: paragraphs and tables can be added, moved and removed', async ({ page }) => {
   await openDocument(page);
-  await openNote(page, /Property, plant and equipment/i);
+  await openNote(page, /Trade and other receivables/i);
   const paragraphs = page.getByTestId('afs-paragraph');
   await expect(paragraphs.first()).toBeVisible({ timeout: 45_000 });
 
@@ -577,7 +579,7 @@ test('Editor: paragraphs and tables can be added, moved and removed', async ({ p
     await page.reload();
     await waitForRouteSettled(page);
     await openDocument(page);
-    await openNote(page, /Property, plant and equipment/i);
+    await openNote(page, /Trade and other receivables/i);
     await expect(page.getByTestId('afs-paragraph').first().locator('textarea')).toHaveValue(
       secondBefore,
       { timeout: 45_000 },
@@ -629,7 +631,7 @@ test('Editor: paragraphs and tables can be added, moved and removed', async ({ p
   } finally {
     // ── Delete the paragraph this test added ───────────────────────────────
     await openDocument(page);
-    await openNote(page, /Property, plant and equipment/i);
+    await openNote(page, /Trade and other receivables/i);
     for (let i = 0; i < 8; i += 1) {
       const mine = page
         .getByTestId('afs-paragraph')

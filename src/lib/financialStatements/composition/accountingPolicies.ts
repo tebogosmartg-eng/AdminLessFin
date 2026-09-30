@@ -38,9 +38,14 @@ export function isAccountingPolicyNoteCode(code: string): boolean {
   return POLICY_NOTE_CODES.includes(String(code || '').toUpperCase());
 }
 
+/** The policies a published set opens with, in the order it opens with them. */
+const POLICY_LEAD_ORDER = ['POL.BASIS', 'POL.JUDGEMENTS'];
+
 /**
  * Build the unique policy catalogue for Phase 3.
- * Deduplicates by policy_code — policies appear exactly once.
+ * Deduplicates by policy_code — policies appear exactly once, numbered the
+ * way a published set numbers them: the accounting policies are note 1, so
+ * the basis of preparation is "1." and every policy after it "1.n".
  */
 export function assembleAccountingPolicies(
   policySets: DocPolicySetNode[],
@@ -63,7 +68,24 @@ export function assembleAccountingPolicies(
     }
   }
 
-  return out;
+  // Basis first, judgements second, the rest in their own order — then the
+  // published numbering is written onto the titles.
+  const leadRank = (p: CompositionPolicy) => {
+    const i = POLICY_LEAD_ORDER.indexOf(p.uniqueKey);
+    return i < 0 ? POLICY_LEAD_ORDER.length : i;
+  };
+  out.sort((a, b) => leadRank(a) - leadRank(b) || a.sortOrder - b.sortOrder);
+  return out.map((p, i) => ({
+    ...p,
+    title:
+      i === 0
+        ? `1. ${
+            p.uniqueKey === 'POL.BASIS'
+              ? 'Basis of preparation and summary of significant accounting policies'
+              : p.title
+          }`
+        : `1.${i} ${p.title}`,
+  }));
 }
 
 function mapPolicy(p: DocPolicyNode): CompositionPolicy {
@@ -77,6 +99,8 @@ function mapPolicy(p: DocPolicyNode): CompositionPolicy {
     sortOrder: p.sort_order ?? 0,
     source: p.source || 'framework',
     uniqueKey: String(p.policy_code || p.id).toUpperCase(),
+    table: p.table,
+    bodyAfter: p.bodyAfter,
   };
 }
 

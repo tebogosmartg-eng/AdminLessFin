@@ -45,11 +45,19 @@ export function produceReportingPackage(
     conditional.conditions,
     options?.companyMaterialityPercentage,
   );
+  // A line the preparer switched ON pins its note into the printed document,
+  // even where nothing else in it is filled in yet.
+  const forcedOnCodes = new Set(
+    Object.entries(overrides.lines || {})
+      .filter(([, on]) => on === true)
+      .map(([key]) => key.split('|')[0].toUpperCase()),
+  );
   const disclosureDecisions = makeDisclosureDecisions(
     model,
     entityProfile,
     materiality,
     conditional.conditions,
+    forcedOnCodes,
   );
   const statementPresentation = determineStatementPresentation(model, entityProfile);
 

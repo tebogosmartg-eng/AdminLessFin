@@ -121,9 +121,32 @@ function mergeFrameworkNote(serverNote: DocNoteNode, enriched: DocNoteNode): Doc
   };
 }
 
+/**
+ * Which framework boilerplate policies apply only when the company has the
+ * item. A two-man service company does not publish a hyperinflation policy,
+ * a business-combinations policy or a joint-ventures policy — a policy the
+ * facts do not support is noise that buries the ones that matter. A policy
+ * the engagement has authored itself is always kept.
+ */
+const POLICY_CONDITIONS: Record<string, string> = {
+  'POL.INTANGIBLES': 'hasIntangibleAssets',
+  'POL.INVPROP': 'hasInvestmentProperty',
+  'POL.LEASES': 'hasLeases',
+  'POL.INVENTORY': 'hasInventories',
+  'POL.GRANTS': 'hasGovernmentGrants',
+  'POL.ASSOCIATES': 'hasAssociates',
+  'POL.JOINTVENTURES': 'hasJointVentures',
+  'POL.BUSCOMB': 'hasBusinessCombination',
+  'POL.SBP': 'hasShareBasedPayment',
+  'POL.HYPERINFLATION': 'hasHyperinflation',
+  'POL.CONSOLIDATION': 'hasSubsidiariesOrSeparateFs',
+  'POL.FOREX': 'hasForeignCurrency',
+};
+
 function buildFrameworkPolicySet(
   frameworkKey: FrameworkKey,
   serverPolicySets: DocPolicySetNode[],
+  conditions: Record<string, boolean>,
 ): DocPolicySetNode {
   const def = getFrameworkDefinition(frameworkKey);
   const server = serverPolicySets.find((s) => (s.policies || []).length > 0) || serverPolicySets[0];
@@ -133,20 +156,40 @@ function buildFrameworkPolicySet(
   const policies: DocPolicyNode[] = [...(server?.policies || [])];
 
   let sort = policies.length;
-  for (const def_policy of def.policies) {
-    if (existingCodes.has(codeKey(def_policy.code))) continue;
+  const push = (code: string, title: string, body: string) => {
     sort += 1;
     policies.push({
-      id: `fw:policy:${frameworkKey}:${def_policy.code}`,
+      id: `fw:policy:${frameworkKey}:${code}`,
       kind: 'policy',
       policy_set_id: setId,
-      policy_code: def_policy.code,
-      title: def_policy.title,
-      body: def_policy.body,
+      policy_code: code,
+      title,
+      body,
       sort_order: sort,
       status: 'draft',
       source: 'framework',
     });
+  };
+
+  for (const def_policy of def.policies) {
+    if (existingCodes.has(codeKey(def_policy.code))) continue;
+    const conditionKey = POLICY_CONDITIONS[codeKey(def_policy.code)];
+    if (conditionKey && conditions[conditionKey] !== true) continue;
+    push(def_policy.code, def_policy.title, def_policy.body);
+  }
+
+  // Judgements and estimation uncertainty read as policy 1.1 of a published
+  // set, not as a numbered note of their own. The framework's judgements
+  // narrative joins the policies; the composition orders it after the basis
+  // of preparation.
+  if (!policies.some((p) => codeKey(p.policy_code) === 'POL.JUDGEMENTS')) {
+    const judgements = def.notes.find((n) => codeKey(n.code) === 'DISC.JUDGEMENTS');
+    const body = [judgements?.narrative, ...(judgements?.narratives || [])]
+      .filter(Boolean)
+      .join('\n\n');
+    if (body) {
+      push('POL.JUDGEMENTS', 'Significant judgements and sources of estimation uncertainty', body);
+    }
   }
 
   return {
@@ -297,7 +340,7 @@ export function assembleFrameworkDocument(input: FrameworkAssemblyInput): Framew
     }
   }
 
-  const policySets = [buildFrameworkPolicySet(frameworkKey, serverPolicySets)];
+  const policySets = [buildFrameworkPolicySet(frameworkKey, serverPolicySets, conditions)];
 
   return {
     frameworkKey,

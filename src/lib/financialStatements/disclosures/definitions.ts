@@ -12,7 +12,13 @@
  * manual. Leaving it out would hide a disclosure the framework requires; filling
  * it in would be inventing a figure.
  */
-import { AccountIndex, ACCUMULATED_DEPRECIATION, ALLOWANCE, type AccountRow } from './accountIndex';
+import {
+  AccountIndex,
+  ACCUMULATED_DEPRECIATION,
+  ALLOWANCE,
+  type AccountFilter,
+  type AccountRow,
+} from './accountIndex';
 import {
   label,
   MONEY,
@@ -24,11 +30,28 @@ import {
   type GeneratedTable,
 } from './types';
 
+/** What the engagement records about the entity, where a note needs it. */
+export type EntityParticulars = {
+  registeredName?: string | null;
+  countryOfIncorporation?: string | null;
+  registeredOffice?: string | null;
+  natureOfBusiness?: string | null;
+  entityType?: string | null;
+  shares?: {
+    share_class?: string;
+    authorised_shares?: number;
+    issued_shares?: number;
+    issued_shares_prior?: number;
+    par_value?: number;
+  } | null;
+};
+
 export type BuildContext = {
   index: AccountIndex;
   currentLabel: string;
   priorLabel: string;
   withComparatives: boolean;
+  entity?: EntityParticulars | null;
 };
 
 export type DisclosureDefinition = {
@@ -40,6 +63,12 @@ export type DisclosureDefinition = {
   reason(ctx: BuildContext): string;
   narrative(ctx: BuildContext): string[];
   tables(ctx: BuildContext): GeneratedTable[];
+  /**
+   * The note is stated entirely from the company's data: the framework's
+   * generic wording for it does not print, even when the engine has no
+   * narrative of its own (a published note of figures carries none).
+   */
+  ownsNarrative?: boolean;
 };
 
 // ── helpers ────────────────────────────────────────────────────────────────
@@ -157,18 +186,270 @@ function classesOf(index: AccountIndex, subcategory: string, contra: RegExp): Ac
     .sort((a, b) => (a.account_number ?? 0) - (b.account_number ?? 0));
 }
 
+// ── property, plant and equipment from the register ────────────────────────
+
+const isContra = (a: AccountRow) =>
+  String(a.account_role || '').toLowerCase() === 'accumulated_depreciation' ||
+  ACCUMULATED_DEPRECIATION.test(a.name);
+
+const money = (value: number | null, source?: CellSource): Cell => ({
+  value,
+  origin: 'linked',
+  format: MONEY,
+  ...(source ? { source } : {}),
+});
+const round = (v: number) => Math.round(v * 100) / 100;
+/** A total the editor keeps right: the sum of the rows it names. */
+const summed = (value: number, sums: string[]): Cell => ({
+  value,
+  origin: 'calculated',
+  formula: 'Sum of the classes above',
+  sums,
+  format: { ...MONEY, bold: true },
+});
+
+/**
+ * The note as a published set states it — cost, accumulated depreciation and
+ * carrying value by class for both years, and a reconciliation of each
+ * year's carrying amount by class: opening, additions, disposals,
+ * depreciation, closing.
+ *
+ * Cost and its movements come from the ledger (each class is a cost account;
+ * additions are its debits, disposals its credits). The split of accumulated
+ * depreciation by class comes from the fixed asset register's recorded
+ * depreciation runs — and only when the register agrees with the ledger's
+ * accumulated depreciation control account in both years. When it does not,
+ * or the seal carries no register or gross movements, this returns null and
+ * the note falls back to what the ledger alone can support.
+ */
+function ppeFromRegister(ctx: BuildContext): GeneratedTable[] | null {
+  const { index } = ctx;
+  const register = index.register;
+  const start = index.period?.start_date;
+  const end = index.period?.end_date;
+  const priorEnd = index.period?.prior_as_of;
+  const priorStart = index.period?.prior_start_date;
+  if (!register?.length || !index.hasGross || !start || !end || !priorEnd) return null;
+
+  const accounts = index.find({ subcategory: 'Property, Plant and Equipment' });
+  const classes = accounts
+    .filter((a) => !isContra(a))
+    .filter((a) => a.closing !== 0 || a.prior !== 0)
+    .sort((a, b) => (a.account_number ?? 0) - (b.account_number ?? 0));
+  const contra = accounts.filter(isContra);
+  if (!classes.length) return null;
+
+  // Accumulated depreciation by class, from the register, to a date.
+  const chargedTo = (classId: string, from: string | null, to: string) =>
+    register
+      .filter((asset) => asset.asset_account_id === classId)
+      .flatMap((asset) => asset.events)
+      .filter((e) => e.type === 'depreciated' && e.as_of <= to && (from == null || e.as_of > from))
+      .reduce((sum, e) => sum + e.amount, 0);
+  const accumAt = (classId: string, to: string) => chargedTo(classId, null, to);
+
+  // Where each figure comes from, for the reviewer: the class's ledger
+  // account for cost and its movements; the register assets whose recorded
+  // depreciation runs make up accumulated depreciation and the charge.
+  const accountSource = (c: AccountRow, amount: number, basis: CellSource['basis']): CellSource => ({
+    basis,
+    accounts: [{ id: c.id, code: c.account_code ?? (c.account_number != null ? String(c.account_number) : null), name: c.name, amount }],
+  });
+  const registerSource = (classId: string, from: string | null, to: string, basis: CellSource['basis']): CellSource => ({
+    basis,
+    accounts: register
+      .filter((asset) => asset.asset_account_id === classId)
+      .map((asset) => ({
+        id: asset.id,
+        code: asset.asset_code ?? null,
+        name: asset.description || asset.asset_code || 'Asset',
+        amount: -round(
+          asset.events
+            .filter((e) => e.type === 'depreciated' && e.as_of <= to && (from == null || e.as_of > from))
+            .reduce((s2, e) => s2 + e.amount, 0),
+        ),
+      }))
+      .filter((a) => a.amount !== 0),
+  });
+
+  // The register must agree with the ledger's control account, both years.
+  const ledgerAccumNow = -contra.reduce((s, a) => s + a.closing, 0);
+  const ledgerAccumThen = -contra.reduce((s, a) => s + a.prior, 0);
+  const regAccumNow = classes.reduce((s, c) => s + accumAt(c.id, end), 0);
+  const regAccumThen = classes.reduce((s, c) => s + accumAt(c.id, priorEnd), 0);
+  if (Math.abs(regAccumNow - ledgerAccumNow) > 0.5 || Math.abs(regAccumThen - ledgerAccumThen) > 0.5) {
+    return null;
+  }
+
+  const years = [
+    { label: ctx.currentLabel, cost: (c: AccountRow) => c.closing, to: end },
+    ...(ctx.withComparatives ? [{ label: ctx.priorLabel, cost: (c: AccountRow) => c.prior, to: priorEnd }] : []),
+  ];
+
+  // Cost, accumulated depreciation and carrying value, by class, per year.
+  const matrixRows: DisclosureRow[] = [];
+  for (const y of years) {
+    const blank = (): Cell => ({ value: null, origin: 'manual' });
+    matrixRows.push({ kind: 'header', key: `m:${y.label}`, cells: [label(y.label), blank(), blank(), blank()] });
+    let cost = 0;
+    let accum = 0;
+    const keys: string[] = [];
+    for (const c of classes) {
+      const k = y.cost(c);
+      const d = round(accumAt(c.id, y.to));
+      if (k === 0 && d === 0) continue;
+      cost += k;
+      accum += d;
+      const key = `m:${y.label}:${c.name}`;
+      keys.push(key);
+      const basis: CellSource['basis'] = y.to === end ? 'closing' : 'prior';
+      const costSource = accountSource(c, k, basis);
+      const accumSource = registerSource(c.id, null, y.to, basis);
+      matrixRows.push({
+        key,
+        cells: [
+          label(c.name),
+          money(k, costSource),
+          money(-d, accumSource),
+          money(round(k - d), { basis, accounts: [...costSource.accounts, ...accumSource.accounts] }),
+        ],
+      });
+    }
+    matrixRows.push({
+      key: `m:${y.label}:total`,
+      kind: 'total',
+      cells: [
+        label('Total', { bold: true }),
+        summed(round(cost), keys),
+        summed(round(-accum), keys),
+        summed(round(cost - accum), keys),
+      ],
+    });
+  }
+
+  // Reconciliation of each year's carrying amount, by class.
+  const recon = (
+    title: string,
+    code: string,
+    periodStart: string | null,
+    periodEnd: string,
+    openingCost: (c: AccountRow) => number,
+    closingCost: (c: AccountRow) => number,
+    debits: (c: AccountRow) => number,
+    credits: (c: AccountRow) => number,
+  ): GeneratedTable | null => {
+    const openingDate = periodStart ? dayBefore(periodStart) : null;
+    const rows: DisclosureRow[] = [];
+    const totals = [0, 0, 0, 0, 0];
+    let anyDisposal = false;
+    for (const c of classes) {
+      const openAccum = openingDate ? accumAt(c.id, openingDate) : 0;
+      const opening = round(openingCost(c) - openAccum);
+      const additions = round(debits(c));
+      const disposals = round(-credits(c));
+      const depreciation = round(-chargedTo(c.id, openingDate, periodEnd));
+      const closing = round(closingCost(c) - accumAt(c.id, periodEnd));
+      if ([opening, additions, disposals, depreciation, closing].every((v) => v === 0)) continue;
+      if (disposals !== 0) anyDisposal = true;
+      [opening, additions, disposals, depreciation, closing].forEach((v, i) => (totals[i] += v));
+      rows.push({
+        key: `${code}:${c.name}`,
+        cells: [
+          label(c.name),
+          money(opening),
+          money(additions, accountSource(c, additions, 'activity')),
+          money(disposals, accountSource(c, disposals, 'activity')),
+          money(depreciation, registerSource(c.id, openingDate, periodEnd, 'activity')),
+          money(closing),
+        ],
+      });
+    }
+    if (!rows.length) return null;
+    const classKeys = rows.map((r) => r.key!).filter(Boolean);
+    rows.push({
+      key: `${code}:total`,
+      kind: 'total',
+      cells: [label('', { bold: true }), ...totals.map((t) => summed(round(t), classKeys))],
+    });
+    const columns: DisclosureColumn[] = [
+      { label: '', align: 'left', width: 200 },
+      { label: 'Opening balance', align: 'right', width: 80 },
+      { label: 'Additions', align: 'right', width: 80 },
+      { label: 'Disposals', align: 'right', width: 80 },
+      { label: 'Depreciation', align: 'right', width: 80 },
+      { label: 'Closing balance', align: 'right', width: 80 },
+    ];
+    // A disposals column of nothing but dashes is left out.
+    const drop = anyDisposal ? -1 : 3;
+    return {
+      code,
+      title,
+      columns: columns.filter((_, i) => i !== drop),
+      rows: rows.map((r) => ({ ...r, cells: r.cells.filter((_, i) => i !== drop) })),
+    };
+  };
+
+  const tables: GeneratedTable[] = [
+    {
+      code: 'PPE.MATRIX',
+      title: 'Property, plant and equipment',
+      columns: [
+        { label: '', align: 'left', width: 200 },
+        { label: 'Cost', align: 'right', width: 90 },
+        { label: 'Accumulated depreciation', align: 'right', width: 90 },
+        { label: 'Carrying value', align: 'right', width: 90 },
+      ],
+      rows: matrixRows,
+    },
+  ];
+  const current = recon(
+    `Reconciliation of property, plant and equipment - ${ctx.currentLabel}`,
+    'PPE.RECON.CURRENT',
+    start,
+    end,
+    (c) => c.prior,
+    (c) => c.closing,
+    (c) => c.debits,
+    (c) => c.credits,
+  );
+  if (current) tables.push(current);
+  if (ctx.withComparatives && priorStart && index.hasPriorGross) {
+    const prior = recon(
+      `Reconciliation of property, plant and equipment - ${ctx.priorLabel}`,
+      'PPE.RECON.PRIOR',
+      priorStart,
+      priorEnd,
+      (c) => c.prior - c.priorActivity,
+      (c) => c.prior,
+      (c) => c.priorDebits,
+      (c) => c.priorCredits,
+    );
+    if (prior) tables.push(prior);
+  }
+  return tables;
+}
+
+/** The ISO date before another. */
+function dayBefore(iso: string): string {
+  const d = new Date(`${iso}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() - 1);
+  return d.toISOString().slice(0, 10);
+}
+
 // ── definitions ────────────────────────────────────────────────────────────
 
 const PPE: DisclosureDefinition = {
   code: 'DISC.PPE',
   title: 'Property, plant and equipment',
+  ownsNarrative: true,
   applies: (ctx) => ctx.index.any({ subcategory: 'Property, Plant and Equipment' }),
   reason: () => 'The company holds property, plant and equipment.',
-  narrative: () => [
-    'Property, plant and equipment is measured at cost less accumulated depreciation and any accumulated impairment losses. Depreciation is recognised on the straight-line basis over the estimated useful life of each class of asset.',
-    'The carrying amount of each class of property, plant and equipment is reconciled below.',
-  ],
+  // The measurement basis is the accounting policy's to state; the note is
+  // the figures.
+  narrative: () => [],
   tables: (ctx) => {
+    const fromRegister = ppeFromRegister(ctx);
+    if (fromRegister) return fromRegister;
     const classes = classesOf(ctx.index, 'Property, Plant and Equipment', ACCUMULATED_DEPRECIATION);
 
     // Carrying amount by class.
@@ -332,16 +613,14 @@ const RECEIVABLES: DisclosureDefinition = {
 const PAYABLES: DisclosureDefinition = {
   code: 'DISC.PAYABLES',
   title: 'Trade and other payables',
-  applies: (ctx) =>
-    ctx.index.any({ subcategory: ['Trade and Other Payables', 'Statutory Payables', 'Related-party Payables'] }),
-  reason: () => 'The company owes trade, statutory or related-party payables.',
-  narrative: () => [
-    'Trade and other payables are measured at amortised cost. Statutory amounts owing are shown separately.',
-  ],
+  // The note explains the statement line it is referenced from: trade and
+  // other payables. Statutory and related-party payables are lines of their
+  // own on the statement of financial position.
+  applies: (ctx) => ctx.index.any({ subcategory: 'Trade and Other Payables' }),
+  reason: () => 'The company owes trade and other payables.',
+  narrative: () => ['Trade and other payables are measured at amortised cost.'],
   tables: (ctx) => {
-    const subs = ['Trade and Other Payables', 'Statutory Payables', 'Related-party Payables'].filter(
-      (s) => ctx.index.any({ subcategory: s }),
-    );
+    const subs = ['Trade and Other Payables'].filter((s) => ctx.index.any({ subcategory: s }));
     const rows: DisclosureRow[] = [];
     const totals: DisclosureRow[] = [];
     for (const sub of subs) {
@@ -407,38 +686,34 @@ const BORROWINGS: DisclosureDefinition = {
     );
     const total = totalRow(ctx, 'Total borrowings', rows, 'Sum of the borrowing accounts');
 
-    const opening = ctx.index.total({ subcategory: 'Interest-bearing Borrowings' }, 'prior');
-    const closing = ctx.index.total({ subcategory: 'Interest-bearing Borrowings' }, 'closing');
-    const movement: GeneratedTable = {
-      code: 'BORROWINGS.MOVEMENT',
-      title: 'Movement in borrowings',
-      columns: [
-        { label: '', align: 'left', width: 240 },
-        { label: ctx.currentLabel, align: 'right', basis: 'closing', width: 120 },
-      ],
-      rows: [
-        {
-          key: 'opening',
-          cells: [label('Balance at the beginning of the year'), { value: opening.amount, origin: 'linked', format: MONEY, source: opening.source }],
-        },
-        { key: 'raised', cells: [label('Borrowings raised', { indent: 1 }), { value: null, origin: 'manual', format: MONEY }] },
-        { key: 'repaid', cells: [label('Repayments', { indent: 1 }), { value: null, origin: 'manual', format: MONEY }] },
-        { key: 'interest', cells: [label('Interest accrued', { indent: 1 }), { value: null, origin: 'manual', format: MONEY }] },
-        {
-          key: 'closing',
-          kind: 'total',
-          cells: [
-            label('Balance at the end of the year', { bold: true }),
-            { value: closing.amount, origin: 'linked', format: { ...MONEY, bold: true, borderTop: true, doubleBottom: true }, source: closing.source },
-          ],
-        },
-      ],
-    };
-
-    return [
+    const tables: GeneratedTable[] = [
       { code: 'BORROWINGS.ANALYSIS', title: 'Borrowings', columns: columns(ctx), rows: [...rows, total] },
-      movement,
     ];
+    // The movement for the year is the ledger's own: credits raised, debits
+    // repaid. Without gross movements in the seal it cannot be split, and is
+    // not guessed at.
+    if (ctx.index.hasGross) {
+      const priorGross = ctx.withComparatives && ctx.index.hasPriorGross;
+      const sumOf = (f: (a: AccountRow) => number) => accounts.reduce((s, a) => s + f(a), 0);
+      const row = (key: string, text: string, now: number, then: number | null, kind?: DisclosureRow['kind']): DisclosureRow => ({
+        key,
+        kind,
+        cells: [label(text, { bold: kind === 'total' }), money(Math.round(now * 100) / 100), ...(priorGross ? [money(then == null ? null : Math.round(then * 100) / 100)] : [])],
+      });
+      const cols = priorGross ? columns(ctx) : columns(ctx).slice(0, 2);
+      tables.push({
+        code: 'BORROWINGS.MOVEMENT',
+        title: 'Movement in borrowings',
+        columns: cols,
+        rows: [
+          row('opening', 'Balance at the beginning of the year', sumOf((a) => a.prior), sumOf((a) => a.prior - a.priorActivity)),
+          row('raised', 'Borrowings raised', sumOf((a) => a.credits), sumOf((a) => a.priorCredits)),
+          row('repaid', 'Repayments', -sumOf((a) => a.debits), -sumOf((a) => a.priorDebits)),
+          row('closing', 'Balance at the end of the year', sumOf((a) => a.closing), sumOf((a) => a.prior), 'total'),
+        ].filter((r) => r.kind === 'total' || r.key === 'opening' || r.cells.slice(1).some((c) => (c.value ?? 0) !== 0)),
+      });
+    }
+    return tables;
   },
 };
 
@@ -631,30 +906,272 @@ const PROVISIONS: DisclosureDefinition = {
 
 const EQUITY: DisclosureDefinition = {
   code: 'DISC.SHARECAPITAL',
-  title: 'Share capital and reserves',
-  applies: (ctx) => ctx.index.any({ category: 'Equity' }),
-  reason: () => 'The company has issued capital or holds reserves.',
-  narrative: () => [
-    'Issued capital and reserves are stated below. Distributions to owners are recognised directly in equity.',
-  ],
+  title: 'Share capital',
+  ownsNarrative: true,
+  applies: (ctx) => ctx.index.any({ subcategory: 'Issued Capital' }),
+  reason: () => 'The company has issued share capital.',
+  narrative: () => [],
   tables: (ctx) => {
-    const subs = ['Issued Capital', 'Reserves', 'Distributions'].filter((s) =>
-      ctx.index.any({ subcategory: s }),
+    const shares = ctx.entity?.shares ?? null;
+    const shareClass = String(shares?.share_class || 'Ordinary');
+    const count = (v: unknown) =>
+      Number.isFinite(Number(v)) && Number(v) > 0 ? Number(v).toLocaleString('en-ZA').replace(/,/g, ' ') : null;
+    const blank = (text: string, bold = false): DisclosureRow => ({
+      key: `text:${text}`,
+      kind: bold ? 'header' : undefined,
+      cells: [label(text, { bold }), money(null), ...(ctx.withComparatives ? [money(null)] : [])],
+    });
+    const rows: DisclosureRow[] = [];
+    const authorised = count(shares?.authorised_shares);
+    if (authorised) {
+      rows.push(blank('Authorised', true));
+      rows.push({
+        ...blank(`${authorised} ${shareClass.toLowerCase()} shares${shares?.par_value ? ` of R${shares.par_value} each` : ''}`),
+        kind: 'body',
+      });
+      rows.push({ kind: 'spacer', cells: [label(''), money(null), ...(ctx.withComparatives ? [money(null)] : [])] });
+    }
+    rows.push(blank('Issued', true));
+    const issued = count(shares?.issued_shares);
+    const issuedRow = linkedRow(
+      ctx,
+      issued ? `${issued} ${shareClass.toLowerCase()} shares` : `${shareClass} share capital`,
+      { subcategory: 'Issued Capital' },
+      { key: 'issued' },
     );
-    const rows = subs.map((s) =>
-      linkedRow(ctx, s, { subcategory: s, excludeRoles: ['retained_earnings'] }, { indent: 1, key: `eq:${s}` }),
+    rows.push({ ...issuedRow, kind: 'total', key: 'issued' });
+    return [{ code: 'SHARECAPITAL.ANALYSIS', title: 'Share capital', columns: columns(ctx), rows }];
+  },
+};
+
+/** Profit before taxation for a year, from the income and expense accounts. */
+function profitBeforeTax(ctx: BuildContext, basis: 'period' | 'priorPeriod'): number {
+  const flow = (a: AccountRow) => (basis === 'period' ? a.activity : a.priorActivity);
+  const income = ctx.index.find({ type: 'Income' }).reduce((s, a) => s + flow(a), 0);
+  const expense = ctx.index
+    .find({ type: 'Expense' })
+    .filter((a) => String(a.category || '') !== 'Taxation')
+    .reduce((s, a) => s + flow(a), 0);
+  return Math.round((income - expense) * 100) / 100;
+}
+
+const TAXATION: DisclosureDefinition = {
+  code: 'DISC.TAX',
+  title: 'Taxation',
+  ownsNarrative: true,
+  applies: (ctx) =>
+    ctx.index.find({ category: 'Taxation' }).some((a) => a.activity !== 0 || a.priorActivity !== 0),
+  reason: () => 'The company recognised a tax expense.',
+  narrative: () => [],
+  tables: (ctx) => {
+    const accounts = ctx.index
+      .find({ category: 'Taxation' })
+      .filter((a) => a.activity !== 0 || a.priorActivity !== 0)
+      .sort((a, b) => (a.account_number ?? 0) - (b.account_number ?? 0));
+    const rows = accounts.map((a) =>
+      linkedRow(ctx, a.name, { category: 'Taxation', nameMatches: new RegExp(`^${escape(a.name)}$`, 'i') }, { key: `tax:${a.name}`, flow: true }),
     );
-    const retained = retainedEarningsRow(ctx);
-    const all = retained ? [...rows, retained] : rows;
+    const tables: GeneratedTable[] = [
+      {
+        code: 'TAX.COMPONENTS',
+        title: 'Major components of the tax expense',
+        columns: columns(ctx),
+        rows: [...rows, totalRow(ctx, 'Total taxation', rows, 'Sum of the taxation accounts')],
+      },
+    ];
+    // The reconciliation to the statutory rate is stated only where the rate
+    // is known: South African normal tax on companies.
+    const country = String(ctx.entity?.countryOfIncorporation || 'South Africa').toLowerCase();
+    if (country.includes('south africa')) {
+      const RATE = 0.27;
+      const priorKnown = ctx.withComparatives && ctx.index.hasPriorFlows;
+      const pbtNow = profitBeforeTax(ctx, 'period');
+      const pbtThen = priorKnown ? profitBeforeTax(ctx, 'priorPeriod') : null;
+      const taxNow = accounts.reduce((s, a) => s + a.activity, 0);
+      const taxThen = priorKnown ? accounts.reduce((s, a) => s + a.priorActivity, 0) : null;
+      const r2 = (v: number | null) => (v == null ? null : Math.round(v * 100) / 100);
+      const line = (key: string, text: string, now: number | null, then: number | null, kind?: DisclosureRow['kind']): DisclosureRow => ({
+        key,
+        kind,
+        cells: [label(text, { bold: kind === 'total' }), money(r2(now)), ...(ctx.withComparatives ? [money(r2(then))] : [])],
+      });
+      const recon: DisclosureRow[] = [
+        line('pbt', 'Accounting profit', pbtNow, pbtThen),
+        line('at-rate', 'Tax at the applicable tax rate of 27%', pbtNow * RATE, pbtThen == null ? null : pbtThen * RATE),
+      ];
+      const otherNow = taxNow - pbtNow * RATE;
+      const otherThen = taxThen == null || pbtThen == null ? null : taxThen - pbtThen * RATE;
+      if (Math.abs(otherNow) >= 0.5 || (otherThen != null && Math.abs(otherThen) >= 0.5)) {
+        recon.push(line('other', 'Tax effect of adjustments on taxable income', otherNow, otherThen));
+      }
+      recon.push(line('tax-total', 'Taxation', taxNow, taxThen, 'total'));
+      tables.push({ code: 'TAX.RECONCILIATION', title: 'Reconciliation of the tax expense', columns: columns(ctx), rows: recon });
+    }
+    return tables;
+  },
+};
+
+const FINANCE_COSTS: DisclosureDefinition = {
+  code: 'DISC.FINANCECOSTS',
+  title: 'Finance costs',
+  ownsNarrative: true,
+  applies: (ctx) =>
+    ctx.index.find({ category: 'Finance Costs' }).some((a) => a.activity !== 0 || a.priorActivity !== 0),
+  reason: () => 'The company incurred finance costs.',
+  narrative: () => [],
+  tables: (ctx) => {
+    const accounts = ctx.index
+      .find({ category: 'Finance Costs' })
+      .filter((a) => a.activity !== 0 || a.priorActivity !== 0)
+      .sort((a, b) => (a.account_number ?? 0) - (b.account_number ?? 0));
+    const rows = accounts.map((a) =>
+      linkedRow(ctx, a.name, { category: 'Finance Costs', nameMatches: new RegExp(`^${escape(a.name)}$`, 'i') }, { key: `fin:${a.name}`, flow: true }),
+    );
     return [
       {
-        code: 'EQUITY.ANALYSIS',
-        title: 'Share capital and reserves',
+        code: 'FINANCECOSTS.ANALYSIS',
+        title: 'Finance costs',
         columns: columns(ctx),
-        rows: [...all, totalRow(ctx, 'Total equity', all, 'Sum of issued capital, reserves and retained earnings')],
+        rows: [...rows, totalRow(ctx, 'Total finance costs', rows, 'Sum of the finance cost accounts')],
       },
     ];
   },
+};
+
+/** A liability that holds income tax owed — its movement is tax paid, not working capital. */
+const INCOME_TAX_PAYABLE = /income tax|current tax|provisional tax/i;
+
+/**
+ * Cash generated from operations, by the indirect method: profit before tax,
+ * the non-cash and non-operating items taken out, and the movement in working
+ * capital — every figure a movement in the sealed balances. It must equal the
+ * cash generated from operations the statement of cash flows reports from the
+ * ledger's cash, and readiness checks that it does.
+ */
+const CASH_GENERATED: DisclosureDefinition = {
+  code: 'DISC.CASHFLOW',
+  title: 'Cash generated from operations',
+  ownsNarrative: true,
+  applies: (ctx) => ctx.index.any({ subcategory: 'Cash and Cash Equivalents' }) && ctx.index.rows.some((a) => a.hasActivity),
+  reason: () => 'The statement of cash flows reports cash generated from operations.',
+  narrative: () => [],
+  tables: (ctx) => {
+    const priorKnown = ctx.withComparatives && ctx.index.hasPriorFlows;
+    const r2 = (v: number) => Math.round(v * 100) / 100;
+    const now = (f: (a: AccountRow) => number, filter: AccountFilter) => r2(ctx.index.find(filter).reduce((s, a) => s + f(a), 0));
+    const closing = (a: AccountRow) => a.closing;
+    const prior = (a: AccountRow) => a.prior;
+    const opening = (a: AccountRow) => a.prior - a.priorActivity;
+    const move = (filter: AccountFilter, keep: (a: AccountRow) => boolean = () => true) => {
+      const list = ctx.index.find(filter).filter(keep);
+      return [
+        r2(list.reduce((s, a) => s + closing(a) - prior(a), 0)),
+        r2(list.reduce((s, a) => s + prior(a) - opening(a), 0)),
+      ] as const;
+    };
+    const flowOf = (filter: AccountFilter, keep: (a: AccountRow) => boolean = () => true) => {
+      const list = ctx.index.find(filter).filter(keep);
+      return [r2(list.reduce((s, a) => s + a.activity, 0)), r2(list.reduce((s, a) => s + a.priorActivity, 0))] as const;
+    };
+    const isDepreciation = (a: AccountRow) => String(a.account_role || '').toLowerCase() === 'depreciation_expense';
+    const notTaxPayable = (a: AccountRow) => !INCOME_TAX_PAYABLE.test(a.name);
+
+    const pbt = [profitBeforeTax(ctx, 'period'), priorKnown ? profitBeforeTax(ctx, 'priorPeriod') : 0] as const;
+    const dep = flowOf({ type: 'Expense' }, isDepreciation);
+    const otherIncome = flowOf({ category: 'Other Income' });
+    const finance = flowOf({ category: 'Finance Costs' });
+    const inventory = move({ subcategory: 'Inventory' });
+    const receivables = move({ subcategory: 'Trade and Other Receivables' });
+    const payables = move({ subcategory: ['Trade and Other Payables', 'Statutory Payables'] }, notTaxPayable);
+    const provisions = move({ subcategory: 'Provisions' });
+
+    const row = (key: string, text: string, v: readonly [number, number], kind?: DisclosureRow['kind']): DisclosureRow => ({
+      key,
+      kind,
+      cells: [label(text, { bold: kind === 'header' || kind === 'total' }), money(v[0]), ...(ctx.withComparatives ? [money(priorKnown ? v[1] : null)] : [])],
+    });
+    const caption = (text: string): DisclosureRow => ({
+      key: `cap:${text}`,
+      kind: 'header',
+      cells: [label(text, { bold: true }), money(null), ...(ctx.withComparatives ? [money(null)] : [])],
+    });
+    const lines: DisclosureRow[] = [row('pbt', 'Profit before taxation', pbt), caption('Adjustments for:')];
+    const adjust = (key: string, text: string, v: readonly [number, number]) => {
+      if (v[0] !== 0 || v[1] !== 0) lines.push(row(key, text, v));
+    };
+    adjust('dep', 'Depreciation and amortisation', dep);
+    adjust('oi', 'Interest received', [-otherIncome[0], -otherIncome[1]]);
+    adjust('fin', 'Finance costs', finance);
+    const wc: DisclosureRow[] = [];
+    const change = (key: string, text: string, v: readonly [number, number], sign: 1 | -1) => {
+      if (v[0] !== 0 || v[1] !== 0) wc.push(row(key, text, [sign * v[0], sign * v[1]]));
+    };
+    change('inv', 'Inventories', inventory, -1);
+    change('rec', 'Trade and other receivables', receivables, -1);
+    // Liabilities are carried credit-positive: an increase is cash retained.
+    change('pay', 'Trade and other payables', payables, 1);
+    change('prov', 'Provisions', provisions, 1);
+    if (wc.length) lines.push(caption('Changes in working capital:'), ...wc);
+    const all = lines.filter((l) => l.kind !== 'header');
+    const total = [0, 1].map((i) => r2(all.reduce((s, l) => s + Number(l.cells[i + 1]?.value ?? 0), 0))) as [number, number];
+
+    // The reconciliation is stated only when it reconciles: the indirect
+    // figure must equal the cash the ledger itself shows generated from
+    // operations (its operating cash flows before tax paid). Where accounts
+    // the chart has not classified move working capital the indirect method
+    // cannot see, the two differ — and a reconciliation that does not
+    // reconcile is not printed. Readiness reports the unclassified accounts.
+    const ledgerGenerated = (flows: Array<{ section: string; category: string; amount: number }> | null) =>
+      flows == null
+        ? null
+        : r2(
+            flows
+              .filter((f) => String(f.section) === 'Operating' && !INCOME_TAX_PAYABLE.test(String(f.category)))
+              .reduce((s, f) => s + Number(f.amount || 0), 0),
+          );
+    const ledgerNow = ledgerGenerated(ctx.index.cashFlow);
+    const ledgerThen = priorKnown ? ledgerGenerated(ctx.index.priorCashFlow) : null;
+    if (ledgerNow == null || Math.abs(ledgerNow - total[0]) > 1) return [];
+    if (ledgerThen != null && Math.abs(ledgerThen - total[1]) > 1) return [];
+
+    lines.push(row('cash-generated', 'Cash generated from operations', total, 'total'));
+    return [{ code: 'CASHFLOW.CGO', title: 'Cash generated from operations', columns: columns(ctx), rows: lines }];
+  },
+};
+
+const EVENTS_AFTER_REPORTING: DisclosureDefinition = {
+  code: 'DISC.EVENTS',
+  title: 'Events after the reporting period',
+  applies: (ctx) => ctx.index.rows.length > 0,
+  reason: () => 'Every set of annual financial statements addresses events after the reporting date.',
+  narrative: () => [
+    'The directors are not aware of any material event which occurred after the reporting date and up to the date of this report.',
+  ],
+  tables: () => [],
+};
+
+const GENERAL_INFORMATION: DisclosureDefinition = {
+  code: 'DISC.GENERAL',
+  title: 'General information',
+  applies: (ctx) => !!(ctx.entity?.registeredName || ctx.entity?.natureOfBusiness),
+  reason: () => 'The entity is identified in its annual financial statements.',
+  narrative: (ctx) => {
+    const e = ctx.entity || {};
+    const name = e.registeredName || 'The company';
+    const country = e.countryOfIncorporation || 'South Africa';
+    const kind = /private/i.test(String(e.entityType || '')) || /\(pty\)/i.test(name) ? 'a private company' : 'a company';
+    const office = String(e.registeredOffice || '')
+      .split(/\r?\n/)
+      .map((l) => l.trim())
+      .filter(Boolean)
+      .join(', ');
+    const nature = String(e.natureOfBusiness || '').trim().replace(/\.$/, '');
+    const parts = [`${name} is ${kind} incorporated and domiciled in ${country}.`];
+    if (office) parts.push(`The address of its registered office is ${office}.`);
+    if (nature) parts.push(`Its principal activities are ${nature.charAt(0).toLowerCase()}${nature.slice(1)}.`);
+    return [parts.join(' ')];
+  },
+  tables: () => [],
 };
 
 /**
@@ -705,6 +1222,7 @@ function escape(text: string): string {
 }
 
 export const DISCLOSURE_DEFINITIONS: DisclosureDefinition[] = [
+  GENERAL_INFORMATION,
   PPE,
   INTANGIBLES,
   INVENTORIES,
@@ -719,6 +1237,10 @@ export const DISCLOSURE_DEFINITIONS: DisclosureDefinition[] = [
   COST_OF_SALES,
   EMPLOYEE_COSTS,
   OPERATING_EXPENSES,
+  FINANCE_COSTS,
+  TAXATION,
+  CASH_GENERATED,
+  EVENTS_AFTER_REPORTING,
 ];
 
 /** Build every disclosure the company's accounting data supports. */
@@ -727,13 +1249,15 @@ export function generateDisclosures(ctx: BuildContext): GeneratedDisclosure[] {
   for (const def of DISCLOSURE_DEFINITIONS) {
     if (!def.applies(ctx)) continue;
     const tables = def.tables(ctx).filter((t) => t.rows.length > 0);
-    if (tables.length === 0) continue;
+    const narrative = def.narrative(ctx);
+    if (tables.length === 0 && narrative.length === 0) continue;
     out.push({
       code: def.code,
       title: def.title,
-      narrative: def.narrative(ctx),
+      narrative,
       tables,
       reason: def.reason(ctx),
+      ownsNarrative: !!def.ownsNarrative,
     });
   }
   return out;

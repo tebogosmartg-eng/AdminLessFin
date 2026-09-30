@@ -4,7 +4,7 @@
  * Transforms CorporateInformationModel into professional publication layout rows.
  * All formatting rules live here — renderers only position pre-formatted content.
  */
-import { formatBanker, formatDirectorName, levelOfAssuranceLabel } from './formatting';
+import { formatBanker } from './formatting';
 import type { CorporateInformationModel } from './types';
 import type {
   CorporateInformationPresentation,
@@ -61,185 +61,138 @@ function pushSingle(
   if (v) rows.push({ kind: 'single', id, label, value: v });
 }
 
-function buildEntitySection(model: CorporateInformationModel): CorporateInformationPresentationRow[] {
-  const rows: CorporateInformationPresentationRow[] = [];
-  rows.push({ kind: 'group_header', id: 'grp-entity', label: 'Entity Identity' });
-  pushSingle(rows, 'reg-name', 'Registered name', model.entityIdentity.registeredName.formatted);
-  pushSingle(rows, 'reg-no', 'Registration number', model.entityIdentity.registrationNumber.formatted);
-  pushSingle(rows, 'trading', 'Trading name', model.entityIdentity.tradingName.formatted);
-  pushSingle(rows, 'nob', 'Nature of business', model.entityIdentity.natureOfBusiness.formatted);
-  pushSingle(rows, 'country', 'Country of incorporation', model.entityIdentity.countryOfIncorporation.formatted);
-  pushSingle(rows, 'etype', 'Entity type', model.entityIdentity.entityType.formatted);
-  pushSingle(rows, 'framework', 'Reporting framework', model.entityIdentity.reportingFramework.formatted);
-  return rows;
+/** The level of assurance written the way a general information page states it. */
+function levelOfAssuranceSentence(model: CorporateInformationModel): string | null {
+  const label = String(model.levelOfAssurance.formatted || '');
+  if (!label) return null;
+  if (/audit/i.test(label)) {
+    return 'These annual financial statements have been audited in compliance with the applicable requirements of the Companies Act of South Africa.';
+  }
+  if (/review/i.test(label)) {
+    return 'These annual financial statements have been independently reviewed in compliance with the applicable requirements of the Companies Act of South Africa.';
+  }
+  if (/compil/i.test(label)) {
+    return 'These annual financial statements have been compiled by an accounting practitioner.';
+  }
+  return 'These annual financial statements are unaudited.';
 }
 
-function buildAddressSection(model: CorporateInformationModel): CorporateInformationPresentationRow[] {
+/**
+ * Build the general information page from the canonical model — one flat
+ * label/value list in the order a published set of annual financial
+ * statements presents it: the entity, the people, the addresses, the
+ * practitioners, and how the statements were prepared. Engagement workflow
+ * metadata (who reviewed, which partner, reporting currency) stays out of
+ * the published page.
+ */
+export function buildCorporateInformationPresentation(
+  model: CorporateInformationModel,
+): CorporateInformationPresentation {
   const rows: CorporateInformationPresentationRow[] = [];
+
+  pushSingle(
+    rows,
+    'country',
+    'Country of incorporation and domicile',
+    model.entityIdentity.countryOfIncorporation.formatted || 'South Africa',
+  );
+  pushSingle(
+    rows,
+    'nob',
+    'Nature of business and principal activities',
+    model.entityIdentity.natureOfBusiness.formatted,
+  );
+
+  const activeDirectors = model.directors.filter((d) => d.active);
+  if (activeDirectors.length) {
+    rows.push({
+      kind: 'person_list',
+      id: 'directors-list',
+      label: 'Directors',
+      people: activeDirectors.map((d) => ({ name: d.name, detail: null })),
+    });
+  }
+
   const addressLabels: Record<string, string> = {
     registered_office: 'Registered office',
     business_address: 'Business address',
     postal_address: 'Postal address',
     physical_address: 'Physical address',
-    website: 'Website',
-    email: 'Email',
-    telephone: 'Telephone',
   };
-  const addresses = model.addresses.filter((a) => a.value.trim());
-  if (!addresses.length) return rows;
-
-  rows.push({ kind: 'group_header', id: 'grp-addresses', label: 'Addresses' });
-  for (const addr of addresses) {
-    const label = addressLabels[addr.kind] || addr.kind;
+  for (const kind of ['registered_office', 'business_address', 'postal_address', 'physical_address']) {
+    const addr = model.addresses.find((a) => a.kind === kind && a.value.trim());
+    if (!addr) continue;
     const lines = splitAddressLines(addr.value);
-    if (lines.length <= 1 && ['website', 'email', 'telephone'].includes(addr.kind)) {
-      pushSingle(rows, `addr-${addr.kind}`, label, addr.value);
-    } else {
-      rows.push({
-        kind: 'address_block',
-        id: `addr-${addr.kind}`,
-        label,
-        lines: lines.length ? lines : [addr.value.trim()],
-      });
-    }
+    rows.push({
+      kind: 'address_block',
+      id: `addr-${addr.kind}`,
+      label: addressLabels[kind],
+      lines: lines.length ? lines : [addr.value.trim()],
+    });
   }
-  return rows;
-}
-
-function buildGovernanceSection(model: CorporateInformationModel): CorporateInformationPresentationRow[] {
-  const rows: CorporateInformationPresentationRow[] = [];
-  if (!model.governance.length) return rows;
-
-  const governanceLabels: Record<string, string> = {
-    company_secretary: 'Company secretary',
-    auditor: 'Auditor',
-    independent_reviewer: 'Independent reviewer',
-    accounting_officer: 'Accounting officer',
-    partner: 'Partner',
-    manager: 'Manager',
-    reviewer: 'Reviewer',
-    preparer: 'Preparer',
-    authorised_representative: 'Authorised representative',
-  };
-
-  rows.push({ kind: 'group_header', id: 'grp-governance', label: 'Governance' });
-  for (const gov of model.governance) {
-    pushSingle(rows, `gov-${gov.role}`, governanceLabels[gov.role] || gov.role, gov.name);
+  for (const kind of ['telephone', 'email', 'website']) {
+    const addr = model.addresses.find((a) => a.kind === kind && a.value.trim());
+    if (addr) pushSingle(rows, `addr-${kind}`, kind.charAt(0).toUpperCase() + kind.slice(1), addr.value);
   }
-  return rows;
-}
 
-function buildDirectorsSection(model: CorporateInformationModel): CorporateInformationPresentationRow[] {
-  const active = model.directors.filter((d) => d.active);
-  if (!active.length) return [];
-  return [
-    { kind: 'group_header', id: 'grp-directors', label: 'Directors' },
-    {
-      kind: 'person_list',
-      id: 'directors-list',
-      label: 'Directors',
-      people: active.map((d) => ({
-        name: formatDirectorName(d),
-        detail: d.appointmentDate ? `Appointed ${d.appointmentDate}` : null,
-      })),
-    },
-  ];
-}
-
-function buildBankersSection(model: CorporateInformationModel): CorporateInformationPresentationRow[] {
-  const active = model.principalBankers.filter((b) => b.active);
-  if (!active.length) return [];
-  return [
-    { kind: 'group_header', id: 'grp-bankers', label: 'Principal Bankers' },
-    {
+  const bankers = model.principalBankers.filter((b) => b.active);
+  if (bankers.length) {
+    rows.push({
       kind: 'banker_list',
       id: 'bankers-list',
-      label: 'Principal bankers',
-      bankers: active.map((b) => ({
+      label: 'Bankers',
+      bankers: bankers.map((b) => ({
         name: b.bankName,
         detail: formatBanker(b).replace(b.bankName, '').replace(/^,\s*/, '') || null,
       })),
-    },
-  ];
-}
+    });
+  }
 
-function buildTaxSection(model: CorporateInformationModel): CorporateInformationPresentationRow[] {
-  const applicable = model.taxRegistrations.filter((t) => t.applicable && t.number.trim());
-  if (!applicable.length) return [];
-  return [
-    { kind: 'group_header', id: 'grp-tax', label: 'Tax Registrations' },
-    {
+  const practitionerLabels: Record<string, string> = {
+    auditor: 'Auditors',
+    independent_reviewer: 'Independent reviewers',
+    accounting_officer: 'Accounting officer',
+    company_secretary: 'Company secretary',
+  };
+  for (const role of ['auditor', 'independent_reviewer', 'accounting_officer', 'company_secretary']) {
+    const entry = model.governance.find((g) => g.role === role && g.name.trim());
+    if (entry) pushSingle(rows, `gov-${role}`, practitionerLabels[role], entry.name);
+  }
+
+  pushSingle(
+    rows,
+    'reg-no',
+    'Company registration number',
+    model.entityIdentity.registrationNumber.formatted,
+  );
+
+  const applicableTax = model.taxRegistrations.filter((t) => t.applicable && t.number.trim());
+  if (applicableTax.length) {
+    rows.push({
       kind: 'tax_list',
       id: 'tax-list',
       label: 'Tax registrations',
-      items: applicable.map((t) => ({ label: t.label, number: t.number })),
-    },
-  ];
-}
-
-function buildEngagementSection(model: CorporateInformationModel): CorporateInformationPresentationRow[] {
-  const rows: CorporateInformationPresentationRow[] = [];
-  const e = model.engagement;
-  const hasEngagement =
-    e.reportingPeriod.formatted ||
-    e.comparativePeriod.formatted ||
-    e.reportingCurrency.formatted ||
-    e.functionalCurrency.formatted ||
-    model.levelOfAssurance.formatted ||
-    e.preparedBy.formatted ||
-    e.reviewedBy.formatted ||
-    e.partner.formatted ||
-    e.approvalDate.formatted ||
-    e.authorisationDate.formatted ||
-    e.issueDate.formatted;
-
-  if (!hasEngagement) return rows;
-
-  rows.push({ kind: 'group_header', id: 'grp-engagement', label: 'Engagement Information' });
-  pushSingle(rows, 'rep-period', 'Reporting period', e.reportingPeriod.formatted);
-  pushSingle(rows, 'comp-period', 'Comparative period', e.comparativePeriod.formatted);
-  pushSingle(rows, 'rep-currency', 'Reporting currency', e.reportingCurrency.formatted);
-  pushSingle(rows, 'func-currency', 'Functional currency', e.functionalCurrency.formatted);
-  pushSingle(rows, 'loa', 'Level of assurance', model.levelOfAssurance.formatted);
-  pushSingle(rows, 'prepared', 'Prepared by', e.preparedBy.formatted);
-  pushSingle(rows, 'reviewed', 'Reviewed by', e.reviewedBy.formatted);
-  pushSingle(rows, 'partner', 'Partner', e.partner.formatted);
-  pushSingle(rows, 'approval', 'Approval date', e.approvalDate.formatted);
-  pushSingle(rows, 'auth', 'Authorisation date', e.authorisationDate.formatted);
-  pushSingle(rows, 'issue', 'Issue date', e.issueDate.formatted);
-  return rows;
-}
-
-/** Build professional corporate information presentation from canonical model. */
-export function buildCorporateInformationPresentation(
-  model: CorporateInformationModel,
-): CorporateInformationPresentation {
-  const sectionBuilders = [
-    { id: 'entity', title: 'Entity Identity', build: buildEntitySection },
-    { id: 'addresses', title: 'Addresses', build: buildAddressSection },
-    { id: 'governance', title: 'Governance', build: buildGovernanceSection },
-    { id: 'directors', title: 'Directors', build: buildDirectorsSection },
-    { id: 'bankers', title: 'Principal Bankers', build: buildBankersSection },
-    { id: 'tax', title: 'Tax Registrations', build: buildTaxSection },
-    { id: 'engagement', title: 'Engagement Information', build: buildEngagementSection },
-  ];
-
-  const sections: CorporateInformationPresentation['sections'] = [];
-  const rows: CorporateInformationPresentationRow[] = [];
-
-  for (const sb of sectionBuilders) {
-    const sectionRows = sb.build(model);
-    if (sectionRows.length) {
-      sections.push({ id: sb.id, title: sb.title, rows: sectionRows });
-      if (rows.length) rows.push({ kind: 'spacer', id: `sp-${sb.id}`, height: 6 });
-      rows.push(...sectionRows);
-    }
+      items: applicableTax.map((t) => ({ label: t.label, number: t.number })),
+    });
   }
+
+  const assurance = levelOfAssuranceSentence(model);
+  if (assurance) rows.push({ kind: 'paragraph', id: 'loa', label: 'Level of assurance', value: assurance });
+
+  if (model.engagement.preparedBy.formatted) {
+    rows.push({
+      kind: 'paragraph',
+      id: 'prepared',
+      label: 'Preparer',
+      value: `The annual financial statements were compiled by: ${model.engagement.preparedBy.formatted}`,
+    });
+  }
+  pushSingle(rows, 'issue', 'Issued', model.engagement.issueDate.formatted);
 
   return {
     version: '16.1',
-    title: 'Corporate Information',
-    sections,
+    title: 'General Information',
+    sections: [{ id: 'general', title: 'General Information', rows }],
     rows,
     presentationFingerprint: fingerprint(rows),
   };

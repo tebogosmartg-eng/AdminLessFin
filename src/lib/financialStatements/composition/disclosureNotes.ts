@@ -63,7 +63,7 @@ export function toCompositionDisclosureNote(
       : emptyDisclosureLinks());
 
   const heading =
-    opts.noteNumber != null ? `Note ${opts.noteNumber}. ${opts.title}` : null;
+    opts.noteNumber != null ? `${opts.noteNumber}. ${opts.title}` : null;
 
   return {
     id: note.id,

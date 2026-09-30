@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { invokeFinancialStatements } from '../../../lib/financialStatements/api';
 import { reviewStageLabel } from '../../../lib/financialStatements/presentation';
@@ -68,6 +68,18 @@ export default function WorkspaceReview({
     enabled: !!dashQuery.data?.review?.id,
   });
 
+  // The checks the statements last went through: leaving draft requires the
+  // newest passed validation run, not whichever one the review was opened on.
+  const validationQuery = useQuery({
+    queryKey: ['efs_validation_dash', companyId, workspaceId],
+    queryFn: () =>
+      invokeFinancialStatements<{ latest_run?: { id: string } | null; ready_for_review?: boolean }>(
+        companyId,
+        'GET_VALIDATION_DASHBOARD',
+        { workspace_id: workspaceId },
+      ),
+  });
+
   const invalidate = () => {
     qc.invalidateQueries({ queryKey: ['efs_review_dash', companyId, workspaceId] });
     qc.invalidateQueries({ queryKey: ['efs_review_queries', companyId, workspaceId] });
@@ -76,6 +88,27 @@ export default function WorkspaceReview({
 
   const reviewId = dashQuery.data?.review?.id;
   const stage = dashQuery.data?.stage || dashQuery.data?.review?.stage || 'draft';
+
+  // A workspace that reaches this tab is under review by definition: open the
+  // engagement's review the first time anyone looks for it.
+  const ensureReview = useMutation({
+    mutationFn: () =>
+      invokeFinancialStatements(companyId, 'GET_OR_CREATE_PACK_REVIEW', {
+        workspace_id: workspaceId,
+      }),
+    onSuccess: invalidate,
+    onError: (e: Error) => showError(e.message),
+  });
+  const ensureReviewStarted = useRef(false);
+  useEffect(() => {
+    if (dashQuery.isSuccess && !dashQuery.data?.review && !ensureReviewStarted.current) {
+      ensureReviewStarted.current = true;
+      ensureReview.mutate();
+    }
+  }, [dashQuery.isSuccess, dashQuery.data?.review, ensureReview]);
+  // Each action is offered only at the stage the workflow accepts it, so the
+  // buttons read as the path through the review rather than a bag of calls.
+  const at = (...stages: string[]) => !!reviewId && stages.includes(stage);
 
   const assignSelf = useMutation({
     mutationFn: (role: 'manager' | 'partner') => {
@@ -96,7 +129,12 @@ export default function WorkspaceReview({
   const advance = useMutation({
     mutationFn: (method: string) => {
       if (!reviewId) throw new Error('Review is not ready');
-      return invokeFinancialStatements(companyId, method, { pack_review_id: reviewId });
+      const payload: Record<string, unknown> = { pack_review_id: reviewId };
+      // Leaving draft certifies against the newest validation run.
+      if (method === 'SUBMIT_FOR_VALIDATION_COMPLETE' && validationQuery.data?.latest_run?.id) {
+        payload.validation_run_id = validationQuery.data.latest_run.id;
+      }
+      return invokeFinancialStatements(companyId, method, payload);
     },
     onSuccess: () => {
       showSuccess('Review updated');
@@ -167,7 +205,10 @@ export default function WorkspaceReview({
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="flex flex-wrap items-center gap-2">
-            <Badge>{reviewStageLabel(stage)}</Badge>
+            {/* No stage is claimed before the review has actually loaded. */}
+            <Badge data-testid="afs-review-stage" variant={reviewId ? 'default' : 'outline'}>
+              {reviewId ? reviewStageLabel(stage) : 'Opening review…'}
+            </Badge>
           </div>
 
           <div className="rounded-md border p-4 space-y-2">
@@ -191,7 +232,7 @@ export default function WorkspaceReview({
               <Button
                 size="sm"
                 variant="outline"
-                disabled={assignSelf.isPending}
+                disabled={assignSelf.isPending || !reviewId}
                 onClick={() => assignSelf.mutate('manager')}
               >
                 Assign me as manager
@@ -199,21 +240,21 @@ export default function WorkspaceReview({
               <div className="flex flex-wrap gap-2">
                 <Button
                   size="sm"
-                  disabled={advance.isPending}
+                  disabled={advance.isPending || !at('draft')}
                   onClick={() => advance.mutate('SUBMIT_FOR_VALIDATION_COMPLETE')}
                 >
                   Mark checks complete
                 </Button>
                 <Button
                   size="sm"
-                  disabled={advance.isPending}
+                  disabled={advance.isPending || !at('validation_complete')}
                   onClick={() => advance.mutate('START_MANAGER_REVIEW')}
                 >
                   Start manager review
                 </Button>
                 <Button
                   size="sm"
-                  disabled={decide.isPending}
+                  disabled={decide.isPending || !at('manager_review')}
                   onClick={() =>
                     decide.mutate({ decision_code: 'approve', actor_role: 'manager' })
                   }
@@ -228,7 +269,7 @@ export default function WorkspaceReview({
               <Button
                 size="sm"
                 variant="outline"
-                disabled={assignSelf.isPending}
+                disabled={assignSelf.isPending || !reviewId}
                 onClick={() => assignSelf.mutate('partner')}
               >
                 Assign me as partner
@@ -236,14 +277,14 @@ export default function WorkspaceReview({
               <div className="flex flex-wrap gap-2">
                 <Button
                   size="sm"
-                  disabled={advance.isPending}
+                  disabled={advance.isPending || !at('manager_approved')}
                   onClick={() => advance.mutate('START_PARTNER_REVIEW')}
                 >
                   Start partner review
                 </Button>
                 <Button
                   size="sm"
-                  disabled={decide.isPending}
+                  disabled={decide.isPending || !at('partner_review')}
                   onClick={() =>
                     decide.mutate({ decision_code: 'approve', actor_role: 'partner' })
                   }
@@ -253,7 +294,7 @@ export default function WorkspaceReview({
                 <Button
                   size="sm"
                   variant="secondary"
-                  disabled={advance.isPending}
+                  disabled={advance.isPending || !at('partner_approved')}
                   onClick={() => advance.mutate('MARK_PUBLICATION_READY')}
                 >
                   Mark publication ready

@@ -59,7 +59,7 @@ export function registerFromComposition(
       disclosureCode: String(n.disclosureCode || '').toUpperCase(),
       noteNumber: n.noteNumber as number,
       title: n.title,
-      heading: n.heading || `Note ${n.noteNumber}. ${n.title}`,
+      heading: n.heading || `${n.noteNumber}. ${n.title}`,
     }));
   const byId = new Map(notes.map((n) => [n.id, n]));
   const byCode = new Map<string, RegisteredNote>();

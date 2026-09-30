@@ -59,8 +59,12 @@ function computeOrderingFactor(
   if (decision?.shouldExpand) profileWeight -= 20;
   if (decision?.shouldSuppress) profileWeight += 500;
 
+  // The framework's presentation sequence is the order a published set reads
+  // in — balance sheet notes, then income notes, then narrative. Materiality
+  // and profile weights break ties and demote suppressed notes; they never
+  // pull a note out of its section of the document.
   const finalOrder =
-    frameworkOrder + materialityWeight + profileWeight + Math.floor(faceStatementRef / 10);
+    frameworkOrder * 100 + materialityWeight + profileWeight + Math.floor(faceStatementRef / 10);
 
   return {
     code,

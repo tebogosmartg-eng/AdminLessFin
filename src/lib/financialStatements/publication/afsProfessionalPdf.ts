@@ -51,6 +51,10 @@ const LINE_LABEL_OVERRIDES = {
   "Opening equity": "Opening equity",
   "Closing equity": "Closing equity",
   "Net change in cash": "Net increase / (decrease) in cash and cash equivalents",
+  // The statement of cash flows reads as a published set writes it.
+  "Operating activities": "Cash flows from operating activities",
+  "Investing activities": "Cash flows from investing activities",
+  "Financing activities": "Cash flows from financing activities",
 };
 
 import { formatReportingEndDate } from "./reportingPeriodFormatter";
@@ -106,7 +110,7 @@ export function humanFrameworkLabel(
 export function professionalStatementTitle(statementType, fallback) {
   const map = {
     financial_position: "Statement of Financial Position",
-    financial_performance: "Statement of Profit or Loss and Other Comprehensive Income",
+    financial_performance: "Statement of Comprehensive Income",
     cash_flows: "Statement of Cash Flows",
     changes_in_equity: "Statement of Changes in Equity",
   };
@@ -558,9 +562,9 @@ export function validateProfessionalLayout(pdfText) {
   const lower = t.toLowerCase();
   const checks = {
     hasCoverEntity: /annual financial statements/i.test(t),
-    hasContents: /\bcontents\b/i.test(t),
+    hasContents: /\b(index|contents)\b/i.test(t),
     hasSfpTitle: /statement of financial position/i.test(t),
-    hasPlTitle: /statement of profit or loss/i.test(t),
+    hasPlTitle: /statement of (comprehensive income|profit or loss)/i.test(t),
     hasEquityTitle: /statement of changes in equity/i.test(t),
     hasCfTitle: /statement of cash flows/i.test(t),
     hasNumberedNotes: /note\s+1\s*[.]\s*basis of preparation/i.test(t),

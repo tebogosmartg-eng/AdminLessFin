@@ -34,7 +34,7 @@ export type LineItem = {
   printed: boolean;
 };
 
-type TableBlock = { type: 'table'; title: string; rows: string[][] };
+type TableBlock = { type: 'table'; title: string; rows: string[][]; kinds?: string[] };
 type Block = { type: 'paragraph'; text: string; bold?: boolean } | TableBlock;
 
 function slug(text: string): string {
@@ -80,9 +80,11 @@ export function applyLineChoices<B extends Block>(
       continue;
     }
     const [header, ...body] = block.rows;
+    const bodyKinds = block.kinds && block.kinds.length === block.rows.length ? block.kinds.slice(1) : null;
     const seen = new Map<string, number>();
     const kept: string[][] = [];
-    for (const row of body) {
+    const keptKinds: string[] = [];
+    for (const [index, row] of body.entries()) {
       const label = String(row[0] ?? '').trim();
       const n = seen.get(label) ?? 0;
       seen.set(label, n + 1);
@@ -100,11 +102,32 @@ export function applyLineChoices<B extends Block>(
         choice,
         printed,
       });
-      if (printed) kept.push(row);
+      if (printed) {
+        kept.push(row);
+        if (bodyKinds) keptKinds.push(bodyKinds[index]);
+      }
     }
-    // A table with nothing left to print is not printed, heading and all.
-    if (kept.length === 0 && body.length > 0) continue;
-    out.push({ ...block, rows: header ? [header, ...kept] : kept });
+    // A table with nothing left to print is not printed, heading and all —
+    // and a table that never had a body row is a bare header, not a table.
+    if (kept.length === 0) continue;
+    // A caption left with nothing under it — the next row is another caption,
+    // or there is none — says nothing: it goes with its lines.
+    let rowsOut = kept;
+    let kindsOut: string[] | undefined = bodyKinds ? keptKinds : undefined;
+    if (kindsOut) {
+      const keep = kindsOut.map((k, i) => {
+        if (k !== 'header') return true;
+        const next = kindsOut![i + 1];
+        return next != null && next !== 'header';
+      });
+      rowsOut = kept.filter((_, i) => keep[i]);
+      kindsOut = kindsOut.filter((_, i) => keep[i]);
+    }
+    out.push({
+      ...block,
+      rows: header ? [header, ...rowsOut] : rowsOut,
+      ...(kindsOut ? { kinds: header ? [block.kinds![0], ...kindsOut] : kindsOut } : {}),
+    });
   }
   return { blocks: out, items };
 }

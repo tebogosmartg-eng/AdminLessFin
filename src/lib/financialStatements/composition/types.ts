@@ -153,6 +153,8 @@ export type DisclosureLibraryComponent = {
   bold?: boolean;
   title: string | null;
   rows: string[][] | null;
+  /** Row kinds, index for index with `rows` (row 0 is the column header). */
+  kinds?: string[] | null;
   items: string[] | null;
   targetNoteNumber: number | null;
   frameworkSection: string | null;
@@ -299,6 +301,8 @@ export type CompositionTable = {
   kind: 'table';
   title: string;
   rows: string[][];
+  /** Row kinds, index for index with `rows` (row 0 is the column header). */
+  kinds?: string[];
   componentKind: DisclosureComponentKind;
 };
 
@@ -322,6 +326,8 @@ export type CompositionPolicy = {
   source: 'engagement' | 'framework';
   /** Policies appear once — never duplicated into disclosure notes. */
   uniqueKey: string;
+  table?: string[][];
+  bodyAfter?: string;
 };
 
 export type CompositionDisclosureNote = {
@@ -421,6 +427,8 @@ export type CompositionDocument = {
   numberedNotes: CompositionDisclosureNote[];
   /** V16.0 — Structured enterprise disclosure objects (metadata-driven). */
   enterpriseDisclosures: EnterpriseDisclosureObject[];
+  /** Supplementary schedules (Detailed Income Statement), behind their disclaimer. */
+  supplementarySchedules?: Array<{ id: string; title: string; rows: string[][]; kinds?: string[] }>;
   /** Deduplicated accounting policies (Phase 3). */
   accountingPolicies: CompositionPolicy[];
   /** Statement → disclosure automatic links. */

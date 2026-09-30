@@ -23,10 +23,20 @@ import {
   assembleFrameworkDocument,
   type OptionalDisclosureStatus,
 } from '../framework/frameworkContentEngine';
-import { inferDisclosureConditions } from '../framework/frameworkContent';
+import {
+  getFrameworkDefinition,
+  inferDisclosureConditions,
+  normaliseFrameworkKey,
+} from '../framework/frameworkContent';
+import { composeCompanyPolicies } from '../framework/companyPolicies';
 import type { ManualField } from '../framework/trialBalanceDisclosureMapping';
 import { applyGeneratedDisclosures } from '../disclosures/assemble';
 import type { FinancialFacts } from '../disclosures/accountIndex';
+import type { EntityParticulars } from '../disclosures/definitions';
+import {
+  buildDetailedIncomeStatement,
+  type SupplementarySchedule,
+} from '../publication/detailedIncomeStatement';
 import { reportingYears } from '../publication/statementPresentation';
 
 export type { DocSignatureNode } from './signatureModel';
@@ -62,6 +72,10 @@ export type DocPolicyNode = {
   status?: string;
   /** Provenance: 'engagement' (server, editable) or 'framework' (generated). */
   source?: 'engagement' | 'framework';
+  /** A table the policy states (depreciation methods and useful lives). */
+  table?: string[][];
+  /** Wording that follows the table. */
+  bodyAfter?: string;
 };
 
 export type DocPolicySetNode = {
@@ -164,6 +178,8 @@ export type DocumentModel = {
   generatedDisclosures?: string[];
   /** Why each generated disclosure was included. */
   disclosureReasons?: Record<string, string>;
+  /** The supplementary Detailed Income Statement, built from the sealed facts. */
+  detailedIncomeStatement?: SupplementarySchedule | null;
 };
 
 /** Lightweight mirror of disclosure-platform cross-reference rows (read-only). */
@@ -179,7 +195,7 @@ const STATEMENT_SKELETON: Array<{ statement_type: string; title: string }> = [
   { statement_type: 'financial_position', title: 'Statement of Financial Position' },
   {
     statement_type: 'financial_performance',
-    title: 'Statement of Profit or Loss and Other Comprehensive Income',
+    title: 'Statement of Comprehensive Income',
   },
   { statement_type: 'changes_in_equity', title: 'Statement of Changes in Equity' },
   { statement_type: 'cash_flows', title: 'Statement of Cash Flows' },
@@ -455,14 +471,40 @@ export async function loadDocumentModel(params: {
   // Note tables head their figure columns exactly as the statements do:
   // the current year, then the comparative.
   const years = reportingYears({ end_date: dashboard.reportingPeriod?.end_date, label: periodLabel });
+  const entityInfo = generalInfo as
+    | (EfsWorkspaceGeneralInformation & {
+        country_of_incorporation?: string | null;
+        entity_type?: string | null;
+      })
+    | null;
   const generated = applyGeneratedDisclosures(assembled.notes, {
     facts: factsRes,
     currentLabel: years.current,
     priorLabel: years.comparative,
+    entity: entityInfo
+      ? {
+          registeredName: entityInfo.registered_name ?? companyName ?? null,
+          countryOfIncorporation: entityInfo.country_of_incorporation ?? null,
+          registeredOffice: entityInfo.registered_office ?? null,
+          natureOfBusiness: entityInfo.nature_of_business ?? null,
+          entityType: entityInfo.entity_type ?? null,
+          shares: (entityInfo.share_information as EntityParticulars['shares']) ?? null,
+        }
+      : null,
   });
 
   const notes = generated.notes;
-  const policySets = assembled.policySets;
+  // The policies the company applies, stated from its own facts; a policy
+  // the preparer rewrote is kept as they wrote it.
+  const frameworkPolicyText = new Map(
+    getFrameworkDefinition(normaliseFrameworkKey(frameworkKey)).policies.map((p) => [
+      String(p.code).toUpperCase(),
+      p.body,
+    ]),
+  );
+  const policySets = assembled.policySets.map((set) =>
+    composeCompanyPolicies(set, factsRes, frameworkPolicyText),
+  );
   const crossReferences: DocCrossReference[] = (disclosureDashRes?.cross_references || []).map(
     (x) => ({
       id: x.id,
@@ -512,6 +554,7 @@ export async function loadDocumentModel(params: {
     ),
     generatedDisclosures: generated.generatedCodes,
     disclosureReasons: generated.reasons,
+    detailedIncomeStatement: buildDetailedIncomeStatement(factsRes, years),
   };
 }
 

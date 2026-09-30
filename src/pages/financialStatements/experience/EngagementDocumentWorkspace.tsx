@@ -22,6 +22,7 @@ export type DocSelection =
   | { kind: 'cover'; id: string }
   | { kind: 'information'; id: string }
   | { kind: 'contents'; id: string }
+  | { kind: 'front'; id: string }
   | { kind: 'statement'; id: string }
   | { kind: 'policySet'; id: string }
   | { kind: 'policy'; id: string }
@@ -135,6 +136,7 @@ export default function WorkspaceDocumentWorkspace({
             onToggleHidden={overridesApi.toggleHidden}
             onAddDisclosure={() => setAddDisclosureOpen(true)}
             register={register}
+            frontMatter={prepared?.view?.frontMatter ?? null}
           />
         </div>
 

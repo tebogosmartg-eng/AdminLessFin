@@ -76,6 +76,27 @@ function stringifyCell(value: unknown): string {
  * `{ cells: [...] }` rows the engine produces now. Missing that last one is how
  * a note came out populated in the editor and blank in the PDF.
  */
+const MANUAL_PLACEHOLDER = '[ — ]';
+
+/**
+ * The kind of each row `tableToCompositionRows` returns, index for index:
+ * 'columns' for the column header, then the stored row kind ('header',
+ * 'subtotal', 'total', 'spacer') or 'data'. Renderers rule and embolden from
+ * this rather than guessing from a label.
+ */
+export function tableRowKinds(columns: unknown[], rows: unknown[]): string[] {
+  const out: string[] = [];
+  if (Array.isArray(columns) && columns.length) out.push('columns');
+  for (const row of rows || []) {
+    const kind =
+      row && typeof row === 'object' && !Array.isArray(row)
+        ? String((row as Record<string, unknown>).kind ?? '')
+        : '';
+    out.push(kind || 'data');
+  }
+  return out;
+}
+
 export function tableToCompositionRows(columns: unknown[], rows: unknown[]): string[][] {
   const out: string[][] = [];
   if (Array.isArray(columns) && columns.length) {
@@ -84,11 +105,34 @@ export function tableToCompositionRows(columns: unknown[], rows: unknown[]): str
   for (const row of rows || []) {
     if (row && typeof row === 'object' && !Array.isArray(row) && Array.isArray((row as Record<string, unknown>).cells)) {
       const cells = (row as Record<string, unknown>).cells as unknown[];
+      const kind = String((row as Record<string, unknown>).kind ?? '');
+      // A row with a merged cell is a caption the preparer laid out, not a
+      // line of figures waiting for input.
+      const merged = cells.some((c) => Number((c as Record<string, unknown> | null)?.colSpan ?? 1) > 1);
+      // A row the preparer added themselves prints as they wrote it; only a
+      // line the engine laid out for a figure is waiting for one.
+      const rowKey = String((row as Record<string, unknown>).key ?? '');
+      const authored = /^(added|copy|pasted)-/.test(rowKey);
+      const figureRow = kind !== 'header' && kind !== 'spacer' && !merged && !authored;
       // A cell swallowed by a merge prints as a blank, keeping the columns lined up.
       out.push(
-        cells.map((c) => {
+        cells.map((c, i) => {
           const obj = c as Record<string, unknown> | null;
-          return obj && typeof obj === 'object' && obj.colSpan === 0 ? '' : stringifyCell(c);
+          if (obj && typeof obj === 'object' && obj.colSpan === 0) return '';
+          // A figure the preparer has still to supply is a placeholder, not a
+          // blank: the line is held back from print until it is filled in or
+          // switched on, rather than printing as an empty row.
+          if (
+            figureRow &&
+            i > 0 &&
+            obj &&
+            typeof obj === 'object' &&
+            obj.origin === 'manual' &&
+            (obj.value == null || String(obj.value).trim() === '')
+          ) {
+            return MANUAL_PLACEHOLDER;
+          }
+          return stringifyCell(c);
         }),
       );
     } else if (Array.isArray(row)) {
@@ -121,6 +165,7 @@ export function buildLibraryComponent(
     bold?: boolean;
     title?: string;
     rows?: string[][];
+    kinds?: string[];
     items?: string[];
     targetNoteNumber?: number | null;
     frameworkSection?: string;
@@ -135,6 +180,7 @@ export function buildLibraryComponent(
     bold: content.bold,
     title: content.title ?? null,
     rows: content.rows ?? null,
+    kinds: content.kinds ?? null,
     items: content.items ?? null,
     targetNoteNumber: content.targetNoteNumber ?? null,
     frameworkSection: content.frameworkSection ?? null,
@@ -186,11 +232,13 @@ export function buildDisclosureLibraryComponents(note: DocNoteNode): DisclosureL
 
   for (const table of note.tables || []) {
     const rows = tableToCompositionRows(table.columns_json, table.rows_json);
+    const kinds = tableRowKinds(table.columns_json, table.rows_json);
     const libKind = inferLibraryKind(null, null, table);
     components.push(
       buildLibraryComponent(table.id, libKind, {
         title: table.title,
         rows,
+        kinds: kinds.length === rows.length ? kinds : undefined,
       }),
     );
   }
@@ -258,6 +306,7 @@ export function libraryToCompositionComponents(
         kind: 'table',
         title: lib.title || '',
         rows: lib.rows,
+        kinds: lib.kinds ?? undefined,
         componentKind: tableKind,
       };
       tables.push(compTable);

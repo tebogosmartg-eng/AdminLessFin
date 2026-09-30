@@ -143,14 +143,18 @@ describe('V16.1 — Validation', () => {
 });
 
 describe('V16.1 — Presentation Model', () => {
-  it('builds professional presentation with grouped sections', () => {
+  it('builds the general information page as one flat label/value list', () => {
     const model = buildRegressionScenarioModel('service_entity');
     const corp = provideCorporateInformation(model);
     const presentation = buildCorporateInformationPresentation(corp);
     expect(presentation.version).toBe('16.1');
-    expect(presentation.sections.length).toBeGreaterThan(3);
+    expect(presentation.title).toBe('General Information');
+    // No group headers: the page reads as a published set's first page.
+    expect(presentation.rows.some((r) => r.kind === 'group_header')).toBe(false);
     expect(presentation.rows.some((r) => r.kind === 'person_list')).toBe(true);
     expect(presentation.rows.some((r) => r.kind === 'address_block' || r.kind === 'single')).toBe(true);
+    // Engagement workflow metadata stays out of the published page.
+    expect(presentation.rows.some((r) => 'label' in r && r.label === 'Reviewed by')).toBe(false);
   });
 
   it('renders directors as person_list not comma-separated', () => {
@@ -196,7 +200,7 @@ describe('V16.1 — Publication Contract', () => {
     const view = prepareCanonicalDocumentView(model, overrides);
     const publishPkg = buildCanonicalPublishPackage(model, overrides);
     const docxText = extractDocxPlainText(publishPkg.docxBytes);
-    expect(docxText).toContain('Corporate Information');
+    expect(docxText).toContain('General Information');
     expect(docxText).toContain(model.entity?.registered_name?.split(' ')[0] || '');
     expect(view.corporateInformation.principalBankers.length).toBeGreaterThan(0);
   });

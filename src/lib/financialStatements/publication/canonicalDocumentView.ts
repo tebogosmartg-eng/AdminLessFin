@@ -39,14 +39,26 @@ import { corporateDisplayFromModel } from '../corporateInformation/accessors';
 import type { CorporateInformationModel } from '../corporateInformation';
 import { produceReportingPackage, type ReportingIntelligenceOptions } from '../reportingIntelligence/orchestrator';
 import type { ReportingPackage } from '../reportingIntelligence/types';
+import {
+  approvalIntro,
+  auditorsReportParagraphs,
+  directorsReportParagraphs,
+  directorsResponsibilitiesParagraphs,
+} from './statutoryFrontMatter';
 import { enterpriseDisclosureToBlocks } from '../composition/enterpriseDisclosure';
-import { tableToCompositionRows } from '../composition/disclosureComponents';
+import { tableRowKinds, tableToCompositionRows } from '../composition/disclosureComponents';
 import { presentTableRows, reportingYears } from './statementPresentation';
 import { applyLineChoices, type LineItem } from './lineItems';
 
 export type CanonicalTextBlock =
   | { type: 'paragraph'; text: string; bold?: boolean }
-  | { type: 'table'; title: string; rows: string[][] };
+  | {
+      type: 'table';
+      title: string;
+      rows: string[][];
+      /** Row kinds, index for index with `rows` (row 0 is the column header). */
+      kinds?: string[];
+    };
 
 export type CanonicalStatement = {
   id: string;
@@ -85,6 +97,35 @@ export type CanonicalPolicy = {
   title: string;
   body: string;
   policyCode: string;
+  /** A table the policy states, header row first. */
+  table?: string[][];
+  /** Wording that follows the table. */
+  bodyAfter?: string;
+};
+
+/** One block of a narrative section: an optional run-in heading and its text. */
+export type CanonicalNarrativeBlock = { heading?: string; body: string };
+
+/**
+ * A narrative front-matter section as it will print. The wording is the
+ * practice's own where the preparer has written it, and the generated
+ * statutory text otherwise — resolved HERE once, for every renderer and
+ * for the editor alike.
+ */
+export type CanonicalFrontMatterSection = {
+  /** Composition section id — also the key authored wording is stored under. */
+  id: string;
+  title: string;
+  blocks: CanonicalNarrativeBlock[];
+  /** True when the preparer's wording replaced the generated text. */
+  authored: boolean;
+};
+
+export type CanonicalFrontMatter = {
+  responsibilities: CanonicalFrontMatterSection;
+  directorsReport: CanonicalFrontMatterSection;
+  practitionerReport: CanonicalFrontMatterSection;
+  approval: CanonicalFrontMatterSection;
 };
 
 export type CanonicalDocumentView = {
@@ -127,6 +168,13 @@ export type CanonicalDocumentView = {
    * Single object consumed by all renderers — renderers never query repositories.
    */
   corporateInformation: CorporateInformationModel;
+  /**
+   * The narrative front matter as it will print: the directors'
+   * responsibilities statement, the directors' report, the practitioner's
+   * report and the approval wording — authored text where the preparer has
+   * written it, generated statutory wording otherwise.
+   */
+  frontMatter: CanonicalFrontMatter;
 };
 
 export type CanonicalPresentationMeta = {
@@ -184,7 +232,15 @@ function buildNoteBlocks(
     const rows = tableToRows(table.columns_json, table.rows_json).map((row) =>
       row.map((cell) => rewrite(cell)),
     );
-    if (rows.length) blocks.push({ type: 'table', title: rewrite(table.title), rows });
+    const kinds = tableRowKinds(table.columns_json, table.rows_json);
+    if (rows.length) {
+      blocks.push({
+        type: 'table',
+        title: rewrite(table.title),
+        rows,
+        kinds: kinds.length === rows.length ? kinds : undefined,
+      });
+    }
   }
 
   // V15.0: Accounting policies are composed in Phase 3 — never embedded into notes.
@@ -210,6 +266,8 @@ function mapPolicies(policies: CompositionPolicy[], frameworkLabel: string): Can
     id: p.id,
     title: p.title,
     policyCode: p.policyCode,
+    table: p.table,
+    bodyAfter: p.bodyAfter,
     body:
       p.body.trim() ||
       `The ${p.title.toLowerCase()} policy is applied in accordance with ${frameworkLabel}.`,
@@ -352,13 +410,14 @@ export function prepareCanonicalDocumentView(
               type: 'table' as const,
               title: b.title,
               rows: b.rows.map((row) => row.map((cell) => rewrite(cell))),
+              kinds: b.kinds && b.kinds.length === b.rows.length ? b.kinds : undefined,
             },
       );
       return {
         id: n.id,
         noteNumber: n.noteNumber!,
         title: n.title,
-        heading: n.heading || `Note ${n.noteNumber}. ${n.title}`,
+        heading: n.heading || `${n.noteNumber}. ${n.title}`,
         blocks: (blocks.length ? blocks : buildNoteBlocks(
           model.notes.find((m) => m.id === n.id) || {
             id: n.id,
@@ -395,7 +454,7 @@ export function prepareCanonicalDocumentView(
       id: n.id,
       noteNumber: n.noteNumber!,
       title: n.title,
-      heading: n.heading || `Note ${n.noteNumber}. ${n.title}`,
+      heading: n.heading || `${n.noteNumber}. ${n.title}`,
       blocks: buildNoteBlocks(source || emptyNote, overrides, frameworkLabel, rewrite).map(present),
     };
   });
@@ -485,7 +544,7 @@ export function prepareCanonicalDocumentView(
     businessAddress: businessAddress?.value ?? null,
   };
 
-  return {
+  const viewSansFront = {
     companyName,
     frameworkLabel,
     periodCaption,
@@ -503,5 +562,74 @@ export function prepareCanonicalDocumentView(
     composition,
     reportingPackage,
     corporateInformation,
+  };
+  return {
+    ...viewSansFront,
+    frontMatter: resolveFrontMatter(viewSansFront as CanonicalDocumentView, overrides),
+  };
+}
+
+/** The report title the level of assurance calls for. */
+export function practitionerReportTitle(assurance: string): string {
+  if (/review/i.test(assurance)) return "Independent Reviewer's Report";
+  if (/compil/i.test(assurance)) return "Practitioner's Compilation Report";
+  return "Independent Auditor's Report";
+}
+
+/** Authored wording where the preparer wrote it, the generated text otherwise. */
+function resolveFrontSection(
+  overrides: DocOverrides,
+  id: string,
+  defaultTitle: string,
+  generated: CanonicalNarrativeBlock[],
+): CanonicalFrontMatterSection {
+  const authored = overrides.narratives?.[id];
+  const authoredBlocks = Array.isArray(authored)
+    ? authored
+        .map((b) => ({
+          heading: String(b?.heading ?? '').trim() || undefined,
+          body: String(b?.body ?? '').trim(),
+        }))
+        .filter((b) => b.body || b.heading)
+    : [];
+  const blocks = authoredBlocks.length ? authoredBlocks : generated;
+  return {
+    id,
+    title: resolvedTitle(overrides, id, defaultTitle),
+    blocks,
+    authored: authoredBlocks.length > 0,
+  };
+}
+
+function resolveFrontMatter(
+  view: CanonicalDocumentView,
+  overrides: DocOverrides,
+): CanonicalFrontMatter {
+  const assurance = view.corporateInformation.levelOfAssurance.formatted || '';
+  return {
+    responsibilities: resolveFrontSection(
+      overrides,
+      'front:directors_responsibilities',
+      "Directors' Responsibilities and Approval",
+      directorsResponsibilitiesParagraphs(view).map((body) => ({ body })),
+    ),
+    directorsReport: resolveFrontSection(
+      overrides,
+      'front:directors_report',
+      "Directors' Report",
+      directorsReportParagraphs(view),
+    ),
+    practitionerReport: resolveFrontSection(
+      overrides,
+      'front:independent_auditor',
+      practitionerReportTitle(assurance),
+      auditorsReportParagraphs(view).map((body) => ({ body })),
+    ),
+    approval: resolveFrontSection(
+      overrides,
+      'front:approval',
+      'Approval of Annual Financial Statements',
+      [{ body: approvalIntro(view) }],
+    ),
   };
 }

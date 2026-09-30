@@ -193,6 +193,11 @@ export function adaptFinancialFacts(factRow, snapshotVersionId) {
   if (ds.prior_canonical_aggregation) {
     (facts as any).prior_canonical_aggregation = Object.freeze({ ...ds.prior_canonical_aggregation });
   }
+  // Gross debits/credits per account and the fixed asset register, where the
+  // seal carries them (snapshots sealed before they were captured do not).
+  if (Array.isArray(ds.gross_movements)) (facts as any).gross_movements = ds.gross_movements;
+  if (Array.isArray(ds.prior_gross_movements)) (facts as any).prior_gross_movements = ds.prior_gross_movements;
+  if (Array.isArray(ds.fixed_asset_register)) (facts as any).fixed_asset_register = ds.fixed_asset_register;
   Object.freeze(facts);
 
   return facts;

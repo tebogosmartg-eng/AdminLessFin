@@ -1,6 +1,6 @@
 # V15.0 Composition Engine Evidence
 
-Generated: 2026-09-28T13:06:21.830Z
+Generated: 2026-09-30T06:31:10.925Z
 Decision: READY FOR CERTIFICATION
 Entity: AdminLess Composition Demo (Pty) Ltd
 
@@ -12,7 +12,7 @@ Entity: AdminLess Composition Demo (Pty) Ltd
 - Phase `supplementary`: Supplementary Information (3 sections)
 - Phase `approval`: Approval (1 sections)
 
-## Accounting policies: 22 (Phase 3, not numbered notes)
+## Accounting policies: 12 (Phase 3, not numbered notes)
 ## Disclosure notes: 16 (auto-numbered, no gaps)
 
 ## Note numbering
@@ -53,7 +53,7 @@ Entity: AdminLess Composition Demo (Pty) Ltd
 - pdfGenerated: PASS
 - docxGenerated: PASS
 
-PDF: 81963 bytes
-DOCX: 102664 bytes
+PDF: 51641 bytes
+DOCX: 72321 bytes
 
 Artifacts: `AFS_V15_Composition_Demo.pdf`, `AFS_V15_Composition_Demo.docx`

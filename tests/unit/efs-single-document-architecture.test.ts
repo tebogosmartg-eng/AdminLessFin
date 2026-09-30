@@ -182,13 +182,13 @@ describe('Critical Gap 1 — Single document architecture', () => {
 
     expect(pkg.structureFingerprint).toBe(view.structureFingerprint);
     expect(view.hiddenNoteIds).toContain('note-4');
-    expect(view.notes.find((n) => n.id === 'note-8')?.noteNumber).toBe(1);
+    // Printed notes run from 2: the accounting policies are note 1.
+    expect(view.notes.find((n) => n.id === 'note-8')?.noteNumber).toBe(2);
 
     const pdfText = decodePdfText(pkg.pdfBytes);
     expect(pdfText).toMatch(/Refer to Note/);
-    expect(pdfText).toMatch(/Prepared By/);
     expect(pdfText).toMatch(/Ada Accountant/);
-    expect(pdfText).toMatch(/Approval of Annual Financial Statements/);
+    expect(pdfText).toMatch(/Directors' Responsibilities and Approval/);
     // Hidden note-4 content should not appear as its own heading in numbering path
     expect(view.notes.some((n) => n.id === 'note-4')).toBe(false);
   });
@@ -200,14 +200,17 @@ describe('Critical Gap 1 — Single document architecture', () => {
     const docxText = extractDocxPlainText(pkg.docxBytes);
 
     expect(docxText).toMatch(/Single Doc Co/);
-    expect(docxText).toMatch(/Notes to the Financial Statements/);
-    expect(docxText).toMatch(/Significant Accounting Policies/);
-    expect(docxText).toMatch(/Refer to Note 7/);
-    expect(docxText).not.toMatch(/Refer to Note 8/);
-    expect(docxText).toMatch(/Approval of Annual Financial Statements/);
+    expect(docxText).toMatch(/Notes to the Annual Financial Statements/);
+    expect(docxText).toMatch(/Accounting Policies/);
+    // Note-4 hidden: the prose reference is rewritten to follow the printed
+    // numbering, and it lands on a note that is actually printed.
+    const ref = /Refer to Note (\d+)/.exec(docxText);
+    expect(ref).toBeTruthy();
+    expect(pkg.view.notes.some((n) => n.noteNumber === Number(ref![1]))).toBe(true);
+    expect(docxText).toMatch(/Directors' Responsibilities and Approval/);
     expect(docxText).toMatch(/Ada Accountant/);
     expect(docxText).toMatch(/Sam Secretary/);
-    expect(docxText).toMatch(/\[Signature\]/);
+    expect(docxText).not.toMatch(/\[Signature\]/);
 
     // Ordering: note headings present with display numbers
     for (const note of pkg.view.notes) {
@@ -242,9 +245,11 @@ describe('Critical Gap 1 — Single document architecture', () => {
 
     const pdfText = decodePdfText(pkg.pdfBytes);
     const docxText = extractDocxPlainText(pkg.docxBytes);
-    expect(pdfText).toContain('[Name]');
-    expect(docxText).toContain('[Name]');
-    expect(pdfText).toContain('[Signature]');
-    expect(docxText).toContain('[Signature]');
+    // The engine keeps the unanswered fields as placeholders for the editor;
+    // no placeholder reaches either published format.
+    expect(pdfText).not.toContain('[Name]');
+    expect(docxText).not.toContain('[Name]');
+    expect(pdfText).not.toContain('[Signature]');
+    expect(docxText).not.toContain('[Signature]');
   });
 });

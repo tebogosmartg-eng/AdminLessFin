@@ -42,6 +42,7 @@ tests/e2e/evidence/staging-recovery/age-analysis/*.csv
 # Certification probes, lint dumps, and scratch output
 tmp/
 test-results/
+test-evidence/
 playwright-report/
 certification-output.json
 lint-src.json

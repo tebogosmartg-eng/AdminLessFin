@@ -293,7 +293,7 @@ describe('Phase A — Note numbering baseline', () => {
     expect(hiddenIds).toContain('note-old');
     expect(visible.map((v) => v.note.id)).not.toContain('note-old');
     expect(visible[0].noteNumber).toBe(1);
-    expect(visible[0].heading).toMatch(/^Note 1\. /);
+    expect(visible[0].heading).toMatch(/^1\. /);
     expect(visible.every((v, idx) => v.noteNumber === idx + 1)).toBe(true);
   });
 
@@ -307,7 +307,7 @@ describe('Phase A — Note numbering baseline', () => {
     // V15.0: DISC.POLICIES is a policy vessel — excluded from note numbering (Phase 3).
     expect(visible.map((v) => v.note.disclosure_code)).toEqual(['DISC.REVENUE']);
     expect(visible[0].noteNumber).toBe(1);
-    expect(visible[0].heading).toBe('Note 1. Revenue');
+    expect(visible[0].heading).toBe('1. Revenue');
   });
 
   it('excludes accounting policy vessels from note numbering (V15.0)', () => {
@@ -323,7 +323,7 @@ describe('Phase A — Note numbering baseline', () => {
     };
     const { visible } = computeNoteNumbering(baselineModel().notes, overrides);
     expect(visible[0].title).toBe('Basis of Accounting');
-    expect(visible[0].heading).toBe('Note 1. Basis of Accounting');
+    expect(visible[0].heading).toBe('1. Basis of Accounting');
   });
 
   it('honours custom order overrides over default rank', () => {
@@ -429,13 +429,11 @@ describe('Phase A — Workspace PDF + Preview≡PDF consistency', () => {
     };
     const { previewBytes } = previewAndDownloadBytes(baselineModel(), overrides);
     const text = decodePdfText(previewBytes);
-    expect(text).toMatch(/Note 1\./);
     expect(text).toMatch(/Basis of preparation/);
     // Hidden disclosure note body must not appear as a numbered note.
-    expect(text).not.toMatch(/Note \d+\.\s*Revenue/i);
-    // V15.0: Accounting Policies remain as Phase 3 (not a numbered disclosure note).
-    expect(text).toMatch(/Significant Accounting Policies/i);
-    expect(text).not.toMatch(/Note \d+\.\s*Significant accounting policies/i);
+    expect(text).not.toMatch(/(^|\n)\d+\.\s*Revenue/i);
+    // Accounting Policies remain their own section, numbered 1 within it.
+    expect(text).toMatch(/Accounting Policies/i);
   });
 
   it('workspace PDF contains cover entity and primary statement titles', () => {
@@ -443,8 +441,9 @@ describe('Phase A — Workspace PDF + Preview≡PDF consistency', () => {
     const text = decodePdfText(previewBytes);
     expect(text).toMatch(/Baseline Entity/);
     expect(text).toMatch(/Statement of Financial Position/i);
-    expect(text).toMatch(/Contents/i);
-    expect(text).toMatch(/Note 1/);
+    expect(text).toMatch(/Index/i);
+    // The accounting policies open as note 1 of the published set.
+    expect(text).toMatch(/1\. Basis of preparation/);
   });
 
   it('workspace PDF layout checks pass for baseline content', () => {

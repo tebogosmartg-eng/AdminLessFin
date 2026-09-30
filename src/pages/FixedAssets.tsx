@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { format } from 'date-fns';
 import {
@@ -34,7 +34,8 @@ import { useAuth } from '../contexts/AuthContext';
 import { useReportingPeriod } from '../contexts/ReportingPeriodContext';
 import { assetRegisterFacetsQuery, assetRegisterQuery } from '../lib/queries';
 import { formatCurrency } from '../lib/utils';
-import { showSuccess } from '../utils/toast';
+import { showError, showSuccess } from '../utils/toast';
+import { supabase } from '../integrations/supabase/client';
 import { DEFAULT_REGISTER_PAGE_SIZE } from '../lib/assets/assetRegisterQuery';
 import {
   AssetRegisterFilters,
@@ -113,8 +114,10 @@ function exportAssetsCsv(rows: EnterpriseFixedAsset[], filename: string) {
 const FixedAssets = () => {
   useDocumentTitle('Asset Register');
   const navigate = useNavigate();
+  const qc = useQueryClient();
   const { activeCompany } = useAuth();
   const companyId = activeCompany?.id;
+  const [depreciationAsOf, setDepreciationAsOf] = useState(() => format(new Date(), 'yyyy-MM-dd'));
   const {
     yearCode,
     financialYearStart,
@@ -266,6 +269,33 @@ const FixedAssets = () => {
     setIsAssetFormOpen(true);
   };
 
+  const runDepreciation = useMutation({
+    mutationFn: async () => {
+      const { data, error } = await supabase.functions.invoke('fixed-assets', {
+        body: { method: 'RUN_DEPRECIATION', company_id: companyId, as_of: depreciationAsOf },
+      });
+      if (error) throw new Error(error.message);
+      return data as {
+        processed: Array<{ asset_code: string; amount: number }>;
+        skipped: Array<{ asset_code: string; reason: string }>;
+        total_amount: number;
+      };
+    },
+    onSuccess: (r) => {
+      if (r.processed.length) {
+        showSuccess(
+          `Depreciation posted for ${r.processed.length} asset${r.processed.length === 1 ? '' : 's'} — R${r.total_amount.toLocaleString()}`,
+        );
+      } else {
+        showSuccess('Nothing owing — every asset is depreciated to that date.');
+      }
+      qc.invalidateQueries({ queryKey: ['asset_register', companyId] });
+      qc.invalidateQueries({ queryKey: ['asset_register_facets', companyId] });
+      qc.invalidateQueries({ queryKey: ['fixed_assets', companyId] });
+    },
+    onError: (e: Error) => showError(e.message),
+  });
+
   const handleDispose = (asset: EnterpriseFixedAsset) => {
     setSelectedAsset(asset);
     setIsDisposalFormOpen(true);
@@ -277,9 +307,29 @@ const FixedAssets = () => {
     <div className="space-y-4">
       <Alert className="border-muted bg-muted/30">
         <Terminal className="h-4 w-4" />
-        <AlertTitle className="text-sm">Depreciation schedule</AlertTitle>
+        <AlertTitle className="text-sm">Depreciation</AlertTitle>
         <AlertDescription className="text-xs text-muted-foreground">
-          Automate monthly depreciation via a Supabase cron on the <code>run-depreciation</code> Edge Function.
+          <div className="flex flex-wrap items-center gap-2">
+            <span>
+              Post the straight-line charge for every active asset, through the posting engine, up to:
+            </span>
+            <Input
+              type="date"
+              className="h-8 w-40"
+              value={depreciationAsOf}
+              onChange={(e) => setDepreciationAsOf(e.target.value)}
+              data-testid="depreciation-as-of"
+            />
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={runDepreciation.isPending || !companyId}
+              onClick={() => runDepreciation.mutate()}
+              data-testid="run-depreciation"
+            >
+              {runDepreciation.isPending ? 'Posting…' : 'Run depreciation'}
+            </Button>
+          </div>
         </AlertDescription>
       </Alert>
 

@@ -10,10 +10,9 @@ import { CORPORATE_INFO_LABEL_WIDTH } from '../corporateInformationRender';
 export function renderCorporateInformationPresentationPdf(
   engine: LayoutEngine,
   presentation: CorporateInformationPresentation,
-  accent?: Rgb,
+  _accent?: Rgb,
 ): void {
-  engine.sectionTitleBlock(presentation.title, accent);
-
+  // The section title lives in the running header; the page opens with rows.
   for (const row of presentation.rows) {
     switch (row.kind) {
       case 'group_header':

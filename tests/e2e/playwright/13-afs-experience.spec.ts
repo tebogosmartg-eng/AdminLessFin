@@ -114,7 +114,7 @@ test('7-9: the user can open an actual statement and see figures from the ledger
 
   const text = await table.innerText();
   // Real classified lines, not five type-level buckets.
-  expect(text).toMatch(/Trade and Other Receivables/i);
+  expect(text).toMatch(/Trade and other receivables/i);
   expect(text).toMatch(/Total Assets/i);
   // Figures that came out of the accounting records.
   const fromLedger = (await edge('financial-statements', {
@@ -125,8 +125,8 @@ test('7-9: the user can open an actual statement and see figures from the ledger
   const sfp = fromLedger.statements.find((s) => s.statement_type === 'financial_position');
   const totalAssets = sfp?.lines.find((l) => l.line_code === 'sfp.total_assets')?.amount ?? 0;
   const shown = text.replace(/\s|\u00a0/g, '');
-  const formatted = Math.abs(totalAssets).toFixed(2).replace('.', ',');
-  expect(shown).toContain(formatted.replace(/\B(?=(\d{3})+(?!\d))/g, ''));
+  // The statements print whole Rands; the cents live on in the figures.
+  expect(shown).toContain(String(Math.round(Math.abs(totalAssets))));
 
   await page.screenshot({ path: 'tests/e2e/artifacts/after-3-statement.png', fullPage: true });
   await expectNoErrorBoundary(page);
@@ -402,7 +402,7 @@ test('12: the printed document previews as a real PDF', async ({ page }) => {
   expect(bytes.length).toBeGreaterThan(5_000);
   // The statements and the entity are actually in the file.
   expect(text).toContain('Statement of Financial Position');
-  expect(text).toContain('Trade and Other Receivables');
+  expect(text).toContain('Trade and other receivables');
   expect(text).toContain('Basis of preparation');
   // eslint-disable-next-line no-console
   console.log(`[evidence] PDF ${download.suggestedFilename()} — ${bytes.length} bytes`);

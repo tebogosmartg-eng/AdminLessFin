@@ -14,7 +14,7 @@ export const PAGE_H = 841.89;
 // Statutory margins (generous, print-safe).
 export const MARGIN_L = 58;
 export const MARGIN_R = 58;
-export const MARGIN_TOP = 96; // leaves room for the running header
+export const MARGIN_TOP = 112; // leaves room for the running header + section title
 export const MARGIN_BOTTOM = 68; // leaves room for the running footer
 export const CONTENT_L = MARGIN_L;
 export const CONTENT_R = PAGE_W - MARGIN_R;

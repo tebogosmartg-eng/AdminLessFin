@@ -166,7 +166,7 @@ export function toEnterpriseDisclosure(
   );
 
   const heading =
-    opts.noteNumber != null ? `Note ${opts.noteNumber}. ${opts.title}` : null;
+    opts.noteNumber != null ? `${opts.noteNumber}. ${opts.title}` : null;
 
   const partial: EnterpriseDisclosureObject = {
     id: note.id,
@@ -247,11 +247,11 @@ export function enterpriseDisclosureToBlocks(
   disclosure: EnterpriseDisclosureObject,
 ): Array<
   | { type: 'paragraph'; text: string; bold?: boolean; componentKind?: string }
-  | { type: 'table'; title: string; rows: string[][]; componentKind?: string }
+  | { type: 'table'; title: string; rows: string[][]; kinds?: string[]; componentKind?: string }
 > {
   const blocks: Array<
     | { type: 'paragraph'; text: string; bold?: boolean; componentKind?: string }
-    | { type: 'table'; title: string; rows: string[][]; componentKind?: string }
+    | { type: 'table'; title: string; rows: string[][]; kinds?: string[]; componentKind?: string }
   > = [];
 
   for (const section of disclosure.sections) {
@@ -263,6 +263,7 @@ export function enterpriseDisclosureToBlocks(
         type: 'table',
         title: t.title,
         rows: t.rows,
+        kinds: t.kinds,
         componentKind: t.componentKind,
       });
     }

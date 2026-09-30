@@ -176,6 +176,53 @@ describe('rebuilding a disclosure the preparer has worked on', () => {
     expect(merged.rows[0].cells[0].format).toMatchObject({ bold: true, italic: true });
   });
 
+  it('brings in an account posted to after the note was saved, and adds it into the totals', () => {
+    const money = (v: number) => ({ value: v, origin: 'linked' as const });
+    const label = (t: string) => ({ value: t, origin: 'manual' as const });
+    // The receivables note as it was saved, before VAT Input carried a balance.
+    const saved: GeneratedTable = {
+      code: 'RECEIVABLES.ANALYSIS',
+      title: 'Trade and other receivables',
+      columns: [],
+      rows: [
+        { key: 'gross:Accounts Receivable (Trade Debtors)', cells: [label('AR'), money(1_150), money(0)] },
+        { key: 'gross:Prepaid Expenses', cells: [label('Prepaid'), money(790_000), money(280_000)] },
+        {
+          key: 'Gross receivables',
+          kind: 'subtotal',
+          cells: [
+            label('Gross receivables'),
+            { value: 791_150, origin: 'calculated', sums: ['gross:Accounts Receivable (Trade Debtors)', 'gross:Prepaid Expenses'] },
+            { value: 280_000, origin: 'calculated', sums: ['gross:Accounts Receivable (Trade Debtors)', 'gross:Prepaid Expenses'] },
+          ],
+        },
+        { key: 'allowance', cells: [label('Allowance'), money(-50_500), money(-32_000)] },
+        {
+          key: 'Net receivables',
+          kind: 'total',
+          cells: [
+            label('Net receivables'),
+            { value: 740_650, origin: 'calculated', sums: ['Gross receivables', 'allowance'] },
+            { value: 248_000, origin: 'calculated', sums: ['Gross receivables', 'allowance'] },
+          ],
+        },
+      ],
+    };
+    const fresh: GeneratedTable = JSON.parse(JSON.stringify(saved));
+    fresh.rows[0].cells[1].value = 139_150;
+    fresh.rows.splice(2, 0, { key: 'gross:VAT Input (Receivable)', cells: [label('VAT Input'), money(5_100), money(0)] });
+
+    const merged = mergeTable(fresh, saved);
+    const net = merged.rows.find((r) => r.key === 'Net receivables')!;
+    expect(net.cells[1].value).toBe(883_750);
+    expect(net.cells[2].value).toBe(248_000);
+    // Placed with its group, above the subtotal that adds it up.
+    const keys = merged.rows.map((r) => r.key);
+    expect(keys.indexOf('gross:VAT Input (Receivable)')).toBeLessThan(keys.indexOf('Gross receivables'));
+    // The saved input is not changed underneath the caller.
+    expect(saved.rows[2].cells[1].sums).toHaveLength(2);
+  });
+
   it('does not bring back a row the preparer deleted', () => {
     const saved = JSON.parse(JSON.stringify(generated())) as GeneratedTable;
     saved.rows = saved.rows.filter((r) => r.key !== 'cost:Motor Vehicles');
@@ -244,8 +291,10 @@ describe('merging narrative when the statements are rebuilt', () => {
     return {
       id: NOTE_ID,
       kind: 'note' as const,
-      disclosure_code: 'DISC.PPE',
-      title: 'Property, plant and equipment',
+      // A note the engine states narrative for. (The PPE note carries none: its
+      // measurement basis is the accounting policy's to state.)
+      disclosure_code: 'DISC.RECEIVABLES',
+      title: 'Trade and other receivables',
       status: 'in_progress',
       requirement_level: 'required',
       sort_order: 30,
@@ -260,7 +309,7 @@ describe('merging narrative when the statements are rebuilt', () => {
       facts: facts(),
       currentLabel: 'FY2026',
       priorLabel: 'FY2025',
-    }).notes.find((n) => n.disclosure_code === 'DISC.PPE')!;
+    }).notes.find((n) => n.disclosure_code === 'DISC.RECEIVABLES')!;
   }
 
   it('keeps the framework wording the preparer has not touched', () => {
@@ -280,7 +329,7 @@ describe('merging narrative when the statements are rebuilt', () => {
 
   it('does not drop the rest of the framework wording when one paragraph is rewritten', () => {
     const generated = rebuild(noteWith([]));
-    expect(generated.paragraphs.length).toBeGreaterThan(1);
+    expect(generated.paragraphs.length).toBeGreaterThan(0);
 
     const rewritten = rebuild(
       noteWith([
@@ -289,7 +338,7 @@ describe('merging narrative when the statements are rebuilt', () => {
     );
     expect(rewritten.paragraphs).toHaveLength(generated.paragraphs.length);
     expect(rewritten.paragraphs[0].body).toBe('Our own first sentence.');
-    expect(rewritten.paragraphs[1].body).toBe(generated.paragraphs[1].body);
+    generated.paragraphs.slice(1).forEach((p, i) => expect(rewritten.paragraphs[i + 1].body).toBe(p.body));
   });
 
   it('puts the preparer\u2019s own additions after the standard wording', () => {

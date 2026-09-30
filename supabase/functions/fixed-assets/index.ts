@@ -1081,6 +1081,226 @@ serve(withEnterprisePlatform('fixed-assets', 'tenant', async (req, _ctx) => {
         break;
       }
 
+      // ── Register take-on and depreciation runs ──────────────────────────
+      case 'REGISTER_TAKE_ON': {
+        // Registers an asset whose cost is ALREADY carried in the general
+        // ledger (an adoption of the register, not a purchase) — no journal
+        // is posted. The take-on refuses to carry the register past what the
+        // ledger holds on the asset's cost account, so the register can never
+        // claim assets the books do not.
+        if (!isAdmin) throw new Error('Permission denied: admin required for a register take-on.');
+        const a = body.assetData || {};
+        if (!a.description || !a.purchase_date || !a.asset_account_id || !(Number(a.purchase_cost) > 0)) {
+          throw new Error('A take-on needs a description, purchase_date, purchase_cost and asset_account_id.');
+        }
+        const { data: account, error: accErr } = await supabaseAdmin
+          .from('chart_of_accounts')
+          .select('id, name')
+          .eq('id', a.asset_account_id)
+          .eq('company_id', company_id)
+          .single();
+        if (accErr || !account) throw new Error("Asset account not found in this company's chart.");
+
+        const { data: ledgerLines, error: llErr } = await supabaseAdmin
+          .from('journal_entry_items')
+          .select('type, amount, journal_entries!inner(company_id)')
+          .eq('account_id', a.asset_account_id)
+          .eq('journal_entries.company_id', company_id);
+        if (llErr) throw llErr;
+        const ledgerCost = (ledgerLines || []).reduce(
+          (sum, l) => sum + (l.type === 'debit' ? Number(l.amount) : -Number(l.amount)), 0);
+        const { data: registered, error: regErr } = await supabaseAdmin
+          .from('fixed_assets')
+          .select('purchase_cost')
+          .eq('company_id', company_id)
+          .eq('asset_account_id', a.asset_account_id)
+          .neq('status', 'disposed');
+        if (regErr) throw regErr;
+        const registeredCost = (registered || []).reduce((s, r) => s + Number(r.purchase_cost || 0), 0);
+        if (registeredCost + Number(a.purchase_cost) > ledgerCost + 0.005) {
+          throw new Error(
+            `Take-on refused: the register would carry ${registeredCost + Number(a.purchase_cost)} against ` +
+            `${account.name}, but the ledger carries ${ledgerCost}. Post the acquisition first.`);
+        }
+
+        let assetCode = (a.asset_code || '').trim();
+        if (!assetCode) {
+          const { data: allocated, error: allocErr } = await supabaseAdmin.rpc('allocate_asset_code', { p_company_id: company_id });
+          if (allocErr) throw allocErr;
+          assetCode = allocated;
+        }
+        const { data: takeOn, error: insErr } = await supabaseAdmin
+          .from('fixed_assets')
+          .insert({
+            company_id,
+            asset_code: assetCode,
+            description: a.description,
+            category_id: a.category_id || null,
+            purchase_date: a.purchase_date,
+            purchase_cost: a.purchase_cost,
+            asset_account_id: a.asset_account_id,
+            depreciation_method: a.depreciation_method ?? 'straight-line',
+            useful_life_years: a.useful_life_years ?? null,
+            residual_value: a.residual_value ?? 0,
+            accumulated_depreciation_account_id: a.accumulated_depreciation_account_id || null,
+            depreciation_expense_account_id: a.depreciation_expense_account_id || null,
+            accumulated_depreciation: 0,
+            last_depreciation_date: null,
+            status: 'active',
+            location: a.location || null,
+            department: a.department || null,
+            custodian_name: a.custodian_name || null,
+            serial_number: a.serial_number || null,
+            asset_tag: a.asset_tag || assetCode,
+            lifecycle_stage: 'in_service',
+          })
+          .select()
+          .single();
+        if (insErr) throw insErr;
+        await recordLifecycle(supabaseAdmin, {
+          company_id, asset_id: takeOn.id, event_type: 'created',
+          user_id: user.id, user_name: actorName,
+          reason: 'Register take-on — cost already carried in the general ledger; no journal posted',
+          reference: a.source_reference || null,
+          metadata: { take_on: true, ledger_cost: ledgerCost },
+        });
+        data = takeOn;
+        break;
+      }
+
+      case 'RUN_DEPRECIATION': {
+        // Company-scoped depreciation run to a stated date. Every charge is
+        // posted through posting_engine_submit under the fixed_assets module
+        // (the only module the depreciation accounts accept), one journal per
+        // asset, idempotent on (asset, as-of date). Supersedes the global
+        // run-depreciation cron for interactive use: that function crosses
+        // companies and writes journal rows directly, this one does neither.
+        if (!isAdmin) throw new Error('Permission denied: admin required to run depreciation.');
+        const asOf = String(body.as_of || '').slice(0, 10);
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(asOf)) throw new Error('RUN_DEPRECIATION needs as_of (YYYY-MM-DD).');
+        if (asOf > new Date().toISOString().slice(0, 10)) {
+          // A provisional charge to the end of the reporting period being
+          // closed is legitimate; depreciating beyond the open year is not.
+          const { data: openYear } = await supabaseAdmin
+            .from('financial_years')
+            .select('end_date')
+            .eq('company_id', company_id)
+            .in('status', ['open', 'draft'])
+            .order('end_date', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+          if (!openYear || asOf > openYear.end_date) {
+            throw new Error('Depreciation can only be posted up to the end of the open financial year.');
+          }
+        }
+
+        let assetQuery = supabaseAdmin
+          .from('fixed_assets')
+          .select('*')
+          .eq('company_id', company_id)
+          .eq('status', 'active')
+          .not('depreciation_method', 'is', null)
+          .not('useful_life_years', 'is', null)
+          .not('depreciation_expense_account_id', 'is', null)
+          .not('accumulated_depreciation_account_id', 'is', null);
+        if (Array.isArray(body.asset_ids) && body.asset_ids.length) {
+          assetQuery = assetQuery.in('id', body.asset_ids);
+        }
+        const { data: dueAssets, error: dueErr } = await assetQuery;
+        if (dueErr) throw dueErr;
+
+        const monthEnd = (y, mIdx) => new Date(Date.UTC(y, mIdx + 1, 0)).toISOString().slice(0, 10);
+        const processed = [];
+        const skipped = [];
+        for (const asset of dueAssets || []) {
+          if (asset.depreciation_method !== 'straight-line') {
+            skipped.push({ asset_code: asset.asset_code, reason: `method ${asset.depreciation_method} not supported` });
+            continue;
+          }
+          const monthly = straightLineMonthly(asset.purchase_cost, asset.residual_value, asset.useful_life_years);
+          if (monthly <= 0) { skipped.push({ asset_code: asset.asset_code, reason: 'nothing depreciable' }); continue; }
+
+          // Months owing: every calendar month whose end falls on or before
+          // as_of, starting with the purchase month on a first run, or the
+          // month after the last run otherwise.
+          const baseline = asset.last_depreciation_date || asset.purchase_date;
+          const base = new Date(baseline + 'T00:00:00Z');
+          let y = base.getUTCFullYear();
+          let m = base.getUTCMonth();
+          if (asset.last_depreciation_date) { m += 1; if (m > 11) { m = 0; y += 1; } }
+          let months = 0;
+          while (monthEnd(y, m) <= asOf) { months += 1; m += 1; if (m > 11) { m = 0; y += 1; } }
+          if (months <= 0) { skipped.push({ asset_code: asset.asset_code, reason: 'no month owing' }); continue; }
+
+          const depreciable = Number(asset.purchase_cost) - Number(asset.residual_value || 0);
+          const remaining = depreciable - Number(asset.accumulated_depreciation || 0);
+          const amount = Math.round(Math.min(monthly * months, Math.max(remaining, 0)) * 100) / 100;
+          if (amount <= 0) {
+            await supabaseAdmin.from('fixed_assets').update({ status: 'fully-depreciated' }).eq('id', asset.id).eq('company_id', company_id);
+            skipped.push({ asset_code: asset.asset_code, reason: 'fully depreciated' });
+            continue;
+          }
+
+          const { data: postingResult, error: postErr } = await supabaseAdmin.rpc('posting_engine_submit', {
+            p_request: {
+              company_id,
+              posting_date: asOf,
+              module: 'fixed_assets',
+              document_type: 'depreciation_run',
+              idempotency_key: `fixed_assets:depreciation:${asset.id}:${asOf}`,
+              description: `Depreciation on ${asset.description} (${asset.asset_code}) to ${asOf}`,
+              created_by: user.id,
+              lines: [
+                { account_id: asset.depreciation_expense_account_id, debit: amount, credit: 0 },
+                { account_id: asset.accumulated_depreciation_account_id, debit: 0, credit: amount },
+              ],
+            },
+            p_mode: 'commit',
+          });
+          if (postErr) { skipped.push({ asset_code: asset.asset_code, reason: postErr.message }); continue; }
+          if (postingResult && postingResult.posting_status === 'duplicate') {
+            skipped.push({ asset_code: asset.asset_code, reason: 'already posted for this date' });
+            continue;
+          }
+
+          const newAccumulated = Number(asset.accumulated_depreciation || 0) + amount;
+          const asOfYear = Number(asOf.slice(0, 4));
+          const priorYtd = asset.depreciation_ytd_year === asOfYear ? Number(asset.depreciation_ytd || 0) : 0;
+          const { error: updErr } = await supabaseAdmin
+            .from('fixed_assets')
+            .update({
+              accumulated_depreciation: newAccumulated,
+              last_depreciation_date: asOf,
+              depreciation_ytd: priorYtd + amount,
+              depreciation_ytd_year: asOfYear,
+              status: newAccumulated >= depreciable ? 'fully-depreciated' : 'active',
+              updated_at: new Date().toISOString(),
+            })
+            .eq('id', asset.id)
+            .eq('company_id', company_id);
+          if (updErr) {
+            skipped.push({ asset_code: asset.asset_code, reason: `posted but register update failed: ${updErr.message}` });
+            continue;
+          }
+
+          await recordLifecycle(supabaseAdmin, {
+            company_id, asset_id: asset.id, event_type: 'depreciated',
+            user_id: user.id, user_name: actorName,
+            reason: `Depreciation run to ${asOf}`,
+            reference: postingResult?.journal_id || null,
+            metadata: { amount, months, as_of: asOf, journal_entry_id: postingResult?.journal_id || null },
+          });
+          processed.push({ asset_code: asset.asset_code, description: asset.description, months, amount, journal_id: postingResult?.journal_id || null });
+        }
+        data = {
+          as_of: asOf,
+          processed,
+          skipped,
+          total_amount: Math.round(processed.reduce((s, p) => s + p.amount, 0) * 100) / 100,
+        };
+        break;
+      }
+
       case 'GET_REGISTER':
         data = await fetchRegisterPage(supabaseAdmin, company_id, body);
         break;

@@ -18,8 +18,42 @@ export type FactAccount = {
   account_role?: string | null;
 };
 
+/** One asset in the fixed asset register, as sealed with the facts. */
+export type RegisterAsset = {
+  id: string;
+  asset_code?: string | null;
+  description?: string | null;
+  asset_account_id: string | null;
+  accumulated_depreciation_account_id?: string | null;
+  purchase_date?: string | null;
+  cost: number;
+  residual_value?: number | null;
+  useful_life_years?: number | null;
+  depreciation_method?: string | null;
+  status?: string | null;
+  /** Depreciation charged (and disposal), each with the date it ran to. */
+  events: Array<{ type: string; as_of: string; amount: number }>;
+};
+
+export type GrossMovement = { id: string; debits: number; credits: number };
+
 export type FinancialFacts = {
-  period?: { start_date?: string; end_date?: string; prior_as_of?: string; period_key?: string };
+  period?: {
+    start_date?: string;
+    end_date?: string;
+    prior_as_of?: string;
+    period_key?: string;
+    prior_start_date?: string;
+    prior_opening_as_of?: string;
+  };
+  /** Debits and credits per account over the year (absent on older seals). */
+  gross_movements?: GrossMovement[] | null;
+  prior_gross_movements?: GrossMovement[] | null;
+  /** The fixed asset register sub-ledger (absent on older seals). */
+  fixed_asset_register?: RegisterAsset[] | null;
+  /** The ledger's cash movements by section and counter-account, each year. */
+  cash_flow?: Array<{ section: string; category: string; amount: number }> | null;
+  prior_cash_flow?: Array<{ section: string; category: string; amount: number }> | null;
   balances_as_of?: Array<FactAccount & { balance?: number }>;
   balances_prior_as_of?: Array<FactAccount & { balance?: number }>;
   period_activity?: Array<
@@ -39,6 +73,11 @@ export type AccountRow = FactAccount & {
   hasActivity: boolean;
   /** Movement over the comparative year, where the seal carries it. */
   priorActivity: number;
+  /** Gross debits and credits over each year, where the seal carries them. */
+  debits: number;
+  credits: number;
+  priorDebits: number;
+  priorCredits: number;
 };
 
 export type AccountFilter = {
@@ -73,9 +112,22 @@ export class AccountIndex {
    * revenue and expenses are unknown — a running balance is not last year.
    */
   readonly hasPriorFlows: boolean;
+  /** True when the seal carries gross debits and credits for the year. */
+  readonly hasGross: boolean;
+  readonly hasPriorGross: boolean;
+  /** The fixed asset register, where the seal carries it. */
+  readonly register: RegisterAsset[] | null;
+  /** The ledger's cash movements, where the seal carries them. */
+  readonly cashFlow: Array<{ section: string; category: string; amount: number }> | null;
+  readonly priorCashFlow: Array<{ section: string; category: string; amount: number }> | null;
 
   constructor(facts: FinancialFacts | null | undefined) {
     this.period = facts?.period;
+    this.register = Array.isArray(facts?.fixed_asset_register) ? facts!.fixed_asset_register! : null;
+    this.cashFlow = Array.isArray(facts?.cash_flow) ? facts!.cash_flow! : null;
+    this.priorCashFlow = Array.isArray(facts?.prior_cash_flow) ? facts!.prior_cash_flow! : null;
+    this.hasGross = Array.isArray(facts?.gross_movements);
+    this.hasPriorGross = Array.isArray(facts?.prior_gross_movements);
     const byId = new Map<string, AccountRow>();
 
     const put = (a: FactAccount, patch: Partial<AccountRow>) => {
@@ -99,6 +151,10 @@ export class AccountIndex {
         activity: 0,
         hasActivity: false,
         priorActivity: 0,
+        debits: 0,
+        credits: 0,
+        priorDebits: 0,
+        priorCredits: 0,
         ...patch,
       });
     };
@@ -111,6 +167,15 @@ export class AccountIndex {
     this.hasPriorFlows = Array.isArray(facts?.prior_period_activity);
     for (const a of arr(facts?.prior_period_activity ?? undefined)) {
       put(a, { priorActivity: n(a.period_activity) });
+    }
+
+    for (const g of arr(facts?.gross_movements ?? undefined)) {
+      const row = byId.get(g.id);
+      if (row) Object.assign(row, { debits: n(g.debits), credits: n(g.credits) });
+    }
+    for (const g of arr(facts?.prior_gross_movements ?? undefined)) {
+      const row = byId.get(g.id);
+      if (row) Object.assign(row, { priorDebits: n(g.debits), priorCredits: n(g.credits) });
     }
 
     this.rows = [...byId.values()];

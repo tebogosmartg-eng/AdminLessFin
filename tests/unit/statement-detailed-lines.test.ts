@@ -78,17 +78,18 @@ describe('detailed statement lines — presentation from the chart of accounts',
   it('groups assets by category and subcategory, in statement order', () => {
     const lines = buildPositionLines({ closing, prior, canonical, presentation: DEFAULT_PRESENTATION }) as Line[];
     const assetLabels = labels(lines.filter((l) => l.section === 'assets'));
+    // Printed in sentence case, as a published set reads.
     expect(assetLabels).toEqual([
-      'Non-Current Assets',
-      'Property, Plant and Equipment',
-      'Intangible Assets',
-      'Total Non-Current Assets',
-      'Current Assets',
+      'Non-current assets',
+      'Property, plant and equipment',
+      'Intangible assets',
+      'Total non-current assets',
+      'Current assets',
       'Inventory',
-      'Trade and Other Receivables',
-      'Cash and Cash Equivalents',
-      'Total Current Assets',
-      'Total Assets',
+      'Trade and other receivables',
+      'Cash and cash equivalents',
+      'Total current assets',
+      'Total assets',
     ]);
   });
 
@@ -107,15 +108,15 @@ describe('detailed statement lines — presentation from the chart of accounts',
 
   it('carries comparative figures per line', () => {
     const lines = buildPositionLines({ closing, prior, canonical, presentation: DEFAULT_PRESENTATION }) as Line[];
-    const ppe = lines.find((l) => l.label === 'Property, Plant and Equipment');
-    const receivables = lines.find((l) => l.label === 'Trade and Other Receivables');
-    const payables = lines.find((l) => l.label === 'Trade and Other Payables');
+    const ppe = lines.find((l) => l.label === 'Property, plant and equipment');
+    const receivables = lines.find((l) => l.label === 'Trade and other receivables');
+    const payables = lines.find((l) => l.label === 'Trade and other payables');
     expect(ppe?.amount).toBe(120_000);
     expect(ppe?.prior_amount).toBe(100_000);
     expect(receivables?.prior_amount).toBe(60_000);
     expect(payables?.prior_amount).toBe(25_000);
     // A line with no prior balance comparatives to nil, not to its own figure.
-    expect(lines.find((l) => l.label === 'Intangible Assets')?.prior_amount).toBe(0);
+    expect(lines.find((l) => l.label === 'Intangible assets')?.prior_amount).toBe(0);
   });
 
   it('subtotals each category from the lines printed under it', () => {
@@ -233,10 +234,10 @@ describe('framework presentation', () => {
       presentation: { equity_label: 'Net Assets', equity_section_label: 'Net Assets', revenue_label: 'Receipts' },
     });
     const lines = buildPositionLines({ closing, prior, canonical, presentation: mcs }) as Line[];
-    expect(find(lines, 'sfp.total_equity')?.label).toBe('Total Net Assets');
+    expect(find(lines, 'sfp.total_equity')?.label).toBe('Total net assets');
     expect(find(lines, 'sfp.equity')?.label).toBe('Net Assets');
     // Unset keys keep the defaults.
-    expect(mcs.total_assets_label).toBe('Total Assets');
+    expect(mcs.total_assets_label).toBe('Total assets');
   });
 });
 
@@ -258,20 +259,27 @@ describe('financial performance', () => {
     }) as Line[];
     const shown = labels(lines);
     expect(shown).toContain('Revenue');
-    expect(shown).toContain('Other Income');
-    expect(shown).toContain('Cost of Sales');
-    expect(shown).toContain('Employee Costs');
+    expect(shown).toContain('Other income');
+    expect(shown).toContain('Cost of sales');
+    expect(shown).toContain('Employee costs');
   });
 
-  it('takes the result from the accounting engine', () => {
+  it('takes the result from the accounting engine and closes on comprehensive income', () => {
     const lines = buildPerformanceLines({
       activity,
       canonical: perfCanonical,
       presentation: DEFAULT_PRESENTATION,
     }) as Line[];
-    expect(find(lines, 'perf.total_revenue')?.amount).toBe(502_000);
-    expect(find(lines, 'perf.total_expenses')?.amount).toBe(460_000);
+    // The face reads like a published statement: cost of sales under revenue,
+    // a gross-profit tier, then the result and total comprehensive income.
+    expect(find(lines, 'perf.gross_profit')?.amount).toBe(200_000);
     expect(find(lines, 'perf.result')?.amount).toBe(42_000);
+    expect(find(lines, 'perf.oci')?.amount).toBe(0);
+    const tci = find(lines, 'perf.total_comprehensive');
+    expect(tci?.amount).toBe(42_000);
+    expect(tci?.is_grand_total).toBe(true);
+    // One revenue line needs no "Total revenue" row above the result.
+    expect(find(lines, 'perf.total_revenue')).toBeUndefined();
   });
 });
 
@@ -309,14 +317,46 @@ describe('comparatives from the sealed comparative year', () => {
   });
 
   it('states changes in equity for both years, closing on the balance sheet equity', () => {
+    type EqLine = Line & {
+      columns?: { capital?: number | null; retained?: number | null; total?: number | null };
+    };
+    const capital = (amount: number) => [
+      { id: 'cap', name: 'Share capital', type: 'Equity', category: 'Equity', balance: amount },
+    ];
     const lines = buildEquityLines({
       canonical: { openingEquity: 2_188_800, netProfit: 2_155_950, otherEquityMovements: 0, equity: 4_344_750 },
-      priorCanonical: { openingEquity: 900_000, netProfit: 1_288_800, otherEquityMovements: 0, equity: 2_188_800 },
-    }) as Line[];
-    expect(lines.map((l) => [l.line_code, l.amount, l.prior_amount])).toEqual([
-      ['eq.opening', 2_188_800, 900_000],
-      ['eq.period_result', 2_155_950, 1_288_800],
-      ['eq.closing', 4_344_750, 2_188_800],
+      priorCanonical: { openingEquity: 900_000, netProfit: 1_288_800, otherEquityMovements: 1_288_800 - 1_288_800, equity: 2_188_800 },
+      closing: capital(900_000),
+      prior: capital(900_000),
+      priorOpening: capital(900_000),
+      period: { end_date: '2026-02-28', prior_as_of: '2025-02-28', prior_opening_as_of: '2024-02-28' },
+    }) as EqLine[];
+    // A matrix: both years' movements as rows, one column per component.
+    expect(lines.map((l) => l.line_code)).toEqual([
+      'eq.prior_opening',
+      'eq.prior_result',
+      'eq.prior_oci',
+      'eq.prior_tci',
+      'eq.opening',
+      'eq.period_result',
+      'eq.oci',
+      'eq.tci',
+      'eq.closing',
     ]);
+    // The balance rows carry the balance dates.
+    expect(find(lines, 'eq.prior_opening')?.label).toBe('Balance at 28 February 2024');
+    expect(find(lines, 'eq.closing')?.label).toBe('Balance at 28 February 2026');
+    // Each row cross-adds: capital + retained = total; the totals articulate.
+    for (const line of lines) {
+      const c = line.columns!;
+      expect((c.capital ?? 0) + (c.retained ?? 0)).toBeCloseTo(c.total ?? 0, 2);
+    }
+    const closing = find(lines, 'eq.closing') as EqLine;
+    expect(closing.columns).toEqual({ capital: 900_000, retained: 3_444_750, total: 4_344_750 });
+    // The articulation codes keep their comparative figures for the readiness
+    // checks, exactly as the two-column statement carried them.
+    expect(closing.amount).toBe(4_344_750);
+    expect(closing.prior_amount).toBe(2_188_800);
+    expect(find(lines, 'eq.period_result')?.prior_amount).toBe(1_288_800);
   });
 });

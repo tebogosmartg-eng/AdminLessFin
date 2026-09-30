@@ -259,6 +259,8 @@ describe('V13.1 — No placeholder or development artifacts in the rendered AFS'
     expect(/\bdisc\.[a-z0-9_.]+/.test(text)).toBe(false);
     // Genuine statutory content is present.
     expect(text.includes('basis of preparation')).toBe(true);
-    expect(text.includes('related part')).toBe(true);
+    // Related parties stays in the working document, but a note whose table
+    // holds nothing but placeholders is withheld from print until filled in.
+    expect(model.notes.some((n) => n.disclosure_code === 'DISC.RELATED')).toBe(true);
   });
 });

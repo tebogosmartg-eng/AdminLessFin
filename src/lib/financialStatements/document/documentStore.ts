@@ -21,6 +21,8 @@ export type DocFormatting = {
   align?: 'left' | 'center' | 'right';
 };
 
+export type NarrativeBlockOverride = { heading?: string; body: string };
+
 export type DocOverrides = {
   version: 1;
   hidden: Record<string, boolean>;
@@ -34,6 +36,13 @@ export type DocOverrides = {
   lines: Record<string, boolean>;
   /** Notes that begin on a new page, by note id. */
   pageBreaks: Record<string, boolean>;
+  /**
+   * The preparer's own wording for a narrative section (the directors'
+   * report, the responsibilities statement, the practitioner's report, the
+   * approval wording), by section id. Absent means the generated statutory
+   * wording prints.
+   */
+  narratives: Record<string, NarrativeBlockOverride[]>;
   updatedAt: string;
 };
 
@@ -49,6 +58,7 @@ export function emptyOverrides(): DocOverrides {
     formatting: {},
     lines: {},
     pageBreaks: {},
+    narratives: {},
     updatedAt: new Date().toISOString(),
   };
 }
@@ -63,6 +73,7 @@ function normalise(parsed: Partial<DocOverrides> | null | undefined): DocOverrid
     formatting: parsed?.formatting || {},
     lines: parsed?.lines || {},
     pageBreaks: parsed?.pageBreaks || {},
+    narratives: parsed?.narratives || {},
   };
 }
 
@@ -259,6 +270,7 @@ export function useDocumentOverrides(workspaceId: string, companyId?: string) {
           order: drop(prev.order),
           titleOverrides: drop(prev.titleOverrides),
           formatting: drop(prev.formatting),
+          narratives: drop(prev.narratives || {}),
         };
       }),
     [mutate],
@@ -288,6 +300,26 @@ export function useDocumentOverrides(workspaceId: string, companyId?: string) {
     [mutate],
   );
 
+  /**
+   * The preparer's wording for a narrative section. Passing `null` returns
+   * the section to the generated statutory wording — the choice is forgotten,
+   * not recorded, so the document's record only lists sections that were
+   * actually rewritten.
+   */
+  const setNarrative = useCallback(
+    (sectionId: string, blocks: NarrativeBlockOverride[] | null) =>
+      mutate((prev) => {
+        const next = { ...(prev.narratives || {}) };
+        const kept = (blocks || [])
+          .map((b) => ({ heading: b.heading?.trim() || undefined, body: String(b.body ?? '').trim() }))
+          .filter((b) => b.body || b.heading);
+        if (blocks === null || kept.length === 0) delete next[sectionId];
+        else next[sectionId] = kept;
+        return { ...prev, narratives: next };
+      }),
+    [mutate],
+  );
+
   /** Start a note on a new page, or let it follow on. */
   const setPageBreak = useCallback(
     (noteId: string, breakBefore: boolean) =>
@@ -304,6 +336,7 @@ export function useDocumentOverrides(workspaceId: string, companyId?: string) {
     overrides,
     error,
     setLine,
+    setNarrative,
     setPageBreak,
     setHidden,
     toggleHidden,

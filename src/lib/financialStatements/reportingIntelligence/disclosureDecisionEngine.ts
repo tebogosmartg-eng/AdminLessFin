@@ -4,7 +4,9 @@
  * Determines whether each disclosure should exist, expand, simplify, merge, or suppress.
  */
 import type { DocumentModel } from '../document/documentModel';
+import type { DocNoteNode } from '../document/documentModel';
 import type { DisclosureConditionMap } from '../framework/knowledgeRepository/types';
+import { tableToCompositionRows } from '../composition/disclosureComponents';
 import { extractStatementFacts } from './facts';
 import type {
   DisclosureDecision,
@@ -12,6 +14,37 @@ import type {
   MaterialityAssessment,
   MaterialityAction,
 } from './types';
+
+/**
+ * Notes whose content belongs inside the accounting policies section of a
+ * published set — the basis of preparation is policy 1, judgements are
+ * policy 1.1 — and which would otherwise print the same words twice.
+ */
+const PRESENTED_IN_POLICIES = new Set(['DISC.BASIS', 'DISC.JUDGEMENTS', 'DISC.BORROWINGCOST']);
+
+const PLACEHOLDER_CELL = /^\[\s*[—–-]?\s*\]$/;
+
+/**
+ * Whether any table of this note carries a filled-in figure. A framework note
+ * arrives with every line the framework might ask for, all reading "[ — ]";
+ * a note whose tables hold nothing but placeholders and blanks has nothing to
+ * say yet, and a published set does not print a heading over an empty form.
+ * A note without tables is narrative by design and is never judged here.
+ */
+function hasFilledFigure(note: DocNoteNode): boolean | null {
+  const tables = note.tables || [];
+  if (!tables.length) return null;
+  for (const table of tables) {
+    const rows = tableToCompositionRows(table.columns_json, table.rows_json);
+    for (const row of rows.slice(1)) {
+      for (const cell of row.slice(1)) {
+        const v = String(cell ?? '').trim();
+        if (v && /\d/.test(v) && !PLACEHOLDER_CELL.test(v)) return true;
+      }
+    }
+  }
+  return false;
+}
 
 const SUPPRESS_WHEN_ABSENT: Array<{ code: string; factCheck: (facts: ReturnType<typeof extractStatementFacts>) => boolean; reason: string }> = [
   {
@@ -75,6 +108,8 @@ export function makeDisclosureDecisions(
   profile: EntityProfile,
   materiality: MaterialityAssessment[],
   conditions: DisclosureConditionMap,
+  /** Codes where the preparer switched a line on: never withheld as unfilled. */
+  forcedOnCodes: Set<string> = new Set(),
 ): DisclosureDecision[] {
   const facts = extractStatementFacts(model);
   const materialityByCode = new Map(materiality.map((m) => [m.disclosureCode, m]));
@@ -143,6 +178,26 @@ export function makeDisclosureDecisions(
 
     if (shouldMerge && code === 'DISC.PAYABLES') {
       mergedWith = 'DISC.FININST';
+    }
+
+    // The basis of preparation and the significant judgements are presented
+    // inside the accounting policies (1 and 1.1); the same words are not
+    // printed a second time as numbered notes.
+    if (PRESENTED_IN_POLICIES.has(String(code || '').toUpperCase())) {
+      exists = false;
+      shouldSuppress = true;
+      reason = 'Presented within the accounting policies';
+    }
+
+    // A note whose tables hold nothing but "[ — ]" placeholders is a form
+    // nobody has filled in. It is withheld from the printed document — still
+    // in the editor, still switchable on line by line — rather than printed
+    // as a heading over boilerplate that promises a table that is not there.
+    if (exists && hasFilledFigure(note) === false && !forcedOnCodes.has(String(code || '').toUpperCase())) {
+      exists = false;
+      shouldSuppress = true;
+      reason =
+        'Nothing filled in yet — the note prints once a figure is entered or one of its lines is switched on';
     }
 
     decisions.push({

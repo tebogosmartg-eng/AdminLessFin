@@ -115,6 +115,46 @@ async function writeActivity(admin, row) {
   await admin.from("efs_workspace_activity").insert(row);
 }
 
+/**
+ * A set marked final is read-only until it is reopened. The client disables
+ * its editors, but the document's integrity cannot depend on the client:
+ * every content write lands here first.
+ */
+async function assertWorkspaceEditable(admin, companyId, workspaceId) {
+  if (!workspaceId) return;
+  const { data: lockSnapshots, error: lockErr } = await admin
+    .from("efs_reporting_snapshots")
+    .select("current_version_id, created_at, efs_snapshot_versions!efs_snapshot_versions_snapshot_id_fkey(id, status, version_no)")
+    .eq("workspace_id", workspaceId)
+    .eq("company_id", companyId)
+    .order("created_at", { ascending: false })
+    .limit(1);
+  if (lockErr) throw lockErr;
+  const snap = lockSnapshots?.[0];
+  if (!snap) return;
+  const versions = snap.efs_snapshot_versions || [];
+  const current =
+    versions.find((v) => v.id === snap.current_version_id) ||
+    [...versions].sort((a, b) => b.version_no - a.version_no)[0];
+  if (current && (current.status === "frozen" || current.status === "publication_bound")) {
+    throw new Error(
+      "These financial statements are final. Reopen them for changes before editing.",
+    );
+  }
+}
+
+/** The same lock, reached from a disclosure instance. */
+async function assertDisclosureEditable(admin, companyId, instanceId) {
+  if (!instanceId) return;
+  const { data: inst } = await admin
+    .from("efs_disclosure_instances")
+    .select("workspace_id")
+    .eq("id", instanceId)
+    .eq("company_id", companyId)
+    .maybeSingle();
+  await assertWorkspaceEditable(admin, companyId, inst?.workspace_id);
+}
+
 /** PostgREST errors are plain objects — normalize so catch/platformError keep SQL details. */
 function throwDbError(step, { table = null, rpc = null, payload = null, error, rows = null }) {
   const postgrest = error && typeof error === "object"
@@ -1597,6 +1637,36 @@ serve(withEnterprisePlatform("financial-statements", "tenant", async (req, _ctx)
             "Frozen Snapshot Version cannot be edited in place. Pass force_successor=true to create a successor version.",
           );
         }
+        // Reopening a final set means it will change: the review that approved
+        // the final version does not approve what comes next. The open review
+        // is superseded (its decisions, sign-offs and history are kept), so the
+        // new draft goes through review again before it can be finalised.
+        if (last && ["frozen", "publication_bound"].includes(last.status) && body.force_successor) {
+          const { data: openReview } = await admin
+            .from("efs_pack_reviews")
+            .select("id, stage")
+            .eq("workspace_id", workspace.id)
+            .eq("company_id", company_id)
+            .eq("status", "open")
+            .maybeSingle();
+          if (openReview) {
+            const { error: supErr } = await admin
+              .from("efs_pack_reviews")
+              .update({ status: "superseded", updated_at: new Date().toISOString() })
+              .eq("id", openReview.id)
+              .eq("company_id", company_id);
+            if (supErr) throw supErr;
+            await appendPackReviewHistory(admin, {
+              company_id,
+              pack_review_id: openReview.id,
+              event_type: "review.superseded",
+              actor_user_id: user.id,
+              from_stage: openReview.stage,
+              to_stage: openReview.stage,
+              message: "Statements reopened for changes; this review no longer approves the set.",
+            });
+          }
+        }
 
         const nextNo = (last?.version_no || 0) + 1;
         logStep("STEP 7 Create snapshot version", {
@@ -2162,6 +2232,91 @@ serve(withEnterprisePlatform("financial-statements", "tenant", async (req, _ctx)
         }
         dataset.source_rpc_refs = source_rpc_refs;
 
+        // Gross movements per account for each year. A net movement cannot say
+        // how much of a change in an asset class was additions and how much
+        // disposals, nor how much of a loan was raised and how much repaid —
+        // the notes need the debits and credits that made it up.
+        {
+          const grossFor = async (from, to) => {
+            const out = new Map();
+            if (!from || !to) return out;
+            const PAGE = 1000;
+            for (let offset = 0; ; offset += PAGE) {
+              const { data: lines, error: gErr } = await admin
+                .from("journal_entry_items")
+                .select("account_id, type, amount, journal_entries!inner(company_id, entry_date)")
+                .eq("journal_entries.company_id", company_id)
+                .gte("journal_entries.entry_date", from)
+                .lte("journal_entries.entry_date", to)
+                .order("id")
+                .range(offset, offset + PAGE - 1);
+              if (gErr) throw gErr;
+              for (const l of lines || []) {
+                const g = out.get(l.account_id) || { debits: 0, credits: 0 };
+                if (l.type === "debit") g.debits += Number(l.amount || 0);
+                else g.credits += Number(l.amount || 0);
+                out.set(l.account_id, g);
+              }
+              if (!lines || lines.length < PAGE) break;
+            }
+            return out;
+          };
+          const toRows = (m) =>
+            [...m.entries()].map(([id, g]) => ({ id, debits: round2(g.debits), credits: round2(g.credits) }));
+          dataset.gross_movements = toRows(await grossFor(start_date, end_date));
+          if (dataset.period?.prior_start_date) {
+            dataset.prior_gross_movements = toRows(
+              await grossFor(dataset.period.prior_start_date, dataset.period.prior_as_of || prior_as_of),
+            );
+          }
+        }
+
+        // The fixed asset register, as a sub-ledger of the property, plant and
+        // equipment accounts: each asset, the cost account it sits in, and the
+        // depreciation recorded against it with the date each charge ran to.
+        // The notes split accumulated depreciation by class from this, and use
+        // it only when it agrees with the ledger's control account.
+        {
+          const { data: assets, error: faErr } = await admin
+            .from("fixed_assets")
+            .select("id, asset_code, description, asset_account_id, accumulated_depreciation_account_id, purchase_date, purchase_cost, residual_value, useful_life_years, depreciation_method, status")
+            .eq("company_id", company_id);
+          if (faErr) throw faErr;
+          const { data: events, error: evErr } = await admin
+            .from("asset_lifecycle_events")
+            .select("asset_id, event_type, event_date, metadata")
+            .eq("company_id", company_id)
+            .in("event_type", ["depreciated", "disposed"]);
+          if (evErr) throw evErr;
+          const byAsset = new Map();
+          for (const e of events || []) {
+            const list = byAsset.get(e.asset_id) || [];
+            const meta = e.metadata || {};
+            // Memo-only component charges never reached the ledger.
+            if (e.event_type === "depreciated" && meta.memo_only) continue;
+            list.push({
+              type: e.event_type,
+              as_of: String(meta.as_of || e.event_date || "").slice(0, 10),
+              amount: round2(Number(meta.amount || 0)),
+            });
+            byAsset.set(e.asset_id, list);
+          }
+          dataset.fixed_asset_register = (assets || []).map((a) => ({
+            id: a.id,
+            asset_code: a.asset_code,
+            description: a.description,
+            asset_account_id: a.asset_account_id,
+            accumulated_depreciation_account_id: a.accumulated_depreciation_account_id,
+            purchase_date: a.purchase_date,
+            cost: round2(Number(a.purchase_cost || 0)),
+            residual_value: round2(Number(a.residual_value || 0)),
+            useful_life_years: a.useful_life_years,
+            depreciation_method: a.depreciation_method,
+            status: a.status,
+            events: (byAsset.get(a.id) || []).filter((e) => e.as_of),
+          }));
+        }
+
         // Seal Canonical Financial Aggregation once — Statement Engine must consume, not recalculate.
         {
           const { data: coaMeta } = await admin
@@ -2551,6 +2706,9 @@ serve(withEnterprisePlatform("financial-statements", "tenant", async (req, _ctx)
           balances_prior_opening_as_of: facts.balances_prior_opening_as_of,
           prior_period_activity: facts.prior_period_activity,
           prior_cash_flow: facts.prior_cash_flow,
+          gross_movements: facts.gross_movements ?? null,
+          prior_gross_movements: facts.prior_gross_movements ?? null,
+          fixed_asset_register: facts.fixed_asset_register ?? null,
           source_rpc_refs: facts.source_rpc_refs,
           version_status: version.status,
           live_gl: false,
@@ -3587,6 +3745,7 @@ serve(withEnterprisePlatform("financial-statements", "tenant", async (req, _ctx)
 
       case "CREATE_DISCLOSURE_INSTANCE": {
         if (!body.workspace_id) throw new Error("workspace_id is required.");
+        await assertWorkspaceEditable(admin, company_id, body.workspace_id);
         if (!body.structure_node_id && !body.structure_node_code) {
           throw new Error("structure_node_id or structure_node_code is required.");
         }
@@ -3870,6 +4029,7 @@ serve(withEnterprisePlatform("financial-statements", "tenant", async (req, _ctx)
         if (sec.efs_disclosure_instances.status === "superseded") {
           throw new Error("Cannot edit sections of a superseded disclosure.");
         }
+        await assertDisclosureEditable(admin, company_id, sec.disclosure_instance_id);
         const { data, error } = await admin
           .from("efs_disclosure_sections")
           .update({ body: body.body ?? sec.body, title: body.title ?? sec.title })
@@ -3890,6 +4050,9 @@ serve(withEnterprisePlatform("financial-statements", "tenant", async (req, _ctx)
         if (!body.paragraph_id && !body.disclosure_instance_id) {
           throw new Error("paragraph_id or disclosure_instance_id is required.");
         }
+        if (body.disclosure_instance_id) {
+          await assertDisclosureEditable(admin, company_id, body.disclosure_instance_id);
+        }
         if (body.paragraph_id) {
           const { data: para, error: pErr } = await admin
             .from("efs_disclosure_paragraphs")
@@ -3901,6 +4064,7 @@ serve(withEnterprisePlatform("financial-statements", "tenant", async (req, _ctx)
           if (para.efs_disclosure_instances.status === "superseded") {
             throw new Error("Cannot edit paragraphs of a superseded disclosure.");
           }
+          await assertDisclosureEditable(admin, company_id, para.disclosure_instance_id);
           const { data, error } = await admin
             .from("efs_disclosure_paragraphs")
             .update({
@@ -3942,6 +4106,9 @@ serve(withEnterprisePlatform("financial-statements", "tenant", async (req, _ctx)
         if (!body.table_id && !body.disclosure_instance_id) {
           throw new Error("table_id or disclosure_instance_id is required.");
         }
+        if (body.disclosure_instance_id) {
+          await assertDisclosureEditable(admin, company_id, body.disclosure_instance_id);
+        }
         if (body.table_id) {
           const { data: tbl, error: tErr } = await admin
             .from("efs_disclosure_tables")
@@ -3953,6 +4120,7 @@ serve(withEnterprisePlatform("financial-statements", "tenant", async (req, _ctx)
           if (tbl.efs_disclosure_instances.status === "superseded") {
             throw new Error("Cannot edit tables of a superseded disclosure.");
           }
+          await assertDisclosureEditable(admin, company_id, tbl.disclosure_instance_id);
           // Presentation storage only — never recalculates statement/engine amounts
           const { data, error } = await admin
             .from("efs_disclosure_tables")
@@ -4024,6 +4192,7 @@ serve(withEnterprisePlatform("financial-statements", "tenant", async (req, _ctx)
           .maybeSingle();
         if (presentWsErr) throw presentWsErr;
         if (!presentWs) throw new Error("Financial statements not found for this company.");
+        await assertWorkspaceEditable(admin, company_id, body.workspace_id);
 
         const { data: priorPresentation } = await admin
           .from("efs_document_presentation")
@@ -4105,6 +4274,7 @@ serve(withEnterprisePlatform("financial-statements", "tenant", async (req, _ctx)
           .maybeSingle();
         if (doomedErr) throw doomedErr;
         if (!doomed) throw new Error(`${deletingTable ? "Table" : "Paragraph"} not found.`);
+        await assertDisclosureEditable(admin, company_id, doomed.disclosure_instance_id);
         if (doomed.efs_disclosure_instances.status === "superseded") {
           throw new Error(
             "This note belongs to a previous reporting framework and can no longer be edited.",
@@ -4154,6 +4324,7 @@ serve(withEnterprisePlatform("financial-statements", "tenant", async (req, _ctx)
           .maybeSingle();
         if (authoredWsErr) throw authoredWsErr;
         if (!authoredWs) throw new Error("Financial statements not found for this company.");
+        await assertWorkspaceEditable(admin, company_id, body.workspace_id);
 
         const authoredPackId =
           body.framework_pack_id ||
@@ -4348,6 +4519,7 @@ serve(withEnterprisePlatform("financial-statements", "tenant", async (req, _ctx)
           .eq("company_id", company_id)
           .single();
         if (iErr || !inst) throw new Error("Disclosure instance not found.");
+        await assertWorkspaceEditable(admin, company_id, inst.workspace_id);
         const next = body.to_status;
         if (!(allowed[inst.status] || []).includes(next)) {
           throw new Error(`Invalid disclosure status transition ${inst.status} → ${next}`);
@@ -4535,6 +4707,7 @@ serve(withEnterprisePlatform("financial-statements", "tenant", async (req, _ctx)
           .single();
         if (sErr || !set) throw new Error("Accounting policy set not found.");
         if (set.status === "superseded") throw new Error("Cannot edit superseded policy set.");
+        await assertWorkspaceEditable(admin, company_id, set.workspace_id);
 
         const { data: existing } = await admin
           .from("efs_accounting_policies")
@@ -6288,6 +6461,7 @@ serve(withEnterprisePlatform("financial-statements", "tenant", async (req, _ctx)
           .eq("company_id", company_id)
           .single();
         if (wsErr || !ws) throw new Error("Workspace not found.");
+        await assertWorkspaceEditable(admin, company_id, body.workspace_id);
 
         const info = body.general_information || body.info || {};
         await upsertMasterDataFromEngagementPayload(admin, company_id, info);

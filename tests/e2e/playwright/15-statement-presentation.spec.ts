@@ -78,11 +78,16 @@ test('statements read current year first, and every note reference opens its not
     await expect(page.getByTestId('afs-statement')).toBeVisible();
 
     // Current year, then the comparative: 2026 then 2025, never the reverse.
-    const current = (await page.getByTestId('afs-col-current').innerText()).match(/\d{4}/)?.[0];
-    const comparativeCell = page.getByTestId('afs-col-comparative');
-    if (await comparativeCell.count()) {
-      const comparative = (await comparativeCell.innerText()).match(/\d{4}/)?.[0];
-      expect(Number(current), `${label}: current year first`).toBe(Number(comparative) + 1);
+    // The Statement of Changes in Equity is a matrix headed by the components
+    // of equity instead of the years, so it carries no year columns.
+    const currentCell = page.getByTestId('afs-col-current');
+    if (await currentCell.count()) {
+      const current = (await currentCell.innerText()).match(/\d{4}/)?.[0];
+      const comparativeCell = page.getByTestId('afs-col-comparative');
+      if (await comparativeCell.count()) {
+        const comparative = (await comparativeCell.innerText()).match(/\d{4}/)?.[0];
+        expect(Number(current), `${label}: current year first`).toBe(Number(comparative) + 1);
+      }
     }
 
     const refs = await noteRefs(page);
@@ -91,6 +96,8 @@ test('statements read current year first, and every note reference opens its not
       await page.locator(`[data-testid="afs-note-ref"][data-note-id="${ref.id}"]`).first().click();
       // The note that opens is the note printed with that number…
       await expect(page.getByTestId('afs-note-heading')).toContainText(`Note ${ref.number}.`);
+      // …and no note is numbered 1: the accounting policies are note 1.
+      expect(Number(ref.number)).toBeGreaterThanOrEqual(2);
       // …and the navigator agrees on its number.
       await expect(
         nav.locator(`[data-testid="afs-tree-note"][data-note-number="${ref.number}"]`),
@@ -130,12 +137,15 @@ test('statements read current year first, and every note reference opens its not
       const label = p.texts.find((t) => t.x >= x1 - 1 && t.x <= x2 && t.y >= y1 && t.y <= y2);
       if (!label || !/^\d+$/.test(label.text)) continue;
       const target = byId.get(link.dest)!;
-      expect(target.texts.some((t) => t.text.startsWith(`Note ${label.text}. `))).toBe(true);
+      // A published heading: "5. Trade and other receivables".
+      expect(target.texts.some((t) => t.text.startsWith(`${label.text}. `))).toBe(true);
       links += 1;
     }
-    // A statement page's column band reads Notes, current year, comparative.
-    const band = p.texts.findIndex((t) => t.text === 'Notes');
+    // A statement page's band reads "Figures in Rand … Note(s)", then the
+    // current year, then the comparative.
+    const band = p.texts.findIndex((t) => t.text === 'Note(s)');
     if (band >= 0 && /^\d{4}$/.test(p.texts[band + 1]?.text || '') && /^\d{4}$/.test(p.texts[band + 2]?.text || '')) {
+      expect(p.texts.some((t) => t.text === 'Figures in Rand')).toBe(true);
       expect(Number(p.texts[band + 1].text)).toBe(Number(p.texts[band + 2].text) + 1);
     }
   }
@@ -178,9 +188,20 @@ test('the statements and notes tell one story, and unfilled lines do not print',
   expect(claims).toEqual(assets);
   console.log(`[evidence] assets ${JSON.stringify(assets)} = equity and liabilities ${JSON.stringify(claims)}`);
 
-  // The equity the statement of changes closes on is the balance sheet equity.
+  // The equity the statement of changes closes on is the balance sheet
+  // equity. The statement is a matrix — components across, movements down —
+  // so this year's closing balance and the opening balance it rolls forward
+  // from carry the totals column.
   await nav.getByRole('button', { name: /^Statement of Changes in Equity/ }).click();
-  expect(await statementFigures(page, 'eq.closing')).toEqual(equity);
+  const matrixTotal = async (code: string) => {
+    const row = page.locator(`[data-testid="afs-statement"] tr[data-line-code="${code}"]`);
+    await expect(row).toHaveCount(1);
+    return figure(await row.locator('[data-col="total"]').textContent());
+  };
+  expect(await matrixTotal('eq.closing')).toEqual(equity.current);
+  if (equity.comparative != null) {
+    expect(await matrixTotal('eq.opening')).toEqual(equity.comparative);
+  }
 
   // The Validation panel finds no note that disagrees with its statement.
   await page.getByRole('tab', { name: /^validation$/i }).click();

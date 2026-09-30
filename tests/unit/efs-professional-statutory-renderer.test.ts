@@ -179,22 +179,26 @@ describe('V13.0 — Professional statutory PDF', () => {
     expect(pdfText).toMatch(/IFRS for SMEs/);
   });
 
-  it('renders contents and full statutory document structure', () => {
-    expect(pdfText).toContain('Contents');
+  it('renders the index and full statutory document structure', () => {
+    // The bound order of a published set: general information first, then
+    // the index with its lead-in sentence.
+    expect(pdfText).toContain('Index');
+    expect(pdfText).toContain('comprise the annual financial statements');
+    expect(pdfText).toContain('General Information');
     expect(pdfText).toMatch(/Directors' Responsibilities and Approval/);
     expect(pdfText).toMatch(/Directors' Report/);
     expect(pdfText).toMatch(/Independent Auditor's Report/);
-    expect(pdfText).toContain('Notes to the Financial Statements');
-    expect(pdfText).toContain('Significant Accounting Policies');
-    expect(pdfText).toContain('Supplementary Information');
-    expect(pdfText).toContain('Approval of Annual Financial Statements');
+    expect(pdfText).toContain('Notes to the Annual Financial Statements');
+    expect(pdfText).toContain('Accounting Policies');
+    expect(pdfText).toContain('approved by the board of directors');
   });
 
   it('renders every statement professionally with Note column, figures and totals', () => {
     expect(pdfText).toContain('Statement of Financial Position');
     expect(pdfText).toContain('Notes'); // column header
-    // Figures are written as the notes write them: 2 300,00, not 2,300.00.
-    expect(pdfText).toContain('2 300,00'); // total figure
+    // Figures are printed in whole Rands under a "Figures in Rand" band.
+    expect(pdfText).toContain('Figures in Rand');
+    expect(pdfText).toContain('2 300'); // total figure
     expect(pdfText).toContain('Total assets');
     // Empty statements show the professional placeholder.
     expect(pdfText).toMatch(/Figures will be presented in this statement once the trial\s+balance/);
@@ -206,7 +210,7 @@ describe('V13.0 — Professional statutory PDF', () => {
     // figures as the statements do — not "Current year" and "1,500.00".
     expect(pdfText).toMatch(/Description\s+2026\s+2025/);
     expect(pdfText).not.toContain('Current year');
-    expect(pdfText).toContain('1 500,00');
+    expect(pdfText).toContain('1 500');
     expect(pdfText).not.toContain('1,500.00');
     expect(pdfText).toContain('Total movement');
   });
@@ -216,13 +220,11 @@ describe('V13.0 — Professional statutory PDF', () => {
     expect(pdfText).toMatch(/\(continued\)/);
   });
 
-  it('applies a consistent running header and footer with page numbers', () => {
-    expect(pdfText).toContain('AdminLess Fin');
-    // The cover is page 1 and carries no footer; numbered footers begin at page 2.
-    expect(pdfText).toMatch(/2 \/ \d+/);
-    expect(pdfText).toMatch(/3 \/ \d+/);
-    const total = pageCount(pkg.pdfString);
-    expect(pdfText).toContain(`${total} / ${total}`);
+  it('applies a consistent running header and an unbranded footer', () => {
+    // Software does not sign financial statements: no product name anywhere.
+    expect(pdfText).not.toContain('AdminLess Fin');
+    // The running header carries the company and what the document is.
+    expect(pdfText).toMatch(/Annual Financial Statements for the year ended/);
   });
 });
 
@@ -244,15 +246,14 @@ describe('V13.0 — Preview == PDF == DOCX', () => {
     const docxText = extractDocxPlainText(pkg.docxBytes);
     expect(docxText).toContain('Statutory Render Co (Pty) Ltd');
     expect(docxText).toContain('Statement of Financial Position');
-    expect(docxText).toContain('Notes to the Financial Statements');
-    expect(docxText).toContain('Significant Accounting Policies');
-    expect(docxText).toContain('Supplementary Information');
-    expect(docxText).toContain('Approval of Annual Financial Statements');
-    expect(docxText).toContain('AdminLess Fin');
+    expect(docxText).toContain('Notes to the Annual Financial Statements');
+    expect(docxText).toContain('Accounting Policies');
+    expect(docxText).toContain('approved by the board of directors');
+    expect(docxText).not.toContain('AdminLess Fin');
     // Table content is present in DOCX.
     expect(docxText).toContain('2026');
     // Word keeps the non-breaking thousands separator; compare like for like.
-    expect(docxText.replace(/\u00a0/g, ' ')).toContain('1 500,00');
+    expect(docxText.replace(/\u00a0/g, ' ')).toContain('1 500');
     // Every note heading appears.
     for (const note of pkg.view.notes) expect(docxText).toContain(note.heading);
   });

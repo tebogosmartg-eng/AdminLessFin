@@ -77,17 +77,41 @@ export function lineIndent(line: Pick<EfsStatementLine, 'level'>, role: LineRole
 }
 
 /**
- * A figure as it is printed on a statement: thousands separated, two decimals,
- * negatives in brackets, a nil as a dash. The same writing the notes use, so a
- * figure reads identically on the face of the statement and in its note.
+ * A figure as it is printed on a statement: whole Rands, thousands separated,
+ * negatives in brackets, a nil as a dash — the writing of a published set of
+ * annual financial statements, where the column band reads "Figures in Rand".
+ * The same writing the notes use, so a figure reads identically on the face of
+ * the statement and in its note. The cents live on in the underlying figures;
+ * only the printing rounds.
  *
  * A figure the engine did not produce is left blank rather than shown as nil,
  * because a dash says "nothing" and a blank says "not stated".
  */
-export function formatStatementFigure(value: number | null | undefined, role: LineRole): string {
+export function formatStatementFigure(
+  value: number | null | undefined,
+  role: LineRole,
+  opts: { negate?: boolean } = {},
+): string {
   if (role === 'heading') return '';
   if (value == null || !Number.isFinite(Number(value))) return '';
-  return formatCellValue(Number(value), { numberFormat: 'currency', decimals: 2 });
+  const presented = Math.round(Number(value)) * (opts.negate ? -1 : 1);
+  return formatCellValue(presented === 0 ? 0 : presented, { numberFormat: 'currency', decimals: 0 });
+}
+
+type SignLine = Pick<EfsStatementLine, 'line_code' | 'section'>;
+
+/**
+ * Whether a line prints its figure negated. Expenses on the face of the
+ * statement of comprehensive income are shown in brackets — "Cost of sales
+ * (162 079 910)" — while the engine holds them positive, the way the notes and
+ * the ledger state them. Presentation only: nothing downstream reads the
+ * printed sign back.
+ */
+export function lineNegatesFigure(statementType: string, line: SignLine): boolean {
+  if (statementType !== 'financial_performance') return false;
+  const code = String(line.line_code || '');
+  if (/^perf\.(expenses|cost_of_sales|total_expenses|taxation)/.test(code)) return true;
+  return String(line.section || '') === 'expenses';
 }
 
 type ComparativeLine = Pick<EfsStatementLine, 'prior_amount' | 'is_header' | 'is_subheader'>;
@@ -134,7 +158,7 @@ export function parseFigure(text: string | null | undefined): number | null {
   return negative ? -value : value;
 }
 
-const OLD_FIGURE = /^\(?-?\d{1,3}(?:,\d{3})*\.\d{2}\)?$/;
+const CENTS_FIGURE = /^\(?-?\d{1,3}(?:[ ,\u00a0]\d{3})*[.,]\d{1,2}\)?$/;
 const GENERIC_YEAR = /^(current|prior|comparative) (year|period)$/i;
 
 /**
@@ -142,10 +166,10 @@ const GENERIC_YEAR = /^(current|prior|comparative) (year|period)$/i;
  * figure written the one way the document writes figures.
  *
  * The framework library writes "Current year / Prior year" and "740,650.00";
- * the disclosure engine writes "2026 / 2025" and "740 650,00". Printed side by
- * side in the same note, that reads as two documents. Only a heading that is a
- * generic year caption and a cell that is a figure in the other writing are
- * touched — a year, a count or a word in a cell is left exactly as it is.
+ * the disclosure engine works in cents, "740 650,00". The printed document
+ * writes whole Rands under a "Figures in Rand" band, so any cell that is a
+ * figure carrying decimals is rewritten to that one style. A year, a count, a
+ * percentage or a word in a cell is left exactly as it is.
  */
 export function presentTableRows(rows: string[][], years: ReportingYears): string[][] {
   return rows.map((row, r) =>
@@ -154,7 +178,7 @@ export function presentTableRows(rows: string[][], years: ReportingYears): strin
       if (r === 0 && GENERIC_YEAR.test(text.trim())) {
         return /^current/i.test(text.trim()) ? years.current : years.comparative;
       }
-      if (OLD_FIGURE.test(text.trim())) {
+      if (CENTS_FIGURE.test(text.trim())) {
         const value = parseFigure(text);
         return value == null ? text : formatStatementFigure(value, 'item');
       }

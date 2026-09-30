@@ -67,6 +67,14 @@ describe('lines that print', () => {
     expect(blocks).toEqual([{ type: 'paragraph', text: 'Intro' }]);
   });
 
+  it('never prints a bare header: a table with no body rows is left out', () => {
+    // "New table" left behind by someone testing the editor: a header row and
+    // nothing else. A published set does not print a heading over nothing.
+    const bare = { type: 'table' as const, title: 'New table', rows: [['Description', 'Amount']] };
+    const { blocks } = applyLineChoices('DISC.RELATED', [{ type: 'paragraph', text: 'Narrative' }, bare], {});
+    expect(blocks).toEqual([{ type: 'paragraph', text: 'Narrative' }]);
+  });
+
   it('keeps lines apart that share wording in one table', () => {
     const { items } = applyLineChoices('DISC.X', [table([rows[0], ['Land', '1', '1'], ['Land', '2', '2']])], {});
     expect(new Set(items.map((i) => i.key)).size).toBe(2);

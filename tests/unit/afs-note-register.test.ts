@@ -4,12 +4,13 @@
  * The navigator, the Editor's statements, the Live Preview, the PDF and the
  * Word document all read their note numbers from the note register. These
  * tests hold the register to what the printed document actually contains:
- * numbers 1 to N with no gaps, statement references that land on a printed
+ * a gapless run from the first note number (the policies are note 1), statement references that land on a printed
  * note, and links in the PDF that jump to the note they name.
  */
 import { describe, expect, it } from 'vitest';
 import { emptyOverrides, type DocOverrides } from '../../src/lib/financialStatements/document/documentStore';
 import { buildNoteRegister } from '../../src/lib/financialStatements/document/noteRegister';
+import { FIRST_NOTE_NUMBER } from '../../src/lib/financialStatements/reportingIntelligence/applyIntelligence';
 import type { DocumentModel } from '../../src/lib/financialStatements/document/documentModel';
 import { buildV16SampleModel } from '../../src/lib/financialStatements/composition/fixtures/v16SampleModel';
 import {
@@ -54,8 +55,8 @@ describe('the note register is the printed numbering', () => {
     const printed = printedNumbers(model, overrides);
 
     expect(register.notes.map((n) => [n.id, n.noteNumber])).toEqual(printed.map((n) => [n.id, n.noteNumber]));
-    expect(register.notes.map((n) => n.noteNumber)).toEqual(register.notes.map((_, i) => i + 1));
-    for (const n of printed) expect(n.heading.startsWith(`Note ${n.noteNumber}. `)).toBe(true);
+    expect(register.notes.map((n) => n.noteNumber)).toEqual(register.notes.map((_, i) => i + FIRST_NOTE_NUMBER));
+    for (const n of printed) expect(n.heading.startsWith(`${n.noteNumber}. `)).toBe(true);
   });
 
   it.each(scenarios())('%s: every statement reference lands on a printed note that explains it', (_name, model) => {
@@ -79,7 +80,7 @@ describe('the note register is the printed numbering', () => {
     const hidden: DocOverrides = { ...emptyOverrides(), hidden: { [ppe!.id]: true } };
     const after = buildNoteRegister(model, hidden);
     expect(after.byId.has(ppe!.id)).toBe(false);
-    expect(after.notes.map((n) => n.noteNumber)).toEqual(after.notes.map((_, i) => i + 1));
+    expect(after.notes.map((n) => n.noteNumber)).toEqual(after.notes.map((_, i) => i + FIRST_NOTE_NUMBER));
     // The statement line no longer points anywhere, rather than at a note that is not there.
     expect(statementRefs(model, hidden).some((r) => r.line === 'sfp.ppe')).toBe(false);
     // Every note after it moved up by one, and the statements followed.
@@ -104,7 +105,7 @@ describe('the note register is the printed numbering', () => {
     };
     const after = buildNoteRegister(model, overrides);
     expect(after.notes.map((n) => n.id)).toEqual(moved);
-    expect(after.notes.map((n) => n.noteNumber)).toEqual(moved.map((_, i) => i + 1));
+    expect(after.notes.map((n) => n.noteNumber)).toEqual(moved.map((_, i) => i + FIRST_NOTE_NUMBER));
     expect(printedNumbers(model, overrides).map((n) => n.id)).toEqual(moved);
     for (const r of statementRefs(model, overrides)) {
       expect(after.forLine(r.line)?.noteNumber).toBe(r.ref);
@@ -133,10 +134,35 @@ describe('the note register is the printed numbering', () => {
       order: Object.fromEntries(everyNote.map((id, i) => [id, i])),
     };
     const register = buildNoteRegister(model, overrides);
-    expect(register.notes.map((n) => n.noteNumber)).toEqual(register.notes.map((_, i) => i + 1));
+    expect(register.notes.map((n) => n.noteNumber)).toEqual(register.notes.map((_, i) => i + FIRST_NOTE_NUMBER));
     const printed = printedNumbers(model, overrides);
-    expect(printed.map((n) => n.noteNumber)).toEqual(printed.map((_, i) => i + 1));
+    expect(printed.map((n) => n.noteNumber)).toEqual(printed.map((_, i) => i + FIRST_NOTE_NUMBER));
     for (const id of register.withheld.keys()) expect(register.byId.has(id)).toBe(false);
+  });
+});
+
+describe('a note with nothing filled in is withheld from print', () => {
+  it('withholds an all-placeholder note, and prints it again when a line is switched on', () => {
+    // Find a scenario where the engine held back a note for being unfilled.
+    const found = scenarios()
+      .map(([name, model]) => ({ name, model, register: buildNoteRegister(model, emptyOverrides()) }))
+      .find(({ register }) =>
+        [...register.withheld.values()].some((reason) => /Nothing filled in yet/i.test(reason)),
+      );
+    expect(found, 'a scenario with an unfilled note').toBeDefined();
+    const { model, register } = found!;
+    const [noteId] = [...register.withheld.entries()].find(([, r]) => /Nothing filled in yet/i.test(r))!;
+    const note = model.notes.find((n) => n.id === noteId)!;
+    expect(register.byId.has(noteId)).toBe(false);
+
+    // Switching any line of that note on pins it back into the printed set.
+    const code = String(note.disclosure_code).toUpperCase();
+    const overrides: DocOverrides = {
+      ...emptyOverrides(),
+      lines: { [`${code}|some-table|some-line`]: true },
+    };
+    const after = buildNoteRegister(model, overrides);
+    expect(after.byCode.has(code)).toBe(true);
   });
 });
 
@@ -191,7 +217,7 @@ describe('the printed document links each note reference to its note', () => {
         if (!label || !/^\d+$/.test(label.text)) continue; // a contents entry
         const target = byId.get(link.destPage)!;
         expect(
-          target.texts.some((t) => t.text.startsWith(`Note ${label.text}. `)),
+          target.texts.some((t) => t.text.startsWith(`${label.text}. `)),
           `link "${label.text}" lands on its note`,
         ).toBe(true);
         checked += 1;
@@ -225,8 +251,10 @@ describe('statement presentation', () => {
 
   it('writes a figure the way the notes write it', () => {
     const plain = (s: string) => s.replace(/\u00a0/g, ' ');
-    expect(plain(formatStatementFigure(2540000, 'item'))).toBe('2 540 000,00');
-    expect(plain(formatStatementFigure(-1819850, 'total'))).toBe('(1 819 850,00)');
+    expect(plain(formatStatementFigure(2540000, 'item'))).toBe('2 540 000');
+    expect(plain(formatStatementFigure(-1819850, 'total'))).toBe('(1 819 850)');
+    // The document prints whole Rands; the cents live on in the figures.
+    expect(plain(formatStatementFigure(950172.28, 'item'))).toBe('950 172');
     expect(formatStatementFigure(0, 'item')).toBe('–');
     // Not stated is not the same claim as nil.
     expect(formatStatementFigure(null, 'total')).toBe('');
@@ -262,7 +290,7 @@ describe('statement presentation', () => {
       { current: '2026', comparative: '2025' },
     );
     expect(rows[0]).toEqual(['Description', '2026', '2025']);
-    expect(rows[1].map((c) => c.replace(/\u00a0/g, ' '))).toEqual(['Trade receivables', '740 650,00', '(248 000,00)']);
+    expect(rows[1].map((c) => c.replace(/\u00a0/g, ' '))).toEqual(['Trade receivables', '740 650', '(248 000)']);
     expect(rows[2]).toEqual(['Useful life (years)', '5', '2025']);
   });
 });

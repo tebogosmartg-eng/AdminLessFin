@@ -152,17 +152,18 @@ describe('Phase C — Signature assembly', () => {
 });
 
 describe('Phase C — Signature rendering + Preview≡PDF', () => {
-  it('renders placeholders when signatures are empty', () => {
+  // The practice's internal sign-off grid (prepared / reviewed / approved by)
+  // is workflow, recorded in the review; a published set is approved by its
+  // directors on the responsibilities page. Nothing prints as a placeholder.
+  it('prints the directors\' approval, and no sign-off placeholders', () => {
     const model = baseModel(null);
     const pdf = generateWorkspaceAfsPdf(model, emptyOverrides());
     const text = decodePdfText(workspacePdfToBytes(pdf));
-    expect(text).toMatch(/Approval of Annual Financial Statements/);
-    expect(text).toMatch(/Prepared By/);
-    expect(text).toMatch(/Reviewed By/);
-    expect(text).toMatch(/Approved By/);
-    expect(text).toMatch(/Authorised Representative/);
-    expect(text).toContain(SIGNATURE_PLACEHOLDERS.name);
-    expect(text).toContain(SIGNATURE_PLACEHOLDERS.signature);
+    expect(text).toMatch(/Directors' Responsibilities and Approval/);
+    expect(text).toMatch(/approved by the board of directors/);
+    expect(text).not.toMatch(/Prepared By/);
+    expect(text).not.toContain(SIGNATURE_PLACEHOLDERS.name);
+    expect(text).not.toContain(SIGNATURE_PLACEHOLDERS.signature);
   });
 
   it('renders captured names for partial signatures and placeholders for the rest', () => {
@@ -173,8 +174,9 @@ describe('Phase C — Signature rendering + Preview≡PDF', () => {
     const text = decodePdfText(
       workspacePdfToBytes(generateWorkspaceAfsPdf(model, emptyOverrides())),
     );
+    // The preparer is named where a published set names them: general information.
     expect(text).toMatch(/Ada Accountant/);
-    expect(text).toContain(SIGNATURE_PLACEHOLDERS.name);
+    expect(text).not.toContain(SIGNATURE_PLACEHOLDERS.name);
   });
 
   it('renders complete signature set with dates', () => {
@@ -191,12 +193,11 @@ describe('Phase C — Signature rendering + Preview≡PDF', () => {
       workspacePdfToBytes(generateWorkspaceAfsPdf(model, emptyOverrides())),
     );
     expect(text).toMatch(/Ada Accountant/);
-    expect(text).toMatch(/Mo Manager/);
-    expect(text).toMatch(/Pat Partner/);
     expect(text).toMatch(/Sam Secretary/);
-    expect(text).toMatch(/2026-06-30/);
-    expect(text).toMatch(/2026-07-01/);
-    expect(text).toContain(SIGNATURE_PLACEHOLDERS.signature);
+    // Manager and partner sign-offs are the review workflow's record, not
+    // content of the published statements.
+    expect(text).not.toMatch(/Mo Manager/);
+    expect(text).not.toContain(SIGNATURE_PLACEHOLDERS.signature);
   });
 
   it('Preview bytes equal Download bytes with signatures', () => {

@@ -163,6 +163,30 @@ describe.each(listFrameworkKeys())('Critical Gap 2 — %s pack generates complet
   });
 });
 
+describe('Policies apply only where the company has the item', () => {
+  it('withholds specialised boilerplate policies when the facts do not support them', () => {
+    const result = assembleFrameworkDocument({ frameworkKey: 'IFRS_SME', statements: statements(true) });
+    const codes = result.policySets[0].policies.map((p) => p.policy_code);
+    // A small trading company does not publish these.
+    for (const gone of ['POL.HYPERINFLATION', 'POL.SBP', 'POL.BUSCOMB', 'POL.JOINTVENTURES', 'POL.INVPROP']) {
+      expect(codes, `${gone} needs a supporting fact`).not.toContain(gone);
+    }
+    // The core policies always print, and judgements join them as 1.1.
+    for (const kept of ['POL.BASIS', 'POL.JUDGEMENTS', 'POL.REVENUE', 'POL.FININST', 'POL.TAX']) {
+      expect(codes).toContain(kept);
+    }
+  });
+
+  it('includes a conditional policy the moment its condition is met', () => {
+    const result = assembleFrameworkDocument({
+      frameworkKey: 'IFRS_SME',
+      statements: statements(true),
+      context: { conditions: { hasInvestmentProperty: true } },
+    });
+    expect(result.policySets[0].policies.map((p) => p.policy_code)).toContain('POL.INVPROP');
+  });
+});
+
 describe('Critical Gap 2 — Optional disclosures handled by conditional rules', () => {
   it('flags optional disclosures but does not insert them when conditions are unmet', () => {
     const result = assembleFrameworkDocument({ frameworkKey: 'IFRS', statements: statements(false) });
@@ -273,7 +297,7 @@ describe('Critical Gap 2 — Numbering, cross-references and Preview == Publishe
     const view = prepareCanonicalDocumentView(model, emptyOverrides());
     const numbers = view.notes.map((n) => n.noteNumber);
     expect(numbers).toEqual([...numbers].sort((a, b) => a - b));
-    expect(numbers[0]).toBe(1);
+    expect(numbers[0]).toBe(2); // the accounting policies are note 1
     expect(new Set(numbers).size).toBe(numbers.length);
   });
 

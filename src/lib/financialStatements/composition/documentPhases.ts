@@ -64,7 +64,7 @@ export const DOCUMENT_PHASES: PhaseDefinition[] = [
       { kind: 'statement', title: 'Statement of Financial Position', required: true },
       {
         kind: 'statement',
-        title: 'Statement of Profit or Loss and Other Comprehensive Income',
+        title: 'Statement of Comprehensive Income',
         required: true,
       },
       { kind: 'statement', title: 'Statement of Changes in Equity', required: true },

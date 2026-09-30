@@ -1,6 +1,13 @@
 /**
- * Default note ordering for presentation metadata (V14.2).
+ * Default note ordering for presentation metadata (V14.2 / V18).
  * Lower sortOrder appears earlier in the notes section.
+ *
+ * The sequence is the one a professionally published set reads in: general
+ * information first, then the statement of financial position top to bottom
+ * (assets, equity, liabilities), then the statement of comprehensive income,
+ * then the supporting notes (tax, cash flow), and the narrative notes at the
+ * end. Includes the disclosure engine's codes as well as the framework's, so
+ * both kinds of note file into one sequence.
  */
 export const DEFAULT_NOTE_ORDER: Record<string, number> = {
   'DISC.TRANSITION': 5,
@@ -10,43 +17,55 @@ export const DEFAULT_NOTE_ORDER: Record<string, number> = {
   'DISC.JUDGEMENTS': 40,
   'DISC.POLICYCHANGES': 45,
   'DISC.CONSOLIDATION': 50,
-  'DISC.CAPITAL': 55,
-  'DISC.REVENUE': 100,
-  'DISC.GRANTS': 120,
-  'DISC.REVENUE_NONEXCHANGE': 100,
-  'DISC.REVENUE_EXCHANGE': 110,
-  'DISC.DISCONTINUED': 150,
-  'DISC.PPE': 200,
-  'DISC.INTANGIBLES': 210,
-  'DISC.INVPROP': 220,
-  'DISC.BUSCOMB': 230,
-  'DISC.HERITAGE': 230,
-  'DISC.BIOLOGICAL': 240,
-  'DISC.ASSOCIATES': 250,
-  'DISC.JOINTVENTURES': 255,
-  'DISC.IMPAIRMENT': 270,
-  'DISC.INVENTORIES': 300,
-  'DISC.RECEIVABLES': 310,
-  'DISC.PAYABLES': 320,
-  'DISC.FININST': 330,
-  'DISC.LEASES': 340,
-  'DISC.BORROWINGS': 350,
-  'DISC.BORROWINGCOST': 355,
-  'DISC.PROVISIONS': 400,
-  'DISC.EMPLOYEE': 410,
-  'DISC.SBP': 420,
+  // ── Statement of financial position: assets ──────────────────────────────
+  'DISC.PPE': 100,
+  'DISC.INTANGIBLES': 110,
+  'DISC.INVPROP': 120,
+  'DISC.BUSCOMB': 130,
+  'DISC.HERITAGE': 135,
+  'DISC.BIOLOGICAL': 140,
+  'DISC.ASSOCIATES': 150,
+  'DISC.JOINTVENTURES': 155,
+  'DISC.DEFERREDTAX': 170,
+  'DISC.INVENTORIES': 200,
+  'DISC.RECEIVABLES': 210,
+  'DISC.CASH': 220,
+  'DISC.CASHEQUIV': 220,
+  // ── Equity and liabilities ────────────────────────────────────────────────
+  'DISC.SHARECAPITAL': 300,
+  'DISC.EQUITY': 300,
+  'DISC.CAPITAL': 310,
+  'DISC.BORROWINGS': 320,
+  'DISC.LEASES': 330,
+  'DISC.PAYABLES': 340,
+  'DISC.PROVISIONS': 350,
+  'DISC.FININST': 380,
+  'DISC.FOREX': 390,
+  // ── Statement of comprehensive income ────────────────────────────────────
+  'DISC.REVENUE': 400,
+  'DISC.REVENUE_NONEXCHANGE': 400,
+  'DISC.REVENUE_EXCHANGE': 405,
+  'DISC.GRANTS': 410,
+  'DISC.OTHERINCOME': 420,
+  'DISC.COSTOFSALES': 430,
+  'DISC.OPERATINGEXPENSES': 440,
+  'DISC.EMPLOYEE': 450,
+  'DISC.SBP': 455,
+  'DISC.IMPAIRMENT': 460,
+  'DISC.BORROWINGCOST': 470,
+  'DISC.FINANCECOSTS': 480,
+  'DISC.DISCONTINUED': 480,
   'DISC.TAX': 500,
-  'DISC.DEFERREDTAX': 510,
-  'DISC.FOREX': 520,
   'DISC.HYPERINFLATION': 530,
-  'DISC.SHARECAPITAL': 600,
+  // ── Supporting and narrative notes ────────────────────────────────────────
   'DISC.CASHFLOW': 700,
-  'DISC.RELATED': 800,
-  'DISC.COMMITMENTS': 850,
-  'DISC.CONTINGENT': 860,
+  'DISC.COMMITMENTS': 800,
+  'DISC.CONTINGENT': 810,
+  'DISC.RELATED': 820,
   'DISC.BUDGET': 870,
-  'DISC.EVENTS': 900,
-  'DISC.GOINGCONCERN': 950,
+  'DISC.COMPARATIVES': 880,
+  'DISC.GOINGCONCERN': 900,
+  'DISC.EVENTS': 950,
 };
 
 export function noteSortOrder(code: string): number {

@@ -188,20 +188,29 @@ function applyDisclosureOrdering(
 }
 
 /**
- * Number the notes that will be printed, 1 to N, in the order they print.
+ * The number the notes start from. The accounting policies read as note 1 of
+ * a published set — "1. Basis of preparation…", "1.2 Financial instruments" —
+ * so the first disclosure note is note 2, the way a professionally produced
+ * set of statements numbers them.
+ */
+export const FIRST_NOTE_NUMBER = 2;
+
+/**
+ * Number the notes that will be printed, in the order they print.
  *
  * This is the one place a note gets its number. It runs after suppression and
  * ordering, so a note the engine withheld leaves no gap and cannot be
  * referred to, and every copy of the number — the note, its section, its
  * heading, the enterprise disclosure and the code lookup the statements use —
- * is written here together, so none of them can disagree.
+ * is written here together, so none of them can disagree. Headings print the
+ * way a published set prints them: "3. Property, plant and equipment".
  */
 function renumberPrintedNotes(composition: CompositionDocument): CompositionDocument {
   const noteNumberByCode: Record<string, number> = {};
   const assigned = new Map<string, { noteNumber: number; heading: string }>();
   const numberedNotes = composition.numberedNotes.map((n, idx) => {
-    const noteNumber = idx + 1;
-    const heading = `Note ${noteNumber}. ${n.title}`;
+    const noteNumber = idx + FIRST_NOTE_NUMBER;
+    const heading = `${noteNumber}. ${n.title}`;
     const code = String(n.disclosureCode || '').toUpperCase();
     if (code && noteNumberByCode[code] == null) noteNumberByCode[code] = noteNumber;
     assigned.set(n.id, { noteNumber, heading });

@@ -94,9 +94,12 @@ export default function DocumentTree({
   onToggleHidden,
   onAddDisclosure,
   register,
+  frontMatter,
 }: {
   model: DocumentModel;
   overrides: DocOverrides;
+  /** The narrative front matter as it will print, for titles and edit state. */
+  frontMatter?: import('../../../lib/financialStatements/publication/canonicalDocumentView').CanonicalFrontMatter | null;
   /** The printed numbering — the same one the statements and the PDF use. */
   register: NoteRegister | null;
   selection: DocSelection;
@@ -133,6 +136,33 @@ export default function DocumentTree({
         active={isActive('contents', 'contents')}
         onSelect={() => onSelect({ kind: 'contents', id: 'contents' })}
       />
+
+      <GroupLabel>Reports</GroupLabel>
+      {[
+        {
+          id: 'front:directors_responsibilities',
+          label: frontMatter?.responsibilities.title ?? "Directors' Responsibilities and Approval",
+          authored: frontMatter?.responsibilities.authored,
+        },
+        {
+          id: 'front:directors_report',
+          label: frontMatter?.directorsReport.title ?? "Directors' Report",
+          authored: frontMatter?.directorsReport.authored,
+        },
+        {
+          id: 'front:independent_auditor',
+          label: frontMatter?.practitionerReport.title ?? "Independent Auditor's Report",
+          authored: frontMatter?.practitionerReport.authored,
+        },
+      ].map((row) => (
+        <TreeRow
+          key={row.id}
+          label={row.label}
+          badge={row.authored ? 'edited' : undefined}
+          active={isActive('front', row.id)}
+          onSelect={() => onSelect({ kind: 'front', id: row.id })}
+        />
+      ))}
 
       <GroupLabel>Statements</GroupLabel>
       {model.statements.map((s) => {

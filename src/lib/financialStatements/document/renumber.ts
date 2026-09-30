@@ -83,7 +83,7 @@ export function computeNoteNumbering(
       note: entry.note,
       noteNumber,
       title,
-      heading: `Note ${noteNumber}. ${title}`,
+      heading: `${noteNumber}. ${title}`,
     };
   });
 

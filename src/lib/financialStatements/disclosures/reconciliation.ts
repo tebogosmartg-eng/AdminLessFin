@@ -22,16 +22,28 @@ export type NoteReconciliationRule = {
   row: string;
   /** The statement line it must agree with. */
   line: string;
+  /**
+   * A matrix whose years are rows, not columns: the rows matching `row`
+   * (with `*` for the year) are this year then the comparative, and the
+   * figure is in this column.
+   */
+  matrixColumn?: number;
 };
 
 /** Which note total explains which statement line. Declared once, here. */
 export const NOTE_RECONCILIATIONS: NoteReconciliationRule[] = [
   { disclosure: 'DISC.PPE', table: 'PPE.CARRYING', row: 'Carrying amount', line: 'sfp.ppe' },
+  // The register-backed matrix: each year's total row, carrying value column.
+  { disclosure: 'DISC.PPE', table: 'PPE.MATRIX', row: 'm:*:total', line: 'sfp.ppe', matrixColumn: 3 },
   { disclosure: 'DISC.INTANGIBLES', table: 'INTANGIBLES.CARRYING', row: 'Carrying amount', line: 'sfp.intangibles' },
   { disclosure: 'DISC.INVENTORIES', table: 'INVENTORIES.ANALYSIS', row: 'Total inventories', line: 'sfp.inventory' },
   { disclosure: 'DISC.RECEIVABLES', table: 'RECEIVABLES.ANALYSIS', row: 'Net receivables', line: 'sfp.receivables' },
   { disclosure: 'DISC.CASH', table: 'CASH.ANALYSIS', row: 'Cash and cash equivalents', line: 'sfp.cash' },
   { disclosure: 'DISC.SHARECAPITAL', table: 'EQUITY.ANALYSIS', row: 'Total equity', line: 'sfp.total_equity' },
+  { disclosure: 'DISC.SHARECAPITAL', table: 'SHARECAPITAL.ANALYSIS', row: 'issued', line: 'sfp.issued_capital' },
+  { disclosure: 'DISC.TAX', table: 'TAX.COMPONENTS', row: 'Total taxation', line: 'perf.taxation' },
+  { disclosure: 'DISC.FINANCECOSTS', table: 'FINANCECOSTS.ANALYSIS', row: 'Total finance costs', line: 'perf.finance_costs' },
+  { disclosure: 'DISC.CASHFLOW', table: 'CASHFLOW.CGO', row: 'cash-generated', line: 'cf.operating.cash_generated' },
   { disclosure: 'DISC.BORROWINGS', table: 'BORROWINGS.ANALYSIS', row: 'Total borrowings', line: 'sfp.borrowings' },
   { disclosure: 'DISC.PAYABLES', table: 'PAYABLES.ANALYSIS', row: 'Total trade and other payables', line: 'sfp.payables' },
   { disclosure: 'DISC.PROVISIONS', table: 'PROVISIONS.ANALYSIS', row: 'Total provisions', line: 'sfp.provisions' },
@@ -77,12 +89,24 @@ export function reconcileNotesToStatements(model: DocumentModel): NoteDisagreeme
     const stored = note?.tables.find((t) => t.table_code === rule.table);
     if (!note || !stored) continue;
     const table = asGeneratedTable(stored);
-    const row = table.rows.find((r) => r.key === rule.row || r.cells[0]?.value === rule.row);
-    if (!row) continue;
+    let figures: [number | null, number | null];
+    if (rule.matrixColumn != null) {
+      const [head, tail = ''] = rule.row.split('*');
+      const hits = table.rows.filter((r) => {
+        const key = String(r.key ?? '');
+        return key.startsWith(head) && key.endsWith(tail) && key.length >= head.length + tail.length;
+      });
+      if (!hits.length) continue;
+      figures = [num(hits[0]?.cells[rule.matrixColumn]?.value), num(hits[1]?.cells[rule.matrixColumn]?.value)];
+    } else {
+      const row = table.rows.find((r) => r.key === rule.row || r.cells[0]?.value === rule.row);
+      if (!row) continue;
+      figures = [num(row.cells[1]?.value), num(row.cells[2]?.value)];
+    }
 
     const pairs: Array<['current' | 'comparative', number | null, number | null]> = [
-      ['current', num(row.cells[1]?.value), num(statement.line.amount)],
-      ['comparative', num(row.cells[2]?.value), num(statement.line.prior_amount)],
+      ['current', figures[0], num(statement.line.amount)],
+      ['comparative', figures[1], num(statement.line.prior_amount)],
     ];
     for (const [year, noteFigure, statementFigure] of pairs) {
       if (noteFigure == null || statementFigure == null) continue;

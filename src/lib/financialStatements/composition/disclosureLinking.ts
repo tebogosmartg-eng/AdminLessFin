@@ -182,7 +182,8 @@ export const LINE_DISCLOSURE_LINK_RULES: LineLinkRule[] = [
   },
   {
     lineCodePatterns: ['perf.finance'],
-    disclosureCodes: ['DISC.BORROWINGS', 'DISC.BORROWINGCOST'],
+    // The finance costs note explains the charge; borrowings are the fallback.
+    disclosureCodes: ['DISC.FINANCECOSTS', 'DISC.BORROWINGS', 'DISC.BORROWINGCOST'],
     policyCodes: ['POL.BORROWINGCOST', 'POL.FININST'],
     accountCategories: ['finance_costs'],
   },
@@ -205,7 +206,9 @@ export const LINE_DISCLOSURE_LINK_RULES: LineLinkRule[] = [
     frameworkSections: ['IFRS_SME.5'],
   },
   {
-    lineCodePatterns: ['cf.operating', 'cf.generated', 'cf.investing', 'cf.financing'],
+    // Only cash generated from operations has a note of its own; the other
+    // lines of the statement are self-explanatory.
+    lineCodePatterns: ['cf.operating.cash_generated'],
     disclosureCodes: ['DISC.CASHFLOW'],
     policyCodes: ['POL.CASH'],
     frameworkSections: ['IFRS_SME.7'],
