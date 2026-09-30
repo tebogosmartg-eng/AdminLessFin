@@ -25,7 +25,7 @@ import {
 } from '../document/crossRefRewrite';
 import { buildNoteRegister, registerFromComposition } from '../document/noteRegister';
 import type { NumberedNote } from '../document/renumber';
-import { isHidden, resolvedTitle, type DocOverrides } from '../document/documentStore';
+import { includeChoice, isHidden, resolvedTitle, type DocOverrides } from '../document/documentStore';
 import { resolveNoteContent } from '../document/noteContent';
 import {
   displaySignatureField,
@@ -34,6 +34,7 @@ import {
 } from '../document/signatureModel';
 import { resolveBrandIdentity, type BrandIdentity } from './branding';
 import type { CompositionDocument, CompositionPolicy } from '../composition/types';
+import { statementLineLabel } from '../composition/compose';
 import { provideCorporateInformation } from '../corporateInformation';
 import { corporateDisplayFromModel } from '../corporateInformation/accessors';
 import type { CorporateInformationModel } from '../corporateInformation';
@@ -119,6 +120,8 @@ export type CanonicalFrontMatterSection = {
   blocks: CanonicalNarrativeBlock[];
   /** True when the preparer's wording replaced the generated text. */
   authored: boolean;
+  /** False where the preparer switched the section off; it does not print. */
+  included: boolean;
 };
 
 export type CanonicalFrontMatter = {
@@ -339,8 +342,11 @@ export function prepareCanonicalDocumentView(
   // Every note number on every statement comes from the one register, which
   // holds only the notes this document prints.
   const register = registerFromComposition(composition);
-  const withNoteRef = (line: DocStatementNode['lines'][number]) => ({
+  // Each line carries its printed note number and the caption the preparer
+  // gave it, where they renamed it; the figures are the ledger's.
+  const withNoteRef = (statementType: string) => (line: DocStatementNode['lines'][number]) => ({
     ...line,
+    label: statementLineLabel(overrides, statementType, line),
     note_ref: register.forLine(line.line_code)?.noteNumber ?? null,
   });
 
@@ -359,7 +365,7 @@ export function prepareCanonicalDocumentView(
             statement_type: cs.statementType,
             title: cs.title,
             periodCaption: cs.periodCaption,
-            lines: (source?.lines || []).map(withNoteRef),
+            lines: (source?.lines || []).map(withNoteRef(cs.statementType)),
             populated: cs.populated,
           };
         })
@@ -373,7 +379,7 @@ export function prepareCanonicalDocumentView(
               resolvedTitle(overrides, s.id, s.title),
             ),
             periodCaption: statementPeriodCaption(s.statement_type, model.period || {}),
-            lines: s.lines.map(withNoteRef),
+            lines: s.lines.map(withNoteRef(s.statement_type)),
             populated: s.populated,
           }));
 
@@ -598,6 +604,7 @@ function resolveFrontSection(
     title: resolvedTitle(overrides, id, defaultTitle),
     blocks,
     authored: authoredBlocks.length > 0,
+    included: includeChoice(overrides, 'section', id) !== false,
   };
 }
 

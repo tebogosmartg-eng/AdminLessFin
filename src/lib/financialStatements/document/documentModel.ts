@@ -76,6 +76,13 @@ export type DocPolicyNode = {
   table?: string[][];
   /** Wording that follows the table. */
   bodyAfter?: string;
+  /**
+   * False where nothing in the books calls for this policy. It is still in
+   * the document, switched off, for the preparer to switch on.
+   */
+  applies?: boolean;
+  /** Why it does not apply, in words the preparer reads. */
+  applicability?: string;
 };
 
 export type DocPolicySetNode = {
@@ -126,6 +133,14 @@ export type DocNoteNode = {
   tables: DocTable[];
   /** Provenance: 'engagement' (server, editable) or 'framework' (generated). */
   source?: 'engagement' | 'framework';
+  /**
+   * False for an optional framework disclosure whose condition the books do
+   * not meet. It is still in the document, switched off, for the preparer to
+   * switch on.
+   */
+  applies?: boolean;
+  /** Why it does not apply, in words the preparer reads. */
+  applicability?: string;
 };
 
 export type DocumentPeriod = {

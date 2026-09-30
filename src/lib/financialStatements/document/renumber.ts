@@ -13,7 +13,7 @@
 import { numberDisclosures } from '../publication/afsProfessionalPdf';
 import type { DocNoteNode } from './documentModel';
 import { isPolicyNote } from './documentModel';
-import { isHidden, resolvedTitle, type DocOverrides } from './documentStore';
+import { includeChoice, isHidden, resolvedTitle, type DocOverrides } from './documentStore';
 
 export type NumberedNote = {
   note: DocNoteNode;
@@ -42,7 +42,12 @@ function defaultRankByCode(notes: DocNoteNode[]): Map<string, number> {
 function isVisible(note: DocNoteNode, overrides: DocOverrides): boolean {
   if (note.status === 'superseded') return false;
   if (isPolicyNote(note)) return false;
+  const choice = includeChoice(overrides, 'note', note.disclosure_code);
+  if (choice != null) return choice;
   if (isHidden(overrides, note.id)) return false;
+  // Available but off by default: the books do not call for it, and the
+  // preparer has not switched it on.
+  if (note.applies === false) return false;
   return true;
 }
 

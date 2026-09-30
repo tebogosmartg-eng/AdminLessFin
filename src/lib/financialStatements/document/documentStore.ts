@@ -43,8 +43,108 @@ export type DocOverrides = {
    * wording prints.
    */
   narratives: Record<string, NarrativeBlockOverride[]>;
+  /**
+   * The preparer's decision on whether a note, a policy or a supplementary
+   * schedule prints, keyed by `includeKey` (its code, which survives the note
+   * being stored and re-identified). `true` prints it whatever the engine
+   * decided — a note the materiality rules withheld, a policy the books give
+   * no occasion for; `false` leaves it out. Absent means the engine's
+   * decision stands.
+   */
+  include: Record<string, boolean>;
+  /**
+   * The preparer's wording for a statement line, keyed by `lineLabelKey`
+   * (statement type and line code). Absent means the chart's own caption.
+   */
+  lineLabels: Record<string, string>;
+  /**
+   * The preparer's version of the parts of a policy that are not its body —
+   * the table it states and the wording after it — by policy code. `null`
+   * removes the part; absent keeps what the engine composed.
+   */
+  policyParts: Record<string, { table?: string[][] | null; bodyAfter?: string | null }>;
   updatedAt: string;
 };
+
+/** What can be switched on or off: a note, a policy, a supplementary schedule, a front section. */
+export type IncludeKind = 'note' | 'policy' | 'schedule' | 'section';
+
+/** The key a note, policy or schedule is switched on or off by. */
+export function includeKey(kind: IncludeKind, code: string): string {
+  return `${kind}:${String(code || '').toUpperCase()}`;
+}
+
+/** The key a statement line's caption is renamed by. */
+export function lineLabelKey(statementType: string, lineCode: string): string {
+  return `${String(statementType || '').toUpperCase()}|${String(lineCode || '')}`;
+}
+
+/** The key a supplementary schedule's line caption is renamed by. */
+export function scheduleLineKey(scheduleId: string, label: string): string {
+  return `${scheduleId}|${String(label || '').trim()}`;
+}
+
+/** The preparer's explicit choice for a node, or null where the engine decides. */
+export function includeChoice(
+  overrides: DocOverrides,
+  kind: IncludeKind,
+  code: string,
+): boolean | null {
+  const v = overrides.include?.[includeKey(kind, code)];
+  return typeof v === 'boolean' ? v : null;
+}
+
+/**
+ * Whether a policy prints: the preparer's choice where they made one, else
+ * it prints unless hidden or the books give no occasion for it.
+ */
+export function isPolicyPrinted(
+  overrides: DocOverrides,
+  policy: { id: string; policy_code: string; applies?: boolean; status?: string },
+): boolean {
+  if (policy.status === 'superseded') return false;
+  const choice = includeChoice(overrides, 'policy', policy.policy_code);
+  if (choice != null) return choice;
+  return !isHidden(overrides, policy.id) && policy.applies !== false;
+}
+
+/**
+ * The presentation choices with every include decision folded into `hidden`,
+ * so the composition — which reads `hidden` — sees the preparer's switches.
+ * A note switched on is unhidden (the decision engine is told separately not
+ * to withhold it); a policy the books give no occasion for is hidden unless
+ * switched on.
+ */
+export function resolveInclusion(
+  model: {
+    notes: Array<{ id: string; disclosure_code: string }>;
+    policySets: Array<{ policies: Array<{ id: string; policy_code: string; applies?: boolean; status?: string }> }>;
+  },
+  overrides: DocOverrides,
+): DocOverrides {
+  const hidden = { ...(overrides.hidden || {}) };
+  for (const note of model.notes) {
+    const choice = includeChoice(overrides, 'note', note.disclosure_code);
+    if (choice === true) delete hidden[note.id];
+    else if (choice === false) hidden[note.id] = true;
+  }
+  for (const set of model.policySets) {
+    for (const policy of set.policies || []) {
+      if (isPolicyPrinted(overrides, policy)) delete hidden[policy.id];
+      else hidden[policy.id] = true;
+    }
+  }
+  return { ...overrides, hidden };
+}
+
+/** Codes of the notes the preparer switched on. */
+export function includedNoteCodes(overrides: DocOverrides): Set<string> {
+  return new Set(
+    Object.entries(overrides.include || {})
+      .filter(([k, v]) => v === true && k.startsWith('note:'))
+      .map(([k]) => k.slice('note:'.length)),
+  );
+}
 
 /** Where presentation state used to be kept, read once to carry it over. */
 const LEGACY_PREFIX = 'efs.docws.v1.';
@@ -59,6 +159,9 @@ export function emptyOverrides(): DocOverrides {
     lines: {},
     pageBreaks: {},
     narratives: {},
+    include: {},
+    lineLabels: {},
+    policyParts: {},
     updatedAt: new Date().toISOString(),
   };
 }
@@ -74,6 +177,9 @@ function normalise(parsed: Partial<DocOverrides> | null | undefined): DocOverrid
     lines: parsed?.lines || {},
     pageBreaks: parsed?.pageBreaks || {},
     narratives: parsed?.narratives || {},
+    include: parsed?.include || {},
+    lineLabels: parsed?.lineLabels || {},
+    policyParts: parsed?.policyParts || {},
   };
 }
 
@@ -81,7 +187,8 @@ function hasAnyChoice(o: DocOverrides): boolean {
   return (
     Object.keys(o.hidden).length > 0 ||
     Object.keys(o.order).length > 0 ||
-    Object.keys(o.titleOverrides).length > 0
+    Object.keys(o.titleOverrides).length > 0 ||
+    Object.keys(o.include || {}).length > 0
   );
 }
 
@@ -320,6 +427,65 @@ export function useDocumentOverrides(workspaceId: string, companyId?: string) {
     [mutate],
   );
 
+  /**
+   * Switch a note, policy or schedule on or off. `null` forgets the choice,
+   * handing the decision back to the engine. Switching something on also
+   * forgets an older "hidden" mark on the node, so the two never disagree.
+   */
+  const setIncluded = useCallback(
+    (
+      kind: IncludeKind,
+      code: string,
+      printed: boolean | null,
+      nodeId?: string,
+    ) =>
+      mutate((prev) => {
+        const include = { ...(prev.include || {}) };
+        const key = includeKey(kind, code);
+        if (printed === null) delete include[key];
+        else include[key] = printed;
+        const hidden = { ...prev.hidden };
+        if (nodeId) delete hidden[nodeId];
+        return { ...prev, include, hidden };
+      }),
+    [mutate],
+  );
+
+  /** Rename a statement line; an empty caption returns it to the chart's. */
+  const setLineLabel = useCallback(
+    (key: string, label: string | null) =>
+      mutate((prev) => {
+        const next = { ...(prev.lineLabels || {}) };
+        if (label && label.trim()) next[key] = label.trim();
+        else delete next[key];
+        return { ...prev, lineLabels: next };
+      }),
+    [mutate],
+  );
+
+  /**
+   * Replace part of a policy other than its body. `undefined` for a part
+   * returns it to what the engine composed; `null` removes it.
+   */
+  const setPolicyPart = useCallback(
+    (
+      policyCode: string,
+      part: 'table' | 'bodyAfter',
+      value: string[][] | string | null | undefined,
+    ) =>
+      mutate((prev) => {
+        const code = String(policyCode || '').toUpperCase();
+        const all = { ...(prev.policyParts || {}) };
+        const entry = { ...(all[code] || {}) } as Record<string, unknown>;
+        if (value === undefined) delete entry[part];
+        else entry[part] = value;
+        if (Object.keys(entry).length) all[code] = entry as DocOverrides['policyParts'][string];
+        else delete all[code];
+        return { ...prev, policyParts: all };
+      }),
+    [mutate],
+  );
+
   /** Start a note on a new page, or let it follow on. */
   const setPageBreak = useCallback(
     (noteId: string, breakBefore: boolean) =>
@@ -338,6 +504,9 @@ export function useDocumentOverrides(workspaceId: string, companyId?: string) {
     setLine,
     setNarrative,
     setPageBreak,
+    setIncluded,
+    setLineLabel,
+    setPolicyPart,
     setHidden,
     toggleHidden,
     setOrder,

@@ -27,6 +27,7 @@ export type DocSelection =
   | { kind: 'policySet'; id: string }
   | { kind: 'policy'; id: string }
   | { kind: 'note'; id: string }
+  | { kind: 'schedule'; id: string }
   | { kind: 'signature'; id: string };
 
 /**
@@ -134,6 +135,7 @@ export default function WorkspaceDocumentWorkspace({
             selection={selection}
             onSelect={setSelection}
             onToggleHidden={overridesApi.toggleHidden}
+            onSetIncluded={overridesApi.setIncluded}
             onAddDisclosure={() => setAddDisclosureOpen(true)}
             register={register}
             frontMatter={prepared?.view?.frontMatter ?? null}

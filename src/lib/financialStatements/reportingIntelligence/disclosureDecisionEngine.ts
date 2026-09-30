@@ -110,6 +110,12 @@ export function makeDisclosureDecisions(
   conditions: DisclosureConditionMap,
   /** Codes where the preparer switched a line on: never withheld as unfilled. */
   forcedOnCodes: Set<string> = new Set(),
+  /**
+   * Codes of notes the preparer switched on. The engine's rules decide what
+   * prints by default; they never overrule the preparer. Such a note prints
+   * in full — not collapsed, not merged, not withheld.
+   */
+  switchedOnCodes: Set<string> = new Set(),
 ): DisclosureDecision[] {
   const facts = extractStatementFacts(model);
   const materialityByCode = new Map(materiality.map((m) => [m.disclosureCode, m]));
@@ -128,6 +134,14 @@ export function makeDisclosureDecisions(
     const shouldMerge = action === 'merge';
     let reason = mat?.reason ?? 'Default presentation';
     let mergedWith: string | undefined;
+
+    // An optional disclosure whose condition the books do not meet is
+    // available, switched off, rather than absent.
+    if (note.applies === false) {
+      exists = false;
+      shouldSuppress = true;
+      reason = note.applicability || 'Not indicated by the books. Switch it on if it applies to this entity.';
+    }
 
     const suppressRule = SUPPRESS_WHEN_ABSENT.find((r) => r.code === code);
     if (suppressRule && note.requirement_level !== 'mandatory' && note.requirement_level !== 'required') {
@@ -198,6 +212,14 @@ export function makeDisclosureDecisions(
       shouldSuppress = true;
       reason =
         'Nothing filled in yet — the note prints once a figure is entered or one of its lines is switched on';
+    }
+
+    if (switchedOnCodes.has(String(code || '').toUpperCase())) {
+      exists = true;
+      shouldSuppress = false;
+      shouldSimplify = false;
+      mergedWith = undefined;
+      reason = 'Switched on by the preparer';
     }
 
     decisions.push({

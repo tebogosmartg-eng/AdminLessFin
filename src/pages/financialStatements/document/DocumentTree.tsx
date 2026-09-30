@@ -1,8 +1,11 @@
 import type { NoteRegister } from '../../../lib/financialStatements/document/noteRegister';
 import {
+  includeChoice,
   isHidden,
+  isPolicyPrinted,
   resolvedTitle,
   type DocOverrides,
+  type IncludeKind,
 } from '../../../lib/financialStatements/document/documentStore';
 import type { DocumentModel } from '../../../lib/financialStatements/document/documentModel';
 import { professionalStatementTitle } from '../../../lib/financialStatements/publication/afsProfessionalPdf';
@@ -68,13 +71,22 @@ function TreeRow({
           type="button"
           onClick={onToggleHidden}
           className="shrink-0 rounded p-1 text-muted-foreground opacity-0 hover:text-foreground group-hover:opacity-100"
-          title={hidden ? 'Show in preview / PDF' : 'Hide from preview / PDF'}
-          aria-label={hidden ? 'Show section' : 'Hide section'}
+          title={hidden ? 'Switch on: print in the AFS' : 'Switch off: leave out of the AFS'}
+          aria-label={hidden ? 'Switch on' : 'Switch off'}
+          data-testid={testId ? `${testId}-switch` : undefined}
         >
           {hidden ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
         </button>
       ) : null}
     </div>
+  );
+}
+
+function SubLabel({ children }: { children: React.ReactNode }) {
+  return (
+    <p className="px-3 pb-0.5 pt-2 text-[11px] font-medium text-muted-foreground" data-testid="afs-tree-available">
+      {children}
+    </p>
   );
 }
 
@@ -92,6 +104,7 @@ export default function DocumentTree({
   selection,
   onSelect,
   onToggleHidden,
+  onSetIncluded,
   onAddDisclosure,
   register,
   frontMatter,
@@ -105,6 +118,8 @@ export default function DocumentTree({
   selection: DocSelection;
   onSelect: (selection: DocSelection) => void;
   onToggleHidden: (nodeId: string) => void;
+  /** Switch a note, policy, schedule or front section on or off. */
+  onSetIncluded?: (kind: IncludeKind, code: string, printed: boolean | null, nodeId?: string) => void;
   onAddDisclosure?: () => void;
 }) {
   // Notes are listed in the order they print, each with the number it prints
@@ -154,15 +169,23 @@ export default function DocumentTree({
           label: frontMatter?.practitionerReport.title ?? "Independent Auditor's Report",
           authored: frontMatter?.practitionerReport.authored,
         },
-      ].map((row) => (
-        <TreeRow
-          key={row.id}
-          label={row.label}
-          badge={row.authored ? 'edited' : undefined}
-          active={isActive('front', row.id)}
-          onSelect={() => onSelect({ kind: 'front', id: row.id })}
-        />
-      ))}
+      ].map((row) => {
+        const off = includeChoice(overrides, 'section', row.id) === false;
+        return (
+          <TreeRow
+            key={row.id}
+            label={row.label}
+            testId="afs-tree-front"
+            badge={off ? 'off' : row.authored ? 'edited' : undefined}
+            active={isActive('front', row.id)}
+            muted={off}
+            hideable={!!onSetIncluded}
+            hidden={off}
+            onSelect={() => onSelect({ kind: 'front', id: row.id })}
+            onToggleHidden={() => onSetIncluded?.('section', row.id, off ? null : false)}
+          />
+        );
+      })}
 
       <GroupLabel>Statements</GroupLabel>
       {model.statements.map((s) => {
@@ -199,22 +222,42 @@ export default function DocumentTree({
               active={isActive('policySet', set.id)}
               onSelect={() => onSelect({ kind: 'policySet', id: set.id })}
             />
-            {set.policies.map((p) => {
-              const hidden = isHidden(overrides, p.id);
-              return (
-                <TreeRow
-                  key={p.id}
-                  label={resolvedTitle(overrides, p.id, p.title)}
-                  depth={2}
-                  active={isActive('policy', p.id)}
-                  muted={hidden}
-                  hideable
-                  hidden={hidden}
-                  onSelect={() => onSelect({ kind: 'policy', id: p.id })}
-                  onToggleHidden={() => onToggleHidden(p.id)}
-                />
-              );
-            })}
+            {[...set.policies]
+              .filter((p) => p.status !== 'superseded')
+              .sort((a, b) => Number(isPolicyPrinted(overrides, b)) - Number(isPolicyPrinted(overrides, a)))
+              .map((p, i, all) => {
+                const printed = isPolicyPrinted(overrides, p);
+                const firstOff = !printed && (i === 0 || isPolicyPrinted(overrides, all[i - 1]));
+                const choice = includeChoice(overrides, 'policy', p.policy_code);
+                const why =
+                  choice === false || (choice == null && isHidden(overrides, p.id))
+                    ? 'Switched off by you'
+                    : p.applies === false && choice !== true
+                      ? p.applicability
+                      : undefined;
+                return (
+                  <div key={p.id}>
+                    {firstOff ? <SubLabel>Available, not printed</SubLabel> : null}
+                    <TreeRow
+                      label={resolvedTitle(overrides, p.id, p.title)}
+                      depth={2}
+                      testId="afs-tree-policy"
+                      active={isActive('policy', p.id)}
+                      muted={!printed}
+                      badge={!printed ? 'off' : choice === true && p.applies === false ? 'on' : undefined}
+                      title={why ? `${p.title} - ${why}` : undefined}
+                      hideable
+                      hidden={!printed}
+                      onSelect={() => onSelect({ kind: 'policy', id: p.id })}
+                      onToggleHidden={() =>
+                        onSetIncluded
+                          ? onSetIncluded('policy', p.policy_code, !printed, p.id)
+                          : onToggleHidden(p.id)
+                      }
+                    />
+                  </div>
+                );
+              })}
           </div>
         ))
       )}
@@ -236,32 +279,71 @@ export default function DocumentTree({
       {model.notes.length === 0 ? (
         <p className="px-2 py-1 text-xs text-muted-foreground">No notes yet.</p>
       ) : (
-        notes.map((n) => {
-          const hidden = isHidden(overrides, n.id) || n.status === 'superseded';
+        notes.map((n, i) => {
+          const superseded = n.status === 'superseded';
           const number = numberById.get(n.id);
+          const printed = number != null;
+          const firstOff = !printed && (i === 0 || numberById.get(notes[i - 1].id) != null);
           const title = resolvedTitle(overrides, n.id, n.title);
-          // Left out by the reporting engine, not by the preparer, and the
-          // engine's own reason says why.
-          const withheld = !number && !hidden ? register?.withheld.get(n.id) : undefined;
+          const choice = includeChoice(overrides, 'note', n.disclosure_code);
+          // Why it is not printed: the preparer's switch, or the engine's own
+          // reason, which the preparer can overrule by switching it on.
+          const why = printed
+            ? undefined
+            : choice === false || (choice == null && isHidden(overrides, n.id))
+              ? 'Switched off by you'
+              : superseded
+                ? 'Superseded'
+                : register?.withheld.get(n.id);
           return (
-            <TreeRow
-              key={n.id}
-              label={number ? `Note ${number}. ${title}` : title}
-              depth={1}
-              testId="afs-tree-note"
-              noteNumber={number}
-              badge={withheld ? 'not printed' : undefined}
-              title={withheld ? `${title} — not printed: ${withheld}` : undefined}
-              active={isActive('note', n.id)}
-              muted={hidden}
-              hideable={n.status !== 'superseded'}
-              hidden={hidden}
-              onSelect={() => onSelect({ kind: 'note', id: n.id })}
-              onToggleHidden={() => onToggleHidden(n.id)}
-            />
+            <div key={n.id}>
+              {firstOff ? <SubLabel>Available, not printed</SubLabel> : null}
+              <TreeRow
+                label={number ? `Note ${number}. ${title}` : title}
+                depth={1}
+                testId="afs-tree-note"
+                noteNumber={number}
+                badge={!printed ? 'off' : choice === true ? 'on' : undefined}
+                title={why ? `${title} - not printed: ${why}` : undefined}
+                active={isActive('note', n.id)}
+                muted={!printed}
+                hideable={!superseded}
+                hidden={!printed}
+                onSelect={() => onSelect({ kind: 'note', id: n.id })}
+                onToggleHidden={() =>
+                  onSetIncluded
+                    ? onSetIncluded('note', n.disclosure_code, !printed, n.id)
+                    : onToggleHidden(n.id)
+                }
+              />
+            </div>
           );
         })
       )}
+
+      {model.detailedIncomeStatement ? (
+        <>
+          <GroupLabel>Supplementary Information</GroupLabel>
+          {(() => {
+            const s = model.detailedIncomeStatement!;
+            const off = includeChoice(overrides, 'schedule', s.id) === false;
+            return (
+              <TreeRow
+                label={resolvedTitle(overrides, s.id, s.title)}
+                depth={1}
+                testId="afs-tree-schedule"
+                active={isActive('schedule', s.id)}
+                muted={off}
+                badge={off ? 'off' : undefined}
+                hideable={!!onSetIncluded}
+                hidden={off}
+                onSelect={() => onSelect({ kind: 'schedule', id: s.id })}
+                onToggleHidden={() => onSetIncluded?.('schedule', s.id, off ? null : false)}
+              />
+            );
+          })()}
+        </>
+      ) : null}
 
       <GroupLabel>Signatures</GroupLabel>
       {(model.signatures || []).map((sig) => (

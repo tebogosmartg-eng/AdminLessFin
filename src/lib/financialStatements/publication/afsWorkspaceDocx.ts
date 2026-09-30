@@ -478,10 +478,12 @@ export function renderCanonicalDocx(view: CanonicalDocumentView): Uint8Array<Arr
       'The reports and statements set out below comprise the annual financial statements presented to the shareholders:',
     ),
   );
+  const fm = view.frontMatter;
+  const printedFront = [fm.responsibilities, fm.directorsReport, fm.practitionerReport].filter(
+    (s) => s.included !== false,
+  );
   const tocLabels = [
-    view.frontMatter.responsibilities.title,
-    view.frontMatter.directorsReport.title,
-    view.frontMatter.practitionerReport.title,
+    ...printedFront.map((s) => s.title),
     ...view.statements.map((s) => s.title),
     'Accounting Policies',
     'Notes to the Annual Financial Statements',
@@ -491,16 +493,20 @@ export function renderCanonicalDocx(view: CanonicalDocumentView): Uint8Array<Arr
 
   // Statutory front sections — the wording the preparation engine resolved:
   // authored where the preparer wrote it, generated text otherwise.
-  add(para(view.frontMatter.responsibilities.title, { style: 'Heading1', bold: true, size: 13 }));
-  for (const block of view.frontMatter.responsibilities.blocks) {
-    if (block.heading) add(para(block.heading, { bold: true, size: 10, after: 40 }));
-    if (block.body) add(para(block.body));
+  const blocksOf = (section: typeof fm.responsibilities) => {
+    for (const block of section.blocks) {
+      if (block.heading) add(para(block.heading, { bold: true, size: 10, after: 40 }));
+      if (block.body) add(para(block.body));
+    }
+  };
+  if (fm.responsibilities.included !== false) {
+    add(para(fm.responsibilities.title, { style: 'Heading1', bold: true, size: 13 }));
+    blocksOf(fm.responsibilities);
+  } else if (fm.approval.included !== false) {
+    add(para(fm.approval.title, { style: 'Heading1', bold: true, size: 13 }));
   }
-  for (const block of view.frontMatter.approval.blocks) {
-    if (block.heading) add(para(block.heading, { bold: true, size: 10, after: 40 }));
-    if (block.body) add(para(block.body));
-  }
-  if (view.presentation.directors.length) {
+  if (fm.approval.included !== false) blocksOf(fm.approval);
+  if (fm.approval.included !== false && view.presentation.directors.length) {
     for (const name of view.presentation.directors) {
       add(para('______________________________', { after: 20 }));
       add(para(name, { after: 10 }));
@@ -508,16 +514,10 @@ export function renderCanonicalDocx(view: CanonicalDocumentView): Uint8Array<Arr
     }
   }
 
-  add(para(view.frontMatter.directorsReport.title, { style: 'Heading1', bold: true, size: 13 }));
-  for (const block of view.frontMatter.directorsReport.blocks) {
-    if (block.heading) add(para(block.heading, { bold: true, size: 10, after: 40 }));
-    if (block.body) add(para(block.body));
-  }
-
-  add(para(view.frontMatter.practitionerReport.title, { style: 'Heading1', bold: true, size: 13 }));
-  for (const block of view.frontMatter.practitionerReport.blocks) {
-    if (block.heading) add(para(block.heading, { bold: true, size: 10, after: 40 }));
-    if (block.body) add(para(block.body));
+  for (const section of [fm.directorsReport, fm.practitionerReport]) {
+    if (section.included === false) continue;
+    add(para(section.title, { style: 'Heading1', bold: true, size: 13 }));
+    blocksOf(section);
   }
 
   // Primary statements (Phase 2) — the same two columns on every statement.

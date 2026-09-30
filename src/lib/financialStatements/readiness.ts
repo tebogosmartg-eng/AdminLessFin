@@ -247,6 +247,8 @@ export function assessReadiness(model: DocumentModel): Readiness {
     (n) =>
       n.status !== 'superseded' &&
       n.requirement_level !== 'optional' &&
+      // Available but off by default is not a note the document asks for.
+      n.applies !== false &&
       n.sections.every((s) => !s.body.trim()) &&
       n.paragraphs.every((p) => !p.body.trim()) &&
       n.tables.every((t) => (t.rows_json || []).length === 0),

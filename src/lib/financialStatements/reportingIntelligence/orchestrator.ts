@@ -7,7 +7,11 @@
 import { composeDocument } from '../composition/compose';
 import type { CompositionDocument } from '../composition/types';
 import type { DocumentModel } from '../document/documentModel';
-import type { DocOverrides } from '../document/documentStore';
+import {
+  includedNoteCodes,
+  resolveInclusion,
+  type DocOverrides,
+} from '../document/documentStore';
 import { evaluateConditionalDisclosures } from '../composition/conditionalDisclosureEngine';
 import { validateCompositionDocument } from '../composition/disclosureValidation';
 import { applyIntelligenceToComposition } from './applyIntelligence';
@@ -32,9 +36,13 @@ export type ReportingIntelligenceOptions = {
  */
 export function produceReportingPackage(
   model: DocumentModel,
-  overrides: DocOverrides,
+  presentation: DocOverrides,
   options?: ReportingIntelligenceOptions,
 ): ReportingPackage {
+  // The preparer's on/off switches for notes and policies, folded in before
+  // anything is composed: the engine proposes, the preparer decides.
+  const overrides = resolveInclusion(model, presentation);
+  const switchedOn = includedNoteCodes(presentation);
   const baseComposition = composeDocument(model, overrides);
 
   const entityProfile = profileEntity(model);
@@ -58,6 +66,7 @@ export function produceReportingPackage(
     materiality,
     conditional.conditions,
     forcedOnCodes,
+    switchedOn,
   );
   const statementPresentation = determineStatementPresentation(model, entityProfile);
 

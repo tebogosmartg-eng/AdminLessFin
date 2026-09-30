@@ -1,11 +1,14 @@
 import type { NoteRegister } from '../../../lib/financialStatements/document/noteRegister';
 import {
+  includeChoice,
   isHidden,
+  isPolicyPrinted,
   resolvedTitle,
   type DocumentOverridesApi,
 } from '../../../lib/financialStatements/document/documentStore';
 import type {
   DocNoteNode,
+  DocPolicyNode,
   DocumentModel,
 } from '../../../lib/financialStatements/document/documentModel';
 import type { DocSelection } from '../experience/EngagementDocumentWorkspace';
@@ -21,7 +24,7 @@ type Hideable = { id: string; label: string };
 function resolveHideable(
   model: DocumentModel,
   selection: DocSelection,
-): { node: Hideable | null; kindLabel: string; note?: DocNoteNode } {
+): { node: Hideable | null; kindLabel: string; note?: DocNoteNode; policy?: DocPolicyNode } {
   if (selection.kind === 'statement') {
     const s = model.statements.find((x) => x.id === selection.id);
     return { node: s ? { id: s.id, label: s.title } : null, kindLabel: 'Statement' };
@@ -29,7 +32,7 @@ function resolveHideable(
   if (selection.kind === 'policy') {
     for (const set of model.policySets) {
       const p = set.policies.find((x) => x.id === selection.id);
-      if (p) return { node: { id: p.id, label: p.title }, kindLabel: 'Accounting policy' };
+      if (p) return { node: { id: p.id, label: p.title }, kindLabel: 'Accounting policy', policy: p };
     }
     return { node: null, kindLabel: 'Accounting policy' };
   }
@@ -57,7 +60,7 @@ export default function DocumentPropertiesPanel({
   register: NoteRegister | null;
 }) {
   const { overrides } = overridesApi;
-  const { node, kindLabel, note } = resolveHideable(model, selection);
+  const { node, kindLabel, note, policy } = resolveHideable(model, selection);
 
   if (selection.kind === 'cover' || selection.kind === 'contents' || selection.kind === 'policySet') {
     return (
@@ -86,14 +89,39 @@ export default function DocumentPropertiesPanel({
   }
 
   const superseded = note?.status === 'superseded';
-  const hidden = isHidden(overrides, node.id) || superseded;
+  // What prints is decided by the preparer's switch where they set one, and
+  // by the engine otherwise. The switch shows what will actually print.
+  const choice = note
+    ? includeChoice(overrides, 'note', note.disclosure_code)
+    : policy
+      ? includeChoice(overrides, 'policy', policy.policy_code)
+      : null;
+  const printedNow = note
+    ? register?.byId.get(note.id) != null
+    : policy
+      ? isPolicyPrinted(overrides, policy)
+      : !isHidden(overrides, node.id);
+  const hidden = !printedNow || superseded;
+  const engineReason = note
+    ? register?.withheld.get(note.id)
+    : policy?.applies === false
+      ? policy.applicability
+      : undefined;
+  const setPrinted = (printed: boolean) => {
+    if (note) overridesApi.setIncluded('note', note.disclosure_code, printed, note.id);
+    else if (policy) overridesApi.setIncluded('policy', policy.policy_code, printed, policy.id);
+    else overridesApi.setHidden(node.id, !printed);
+  };
+  const resetToEngine = () => {
+    if (note) overridesApi.setIncluded('note', note.disclosure_code, null, note.id);
+    else if (policy) overridesApi.setIncluded('policy', policy.policy_code, null, policy.id);
+  };
 
   // Reordering works on the notes as they print: swap with the neighbour the
   // reader can see, and restate the whole order as one change.
   const orderedIds = (register?.notes ?? []).map((n) => n.id);
   const currentIndex = note ? orderedIds.indexOf(note.id) : -1;
   const printedNumber = note ? register?.byId.get(note.id)?.noteNumber : undefined;
-  const withheld = note ? register?.withheld.get(note.id) : undefined;
 
   const applyOrder = (ids: string[]) => {
     overridesApi.setOrders(Object.fromEntries(ids.map((id, idx) => [id, idx])));
@@ -117,18 +145,37 @@ export default function DocumentPropertiesPanel({
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div className="flex items-center justify-between rounded-md border px-3 py-2">
-          <div>
-            <Label className="text-sm">Include in preview &amp; PDF</Label>
-            <p className="text-xs text-muted-foreground">
-              {hidden ? 'Currently hidden' : 'Currently shown'}
-            </p>
+        <div className="space-y-2 rounded-md border px-3 py-2">
+          <div className="flex items-center justify-between">
+            <div>
+              <Label className="text-sm">Print in the AFS</Label>
+              <p className="text-xs text-muted-foreground" data-testid="afs-include-state">
+                {superseded
+                  ? 'Superseded'
+                  : choice === true
+                    ? 'On: switched on by you'
+                    : choice === false
+                      ? 'Off: switched off by you'
+                      : hidden
+                        ? 'Off by default'
+                        : 'On by default'}
+              </p>
+            </div>
+            <Switch
+              data-testid="afs-include-switch"
+              checked={!hidden}
+              disabled={superseded}
+              onCheckedChange={(checked) => setPrinted(checked)}
+            />
           </div>
-          <Switch
-            checked={!hidden}
-            disabled={superseded}
-            onCheckedChange={(checked) => overridesApi.setHidden(node.id, !checked)}
-          />
+          {engineReason && choice == null && hidden ? (
+            <p className="text-xs text-muted-foreground">Why it is off: {engineReason}</p>
+          ) : null}
+          {choice != null && (note || policy) ? (
+            <Button variant="link" size="sm" className="h-auto p-0 text-xs" onClick={resetToEngine}>
+              Use the engine's default
+            </Button>
+          ) : null}
         </div>
 
         {note && (
@@ -142,9 +189,6 @@ export default function DocumentPropertiesPanel({
                 </span>
               )}
             </div>
-            {withheld && !hidden && (
-              <p className="text-xs text-muted-foreground">Not printed: {withheld}</p>
-            )}
             <div className="space-y-1.5">
               <Label className="text-sm">Order</Label>
               <div className="flex gap-2">

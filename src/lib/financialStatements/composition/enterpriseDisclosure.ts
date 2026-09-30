@@ -229,13 +229,17 @@ export function buildEnterpriseDisclosures(
   numberedNotes: Array<{ note: DocNoteNode; noteNumber: number; title: string }>,
   disclosureLinks: Array<{ statementType: string; lineCode: string; links: import('./types').DisclosureLinkSet }>,
 ): EnterpriseDisclosureObject[] {
+  // What the document says about itself — a first-time adoption, a
+  // restatement — is judged from the notes it prints. A note that is only
+  // available, switched off, says nothing about this entity.
+  const printed: DocumentModel = { ...model, notes: numberedNotes.map((n) => n.note) };
   return numberedNotes
     .map((n) =>
       toEnterpriseDisclosure(n.note, {
         noteNumber: n.noteNumber,
         title: n.title,
         allLineLinks: disclosureLinks,
-        model,
+        model: printed,
         active: true,
       }),
     )

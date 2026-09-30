@@ -12,8 +12,17 @@ import type {
   DocTable,
   DocumentModel,
 } from '../../../lib/financialStatements/document/documentModel';
-import { resolvedTitle } from '../../../lib/financialStatements/document/documentStore';
+import {
+  includeChoice,
+  isPolicyPrinted,
+  lineLabelKey,
+  resolvedTitle,
+  scheduleLineKey,
+  type IncludeKind,
+} from '../../../lib/financialStatements/document/documentStore';
 import type { DocumentOverridesApi } from '../../../lib/financialStatements/document/documentStore';
+import { statementLineLabel } from '../../../lib/financialStatements/composition/compose';
+import { Switch } from '../../../components/ui/switch';
 import {
   deleteNoteContent,
   isStoredRow,
@@ -372,6 +381,10 @@ function StatementEditor({
     { key: 'retained' as const, label: 'Retained earnings' },
     { key: 'total' as const, label: 'Total equity' },
   ];
+  // Each line reads as it will print: the preparer's caption where they
+  // reworded it.
+  const caption = (ln: { line_code?: string | null; label?: string | null }) =>
+    statementLineLabel(ctx.overridesApi.overrides, statement.statement_type, ln);
 
   return (
     <Card>
@@ -394,6 +407,7 @@ function StatementEditor({
           label="Statement heading"
           locked={ctx.locked}
         />
+        <StatementCaptions statement={statement} ctx={ctx} />
         <div className="overflow-x-auto rounded-md border bg-background">
           <div className="min-w-[30rem] px-4 py-4" data-testid="afs-statement">
             <div className="mb-5 space-y-0.5">
@@ -447,7 +461,7 @@ function StatementEditor({
                           className={cn('py-1.5 pr-3', totalled && 'pt-2')}
                           style={{ paddingLeft: `${lineIndent(ln, role) * 1.25}rem` }}
                         >
-                          {ln.label}
+                          {caption(ln)}
                         </td>
                         {equityComponents.map((c) => {
                           const value = ln.columns
@@ -515,7 +529,7 @@ function StatementEditor({
                             colSpan={columns}
                             className={cn('pb-1 font-semibold', idx === 0 ? 'pt-1' : 'pt-5')}
                           >
-                            {ln.label}
+                            {caption(ln)}
                           </td>
                         </tr>
                       );
@@ -545,7 +559,7 @@ function StatementEditor({
                           className={cn('py-1.5 pr-3', totalled && 'pt-2')}
                           style={{ paddingLeft: `${lineIndent(ln, role) * 1.25}rem` }}
                         >
-                          {ln.label}
+                          {caption(ln)}
                           {ln.is_reconciling && (
                             <span className="ml-2 text-xs">
                               — not yet classified in the chart of accounts
@@ -711,6 +725,14 @@ function PolicyEditor({
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
+        <IncludeSwitch
+          kind="policy"
+          code={policy.policy_code}
+          nodeId={policy.id}
+          printed={isPolicyPrinted(ctx.overridesApi.overrides, policy)}
+          offReason={policy.applies === false ? policy.applicability : null}
+          ctx={ctx}
+        />
         <div className="space-y-1.5">
           <Label>Policy title</Label>
           <Input value={title} disabled={ctx.locked} onChange={(e) => setTitle(e.target.value)} />
@@ -723,6 +745,352 @@ function PolicyEditor({
           <Save className="mr-2 h-4 w-4" />
           {save.isPending ? 'Saving...' : 'Save policy'}
         </Button>
+        <PolicyPartsEditor policy={policy} ctx={ctx} />
+      </CardContent>
+    </Card>
+  );
+}
+
+
+/**
+ * Whether this part of the AFS prints. The engine proposes the default — a
+ * note the materiality rules withhold, a policy the books give no occasion
+ * for — and the preparer decides. Every note, policy, schedule and report
+ * carries this switch.
+ */
+function IncludeSwitch({
+  kind,
+  code,
+  nodeId,
+  printed,
+  offReason,
+  ctx,
+}: {
+  kind: IncludeKind;
+  code: string;
+  nodeId?: string;
+  /** Whether it prints now, all decisions applied. */
+  printed: boolean;
+  /** The engine's reason for leaving it out, where it does. */
+  offReason?: string | null;
+  ctx: EditorContext;
+}) {
+  const choice = includeChoice(ctx.overridesApi.overrides, kind, code);
+  return (
+    <div className="space-y-1 rounded-md border px-3 py-2" data-testid="afs-editor-include">
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <Label className="text-sm">Print in the AFS</Label>
+          <p className="text-xs text-muted-foreground" data-testid="afs-editor-include-state">
+            {choice === true
+              ? 'On: switched on by you'
+              : choice === false
+                ? 'Off: switched off by you'
+                : printed
+                  ? 'On by default'
+                  : 'Off by default'}
+          </p>
+        </div>
+        <Switch
+          data-testid="afs-editor-include-switch"
+          checked={printed}
+          disabled={ctx.locked}
+          onCheckedChange={(on) => ctx.overridesApi.setIncluded(kind, code, on, nodeId)}
+        />
+      </div>
+      {!printed && choice == null && offReason ? (
+        <p className="text-xs text-muted-foreground">Why it is off: {offReason}</p>
+      ) : null}
+      {choice != null ? (
+        <Button
+          variant="link"
+          size="sm"
+          className="h-auto p-0 text-xs"
+          disabled={ctx.locked}
+          onClick={() => ctx.overridesApi.setIncluded(kind, code, null, nodeId)}
+        >
+          Use the engine's default
+        </Button>
+      ) : null}
+    </div>
+  );
+}
+
+/**
+ * A caption the preparer can reword. Blank returns it to the original; the
+ * figure beside it is never edited here.
+ */
+function CaptionInput({
+  original,
+  current,
+  locked,
+  onSave,
+}: {
+  original: string;
+  current: string | undefined;
+  locked?: boolean;
+  onSave: (label: string | null) => void;
+}) {
+  const [value, setValue] = useState(current ?? '');
+  useEffect(() => setValue(current ?? ''), [current]);
+  const commit = () => {
+    const next = value.trim();
+    if (next === (current ?? '')) return;
+    onSave(next && next !== original ? next : null);
+  };
+  return (
+    <Input
+      value={value}
+      placeholder={original}
+      disabled={locked}
+      aria-label={`Caption for ${original}`}
+      onChange={(e) => setValue(e.target.value)}
+      onBlur={commit}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
+      }}
+      className="h-8"
+    />
+  );
+}
+
+/** Every line of a statement, each with a caption the preparer can reword. */
+function StatementCaptions({ statement, ctx }: { statement: DocStatementNode; ctx: EditorContext }) {
+  const labels = ctx.overridesApi.overrides.lineLabels || {};
+  const edited = statement.lines.filter(
+    (l) => labels[lineLabelKey(statement.statement_type, String(l.line_code || ''))],
+  ).length;
+  return (
+    <details className="rounded-md border px-3 py-2" data-testid="afs-statement-captions">
+      <summary className="cursor-pointer text-sm font-medium">
+        Line captions{edited ? ` (${edited} reworded)` : ''}
+      </summary>
+      <p className="mb-2 mt-1 text-xs text-muted-foreground">
+        Reword any caption as it should print. The figures stay the ledger&apos;s. Leave a caption
+        blank to use the chart of accounts&apos; own.
+      </p>
+      <div className="space-y-1.5">
+        {statement.lines
+          .filter((l) => String(l.label || '').trim())
+          .map((l, i) => {
+            const key = lineLabelKey(statement.statement_type, String(l.line_code || ''));
+            return (
+              <div key={`${key}-${i}`} className="grid grid-cols-[minmax(0,1fr)_minmax(0,1.3fr)] items-center gap-2">
+                <span className="truncate text-xs text-muted-foreground" title={String(l.label)}>
+                  {l.label}
+                </span>
+                <CaptionInput
+                  original={String(l.label || '')}
+                  current={labels[key]}
+                  locked={ctx.locked}
+                  onSave={(label) => ctx.overridesApi.setLineLabel(key, label)}
+                />
+              </div>
+            );
+          })}
+      </div>
+    </details>
+  );
+}
+
+/**
+ * The parts of a policy other than its wording: the table it states (useful
+ * lives, for property, plant and equipment) and the wording after it. The
+ * engine composes both from the register; the preparer may rewrite either,
+ * remove it, or return it to the engine's version.
+ */
+function PolicyPartsEditor({ policy, ctx }: { policy: DocPolicyNode; ctx: EditorContext }) {
+  const code = String(policy.policy_code || '').toUpperCase();
+  const parts = ctx.overridesApi.overrides.policyParts?.[code] || {};
+  const table = parts.table === undefined ? policy.table ?? null : parts.table;
+  const bodyAfter = parts.bodyAfter === undefined ? policy.bodyAfter ?? '' : parts.bodyAfter ?? '';
+  const [rows, setRows] = useState<string[][]>(table ?? []);
+  const [after, setAfter] = useState(bodyAfter);
+  const [dirty, setDirty] = useState(false);
+  useEffect(() => {
+    setRows(table ?? []);
+    setAfter(bodyAfter);
+    setDirty(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [policy.id, JSON.stringify(table), bodyAfter]);
+
+  const width = Math.max(2, ...rows.map((r) => r.length));
+  const setCell = (r: number, c: number, v: string) => {
+    setRows((prev) =>
+      prev.map((row, i) => (i === r ? Array.from({ length: width }, (_, j) => (j === c ? v : row[j] ?? '')) : row)),
+    );
+    setDirty(true);
+  };
+  const edited = parts.table !== undefined || parts.bodyAfter !== undefined;
+
+  return (
+    <div className="space-y-3 rounded-md border p-3" data-testid="afs-policy-parts">
+      <div className="flex items-center justify-between">
+        <Label className="text-sm">Table in this policy</Label>
+        {edited ? <Badge variant="outline">Edited</Badge> : null}
+      </div>
+      {rows.length ? (
+        <div className="overflow-x-auto">
+          <table className="w-full border-collapse text-sm">
+            <tbody>
+              {rows.map((row, r) => (
+                <tr key={r}>
+                  {Array.from({ length: width }, (_, c) => (
+                    <td key={c} className="p-0.5">
+                      <Input
+                        className={cn('h-8', r === 0 && 'font-semibold')}
+                        value={row[c] ?? ''}
+                        disabled={ctx.locked}
+                        aria-label={`Row ${r + 1} column ${c + 1}`}
+                        onChange={(e) => setCell(r, c, e.target.value)}
+                      />
+                    </td>
+                  ))}
+                  <td className="w-8 p-0.5">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      aria-label="Remove row"
+                      disabled={ctx.locked}
+                      onClick={() => {
+                        setRows((prev) => prev.filter((_, i) => i !== r));
+                        setDirty(true);
+                      }}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : (
+        <p className="text-xs text-muted-foreground">This policy states no table.</p>
+      )}
+      <div className="flex flex-wrap gap-2">
+        <Button
+          variant="outline"
+          size="sm"
+          disabled={ctx.locked}
+          onClick={() => {
+            setRows((prev) =>
+              prev.length ? [...prev, Array.from({ length: width }, () => '')] : [['Item', 'Depreciation method', 'Average useful life']],
+            );
+            setDirty(true);
+          }}
+        >
+          <Plus className="mr-1 h-4 w-4" /> {rows.length ? 'Add row' : 'Add a table'}
+        </Button>
+      </div>
+      <div className="space-y-1.5">
+        <Label className="text-sm">Wording after the table</Label>
+        <Textarea
+          rows={4}
+          value={after}
+          disabled={ctx.locked}
+          onChange={(e) => {
+            setAfter(e.target.value);
+            setDirty(true);
+          }}
+        />
+      </div>
+      <div className="flex flex-wrap gap-2">
+        <Button
+          size="sm"
+          disabled={ctx.locked || !dirty}
+          onClick={() => {
+            const kept = rows.filter((r) => r.some((c) => String(c || '').trim()));
+            ctx.overridesApi.setPolicyPart(code, 'table', kept.length ? kept : null);
+            ctx.overridesApi.setPolicyPart(code, 'bodyAfter', after.trim() ? after : null);
+            setDirty(false);
+            showSuccess('Policy table and wording saved');
+          }}
+        >
+          <Save className="mr-1 h-4 w-4" /> Save table and wording
+        </Button>
+        <Button
+          variant="ghost"
+          size="sm"
+          disabled={ctx.locked || !edited}
+          onClick={() => {
+            ctx.overridesApi.setPolicyPart(code, 'table', undefined);
+            ctx.overridesApi.setPolicyPart(code, 'bodyAfter', undefined);
+            showSuccess("Returned to the engine's version from the register");
+          }}
+        >
+          Use the engine&apos;s version
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * The Detailed Income Statement: supplementary, built from the ledger. The
+ * preparer decides whether it prints, what it is called and how each line
+ * reads; the figures are the ledger's.
+ */
+function ScheduleEditor({ scheduleId, ctx }: { scheduleId: string; ctx: EditorContext }) {
+  const schedule = ctx.model.detailedIncomeStatement;
+  if (!schedule || schedule.id !== scheduleId) return <ContentsInfo />;
+  const overrides = ctx.overridesApi.overrides;
+  const printed = includeChoice(overrides, 'schedule', schedule.id) !== false;
+  const labels = overrides.lineLabels || {};
+  return (
+    <Card>
+      <CardHeader>
+        <div className="flex flex-wrap items-center gap-2">
+          <CardTitle className="text-base">{resolvedTitle(overrides, schedule.id, schedule.title)}</CardTitle>
+          <Badge variant="outline">Supplementary</Badge>
+        </div>
+        <CardDescription>
+          Supplementary information, printed after the notes behind its own disclaimer. The figures
+          come from your ledger; the title and every caption can be reworded.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <IncludeSwitch
+          kind="schedule"
+          code={schedule.id}
+          printed={printed}
+          ctx={ctx}
+        />
+        <TitleOverrideField
+          nodeId={schedule.id}
+          currentTitle={resolvedTitle(overrides, schedule.id, schedule.title)}
+          overridesApi={ctx.overridesApi}
+          label="Schedule title"
+          locked={ctx.locked}
+        />
+        <div className="overflow-x-auto rounded-md border" data-testid="afs-schedule-lines">
+          <table className="w-full border-collapse text-sm">
+            <tbody>
+              {schedule.rows.map((row, i) => {
+                if (i === 0 || !String(row[0] || '').trim()) return null;
+                const kind = schedule.kinds[i];
+                const key = scheduleLineKey(schedule.id, row[0]);
+                return (
+                  <tr key={`${key}-${i}`} className={cn(kind !== 'data' && 'font-semibold')}>
+                    <td className="w-1/2 p-1">
+                      <CaptionInput
+                        original={row[0]}
+                        current={labels[key]}
+                        locked={ctx.locked}
+                        onSave={(label) => ctx.overridesApi.setLineLabel(key, label)}
+                      />
+                    </td>
+                    {row.slice(1).map((cell, c) => (
+                      <td key={c} className="whitespace-nowrap p-1 text-right tabular-nums">
+                        {cell}
+                      </td>
+                    ))}
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
       </CardContent>
     </Card>
   );
@@ -836,6 +1204,14 @@ function FrontSectionEditor({ sectionId, ctx }: { sectionId: string; ctx: Editor
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
+        <IncludeSwitch kind="section" code={sectionId} printed={section.included !== false} ctx={ctx} />
+        <TitleOverrideField
+          nodeId={sectionId}
+          currentTitle={section.title}
+          overridesApi={ctx.overridesApi}
+          label="Heading"
+          locked={ctx.locked}
+        />
         {blocks.map((block, idx) => (
           <div key={idx} className="space-y-1.5 rounded-md border p-3">
             <div className="flex items-center gap-2">
@@ -1744,6 +2120,14 @@ function NoteEditor({ note, ctx }: { note: DocNoteNode; ctx: EditorContext }) {
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
+        <IncludeSwitch
+          kind="note"
+          code={note.disclosure_code}
+          nodeId={note.id}
+          printed={ctx.register?.byId.get(note.id) != null}
+          offReason={ctx.register?.withheld.get(note.id)}
+          ctx={ctx}
+        />
         <NoteDisagreements note={note} ctx={ctx} />
         <NoteReferencedFrom note={note} ctx={ctx} />
         <NoteStatusControl note={note} ctx={ctx} />
@@ -2141,6 +2525,8 @@ export default function DocumentEditor({
     if (!statement) return <ContentsInfo />;
     return <StatementEditor statement={statement} ctx={ctx} />;
   }
+
+  if (selection.kind === 'schedule') return <ScheduleEditor scheduleId={selection.id} ctx={ctx} />;
 
   if (selection.kind === 'policySet') {
     const set = model.policySets.find((p) => p.id === selection.id);

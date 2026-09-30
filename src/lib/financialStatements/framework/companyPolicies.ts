@@ -200,12 +200,34 @@ export function composeCompanyPolicies(
       policy.source === 'framework' ||
       !norm(policy.body) ||
       norm(policy.body) === norm(defaults.get(code(policy)) || '');
-    if (!composer || !untouched) {
+    if (!composer) {
       policies.push(policy);
       continue;
     }
     const composed = composer(index);
-    if (!composed) continue; // Nothing in the books the policy would govern.
+    if (!composed) {
+      // Nothing in the books the policy would govern. It stays in the
+      // document switched off — the preparer may know better than the ledger
+      // — unless they have written it themselves, which says it applies.
+      policies.push(
+        untouched
+          ? {
+              ...policy,
+              applies: false,
+              applicability:
+                policy.applicability ||
+                'Nothing in the books calls for this policy. Switch it on if it applies to this entity.',
+            }
+          : policy,
+      );
+      continue;
+    }
+    if (!untouched) {
+      // The preparer's wording stands; the table the policy states is still
+      // the company's own, from its register, and keeps printing with it.
+      policies.push({ ...policy, table: composed.table, bodyAfter: composed.bodyAfter });
+      continue;
+    }
     policies.push({
       ...policy,
       title: composed.title ?? policy.title,

@@ -164,12 +164,17 @@ describe.each(listFrameworkKeys())('Critical Gap 2 — %s pack generates complet
 });
 
 describe('Policies apply only where the company has the item', () => {
-  it('withholds specialised boilerplate policies when the facts do not support them', () => {
+  it('keeps specialised policies available but switched off when the facts do not support them', () => {
     const result = assembleFrameworkDocument({ frameworkKey: 'IFRS_SME', statements: statements(true) });
-    const codes = result.policySets[0].policies.map((p) => p.policy_code);
-    // A small trading company does not publish these.
-    for (const gone of ['POL.HYPERINFLATION', 'POL.SBP', 'POL.BUSCOMB', 'POL.JOINTVENTURES', 'POL.INVPROP']) {
-      expect(codes, `${gone} needs a supporting fact`).not.toContain(gone);
+    const policies = result.policySets[0].policies;
+    const codes = policies.map((p) => p.policy_code);
+    // A small trading company does not publish these by default — but the
+    // preparer can switch any of them on, so they are all in the document.
+    for (const off of ['POL.HYPERINFLATION', 'POL.SBP', 'POL.BUSCOMB', 'POL.JOINTVENTURES', 'POL.INVPROP']) {
+      const p = policies.find((x) => x.policy_code === off);
+      expect(p, `${off} is available to switch on`).toBeDefined();
+      expect(p?.applies, `${off} needs a supporting fact to be on by default`).toBe(false);
+      expect(p?.applicability).toMatch(/Switch it on/);
     }
     // The core policies always print, and judgements join them as 1.1.
     for (const kept of ['POL.BASIS', 'POL.JUDGEMENTS', 'POL.REVENUE', 'POL.FININST', 'POL.TAX']) {
@@ -183,18 +188,24 @@ describe('Policies apply only where the company has the item', () => {
       statements: statements(true),
       context: { conditions: { hasInvestmentProperty: true } },
     });
-    expect(result.policySets[0].policies.map((p) => p.policy_code)).toContain('POL.INVPROP');
+    const p = result.policySets[0].policies.find((x) => x.policy_code === 'POL.INVPROP');
+    expect(p).toBeDefined();
+    expect(p?.applies).not.toBe(false);
   });
 });
 
 describe('Critical Gap 2 — Optional disclosures handled by conditional rules', () => {
-  it('flags optional disclosures but does not insert them when conditions are unmet', () => {
+  it('keeps optional disclosures available but switched off when conditions are unmet', () => {
     const result = assembleFrameworkDocument({ frameworkKey: 'IFRS', statements: statements(false) });
     expect(result.optionalDisclosures.length).toBeGreaterThan(0);
     const contingencies = result.optionalDisclosures.find((o) => o.code === 'DISC.CONTINGENT');
     expect(contingencies).toBeDefined();
     expect(contingencies?.included).toBe(false);
-    expect(result.notes.some((n) => n.disclosure_code === 'DISC.CONTINGENT')).toBe(false);
+    const note = result.notes.find((n) => n.disclosure_code === 'DISC.CONTINGENT');
+    expect(note, 'available for the preparer to switch on').toBeDefined();
+    expect(note?.applies).toBe(false);
+    // Its unfilled figures are not outstanding work while it is off.
+    expect(result.manualFields.some((f) => f.noteCode === 'DISC.CONTINGENT')).toBe(false);
   });
 
   it('inserts an optional disclosure when its condition is met', () => {

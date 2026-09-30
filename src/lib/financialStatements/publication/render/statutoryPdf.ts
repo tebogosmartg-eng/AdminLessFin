@@ -500,18 +500,26 @@ export function renderStatutoryPdf(view: CanonicalDocumentView): string {
   };
 
   // The directors approve the statements on their own page: their
-  // responsibilities, the approval wording, and their signatures.
-  renderFrontSection(view.frontMatter.responsibilities, (e) => {
-    for (const block of view.frontMatter.approval.blocks) {
+  // responsibilities, the approval wording, and their signatures. A section
+  // the preparer switched off is not printed; the approval then stands on
+  // its own page.
+  const fm = view.frontMatter;
+  const approve = (e: LayoutEngine) => {
+    if (fm.approval.included === false) return;
+    for (const block of fm.approval.blocks) {
       if (block.heading) e.subHeading(block.heading);
       if (block.body) e.paragraph(block.body, { spacingAfter: 7 });
     }
     if (view.presentation.directors.length) {
       renderDirectorApproval(e, view.presentation.directors);
     }
-  });
-  renderFrontSection(view.frontMatter.directorsReport);
-  renderFrontSection(view.frontMatter.practitionerReport);
+  };
+  if (fm.responsibilities.included !== false) renderFrontSection(fm.responsibilities, approve);
+  else if (fm.approval.included !== false) {
+    renderFrontSection({ ...fm.approval, blocks: [] }, approve);
+  }
+  if (fm.directorsReport.included !== false) renderFrontSection(fm.directorsReport);
+  if (fm.practitionerReport.included !== false) renderFrontSection(fm.practitionerReport);
 
   // ── Primary statements (each on its own page) ─────────────────────────────
   const hints = view.composition?.publicationHints;

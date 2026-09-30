@@ -22,7 +22,6 @@ import type {
 import {
   getFrameworkDefinition,
   normaliseFrameworkKey,
-  resolveExtensionNotes,
   type FrameworkKey,
   type FrameworkNoteDef,
   type FrameworkTableDef,
@@ -65,6 +64,24 @@ export type FrameworkAssemblyInput = {
 
 function codeKey(code: string): string {
   return String(code || '').trim().toUpperCase();
+}
+
+/**
+ * A condition flag in words: 'hasInvestmentProperty' reads "investment
+ * property". Used to tell the preparer why a disclosure or policy is off.
+ */
+export function describeCondition(conditionKey: string | undefined): string {
+  const words = String(conditionKey || '')
+    .replace(/^(has|is|uses|applies)/, '')
+    .replace(/([a-z])([A-Z])/g, '$1 $2')
+    .replace(/\bOr\b/g, 'or')
+    .trim()
+    .toLowerCase();
+  return words || 'the condition it depends on';
+}
+
+function notIndicated(conditionKey: string | undefined): string {
+  return `The books do not indicate ${describeCondition(conditionKey)}. Switch it on if it applies to this entity.`;
 }
 
 /**
@@ -171,11 +188,18 @@ function buildFrameworkPolicySet(
     });
   };
 
+  // Every policy the framework carries is in the document. One the books give
+  // no occasion for is there switched off, for the preparer to switch on —
+  // the entity may hold what its ledger does not yet show.
   for (const def_policy of def.policies) {
     if (existingCodes.has(codeKey(def_policy.code))) continue;
-    const conditionKey = POLICY_CONDITIONS[codeKey(def_policy.code)];
-    if (conditionKey && conditions[conditionKey] !== true) continue;
     push(def_policy.code, def_policy.title, def_policy.body);
+    const conditionKey = POLICY_CONDITIONS[codeKey(def_policy.code)];
+    if (conditionKey && conditions[conditionKey] !== true) {
+      const added = policies[policies.length - 1];
+      added.applies = false;
+      added.applicability = notIndicated(conditionKey);
+    }
   }
 
   // Judgements and estimation uncertainty read as policy 1.1 of a published
@@ -283,18 +307,33 @@ export function assembleFrameworkDocument(input: FrameworkAssemblyInput): Framew
   const notes: DocNoteNode[] = [];
   let sort = 0;
 
-  // Core framework notes plus any active industry-specific extension notes.
-  const noteDefs: FrameworkNoteDef[] = [
-    ...def.notes,
-    ...resolveExtensionNotes(frameworkKey, conditions),
-  ];
+  // Every note the framework carries, and every industry extension note, is
+  // in the document. One whose condition the books do not meet is there
+  // switched off (applies: false) for the preparer to switch on: the engine
+  // decides the default, never what the preparer may publish.
+  const seenCodes = new Set<string>();
+  const noteDefs: Array<FrameworkNoteDef & { extensionCondition?: string }> = [];
+  for (const n of def.notes) {
+    if (seenCodes.has(codeKey(n.code))) continue;
+    seenCodes.add(codeKey(n.code));
+    noteDefs.push(n);
+  }
+  for (const ext of def.extensionPoints || []) {
+    for (const n of ext.notes || []) {
+      if (seenCodes.has(codeKey(n.code))) continue;
+      seenCodes.add(codeKey(n.code));
+      noteDefs.push({ ...n, extensionCondition: ext.conditionKey });
+    }
+  }
 
   for (const noteDef of noteDefs) {
     sort += 10;
     const key = codeKey(noteDef.code);
     const serverNote = serverByCode.get(key);
-    const isOptional = noteDef.requirement === 'optional';
-    const conditionMet = noteDef.conditionKey ? conditions[noteDef.conditionKey] === true : false;
+    const isOptional = noteDef.requirement === 'optional' || !!noteDef.extensionCondition;
+    const conditionKey = noteDef.extensionCondition || noteDef.conditionKey;
+    const conditionMet = conditionKey ? conditions[conditionKey] === true : false;
+    let applies = true;
 
     if (isOptional) {
       const includedFromServer = Boolean(serverNote);
@@ -302,15 +341,15 @@ export function assembleFrameworkDocument(input: FrameworkAssemblyInput): Framew
       optionalDisclosures.push({
         code: noteDef.code,
         title: noteDef.title,
-        conditionKey: noteDef.conditionKey,
+        conditionKey,
         included,
         reason: includedFromServer
           ? 'Included: present as an engagement disclosure.'
           : conditionMet
-            ? `Included: condition '${noteDef.conditionKey}' met.`
-            : `Flagged, not inserted: condition '${noteDef.conditionKey}' not met.`,
+            ? `Included: condition '${conditionKey}' met.`
+            : `Available, off by default: condition '${conditionKey}' not met.`,
       });
-      if (!included) continue;
+      applies = included;
     }
 
     if (serverNote) {
@@ -327,8 +366,15 @@ export function assembleFrameworkDocument(input: FrameworkAssemblyInput): Framew
         manualFields,
       );
       notes.push(mergeFrameworkNote(serverNote, enriched));
-    } else {
+    } else if (applies) {
       notes.push(buildFrameworkNote(frameworkKey, noteDef, sort, facts, manualFields));
+    } else {
+      // Off by default: its unfilled figures are not work the preparer owes
+      // until they switch it on, so they are not reported as outstanding.
+      const note = buildFrameworkNote(frameworkKey, noteDef, sort, facts, []);
+      note.applies = false;
+      note.applicability = notIndicated(conditionKey);
+      notes.push(note);
     }
   }
 

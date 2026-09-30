@@ -2677,14 +2677,33 @@ serve(withEnterprisePlatform("financial-statements", "tenant", async (req, _ctx)
       // ── Phase B: Financial Facts Adapter + Statement Engine ───────────────
       case "GET_FINANCIAL_FACTS": {
         if (!body.snapshot_version_id) throw new Error("snapshot_version_id is required.");
-        const { data: version, error: vErr } = await admin
-          .from("efs_snapshot_versions")
-          .select("id, status, efs_fact_snapshots(*)")
-          .eq("id", body.snapshot_version_id)
-          .eq("company_id", company_id)
-          .single();
-        if (vErr || !version) throw new Error("Snapshot Version not found.");
-        if (!["certified", "frozen", "publication_bound"].includes(version.status)) {
+        const sealedStatuses = ["certified", "frozen", "publication_bound", "superseded"];
+        const loadVersion = (id: string) =>
+          admin
+            .from("efs_snapshot_versions")
+            .select("id, status, predecessor_id, efs_fact_snapshots(*)")
+            .eq("id", id)
+            .eq("company_id", company_id)
+            .single();
+        const { data: requested, error: vErr } = await loadVersion(body.snapshot_version_id);
+        if (vErr || !requested) throw new Error("Snapshot Version not found.");
+        // A set reopened for changes is a new draft version with nothing
+        // sealed on it yet. Until the preparer updates it from accounting,
+        // its statements are still the ones generated from the version it
+        // reopened — so its notes and policies read that version's sealed
+        // facts, never nothing.
+        // A superseded version is still sealed; it only answers for a draft
+        // that succeeded it, never when asked for by its own id.
+        const sealed = (v: { id: string; status: string }) =>
+          ["certified", "frozen", "publication_bound"].includes(v.status) ||
+          (v.id !== requested.id && sealedStatuses.includes(v.status));
+        let version = requested;
+        for (let hop = 0; hop < 10 && !sealed(version) && version.predecessor_id; hop++) {
+          const { data: prior } = await loadVersion(version.predecessor_id);
+          if (!prior) break;
+          version = prior;
+        }
+        if (!sealed(version)) {
           throw new Error("Financial Facts Adapter requires a certified or frozen Snapshot Version.");
         }
         const fact = Array.isArray(version.efs_fact_snapshots)
@@ -2710,7 +2729,9 @@ serve(withEnterprisePlatform("financial-statements", "tenant", async (req, _ctx)
           prior_gross_movements: facts.prior_gross_movements ?? null,
           fixed_asset_register: facts.fixed_asset_register ?? null,
           source_rpc_refs: facts.source_rpc_refs,
-          version_status: version.status,
+          version_status: requested.status,
+          // The version whose seal these facts are, where it is not the one asked for.
+          sealed_version_id: version.id,
           live_gl: false,
         };
         break;

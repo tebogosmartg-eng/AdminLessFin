@@ -5,7 +5,16 @@
  * Does not recalculate accounting, frameworks, or ledger facts.
  */
 import type { DocumentModel } from '../document/documentModel';
-import { isHidden, resolvedTitle, type DocOverrides } from '../document/documentStore';
+import {
+  includeChoice,
+  isHidden,
+  isPolicyPrinted,
+  lineLabelKey,
+  resolvedTitle,
+  scheduleLineKey,
+  type DocOverrides,
+} from '../document/documentStore';
+import type { SupplementarySchedule } from '../publication/detailedIncomeStatement';
 import {
   formatLongDate,
   humanFrameworkLabel,
@@ -39,6 +48,7 @@ import { corporateDisplayFromModel } from '../corporateInformation/accessors';
 import type {
   CompositionDocument,
   CompositionPhase,
+  CompositionPolicy,
   CompositionSection,
   CompositionStatement,
   CompositionStatementLine,
@@ -71,6 +81,49 @@ function fingerprintComposition(parts: {
   return lines.join('\n');
 }
 
+/** A statement line's caption: the preparer's wording, else the chart's. */
+export function statementLineLabel(
+  overrides: DocOverrides,
+  statementType: string,
+  line: { line_code?: string | null; label?: string | null },
+): string {
+  const own = overrides.lineLabels?.[lineLabelKey(statementType, String(line.line_code || ''))];
+  return own && own.trim() ? own : String(line.label || '');
+}
+
+/** A policy with the preparer's table and closing wording, where they changed them. */
+function withPolicyParts(p: CompositionPolicy, overrides: DocOverrides): CompositionPolicy {
+  const parts = overrides.policyParts?.[p.uniqueKey];
+  if (!parts) return p;
+  return {
+    ...p,
+    table: parts.table === undefined ? p.table : parts.table ?? undefined,
+    bodyAfter: parts.bodyAfter === undefined ? p.bodyAfter : parts.bodyAfter ?? undefined,
+  };
+}
+
+/**
+ * The supplementary schedules as the preparer presents them: switched off
+ * where they chose, titled and captioned in their words. The figures are the
+ * ledger's and are never edited here.
+ */
+function presentSchedules(
+  schedules: SupplementarySchedule[],
+  overrides: DocOverrides,
+): SupplementarySchedule[] {
+  return schedules
+    .filter((s) => includeChoice(overrides, 'schedule', s.id) !== false)
+    .map((s) => ({
+      ...s,
+      title: resolvedTitle(overrides, s.id, s.title),
+      rows: s.rows.map((row, i) => {
+        if (i === 0 || !row.length) return row;
+        const own = overrides.lineLabels?.[scheduleLineKey(s.id, row[0])];
+        return own && own.trim() ? [own, ...row.slice(1)] : row;
+      }),
+    }));
+}
+
 function buildCompositionStatement(
   model: DocumentModel,
   overrides: DocOverrides,
@@ -92,7 +145,7 @@ function buildCompositionStatement(
     }
     return {
       lineCode: String(line.line_code || ''),
-      label: String(line.label || ''),
+      label: statementLineLabel(overrides, stmt.statement_type, line),
       classification: classifyStatementLine(stmt.statement_type, line),
       amount: line.amount ?? null,
       priorAmount: (line as { prior_amount?: number | null }).prior_amount ?? null,
@@ -147,10 +200,12 @@ export function composeDocument(
   const numbering = computeCompositionNoteNumbering(model.notes, overrides);
   const hiddenPolicyIds = new Set(
     model.policySets.flatMap((s) =>
-      (s.policies || []).filter((p) => isHidden(overrides, p.id)).map((p) => p.id),
+      (s.policies || []).filter((p) => !isPolicyPrinted(overrides, p)).map((p) => p.id),
     ),
   );
-  const accountingPolicies = assembleAccountingPolicies(model.policySets, hiddenPolicyIds);
+  const accountingPolicies = assembleAccountingPolicies(model.policySets, hiddenPolicyIds).map(
+    (p) => withPolicyParts(p, overrides),
+  );
 
   // Line → disclosure links across all statements
   const disclosureLinks: Array<{
@@ -411,7 +466,10 @@ export function composeDocument(
     numberedNotes,
     enterpriseDisclosures,
     accountingPolicies,
-    supplementarySchedules: model.detailedIncomeStatement ? [model.detailedIncomeStatement] : [],
+    supplementarySchedules: presentSchedules(
+      model.detailedIncomeStatement ? [model.detailedIncomeStatement] : [],
+      overrides,
+    ),
     disclosureLinks,
     noteNumberByCode,
     conditionalActivation: {

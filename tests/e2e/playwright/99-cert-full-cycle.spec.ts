@@ -61,6 +61,16 @@ test('accounting data reaches the finalised, approved PDF', async ({ page }) => 
   // ── 2. Update the statements from accounting, in the product ────────────
   await page.goto('/financial-statements-workspace');
   await waitForRouteSettled(page);
+  // A set finalised by an earlier run is reopened for changes first.
+  await expect(page.getByRole('navigation', { name: /document structure/i })).toBeVisible({
+    timeout: 180_000,
+  });
+  if (await page.getByTestId('afs-locked-banner').isVisible().catch(() => false)) {
+    await page.getByTestId('afs-mode-finalise').click();
+    await page.getByTestId('afs-reopen').click();
+    await page.getByTestId('afs-mode-document').click();
+    await expect(page.getByTestId('afs-locked-banner')).toBeHidden({ timeout: 120_000 });
+  }
   const update = page.getByTestId('afs-update');
   await expect(update).toBeVisible({ timeout: 120_000 });
   await expect(update).toBeEnabled({ timeout: 120_000 });

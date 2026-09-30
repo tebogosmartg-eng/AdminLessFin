@@ -155,7 +155,8 @@ describe('V13.1 — Framework library structure', () => {
 describe('V13.1 — Conditional, required and optional disclosure rules', () => {
   it('conditional disclosures are inserted only when their trigger is present', () => {
     const without = assembleFrameworkDocument({ frameworkKey: 'IFRS', statements: statements() });
-    expect(without.notes.some((n) => n.disclosure_code === 'DISC.LEASES')).toBe(false);
+    // Available, switched off — never absent.
+    expect(without.notes.find((n) => n.disclosure_code === 'DISC.LEASES')?.applies).toBe(false);
 
     const withLeases = assembleFrameworkDocument({
       frameworkKey: 'IFRS',
@@ -164,6 +165,7 @@ describe('V13.1 — Conditional, required and optional disclosure rules', () => 
     });
     const leases = withLeases.notes.find((n) => n.disclosure_code === 'DISC.LEASES');
     expect(leases).toBeDefined();
+    expect(leases?.applies).not.toBe(false);
     expect(leases?.tables.length).toBeGreaterThanOrEqual(1);
     expect(leases?.tables[0].title).toContain('maturity');
   });
@@ -202,7 +204,9 @@ describe('V13.1 — Industry extension points', () => {
 
   it('does not activate extensions when their condition is absent', () => {
     const result = assembleFrameworkDocument({ frameworkKey: 'IFRS', statements: statements() });
-    expect(result.notes.some((n) => n.disclosure_code === 'DISC.BIOLOGICAL')).toBe(false);
+    const bio = result.notes.find((n) => n.disclosure_code === 'DISC.BIOLOGICAL');
+    // In the document for the preparer to switch on, but off by default.
+    expect(bio?.applies).toBe(false);
   });
 });
 
