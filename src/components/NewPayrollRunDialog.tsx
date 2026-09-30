@@ -13,6 +13,7 @@ import {
   DialogFooter,
   DialogDescription,
 } from './ui/dialog';
+import { FormDialog } from './ui/form-dialog';
 import {
   Form,
   FormControl,
@@ -75,7 +76,7 @@ const NewPayrollRunDialog = ({ isOpen, setIsOpen }: NewPayrollRunDialogProps) =>
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={setIsOpen}>
+    <FormDialog open={isOpen} onOpenChange={setIsOpen} dirty={form.formState.isDirty || mutation.isPending}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>Start New Payroll Run</DialogTitle>
@@ -127,7 +128,7 @@ const NewPayrollRunDialog = ({ isOpen, setIsOpen }: NewPayrollRunDialogProps) =>
           </form>
         </Form>
       </DialogContent>
-    </Dialog>
+    </FormDialog>
   );
 };
 

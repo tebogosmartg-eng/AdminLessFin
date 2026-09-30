@@ -8,6 +8,7 @@ import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
 import { useAuth } from '../contexts/AuthContext';
 import { Button } from './ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from './ui/dialog';
+import { FormDialog } from './ui/form-dialog';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from './ui/form';
 import { Input } from './ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
@@ -103,7 +104,7 @@ const InventoryAdjustmentDialog = ({ isOpen, setIsOpen, product }: InventoryAdju
   const diff = newQty - product.quantity_on_hand;
 
   return (
-    <Dialog open={isOpen} onOpenChange={setIsOpen}>
+    <FormDialog open={isOpen} onOpenChange={setIsOpen} dirty={form.formState.isDirty || mutation.isPending}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>Adjust Stock: {product.name}</DialogTitle>
@@ -194,7 +195,7 @@ const InventoryAdjustmentDialog = ({ isOpen, setIsOpen, product }: InventoryAdju
           </form>
         </Form>
       </DialogContent>
-    </Dialog>
+    </FormDialog>
   );
 };
 

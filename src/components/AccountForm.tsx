@@ -12,6 +12,7 @@ import {
   DialogTitle,
   DialogFooter,
 } from './ui/dialog';
+import { FormDialog } from './ui/form-dialog';
 import {
   Form,
   FormControl,
@@ -162,7 +163,7 @@ const AccountForm = ({ isOpen, setIsOpen, account }: AccountFormProps) => {
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={setIsOpen}>
+    <FormDialog open={isOpen} onOpenChange={setIsOpen} dirty={form.formState.isDirty || mutation.isPending}>
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
           <DialogTitle>{account ? 'Edit Account' : 'Add New Account'}</DialogTitle>
@@ -299,7 +300,7 @@ const AccountForm = ({ isOpen, setIsOpen, account }: AccountFormProps) => {
           </form>
         </Form>
       </DialogContent>
-    </Dialog>
+    </FormDialog>
   );
 };
 

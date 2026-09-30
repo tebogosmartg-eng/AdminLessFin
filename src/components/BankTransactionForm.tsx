@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -11,7 +11,9 @@ import { Account } from '../pages/ChartOfAccounts';
 import { BANK_TRANSACTION_TYPES, BANK_TRANSACTION_LABELS, INCREASE_TYPES, BankAccountType } from '../lib/banking/types';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription,
+  DialogClose,
 } from './ui/dialog';
+import { FormDialog } from './ui/form-dialog';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from './ui/form';
 import { Input } from './ui/input';
 import { Textarea } from './ui/textarea';
@@ -105,10 +107,17 @@ const BankTransactionForm = ({ isOpen, setIsOpen, defaultBankAccountId, restrict
     onError: (error: unknown) => showPlatformError(error, { onRetry: () => form.handleSubmit(onSubmit)() }),
   });
 
-  const onSubmit = (values: TransactionFormValues) => mutation.mutate(values);
+  const submitLock = useRef(false);
+  // Two rapid clicks can both pass async validation before isPending
+  // re-renders; the ref closes that window so one submit posts one document.
+  const onSubmit = (values: TransactionFormValues) => {
+    if (submitLock.current) return;
+    submitLock.current = true;
+    mutation.mutate(values, { onSettled: () => { submitLock.current = false; } });
+  };
 
   return (
-    <Dialog open={isOpen} onOpenChange={setIsOpen}>
+    <FormDialog open={isOpen} onOpenChange={setIsOpen} dirty={form.formState.isDirty || mutation.isPending}>
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>{title ?? 'Record Bank Transaction'}</DialogTitle>
@@ -198,13 +207,13 @@ const BankTransactionForm = ({ isOpen, setIsOpen, defaultBankAccountId, restrict
               </FormItem>
             )} />
             <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setIsOpen(false)}>Cancel</Button>
+              <DialogClose asChild><Button type="button" variant="outline">Cancel</Button></DialogClose>
               <Button type="submit" disabled={mutation.isPending}>{mutation.isPending ? 'Posting…' : 'Post Transaction'}</Button>
             </DialogFooter>
           </form>
         </Form>
       </DialogContent>
-    </Dialog>
+    </FormDialog>
   );
 };
 

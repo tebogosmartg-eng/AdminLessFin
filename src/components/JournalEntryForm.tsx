@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useForm, useFieldArray, type FieldErrors } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -13,7 +13,10 @@ import {
   DialogTitle,
   DialogFooter,
   DialogDescription,
+  DialogClose,
 } from './ui/dialog';
+import { FormDialog } from './ui/form-dialog';
+import { draftKey, useFormPersistence } from '../hooks/useFormPersistence';
 import {
   Form,
   FormControl,
@@ -194,6 +197,13 @@ const JournalEntryForm = ({ isOpen, setIsOpen, entryId }: JournalEntryFormProps)
     }
   };
 
+  // Typed work on a NEW journal entry survives refresh, crash and company
+  // switch.
+  const draft = useFormPersistence(form, {
+    storageKey: !isEditing ? draftKey(activeCompany?.id, 'journal-entry') : null,
+    active: isOpen,
+  });
+
   const mutation = useMutation({
     mutationFn: async (values: JournalEntryFormValues) => {
       if (!user || !activeCompany) throw new Error('User not authenticated or no active company');
@@ -244,6 +254,7 @@ const JournalEntryForm = ({ isOpen, setIsOpen, entryId }: JournalEntryFormProps)
       }
     },
     onSuccess: () => {
+      draft.clear();
       queryClient.invalidateQueries({ queryKey: ['journal_entries'] });
       queryClient.invalidateQueries({ queryKey: ['journal_entry_detail', entryId] });
       if (!isEditing && activeCompany) {
@@ -257,7 +268,14 @@ const JournalEntryForm = ({ isOpen, setIsOpen, entryId }: JournalEntryFormProps)
     },
   });
 
-  const onSubmit = (values: JournalEntryFormValues) => mutation.mutate(values);
+  const submitLock = useRef(false);
+  // Two rapid clicks can both pass async validation before isPending
+  // re-renders; the ref closes that window so one submit posts one document.
+  const onSubmit = (values: JournalEntryFormValues) => {
+    if (submitLock.current) return;
+    submitLock.current = true;
+    mutation.mutate(values, { onSettled: () => { submitLock.current = false; } });
+  };
 
   /** Live totals, read at call time so the handlers below stay in step. */
   const readTotals = () => {
@@ -322,7 +340,7 @@ const JournalEntryForm = ({ isOpen, setIsOpen, entryId }: JournalEntryFormProps)
     + 'Debits must equal credits before the entry can be saved.';
 
   return (
-    <Dialog open={isOpen} onOpenChange={setIsOpen}>
+    <FormDialog open={isOpen} onOpenChange={setIsOpen} dirty={form.formState.isDirty || mutation.isPending} onDiscard={draft.clear}>
       <DialogContent className="sm:max-w-3xl flex flex-col max-h-[90vh]">
         <DialogHeader className="flex-shrink-0">
           <DialogTitle>{isEditing ? 'Edit Journal Entry' : 'New Journal Entry'}</DialogTitle>
@@ -455,13 +473,13 @@ const JournalEntryForm = ({ isOpen, setIsOpen, entryId }: JournalEntryFormProps)
 
             </div>
             <DialogFooter className="flex-shrink-0 pt-4 border-t mt-2">
-              <Button type="button" variant="outline" onClick={() => setIsOpen(false)}>Cancel</Button>
+              <DialogClose asChild><Button type="button" variant="outline">Cancel</Button></DialogClose>
               <Button type="submit" disabled={mutation.isPending}>{mutation.isPending ? 'Saving...' : (isEditing ? 'Update Entry' : 'Save Entry')}</Button>
             </DialogFooter>
           </form>
         </Form>
       </DialogContent>
-    </Dialog>
+    </FormDialog>
   );
 };
 

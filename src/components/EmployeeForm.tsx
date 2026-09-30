@@ -1,3 +1,4 @@
+import { useRef } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -13,6 +14,7 @@ import {
   DialogFooter,
   DialogDescription,
 } from './ui/dialog';
+import { FormDialog } from './ui/form-dialog';
 import {
   Form,
   FormControl,
@@ -139,12 +141,17 @@ const EmployeeForm = ({ isOpen, setIsOpen, employee }: EmployeeFormProps) => {
     },
   });
 
+  const submitLock = useRef(false);
+  // Two rapid clicks can both pass async validation before isPending
+  // re-renders; the ref closes that window so one save creates one record.
   const onSubmit = (values: EmployeeFormValues) => {
-    mutation.mutate(values);
+    if (submitLock.current) return;
+    submitLock.current = true;
+    mutation.mutate(values, { onSettled: () => { submitLock.current = false; } });
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={setIsOpen}>
+    <FormDialog open={isOpen} onOpenChange={setIsOpen} dirty={form.formState.isDirty || mutation.isPending}>
       <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
         <DialogHeader>
           <DialogTitle>{employee ? 'Edit Employee' : 'Add New Employee'}</DialogTitle>
@@ -254,7 +261,7 @@ const EmployeeForm = ({ isOpen, setIsOpen, employee }: EmployeeFormProps) => {
           </Button>
         </DialogFooter>
       </DialogContent>
-    </Dialog>
+    </FormDialog>
   );
 };
 

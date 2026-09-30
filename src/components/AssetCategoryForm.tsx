@@ -14,6 +14,7 @@ import {
   DialogFooter,
   DialogDescription,
 } from './ui/dialog';
+import { FormDialog } from './ui/form-dialog';
 import {
   Form,
   FormControl,
@@ -117,7 +118,7 @@ const AssetCategoryForm = ({ isOpen, setIsOpen, category }: AssetCategoryFormPro
   const onSubmit = (values: CategoryFormValues) => mutation.mutate(values);
 
   return (
-    <Dialog open={isOpen} onOpenChange={setIsOpen}>
+    <FormDialog open={isOpen} onOpenChange={setIsOpen} dirty={form.formState.isDirty || mutation.isPending}>
       <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{category ? 'Edit' : 'New'} Asset Category</DialogTitle>
@@ -238,7 +239,7 @@ const AssetCategoryForm = ({ isOpen, setIsOpen, category }: AssetCategoryFormPro
           </form>
         </Form>
       </DialogContent>
-    </Dialog>
+    </FormDialog>
   );
 };
 

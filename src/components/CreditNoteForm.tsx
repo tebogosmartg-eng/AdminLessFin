@@ -12,7 +12,7 @@
  * not submit a credit larger than the invoice has left to credit; the server
  * enforces the same limit.
  */
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -22,7 +22,9 @@ import { supabase } from '../integrations/supabase/client';
 import { useAuth } from '../contexts/AuthContext';
 import { Button } from './ui/button';
 import { Checkbox } from './ui/checkbox';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from './ui/dialog';
+import { DialogClose, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from './ui/dialog';
+import { FormDialog } from './ui/form-dialog';
+import { draftKey, useFormPersistence } from '../hooks/useFormPersistence';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from './ui/form';
 import { Input } from './ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
@@ -186,6 +188,12 @@ const CreditNoteForm = ({ isOpen, setIsOpen, initialCustomerId, initialInvoiceId
     }
   }, [isOpen, nextNumber, form]);
 
+  // Typed work on a credit note survives refresh, crash and company switch.
+  const draft = useFormPersistence(form, {
+    storageKey: draftKey(companyId, 'credit-note'),
+    active: isOpen,
+  });
+
   /** Start from what the invoice actually said. */
   async function loadInvoice(id: string) {
     form.setValue('invoice_id', id);
@@ -277,6 +285,7 @@ const CreditNoteForm = ({ isOpen, setIsOpen, initialCustomerId, initialInvoiceId
     },
     onSuccess: (result, values) => {
       refreshAfterCreditNoteChange(queryClient);
+      draft.clear();
       queryClient.invalidateQueries({ queryKey: ['next_cn_number'] });
       const invoiceNumber = creditableInvoices?.find((i) => i.id === values.invoice_id)?.invoice_number;
       showSuccess(
@@ -292,9 +301,10 @@ const CreditNoteForm = ({ isOpen, setIsOpen, initialCustomerId, initialInvoiceId
   });
 
   const lineError = form.formState.errors.items;
+  const submitLock = useRef(false);
 
   return (
-    <Dialog open={isOpen} onOpenChange={setIsOpen}>
+    <FormDialog open={isOpen} onOpenChange={setIsOpen} dirty={form.formState.isDirty || mutation.isPending} onDiscard={draft.clear}>
       <DialogContent className="max-h-[92vh] overflow-y-auto sm:max-w-5xl">
         <DialogHeader>
           <DialogTitle>Issue credit note</DialogTitle>
@@ -310,7 +320,9 @@ const CreditNoteForm = ({ isOpen, setIsOpen, initialCustomerId, initialInvoiceId
                 showError(overCredit);
                 return;
               }
-              mutation.mutate(values);
+              if (submitLock.current) return;
+              submitLock.current = true;
+              mutation.mutate(values, { onSettled: () => { submitLock.current = false; } });
             })}
             className="space-y-5"
           >
@@ -642,9 +654,9 @@ const CreditNoteForm = ({ isOpen, setIsOpen, initialCustomerId, initialInvoiceId
             </div>
 
             <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setIsOpen(false)}>
-                Cancel
-              </Button>
+              <DialogClose asChild>
+                <Button type="button" variant="outline">Cancel</Button>
+              </DialogClose>
               <Button type="submit" disabled={mutation.isPending || loadingInvoice || !!overCredit || totals.total <= 0}>
                 {mutation.isPending ? 'Issuing…' : 'Issue credit note'}
               </Button>
@@ -652,7 +664,7 @@ const CreditNoteForm = ({ isOpen, setIsOpen, initialCustomerId, initialInvoiceId
           </form>
         </Form>
       </DialogContent>
-    </Dialog>
+    </FormDialog>
   );
 };
 

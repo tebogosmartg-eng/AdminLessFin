@@ -2,7 +2,7 @@
  * V16.1 — Enterprise master data maintenance modules.
  * Each module is the single source of truth for its domain.
  */
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Button } from '../../../../components/ui/button';
 import { Input } from '../../../../components/ui/input';
@@ -52,6 +52,35 @@ function Field({
   );
 }
 
+
+/**
+ * A module's local draft of a shared server record.
+ *
+ * Every module here reads the same master-data query, and saving any one of
+ * them invalidates it. The old pattern — an effect copying query data into
+ * local state on every arrival — meant that saving the directors wiped the
+ * unsaved changes in addresses, tax registrations and every other open
+ * module. The draft now follows the server only while the user has not
+ * edited it; after this module's own save, `saved()` lets the next server
+ * copy through again.
+ */
+function useServerDraft<T>(server: T | undefined, fallback: T) {
+  const [draft, setDraft] = useState<T>(server ?? fallback);
+  const dirty = useRef(false);
+  useEffect(() => {
+    if (server !== undefined && !dirty.current) setDraft(server ?? fallback);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [server]);
+  const update: typeof setDraft = (value) => {
+    dirty.current = true;
+    setDraft(value);
+  };
+  const saved = () => {
+    dirty.current = false;
+  };
+  return [draft, update, saved] as const;
+}
+
 function useMasterData(companyId: string, workspaceId: string) {
   const qc = useQueryClient();
   const query = useQuery({
@@ -86,18 +115,14 @@ export function CompanyProfileModule({
   backLabel?: string;
 }) {
   const { query, saveModule } = useMasterData(companyId, workspaceId);
-  const [draft, setDraft] = useState(query.data?.company_profile || {});
-
-  useEffect(() => {
-    if (query.data) setDraft(query.data.company_profile || {});
-  }, [query.data]);
+  const [draft, setDraft, draftSaved] = useServerDraft(query.data?.company_profile, {});
 
   return (
     <MasterDataModuleShell
       moduleId="company_profile"
       onBack={onBack}
       backLabel={backLabel}
-      onSave={() => saveModule.mutate({ moduleId: 'company_profile', payload: draft })}
+      onSave={() => saveModule.mutate({ moduleId: 'company_profile', payload: draft }, { onSuccess: draftSaved })}
       saving={saveModule.isPending}
     >
       <Field label="Registered Name" value={draft.registered_name || ''} onChange={(v) => setDraft((p) => ({ ...p, registered_name: v }))} />
@@ -122,14 +147,10 @@ export function AddressRepositoryModule({
   backLabel?: string;
 }) {
   const { query, saveModule } = useMasterData(companyId, workspaceId);
-  const [draft, setDraft] = useState(query.data?.addresses || {});
-
-  useEffect(() => {
-    if (query.data) setDraft(query.data.addresses || {});
-  }, [query.data]);
+  const [draft, setDraft, draftSaved] = useServerDraft(query.data?.addresses, {});
 
   return (
-    <MasterDataModuleShell moduleId="addresses" onBack={onBack} backLabel={backLabel} onSave={() => saveModule.mutate({ moduleId: 'addresses', payload: draft })} saving={saveModule.isPending}>
+    <MasterDataModuleShell moduleId="addresses" onBack={onBack} backLabel={backLabel} onSave={() => saveModule.mutate({ moduleId: 'addresses', payload: draft }, { onSuccess: draftSaved })} saving={saveModule.isPending}>
       <Field label="Registered Office" value={draft.registered_office || ''} onChange={(v) => setDraft((p) => ({ ...p, registered_office: v }))} multiline />
       <Field label="Business Address" value={draft.business_address || ''} onChange={(v) => setDraft((p) => ({ ...p, business_address: v }))} multiline />
       <Field label="Postal Address" value={draft.postal_address || ''} onChange={(v) => setDraft((p) => ({ ...p, postal_address: v }))} multiline />
@@ -157,14 +178,10 @@ export function TaxConfigurationModule({
   backLabel?: string;
 }) {
   const { query, saveModule } = useMasterData(companyId, workspaceId);
-  const [draft, setDraft] = useState(query.data?.tax_registrations || {});
-
-  useEffect(() => {
-    if (query.data) setDraft(query.data.tax_registrations || {});
-  }, [query.data]);
+  const [draft, setDraft, draftSaved] = useServerDraft(query.data?.tax_registrations, {});
 
   return (
-    <MasterDataModuleShell moduleId="tax_registrations" onBack={onBack} backLabel={backLabel} onSave={() => saveModule.mutate({ moduleId: 'tax_registrations', payload: draft })} saving={saveModule.isPending}>
+    <MasterDataModuleShell moduleId="tax_registrations" onBack={onBack} backLabel={backLabel} onSave={() => saveModule.mutate({ moduleId: 'tax_registrations', payload: draft }, { onSuccess: draftSaved })} saving={saveModule.isPending}>
       <Field label="VAT Number" value={draft.vat_number || ''} onChange={(v) => setDraft((p) => ({ ...p, vat_number: v }))} />
       <Field label="Income Tax Number" value={draft.income_tax_number || ''} onChange={(v) => setDraft((p) => ({ ...p, income_tax_number: v }))} />
       <Field label="PAYE Number" value={draft.paye_number || ''} onChange={(v) => setDraft((p) => ({ ...p, paye_number: v }))} />
@@ -186,14 +203,10 @@ export function GovernanceModule({
   backLabel?: string;
 }) {
   const { query, saveModule } = useMasterData(companyId, workspaceId);
-  const [draft, setDraft] = useState(query.data?.governance || {});
-
-  useEffect(() => {
-    if (query.data) setDraft(query.data.governance || {});
-  }, [query.data]);
+  const [draft, setDraft, draftSaved] = useServerDraft(query.data?.governance, {});
 
   return (
-    <MasterDataModuleShell moduleId="governance" onBack={onBack} backLabel={backLabel} onSave={() => saveModule.mutate({ moduleId: 'governance', payload: draft })} saving={saveModule.isPending}>
+    <MasterDataModuleShell moduleId="governance" onBack={onBack} backLabel={backLabel} onSave={() => saveModule.mutate({ moduleId: 'governance', payload: draft }, { onSuccess: draftSaved })} saving={saveModule.isPending}>
       <Field label="Company Secretary" value={draft.company_secretary || ''} onChange={(v) => setDraft((p) => ({ ...p, company_secretary: v }))} />
       <Field label="Auditor" value={draft.auditor || ''} onChange={(v) => setDraft((p) => ({ ...p, auditor: v }))} />
       <Field label="Independent Reviewer" value={draft.independent_reviewer || ''} onChange={(v) => setDraft((p) => ({ ...p, independent_reviewer: v }))} />
@@ -214,17 +227,13 @@ export function DirectorRegisterModule({
   backLabel?: string;
 }) {
   const { query, saveModule } = useMasterData(companyId, workspaceId);
-  const [directors, setDirectors] = useState<DirectorMasterEntry[]>([]);
-
-  useEffect(() => {
-    if (query.data) setDirectors(query.data.directors || []);
-  }, [query.data]);
+  const [directors, setDirectors, directorsSaved] = useServerDraft<DirectorMasterEntry[]>(query.data?.directors ?? undefined, []);
 
   const addDirector = () =>
     setDirectors((prev) => [...prev, { name: '', role: '', appointment_date: '' }]);
 
   return (
-    <MasterDataModuleShell moduleId="directors" onBack={onBack} backLabel={backLabel} onSave={() => saveModule.mutate({ moduleId: 'directors', payload: directors })} saving={saveModule.isPending}>
+    <MasterDataModuleShell moduleId="directors" onBack={onBack} backLabel={backLabel} onSave={() => saveModule.mutate({ moduleId: 'directors', payload: directors }, { onSuccess: directorsSaved })} saving={saveModule.isPending}>
       {directors.map((d, i) => (
         <div key={i} className="space-y-2 rounded-md border p-3">
           <Field label="Name" value={d.name} onChange={(v) => setDirectors((prev) => prev.map((x, j) => (j === i ? { ...x, name: v } : x)))} />
@@ -255,17 +264,13 @@ export function PrincipalBankersModule({
   backLabel?: string;
 }) {
   const { query, saveModule } = useMasterData(companyId, workspaceId);
-  const [bankers, setBankers] = useState<PrincipalBankerMasterEntry[]>([]);
-
-  useEffect(() => {
-    if (query.data) setBankers(query.data.principal_bankers || []);
-  }, [query.data]);
+  const [bankers, setBankers, bankersSaved] = useServerDraft<PrincipalBankerMasterEntry[]>(query.data?.principal_bankers ?? undefined, []);
 
   const addBanker = () =>
     setBankers((prev) => [...prev, { name: '', branch: '', branch_code: '', active: true }]);
 
   return (
-    <MasterDataModuleShell moduleId="principal_bankers" onBack={onBack} backLabel={backLabel} onSave={() => saveModule.mutate({ moduleId: 'principal_bankers', payload: bankers })} saving={saveModule.isPending}>
+    <MasterDataModuleShell moduleId="principal_bankers" onBack={onBack} backLabel={backLabel} onSave={() => saveModule.mutate({ moduleId: 'principal_bankers', payload: bankers }, { onSuccess: bankersSaved })} saving={saveModule.isPending}>
       {bankers.map((b, i) => (
         <div key={i} className="space-y-2 rounded-md border p-3">
           <Field label="Bank Name" value={b.name} onChange={(v) => setBankers((prev) => prev.map((x, j) => (j === i ? { ...x, name: v } : x)))} />
@@ -297,11 +302,7 @@ export function OfficerRegisterModule({
   backLabel?: string;
 }) {
   const { query, saveModule } = useMasterData(companyId, workspaceId);
-  const [officers, setOfficers] = useState<CompanyMasterData['officers']>([]);
-
-  useEffect(() => {
-    if (query.data) setOfficers(query.data.officers || []);
-  }, [query.data]);
+  const [officers, setOfficers, officersSaved] = useServerDraft<CompanyMasterData['officers']>(query.data?.officers ?? undefined, []);
 
   const setOfficer = (role: CompanyMasterData['officers'][0]['role'], name: string) => {
     setOfficers((prev) => {
@@ -314,7 +315,7 @@ export function OfficerRegisterModule({
     officers.find((o) => o.role === role)?.name || '';
 
   return (
-    <MasterDataModuleShell moduleId="officers" onBack={onBack} backLabel={backLabel} onSave={() => saveModule.mutate({ moduleId: 'officers', payload: officers })} saving={saveModule.isPending}>
+    <MasterDataModuleShell moduleId="officers" onBack={onBack} backLabel={backLabel} onSave={() => saveModule.mutate({ moduleId: 'officers', payload: officers }, { onSuccess: officersSaved })} saving={saveModule.isPending}>
       <Field label="Preparer" value={byRole('preparer')} onChange={(v) => setOfficer('preparer', v)} />
       <Field label="Reviewer" value={byRole('reviewer')} onChange={(v) => setOfficer('reviewer', v)} />
       <Field label="Partner" value={byRole('partner')} onChange={(v) => setOfficer('partner', v)} />
@@ -335,13 +336,9 @@ export function WorkspaceConfigurationModule({
   onBack: () => void;
 }) {
   const qc = useQueryClient();
-  const [draft, setDraft] = useState<EfsWorkspaceGeneralInformation>(generalInfo || {});
+  const [draft, setDraft, draftSaved] = useServerDraft<EfsWorkspaceGeneralInformation>(generalInfo ?? undefined, {});
   const { financialYears: years, activeFinancialYear: activeYear, financialYearEnd } = useReportingPeriod();
   const calendarEnd = financialYearEnd ? toIsoDate(financialYearEnd) : null;
-
-  useEffect(() => {
-    setDraft(generalInfo || {});
-  }, [generalInfo]);
 
   // Bind reporting year-end to Enterprise Financial Calendar when unset.
   useEffect(() => {
@@ -357,6 +354,7 @@ export function WorkspaceConfigurationModule({
         general_information: draft,
       }),
     onSuccess: () => {
+      draftSaved();
       showSuccess('Engagement configuration saved');
       qc.invalidateQueries({ queryKey: ['efs_engagement_gi', companyId, workspaceId] });
       onBack();

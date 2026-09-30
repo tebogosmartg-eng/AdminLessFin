@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -6,7 +6,9 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../integrations/supabase/client';
 import { useAuth } from '../contexts/AuthContext';
 import { Button } from './ui/button';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from './ui/dialog';
+import { DialogClose, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from './ui/dialog';
+import { FormDialog } from './ui/form-dialog';
+import { draftKey, useFormPersistence } from '../hooks/useFormPersistence';
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from './ui/form';
 import { Input } from './ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
@@ -83,6 +85,12 @@ const AssetForm = ({ isOpen, setIsOpen, assetId }: AssetFormProps) => {
     setCategoryIntel({});
   });
 
+  // Typed work on a NEW asset survives refresh, crash and company switch.
+  const draft = useFormPersistence(form, {
+    storageKey: !isEditing ? draftKey(activeCompany?.id, 'asset') : null,
+    active: isOpen,
+  });
+
   const { data: vendors } = useQuery<Vendor[]>({ ...vendorsQuery(activeCompany!.id), enabled: !!activeCompany });
   const { data: employees } = useQuery<Employee[]>({ ...employeesQuery(activeCompany!.id), enabled: !!activeCompany });
   const { data: categories } = useQuery<AssetCategoryIntelligence[]>({
@@ -147,6 +155,9 @@ const AssetForm = ({ isOpen, setIsOpen, assetId }: AssetFormProps) => {
     if (!categoryId || isEditing) return;
     const cat = categoryById.get(categoryId);
     if (!cat) return;
+    // A residual value the user typed wins over the category's default —
+    // this used to be overwritten on every purchase-cost keystroke.
+    if (form.getFieldState('residual_value').isDirty) return;
     const defaults = categoryDefaultsForAsset(cat, Number(purchaseCost) || 0);
     if (defaults.residual_value != null) {
       form.setValue('residual_value', defaults.residual_value);
@@ -172,6 +183,7 @@ const AssetForm = ({ isOpen, setIsOpen, assetId }: AssetFormProps) => {
       if (error) throw error;
     },
     onSuccess: () => {
+      draft.clear();
       queryClient.invalidateQueries({ queryKey: ['fixed_assets'] });
       queryClient.invalidateQueries({ queryKey: ['asset_register'] });
       queryClient.invalidateQueries({ queryKey: ['asset_register_facets'] });
@@ -182,10 +194,17 @@ const AssetForm = ({ isOpen, setIsOpen, assetId }: AssetFormProps) => {
     onError: (error: Error) => showError(error.message),
   });
 
-  const onSubmit = (values: AssetFormValues) => mutation.mutate(values);
+  const submitLock = useRef(false);
+  // Two rapid clicks can both pass async validation before isPending
+  // re-renders; the ref closes that window so one submit posts one document.
+  const onSubmit = (values: AssetFormValues) => {
+    if (submitLock.current) return;
+    submitLock.current = true;
+    mutation.mutate(values, { onSettled: () => { submitLock.current = false; } });
+  };
 
   return (
-    <Dialog open={isOpen} onOpenChange={setIsOpen}>
+    <FormDialog open={isOpen} onOpenChange={setIsOpen} dirty={form.formState.isDirty || mutation.isPending} onDiscard={draft.clear}>
       <DialogContent className="sm:max-w-4xl">
         <DialogHeader>
           <DialogTitle>{isEditing ? 'Edit Asset' : 'Acquire New Asset'}</DialogTitle>
@@ -295,7 +314,7 @@ const AssetForm = ({ isOpen, setIsOpen, assetId }: AssetFormProps) => {
             </fieldset>
 
             <DialogFooter className="pt-4">
-              <Button type="button" variant="outline" onClick={() => setIsOpen(false)}>Cancel</Button>
+              <DialogClose asChild><Button type="button" variant="outline">Cancel</Button></DialogClose>
               <Button type="submit" disabled={mutation.isPending}>
                 {mutation.isPending ? 'Saving...' : 'Save Asset'}
               </Button>
@@ -303,7 +322,7 @@ const AssetForm = ({ isOpen, setIsOpen, assetId }: AssetFormProps) => {
           </form>
         </Form>
       </DialogContent>
-    </Dialog>
+    </FormDialog>
   );
 };
 

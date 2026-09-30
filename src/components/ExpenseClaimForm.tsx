@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -6,7 +6,10 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../integrations/supabase/client';
 import { useAuth } from '../contexts/AuthContext';
 import { Button } from './ui/button';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from './ui/dialog';
+import { DialogClose, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from './ui/dialog';
+import { FormDialog } from './ui/form-dialog';
+import { draftKey, useFormPersistence } from '../hooks/useFormPersistence';
+import { useDialogFormReset } from '../hooks/useDialogFormReset';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from './ui/form';
 import { Input } from './ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
@@ -89,8 +92,9 @@ const ExpenseClaimForm = ({ isOpen, setIsOpen, claimId }: Props) => {
     enabled: isEditing && isOpen && !!activeCompany,
   });
 
-  useEffect(() => {
-    if (!isOpen) return;
+  // Reset only when the dialog opens or the edited claim arrives — never
+  // because the query refetched, which used to wipe typing.
+  useDialogFormReset(isOpen, existingClaim ? 'edit' : isEditing ? 'pending' : 'new', () => {
     if (isEditing && existingClaim) {
       form.reset({
         employee_id: existingClaim.employee_id,
@@ -118,11 +122,17 @@ const ExpenseClaimForm = ({ isOpen, setIsOpen, claimId }: Props) => {
     }
     setAttachmentFile(null);
     setRemoveAttachment(false);
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- nextNumber applied below
-  }, [existingClaim, isEditing, isOpen, form]);
+  });
+
+  // Typed work on a NEW claim survives refresh, crash and company switch.
+  const draft = useFormPersistence(form, {
+    storageKey: !isEditing ? draftKey(activeCompany?.id, 'expense-claim') : null,
+    active: isOpen,
+  });
 
   useEffect(() => {
-    if (isOpen && !isEditing && nextNumber) {
+    // Fill the number only while the user has not typed one.
+    if (isOpen && !isEditing && nextNumber && !form.getFieldState('claim_number').isDirty) {
       form.setValue('claim_number', nextNumber);
     }
   }, [nextNumber, isEditing, isOpen, form]);
@@ -210,6 +220,7 @@ const ExpenseClaimForm = ({ isOpen, setIsOpen, claimId }: Props) => {
       if (error) throw error;
     },
     onSuccess: () => {
+      draft.clear();
       queryClient.invalidateQueries({ queryKey: ['expense_claims'] });
       queryClient.invalidateQueries({ queryKey: ['next_claim_number', activeCompany?.id] });
       showSuccess(`Expense Claim ${isEditing ? 'updated' : 'created'} successfully.`);
@@ -218,13 +229,20 @@ const ExpenseClaimForm = ({ isOpen, setIsOpen, claimId }: Props) => {
     onError: (error) => showError(`Error: ${error.message}`),
   });
 
-  const onSubmit = (values: FormValues) => mutation.mutate(values);
+  const submitLock = useRef(false);
+  // Two rapid clicks can both pass async validation before isPending
+  // re-renders; the ref closes that window so one submit posts one document.
+  const onSubmit = (values: FormValues) => {
+    if (submitLock.current) return;
+    submitLock.current = true;
+    mutation.mutate(values, { onSettled: () => { submitLock.current = false; } });
+  };
 
   const items = form.watch('items');
   const totalAmount = items.reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
 
   return (
-    <Dialog open={isOpen} onOpenChange={setIsOpen}>
+    <FormDialog open={isOpen} onOpenChange={setIsOpen} dirty={form.formState.isDirty || mutation.isPending} onDiscard={draft.clear}>
       <DialogContent className="sm:max-w-5xl h-[80vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{isEditing ? 'Edit Claim' : 'New Expense Claim'}</DialogTitle>
@@ -316,13 +334,13 @@ const ExpenseClaimForm = ({ isOpen, setIsOpen, claimId }: Props) => {
             </div>
 
             <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setIsOpen(false)}>Cancel</Button>
+              <DialogClose asChild><Button type="button" variant="outline">Cancel</Button></DialogClose>
               <Button type="submit" disabled={mutation.isPending}>{mutation.isPending ? 'Saving...' : 'Save Claim'}</Button>
             </DialogFooter>
           </form>
         </Form>
       </DialogContent>
-    </Dialog>
+    </FormDialog>
   );
 };
 

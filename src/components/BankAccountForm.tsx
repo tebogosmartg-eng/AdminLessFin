@@ -11,6 +11,7 @@ import { BankAccount } from '../lib/banking/types';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription,
 } from './ui/dialog';
+import { FormDialog } from './ui/form-dialog';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from './ui/form';
 import { Input } from './ui/input';
 import { Button } from './ui/button';
@@ -152,7 +153,7 @@ const BankAccountForm = ({ isOpen, setIsOpen, account }: BankAccountFormProps) =
   const pending = createMutation.isPending || editMutation.isPending;
 
   return (
-    <Dialog open={isOpen} onOpenChange={setIsOpen}>
+    <FormDialog open={isOpen} onOpenChange={setIsOpen} dirty={form.formState.isDirty || createMutation.isPending}>
       <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{isEditing ? 'Edit Bank Account' : 'New Bank Account'}</DialogTitle>
@@ -282,7 +283,7 @@ const BankAccountForm = ({ isOpen, setIsOpen, account }: BankAccountFormProps) =
           </form>
         </Form>
       </DialogContent>
-    </Dialog>
+    </FormDialog>
   );
 };
 

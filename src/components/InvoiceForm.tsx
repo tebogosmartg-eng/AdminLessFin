@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useForm, useFieldArray, type FieldErrors } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -7,7 +7,9 @@ import { supabase } from '../integrations/supabase/client';
 import { useAuth } from '../contexts/AuthContext';
 import { useEnterpriseIdentity } from '../hooks/useEnterpriseIdentity';
 import { Button } from './ui/button';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from './ui/dialog';
+import { DialogClose, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from './ui/dialog';
+import { FormDialog } from './ui/form-dialog';
+import { draftKey, useFormPersistence } from '../hooks/useFormPersistence';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from './ui/form';
 import { Input } from './ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
@@ -196,13 +198,21 @@ const InvoiceForm = ({ isOpen, setIsOpen, invoiceId, duplicateFromId, initialCus
     if (controls.inventory) form.setValue('inventory_asset_account_id', controls.inventory.id);
   }, [isOpen, accounts, isEditing, form]);
 
+  const lastTermsFor = useRef('');
   useEffect(() => {
     if (customerId && invoiceDate && !isEditing && customers) {
+      // Recompute only when the customer or the invoice date actually
+      // changed. A refetch of the customers list must not overwrite the due
+      // date, and a due date the user typed by hand wins outright.
+      const key = `${customerId}|${invoiceDate}`;
+      if (lastTermsFor.current === key) return;
+      if (form.getFieldState('due_date').isDirty) return;
       const customer = customers.find(c => c.id === customerId);
       if (customer) {
         const terms = customer.payment_terms || 30;
         const baseDate = new Date(invoiceDate);
         if (isValid(baseDate)) {
+          lastTermsFor.current = key;
           const newDueDate = addDays(baseDate, terms);
           form.setValue('due_date', format(newDueDate, 'yyyy-MM-dd'));
         }
@@ -240,7 +250,12 @@ const InvoiceForm = ({ isOpen, setIsOpen, invoiceId, duplicateFromId, initialCus
     isOpen,
     sourceInvoice ? `src:${sourceId}` : 'new',
     () => {
-      if (!sourceInvoice) return;
+      if (!sourceInvoice) {
+        // A fresh invoice starts fresh: values from the last edit or
+        // duplicate must not leak into it.
+        form.reset();
+        return;
+      }
       const jeItems = invoiceJournalItems<any>(sourceInvoice.journal_entries);
       const arItem = jeItems.find((item: any) => item.type === 'debit');
 
@@ -269,6 +284,12 @@ const InvoiceForm = ({ isOpen, setIsOpen, invoiceId, duplicateFromId, initialCus
     },
   );
 
+  // Typed work on a NEW invoice survives refresh, crash and company switch.
+  const draft = useFormPersistence(form, {
+    storageKey: !isEditing && !isDuplicating ? draftKey(activeCompany?.id, 'invoice') : null,
+    active: isOpen,
+  });
+
   const { data: nextInvoiceNumber } = useQuery({
     queryKey: ['next_invoice_number', activeCompany?.id],
     queryFn: async () => {
@@ -282,7 +303,9 @@ const InvoiceForm = ({ isOpen, setIsOpen, invoiceId, duplicateFromId, initialCus
   });
 
   useEffect(() => {
-    if (nextInvoiceNumber && !isEditing) {
+    // Fill the number only while the user has not typed one; a background
+    // refetch must never overwrite what they entered.
+    if (nextInvoiceNumber && !isEditing && !form.getFieldState('invoice_number').isDirty) {
       form.setValue('invoice_number', nextInvoiceNumber);
     }
   }, [nextInvoiceNumber, isEditing, form]);
@@ -375,6 +398,7 @@ const InvoiceForm = ({ isOpen, setIsOpen, invoiceId, duplicateFromId, initialCus
       return { path: 'boe', invalidationKeys: result.dashboardRefreshKeys };
     },
     onSuccess: (outcome) => {
+      draft.clear();
       if (outcome.path === 'boe') {
         for (const queryKey of outcome.invalidationKeys) {
           queryClient.invalidateQueries({ queryKey: [...queryKey] });
@@ -393,7 +417,14 @@ const InvoiceForm = ({ isOpen, setIsOpen, invoiceId, duplicateFromId, initialCus
     onError: (error) => showPlatformError(error),
   });
 
-  const onSubmit = (values: InvoiceFormValues) => mutation.mutate(values);
+  const submitLock = useRef(false);
+  // Two rapid clicks can both pass async validation before isPending
+  // re-renders; the ref closes that window so one submit posts one document.
+  const onSubmit = (values: InvoiceFormValues) => {
+    if (submitLock.current) return;
+    submitLock.current = true;
+    mutation.mutate(values, { onSettled: () => { submitLock.current = false; } });
+  };
 
   const onInvalid = (errors: FieldErrors<InvoiceFormValues>) => {
     const advancedMissing =
@@ -419,7 +450,7 @@ const InvoiceForm = ({ isOpen, setIsOpen, invoiceId, duplicateFromId, initialCus
 
   return (
     <>
-      <Dialog open={isOpen} onOpenChange={setIsOpen}>
+      <FormDialog open={isOpen} onOpenChange={setIsOpen} dirty={form.formState.isDirty || mutation.isPending} onDiscard={draft.clear}>
         <DialogContent className="sm:max-w-6xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>
@@ -561,13 +592,13 @@ const InvoiceForm = ({ isOpen, setIsOpen, invoiceId, duplicateFromId, initialCus
               <DialogFooter className="pt-4 border-t sticky bottom-0 bg-background py-4">
                 <Button type="button" variant="outline" onClick={() => setIsPreviewOpen(true)}>Preview</Button>
                 <div className="flex-grow" />
-                <Button type="button" variant="outline" onClick={() => setIsOpen(false)}>Cancel</Button>
+                <DialogClose asChild><Button type="button" variant="outline">Cancel</Button></DialogClose>
                 <Button type="submit" disabled={mutation.isPending}>{mutation.isPending ? 'Processing...' : 'Save Invoice'}</Button>
               </DialogFooter>
             </form>
           </Form>
         </DialogContent>
-      </Dialog>
+      </FormDialog>
       
       <Sheet open={isPreviewOpen} onOpenChange={setIsPreviewOpen}>
         <SheetContent className="sm:max-w-3xl w-full overflow-y-auto">

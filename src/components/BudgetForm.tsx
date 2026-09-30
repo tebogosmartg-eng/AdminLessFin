@@ -14,6 +14,7 @@ import {
   DialogFooter,
   DialogDescription,
 } from './ui/dialog';
+import { FormDialog } from './ui/form-dialog';
 import {
   Form,
   FormControl,
@@ -119,7 +120,7 @@ const BudgetForm = ({ isOpen, setIsOpen, budget }: BudgetFormProps) => {
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={setIsOpen}>
+    <FormDialog open={isOpen} onOpenChange={setIsOpen} dirty={form.formState.isDirty || mutation.isPending}>
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
           <DialogTitle>{budget ? 'Edit Budget' : 'Create New Budget'}</DialogTitle>
@@ -210,7 +211,7 @@ const BudgetForm = ({ isOpen, setIsOpen, budget }: BudgetFormProps) => {
           </form>
         </Form>
       </DialogContent>
-    </Dialog>
+    </FormDialog>
   );
 };
 

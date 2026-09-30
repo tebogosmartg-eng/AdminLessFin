@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -8,7 +8,9 @@ import { useAuth } from '../contexts/AuthContext';
 import { bankAccountsQuery } from '../lib/queries';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription,
+  DialogClose,
 } from './ui/dialog';
+import { FormDialog } from './ui/form-dialog';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from './ui/form';
 import { Input } from './ui/input';
 import { Textarea } from './ui/textarea';
@@ -59,12 +61,14 @@ const BankTransferForm = ({ isOpen, setIsOpen, defaultFromBankAccountId }: BankT
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, defaultFromBankAccountId]);
 
+  const transferKey = useRef('');
   const mutation = useMutation({
     mutationFn: async (values: TransferFormValues) => {
       if (!activeCompany || !user) throw new Error('No active company');
       // Client-generated idempotency key means a network retry replays safely
-      // instead of risking a second transfer.
-      const idempotencyKey = crypto.randomUUID();
+      // instead of risking a second transfer. The key lives across retries of
+      // the same submission and is renewed only after a success.
+      const idempotencyKey = transferKey.current;
       const { data, error } = await supabase.functions.invoke('banking', {
         body: {
           method: 'RECORD_TRANSFER', company_id: activeCompany.id,
@@ -82,6 +86,7 @@ const BankTransferForm = ({ isOpen, setIsOpen, defaultFromBankAccountId }: BankT
       return data;
     },
     onSuccess: () => {
+      transferKey.current = '';
       queryClient.invalidateQueries({ queryKey: ['bank_transactions', activeCompany?.id] });
       queryClient.invalidateQueries({ queryKey: ['bank_transfers_view', activeCompany?.id] });
       queryClient.invalidateQueries({ queryKey: ['bank_accounts', activeCompany?.id] });
@@ -92,10 +97,16 @@ const BankTransferForm = ({ isOpen, setIsOpen, defaultFromBankAccountId }: BankT
     onError: (error: unknown) => showPlatformError(error, { onRetry: () => form.handleSubmit(onSubmit)() }),
   });
 
-  const onSubmit = (values: TransferFormValues) => mutation.mutate(values);
+  const submitLock = useRef(false);
+  const onSubmit = (values: TransferFormValues) => {
+    if (submitLock.current) return;
+    submitLock.current = true;
+    if (!transferKey.current) transferKey.current = crypto.randomUUID();
+    mutation.mutate(values, { onSettled: () => { submitLock.current = false; } });
+  };
 
   return (
-    <Dialog open={isOpen} onOpenChange={setIsOpen}>
+    <FormDialog open={isOpen} onOpenChange={setIsOpen} dirty={form.formState.isDirty || mutation.isPending}>
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>Transfer Between Accounts</DialogTitle>
@@ -153,13 +164,13 @@ const BankTransferForm = ({ isOpen, setIsOpen, defaultFromBankAccountId }: BankT
               </FormItem>
             )} />
             <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setIsOpen(false)}>Cancel</Button>
+              <DialogClose asChild><Button type="button" variant="outline">Cancel</Button></DialogClose>
               <Button type="submit" disabled={mutation.isPending}>{mutation.isPending ? 'Transferring…' : 'Transfer'}</Button>
             </DialogFooter>
           </form>
         </Form>
       </DialogContent>
-    </Dialog>
+    </FormDialog>
   );
 };
 

@@ -43,6 +43,30 @@ async function selectFirstOption(
   await page.getByRole('option').first().click();
 }
 
+// ── Workspace selection ──────────────────────────────────────────────────────
+//
+// CRUD flows below need a company whose accounting foundation passes the
+// readiness gate (posting modules are otherwise blocked). The AFS specs
+// (13-18) leave the server-side active company on their own demo tenant, so
+// depending on "whatever is active" made this suite fail for reasons that
+// have nothing to do with CRUD. Pin the same accounting-complete company
+// spec 08 certifies against.
+const READY_COMPANY = 'CERT TX 1785230675937';
+
+test('workspace: CRUD runs against the accounting-complete company', async ({ page }) => {
+  await page.goto('/');
+  await waitForRouteSettled(page);
+  const trigger = page.getByTestId('company-switcher');
+  await expect(trigger).toBeEnabled({ timeout: 30_000 });
+  const label = (await trigger.innerText().catch(() => '')) ?? '';
+  if (label.includes(READY_COMPANY)) return;
+  await trigger.click();
+  const item = page.locator('[data-testid="company-option"]').filter({ hasText: READY_COMPANY }).first();
+  await expect(item).toBeVisible({ timeout: 20_000 });
+  await item.click();
+  await expect(trigger).toHaveAttribute('data-switching', 'false', { timeout: 45_000 });
+});
+
 test.describe('Customers — full UI CRUD workflow', () => {
   const stamp = Date.now();
   const name = `E2E QA Customer ${stamp}`;
@@ -705,6 +729,22 @@ test.describe('Fixed Assets — UI acquire (create) workflow', () => {
         assetPosts.push({ status: res.status(), url: u.replace(/^.*functions\/v1\//, ''), body: body?.slice(0, 400) });
       }
     });
+
+    // A category is required and the ready company may not have one yet —
+    // exactly a first-time user's path: set the category up first.
+    await page.goto('/asset-categories');
+    await waitForRouteSettled(page);
+    const hasCategory = await page
+      .getByRole('row')
+      .nth(1)
+      .isVisible()
+      .catch(() => false);
+    if (!hasCategory) {
+      await page.getByRole('button', { name: /new category/i }).first().click();
+      await page.getByLabel('Category Name').fill(`E2E Plant ${stamp}`);
+      await page.getByRole('button', { name: /save/i }).click();
+      await expect(page.getByRole('row').filter({ hasText: 'E2E Plant' }).first()).toBeVisible({ timeout: 20_000 });
+    }
 
     await page.goto('/fixed-assets');
     await waitForRouteSettled(page);

@@ -14,6 +14,7 @@ import {
   DialogFooter,
   DialogDescription,
 } from './ui/dialog';
+import { FormDialog } from './ui/form-dialog';
 import {
   Form,
   FormControl,
@@ -87,7 +88,7 @@ const InviteMemberDialog = ({ isOpen, setIsOpen }: InviteMemberDialogProps) => {
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={setIsOpen}>
+    <FormDialog open={isOpen} onOpenChange={setIsOpen} dirty={form.formState.isDirty || mutation.isPending}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>Invite Team Member</DialogTitle>
@@ -142,7 +143,7 @@ const InviteMemberDialog = ({ isOpen, setIsOpen }: InviteMemberDialogProps) => {
           </form>
         </Form>
       </DialogContent>
-    </Dialog>
+    </FormDialog>
   );
 };
 

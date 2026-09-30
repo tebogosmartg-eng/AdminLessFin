@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -6,7 +6,10 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../integrations/supabase/client';
 import { useAuth } from '../contexts/AuthContext';
 import { Button } from './ui/button';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from './ui/dialog';
+import { DialogClose, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from './ui/dialog';
+import { FormDialog } from './ui/form-dialog';
+import { draftKey, useFormPersistence } from '../hooks/useFormPersistence';
+import { useDialogFormReset } from '../hooks/useDialogFormReset';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from './ui/form';
 import { Input } from './ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
@@ -89,8 +92,9 @@ const PurchaseOrderForm = ({ isOpen, setIsOpen, poId }: Props) => {
     enabled: isEditing && isOpen && !!activeCompany,
   });
 
-  useEffect(() => {
-    if (!isOpen) return;
+  // Reset only when the dialog opens or the edited PO arrives — never
+  // because the query refetched, which used to wipe typing.
+  useDialogFormReset(isOpen, existingPO ? 'edit' : isEditing ? 'pending' : 'new', () => {
     if (isEditing && existingPO) {
       form.reset({
         po_number: existingPO.po_number,
@@ -122,11 +126,19 @@ const PurchaseOrderForm = ({ isOpen, setIsOpen, poId }: Props) => {
     }
     setAttachmentFile(null);
     setRemoveAttachment(false);
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- nextPONumber applied below
-  }, [existingPO, isEditing, isOpen, form]);
+  });
+
+  // Typed work on a NEW purchase order survives refresh, crash and company
+  // switch.
+  const draft = useFormPersistence(form, {
+    storageKey: !isEditing ? draftKey(activeCompany?.id, 'purchase-order') : null,
+    active: isOpen,
+  });
 
   useEffect(() => {
-    if (isOpen && !isEditing && nextPONumber) {
+    // Fill the number only while the user has not typed one; a background
+    // refetch must never overwrite what they entered.
+    if (isOpen && !isEditing && nextPONumber && !form.getFieldState('po_number').isDirty) {
       form.setValue('po_number', nextPONumber);
     }
   }, [nextPONumber, isEditing, isOpen, form]);
@@ -179,6 +191,7 @@ const PurchaseOrderForm = ({ isOpen, setIsOpen, poId }: Props) => {
       if (error) throw error;
     },
     onSuccess: () => {
+      draft.clear();
       queryClient.invalidateQueries({ queryKey: ['purchase_orders', activeCompany?.id] });
       queryClient.invalidateQueries({ queryKey: ['next_po_number', activeCompany?.id] });
       if (poId) queryClient.invalidateQueries({ queryKey: ['po_detail', poId] });
@@ -188,10 +201,17 @@ const PurchaseOrderForm = ({ isOpen, setIsOpen, poId }: Props) => {
     onError: (error) => showError(`Error: ${error.message}`),
   });
 
-  const onSubmit = (values: POFormValues) => mutation.mutate(values);
+  const submitLock = useRef(false);
+  // Two rapid clicks can both pass async validation before isPending
+  // re-renders; the ref closes that window so one submit posts one document.
+  const onSubmit = (values: POFormValues) => {
+    if (submitLock.current) return;
+    submitLock.current = true;
+    mutation.mutate(values, { onSettled: () => { submitLock.current = false; } });
+  };
 
   return (
-    <Dialog open={isOpen} onOpenChange={setIsOpen}>
+    <FormDialog open={isOpen} onOpenChange={setIsOpen} dirty={form.formState.isDirty || mutation.isPending} onDiscard={draft.clear}>
       <DialogContent className="sm:max-w-6xl h-[80vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{isEditing ? 'Edit Purchase Order' : 'New Purchase Order'}</DialogTitle>
@@ -264,13 +284,13 @@ const PurchaseOrderForm = ({ isOpen, setIsOpen, poId }: Props) => {
               <Button type="button" variant="outline" size="sm" onClick={() => append({ description: '', quantity: 1, unit_cost: 0, project_id: '' })}>Add Line</Button>
             </div>
             <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setIsOpen(false)}>Cancel</Button>
+              <DialogClose asChild><Button type="button" variant="outline">Cancel</Button></DialogClose>
               <Button type="submit" disabled={mutation.isPending}>{mutation.isPending ? 'Saving...' : 'Save PO'}</Button>
             </DialogFooter>
           </form>
         </Form>
       </DialogContent>
-    </Dialog>
+    </FormDialog>
   );
 };
 

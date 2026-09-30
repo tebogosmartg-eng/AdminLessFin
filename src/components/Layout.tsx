@@ -12,6 +12,7 @@ import { ThemeToggle } from './ThemeToggle';
 import CompanySwitcher from './CompanySwitcher';
 import FinancialContextSwitcher from './FinancialContextSwitcher';
 import ContextNotice from './ContextNotice';
+import OfflineBanner from './OfflineBanner';
 import NotificationBell from './NotificationBell';
 import { CommandMenu } from './CommandMenu';
 import { AppSidebarLogo } from './brand';
@@ -157,6 +158,7 @@ const Layout = () => {
             </div>
           )}
         </header>
+        <OfflineBanner />
         <ContextNotice />
         <main className="min-w-0 flex-1 p-4 sm:p-6 print:p-0" role="main">
           {/* Route-level boundary: a crashing page (or a failed lazy chunk)

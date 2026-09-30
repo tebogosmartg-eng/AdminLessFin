@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -6,7 +6,8 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../integrations/supabase/client';
 import { useAuth } from '../contexts/AuthContext';
 import { Button } from './ui/button';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from './ui/dialog';
+import { DialogClose, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from './ui/dialog';
+import { FormDialog } from './ui/form-dialog';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from './ui/form';
 import { Input } from './ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
@@ -76,8 +77,17 @@ const BillPaymentForm = ({ isOpen, setIsOpen, vendorId, vendorName, amountDue, b
   const assetAccounts = accounts?.filter(acc => acc.type === 'Asset');
   const apAccounts = accounts?.filter(acc => acc.type === 'Liability');
 
+  // Reset on the opening edge only: a parent re-render that changes the
+  // amount-due prop must not wipe what the user typed.
+  const openedFor = useRef(false);
   useEffect(() => {
+    if (!isOpen) {
+      openedFor.current = false;
+      return;
+    }
+    if (openedFor.current) return;
     if (isOpen) {
+      openedFor.current = true;
       form.reset({
         payment_date: new Date().toISOString().split('T')[0],
         payment_account_id: form.getValues('payment_account_id'),
@@ -130,12 +140,19 @@ const BillPaymentForm = ({ isOpen, setIsOpen, vendorId, vendorName, amountDue, b
     },
   });
 
-  const onSubmit = (values: PaymentFormValues) => mutation.mutate(values);
+  const submitLock = useRef(false);
+  // Two rapid clicks can both pass async validation before isPending
+  // re-renders; the ref closes that window so one submit posts one document.
+  const onSubmit = (values: PaymentFormValues) => {
+    if (submitLock.current) return;
+    submitLock.current = true;
+    mutation.mutate(values, { onSettled: () => { submitLock.current = false; } });
+  };
 
   const apAccountsList = apAccounts?.filter((a) => !!findAccountByRole([a], 'trade_payable'));
 
   return (
-    <Dialog open={isOpen} onOpenChange={setIsOpen}>
+    <FormDialog open={isOpen} onOpenChange={setIsOpen} dirty={form.formState.isDirty || mutation.isPending}>
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>Record Payment to {vendorName}</DialogTitle>
@@ -181,13 +198,13 @@ const BillPaymentForm = ({ isOpen, setIsOpen, vendorId, vendorName, amountDue, b
             </div>
 
             <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setIsOpen(false)}>Cancel</Button>
+              <DialogClose asChild><Button type="button" variant="outline">Cancel</Button></DialogClose>
               <Button type="submit" disabled={mutation.isPending}>{mutation.isPending ? 'Saving...' : 'Record Payment'}</Button>
             </DialogFooter>
           </form>
         </Form>
       </DialogContent>
-    </Dialog>
+    </FormDialog>
   );
 };
 

@@ -6,7 +6,9 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../integrations/supabase/client';
 import { useAuth } from '../contexts/AuthContext';
 import { Button } from './ui/button';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from './ui/dialog';
+import { DialogClose, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from './ui/dialog';
+import { FormDialog } from './ui/form-dialog';
+import { draftKey, useFormPersistence } from '../hooks/useFormPersistence';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from './ui/form';
 import { Input } from './ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
@@ -261,13 +263,27 @@ const BillForm = ({ isOpen, setIsOpen, billId, duplicateFromId, initialData, onS
     });
   });
 
+  // Typed work on a NEW bill survives refresh, crash and company switch.
+  const draft = useFormPersistence(form, {
+    storageKey: !isEditing && !isDuplicating ? draftKey(activeCompany?.id, 'bill') : null,
+    active: isOpen,
+  });
+
+  const lastTermsFor = useRef('');
   useEffect(() => {
     if (vendorId && billDate && !isEditing && vendors) {
+      // Recompute only when the vendor or the bill date actually changed. A
+      // refetch of the vendors list must not overwrite the due date, and a
+      // due date the user typed by hand wins outright.
+      const key = `${vendorId}|${billDate}`;
+      if (lastTermsFor.current === key) return;
+      if (form.getFieldState('due_date').isDirty) return;
       const vendor = vendors.find(v => v.id === vendorId);
       if (vendor) {
         const terms = vendor.payment_terms || 30;
         const baseDate = new Date(billDate);
         if (isValid(baseDate)) {
+          lastTermsFor.current = key;
           const newDueDate = addDays(baseDate, terms);
           form.setValue('due_date', format(newDueDate, 'yyyy-MM-dd'));
         }
@@ -344,6 +360,7 @@ const BillForm = ({ isOpen, setIsOpen, billId, duplicateFromId, initialData, onS
       if (error) throw new Error(await edgeErrorMessage(error, 'The bill could not be recorded.'));
     },
     onSuccess: () => {
+      draft.clear();
       queryClient.invalidateQueries({ queryKey: ['bills', activeCompany?.id] });
       queryClient.invalidateQueries({ queryKey: ['journal_entries', activeCompany?.id] });
       if (!billId && !duplicateFromId && activeCompany) {
@@ -357,7 +374,14 @@ const BillForm = ({ isOpen, setIsOpen, billId, duplicateFromId, initialData, onS
     onError: (error) => showError(`Error: ${error.message}`),
   });
 
-  const onSubmit = (values: BillFormValues) => mutation.mutate(values);
+  const submitLock = useRef(false);
+  // Two rapid clicks can both pass async validation before isPending
+  // re-renders; the ref closes that window so one submit posts one document.
+  const onSubmit = (values: BillFormValues) => {
+    if (submitLock.current) return;
+    submitLock.current = true;
+    mutation.mutate(values, { onSettled: () => { submitLock.current = false; } });
+  };
 
   // react-hook-form calls this when validation blocks submit. Without it the
   // Record Bill button appeared inert: no request, no message, dialog open.
@@ -382,7 +406,7 @@ const BillForm = ({ isOpen, setIsOpen, billId, duplicateFromId, initialData, onS
   }, 0);
 
   return (
-    <Dialog open={isOpen} onOpenChange={setIsOpen}>
+    <FormDialog open={isOpen} onOpenChange={setIsOpen} dirty={form.formState.isDirty || mutation.isPending} onDiscard={draft.clear}>
       <DialogContent className="sm:max-w-6xl h-[85vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{isEditing ? 'Edit Bill' : isDuplicating ? 'Duplicate Bill' : 'Record New Bill'}</DialogTitle>
@@ -496,7 +520,7 @@ const BillForm = ({ isOpen, setIsOpen, billId, duplicateFromId, initialData, onS
             </div>
 
             <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setIsOpen(false)}>Cancel</Button>
+              <DialogClose asChild><Button type="button" variant="outline">Cancel</Button></DialogClose>
               <Button type="submit" disabled={mutation.isPending}>
                 {mutation.isPending ? 'Saving...' : 'Record Bill'}
               </Button>
@@ -504,7 +528,7 @@ const BillForm = ({ isOpen, setIsOpen, billId, duplicateFromId, initialData, onS
           </form>
         </Form>
       </DialogContent>
-    </Dialog>
+    </FormDialog>
   );
 };
 

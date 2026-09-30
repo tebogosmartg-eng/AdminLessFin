@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -6,7 +6,8 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../integrations/supabase/client';
 import { useAuth } from '../contexts/AuthContext';
 import { Button } from './ui/button';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from './ui/dialog';
+import { DialogClose, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from './ui/dialog';
+import { FormDialog } from './ui/form-dialog';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from './ui/form';
 import { Input } from './ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
@@ -108,8 +109,17 @@ const ReceivePaymentForm = ({ isOpen, setIsOpen, customerId, customerName, amoun
 
   const amount = Number(form.watch('amount') || 0);
 
+  // Reset on the opening edge only. amountDue and customerName are props
+  // recomputed by the parent; a background refetch changing them must not
+  // wipe allocations mid-capture.
+  const openedFor = useRef(false);
   useEffect(() => {
-    if (!isOpen) return;
+    if (!isOpen) {
+      openedFor.current = false;
+      return;
+    }
+    if (openedFor.current) return;
+    openedFor.current = true;
     form.reset({
       payment_date: new Date().toISOString().split('T')[0],
       deposit_account_id: form.getValues('deposit_account_id'),
@@ -208,12 +218,15 @@ const ReceivePaymentForm = ({ isOpen, setIsOpen, customerId, customerName, amoun
     },
   });
 
+  const submitLock = useRef(false);
   const onSubmit = (values: PaymentFormValues) => {
     if (blocked) {
       showError(blocked);
       return;
     }
-    mutation.mutate(values);
+    if (submitLock.current) return;
+    submitLock.current = true;
+    mutation.mutate(values, { onSettled: () => { submitLock.current = false; } });
   };
 
   const setRow = (invoiceId: string, value: string) => {
@@ -222,7 +235,7 @@ const ReceivePaymentForm = ({ isOpen, setIsOpen, customerId, customerName, amoun
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={setIsOpen}>
+    <FormDialog open={isOpen} onOpenChange={setIsOpen} dirty={form.formState.isDirty || edited || mutation.isPending}>
       <DialogContent className="sm:max-w-2xl">
         <DialogHeader>
           <DialogTitle>Receive Payment from {customerName}</DialogTitle>
@@ -350,7 +363,7 @@ const ReceivePaymentForm = ({ isOpen, setIsOpen, customerId, customerName, amoun
             )} />
 
             <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setIsOpen(false)}>Cancel</Button>
+              <DialogClose asChild><Button type="button" variant="outline">Cancel</Button></DialogClose>
               <Button type="submit" disabled={mutation.isPending || !!blocked || !bankAccounts.length}>
                 {mutation.isPending ? 'Saving…' : 'Receive Payment'}
               </Button>
@@ -358,7 +371,7 @@ const ReceivePaymentForm = ({ isOpen, setIsOpen, customerId, customerName, amoun
           </form>
         </Form>
       </DialogContent>
-    </Dialog>
+    </FormDialog>
   );
 };
 

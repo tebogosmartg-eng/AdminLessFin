@@ -12,7 +12,7 @@
  * submit a credit larger than the bill has left to credit; the server enforces
  * the same limit.
  */
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -22,7 +22,9 @@ import { supabase } from '../integrations/supabase/client';
 import { useAuth } from '../contexts/AuthContext';
 import { Button } from './ui/button';
 import { Checkbox } from './ui/checkbox';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from './ui/dialog';
+import { DialogClose, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from './ui/dialog';
+import { FormDialog } from './ui/form-dialog';
+import { draftKey, useFormPersistence } from '../hooks/useFormPersistence';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from './ui/form';
 import { Input } from './ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
@@ -202,6 +204,13 @@ const VendorCreditForm = ({ isOpen, setIsOpen, initialVendorId, initialBillId }:
     }
   }, [isOpen, nextNumber, form]);
 
+  // Typed work on a supplier credit survives refresh, crash and company
+  // switch.
+  const draft = useFormPersistence(form, {
+    storageKey: draftKey(companyId, 'vendor-credit'),
+    active: isOpen,
+  });
+
   /** Start from what the bill actually said. */
   async function loadBill(id: string) {
     form.setValue('bill_id', id);
@@ -293,6 +302,7 @@ const VendorCreditForm = ({ isOpen, setIsOpen, initialVendorId, initialBillId }:
     },
     onSuccess: (result, values) => {
       refreshAfterVendorCreditChange(queryClient);
+      draft.clear();
       queryClient.invalidateQueries({ queryKey: ['next_vcn_number'] });
       const billNumber = creditableBills?.find((b) => b.id === values.bill_id)?.bill_number;
       showSuccess(
@@ -308,9 +318,10 @@ const VendorCreditForm = ({ isOpen, setIsOpen, initialVendorId, initialBillId }:
   });
 
   const lineError = form.formState.errors.items;
+  const submitLock = useRef(false);
 
   return (
-    <Dialog open={isOpen} onOpenChange={setIsOpen}>
+    <FormDialog open={isOpen} onOpenChange={setIsOpen} dirty={form.formState.isDirty || mutation.isPending} onDiscard={draft.clear}>
       <DialogContent className="max-h-[92vh] overflow-y-auto sm:max-w-5xl">
         <DialogHeader>
           <DialogTitle>Record supplier credit</DialogTitle>
@@ -326,7 +337,9 @@ const VendorCreditForm = ({ isOpen, setIsOpen, initialVendorId, initialBillId }:
                 showError(overCredit);
                 return;
               }
-              mutation.mutate(values);
+              if (submitLock.current) return;
+              submitLock.current = true;
+              mutation.mutate(values, { onSettled: () => { submitLock.current = false; } });
             })}
             className="space-y-5"
           >
@@ -658,9 +671,9 @@ const VendorCreditForm = ({ isOpen, setIsOpen, initialVendorId, initialBillId }:
             </div>
 
             <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setIsOpen(false)}>
-                Cancel
-              </Button>
+              <DialogClose asChild>
+                <Button type="button" variant="outline">Cancel</Button>
+              </DialogClose>
               <Button type="submit" disabled={mutation.isPending || loadingBill || !!overCredit || totals.total <= 0}>
                 {mutation.isPending ? 'Recording…' : 'Record supplier credit'}
               </Button>
@@ -668,7 +681,7 @@ const VendorCreditForm = ({ isOpen, setIsOpen, initialVendorId, initialBillId }:
           </form>
         </Form>
       </DialogContent>
-    </Dialog>
+    </FormDialog>
   );
 };
 

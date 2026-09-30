@@ -7,6 +7,7 @@ import { supabase } from '../integrations/supabase/client';
 import { useAuth } from '../contexts/AuthContext';
 import { Button } from './ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from './ui/dialog';
+import { FormDialog } from './ui/form-dialog';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from './ui/form';
 import { Input } from './ui/input';
 import { RadioGroup, RadioGroupItem } from './ui/radio-group';
@@ -100,7 +101,7 @@ const CreateInvoiceFromQuoteDialog = ({ isOpen, setIsOpen, quote }: CreateInvoic
   const hasTax = quote.quote_items.some((item: any) => item.tax_rate_id);
 
   return (
-    <Dialog open={isOpen} onOpenChange={setIsOpen}>
+    <FormDialog open={isOpen} onOpenChange={setIsOpen} dirty={form.formState.isDirty || mutation.isPending}>
       <DialogContent className="sm:max-w-2xl">
         <DialogHeader>
           <DialogTitle>Create Invoice from Quote #{quote.quote_number}</DialogTitle>
@@ -162,7 +163,7 @@ const CreateInvoiceFromQuoteDialog = ({ isOpen, setIsOpen, quote }: CreateInvoic
           </form>
         </Form>
       </DialogContent>
-    </Dialog>
+    </FormDialog>
   );
 };
 

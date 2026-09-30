@@ -6,6 +6,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../integrations/supabase/client';
 import { Button } from './ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from './ui/dialog';
+import { FormDialog } from './ui/form-dialog';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from './ui/form';
 import { Input } from './ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
@@ -98,7 +99,7 @@ const AssetDisposalForm = ({ isOpen, setIsOpen, asset }: AssetDisposalFormProps)
   const gainOrLoss = useMemo(() => proceeds - netBookValue, [proceeds, netBookValue]);
 
   return (
-    <Dialog open={isOpen} onOpenChange={setIsOpen}>
+    <FormDialog open={isOpen} onOpenChange={setIsOpen} dirty={form.formState.isDirty || mutation.isPending}>
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>Dispose Asset</DialogTitle>
@@ -131,7 +132,7 @@ const AssetDisposalForm = ({ isOpen, setIsOpen, asset }: AssetDisposalFormProps)
           </form>
         </Form>
       </DialogContent>
-    </Dialog>
+    </FormDialog>
   );
 };
 

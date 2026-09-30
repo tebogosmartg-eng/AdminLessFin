@@ -7,6 +7,7 @@ import { supabase } from '../integrations/supabase/client';
 import { useAuth } from '../contexts/AuthContext';
 import { Button } from './ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from './ui/dialog';
+import { FormDialog } from './ui/form-dialog';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from './ui/form';
 import { Input } from './ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
@@ -145,7 +146,7 @@ const RecurringBillForm = ({ isOpen, setIsOpen, billId }: Props) => {
   const onSubmit = (values: FormValues) => mutation.mutate(values);
 
   return (
-    <Dialog open={isOpen} onOpenChange={setIsOpen}>
+    <FormDialog open={isOpen} onOpenChange={setIsOpen} dirty={form.formState.isDirty || mutation.isPending}>
       <DialogContent className="sm:max-w-4xl">
         <DialogHeader>
           <DialogTitle>{isEditing ? 'Edit Template' : 'New Recurring Bill'}</DialogTitle>
@@ -183,7 +184,7 @@ const RecurringBillForm = ({ isOpen, setIsOpen, billId }: Props) => {
           </form>
         </Form>
       </DialogContent>
-    </Dialog>
+    </FormDialog>
   );
 };
 

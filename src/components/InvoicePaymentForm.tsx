@@ -1,11 +1,12 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../integrations/supabase/client';
 import { Button } from './ui/button';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from './ui/dialog';
+import { DialogClose, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from './ui/dialog';
+import { FormDialog } from './ui/form-dialog';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from './ui/form';
 import { Input } from './ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
@@ -75,15 +76,27 @@ const InvoicePaymentForm = ({ isOpen, setIsOpen, invoice }: InvoicePaymentFormPr
     ? findCashEquivalentAccounts(assetAccounts)
     : assetAccounts?.filter((a) => !findAccountByRole([a], 'trade_receivable'));
 
+  // Apply defaults once per open per invoice, and again when the true
+  // outstanding balance arrives — but never over an amount the user typed,
+  // and never merely because the parent re-rendered (the `invoice` prop is
+  // an inline object literal with a fresh identity every render).
+  const appliedFor = useRef('');
   useEffect(() => {
-    if (isOpen) {
-      form.setValue('amount', outstanding);
-      const controls = resolveControlAccounts(accounts);
-      if (controls.ar) {
-        form.setValue('ar_account_id', controls.ar.id);
-      }
+    if (!isOpen) {
+      appliedFor.current = '';
+      return;
     }
-  }, [isOpen, invoice, accounts, form, outstanding]);
+    const key = `${invoice.id}|${outstanding}`;
+    if (appliedFor.current === key) return;
+    appliedFor.current = key;
+    if (!form.getFieldState('amount').isDirty) {
+      form.setValue('amount', outstanding);
+    }
+    const controls = resolveControlAccounts(accounts);
+    if (controls.ar && !form.getFieldState('ar_account_id').isDirty) {
+      form.setValue('ar_account_id', controls.ar.id);
+    }
+  }, [isOpen, invoice.id, accounts, form, outstanding]);
 
   const mutation = useMutation({
     mutationFn: async (values: PaymentFormValues) => {
@@ -118,10 +131,17 @@ const InvoicePaymentForm = ({ isOpen, setIsOpen, invoice }: InvoicePaymentFormPr
     },
   });
 
-  const onSubmit = (values: PaymentFormValues) => mutation.mutate(values);
+  const submitLock = useRef(false);
+  // Two rapid clicks can both pass async validation before isPending
+  // re-renders; the ref closes that window so one submit posts one document.
+  const onSubmit = (values: PaymentFormValues) => {
+    if (submitLock.current) return;
+    submitLock.current = true;
+    mutation.mutate(values, { onSettled: () => { submitLock.current = false; } });
+  };
 
   return (
-    <Dialog open={isOpen} onOpenChange={setIsOpen}>
+    <FormDialog open={isOpen} onOpenChange={setIsOpen} dirty={form.formState.isDirty || mutation.isPending}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>Receive Payment</DialogTitle>
@@ -149,13 +169,13 @@ const InvoicePaymentForm = ({ isOpen, setIsOpen, invoice }: InvoicePaymentFormPr
               <FormItem><FormLabel>Credit Accounts Receivable</FormLabel><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue placeholder="Select an A/R account" /></SelectTrigger></FormControl><SelectContent>{arAccounts?.map(acc => <SelectItem key={acc.id} value={acc.id}>{acc.name}</SelectItem>)}</SelectContent></Select><FormMessage /></FormItem>
             )} />
             <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setIsOpen(false)}>Cancel</Button>
+              <DialogClose asChild><Button type="button" variant="outline">Cancel</Button></DialogClose>
               <Button type="submit" disabled={mutation.isPending}>{mutation.isPending ? 'Saving...' : 'Record Payment'}</Button>
             </DialogFooter>
           </form>
         </Form>
       </DialogContent>
-    </Dialog>
+    </FormDialog>
   );
 };
 

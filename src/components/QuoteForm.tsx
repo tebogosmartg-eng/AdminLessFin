@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -7,7 +7,10 @@ import { supabase } from '../integrations/supabase/client';
 import { useAuth } from '../contexts/AuthContext';
 import { useEnterpriseIdentity } from '../hooks/useEnterpriseIdentity';
 import { Button } from './ui/button';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from './ui/dialog';
+import { DialogClose, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from './ui/dialog';
+import { FormDialog } from './ui/form-dialog';
+import { useDialogFormReset } from '../hooks/useDialogFormReset';
+import { draftKey, useFormPersistence } from '../hooks/useFormPersistence';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from './ui/form';
 import { Input } from './ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
@@ -101,12 +104,18 @@ const QuoteForm = ({ isOpen, setIsOpen, quoteId, duplicateFromId }: QuoteFormPro
     enabled: isOpen && !isEditing && !!activeCompany, // Fetch for new or duplicate
   });
 
-  useEffect(() => {
-    if (sourceQuote && isOpen) {
+  // Reset only when the dialog opens or the quote being edited changes —
+  // never because the source query refetched, which used to wipe typing.
+  useDialogFormReset(
+    isOpen,
+    sourceQuote ? `src:${quoteId || duplicateFromId}` : 'new',
+    () => {
+      if (!sourceQuote) {
+        form.reset();
+        return;
+      }
       form.reset({
-        quote_number: isDuplicating
-          ? (typeof nextQuoteNumber === 'string' ? nextQuoteNumber : '')
-          : sourceQuote.quote_number,
+        quote_number: isDuplicating ? '' : sourceQuote.quote_number,
         quote_date: isDuplicating ? format(new Date(), 'yyyy-MM-dd') : sourceQuote.quote_date,
         expiry_date: isDuplicating ? format(addDays(new Date(), 30), 'yyyy-MM-dd') : (sourceQuote.expiry_date || ''),
         customer_id: sourceQuote.customer_id,
@@ -121,11 +130,19 @@ const QuoteForm = ({ isOpen, setIsOpen, quoteId, duplicateFromId }: QuoteFormPro
           tax_rate_id: item.tax_rate_id || '',
         })),
       });
-    }
-  }, [sourceQuote, isEditing, isDuplicating, isOpen, form, nextQuoteNumber]);
+    },
+  );
+
+  // Typed work on a NEW quote survives refresh, crash and company switch.
+  const draft = useFormPersistence(form, {
+    storageKey: !isEditing && !isDuplicating ? draftKey(activeCompany?.id, 'quote') : null,
+    active: isOpen,
+  });
 
   useEffect(() => {
-    if (nextQuoteNumber && !isEditing) {
+    // Fill the number only while the user has not typed one; a background
+    // refetch must never overwrite what they entered.
+    if (nextQuoteNumber && !isEditing && !form.getFieldState('quote_number').isDirty) {
       form.setValue('quote_number', nextQuoteNumber);
     }
   }, [nextQuoteNumber, isEditing, form]);
@@ -199,6 +216,7 @@ const QuoteForm = ({ isOpen, setIsOpen, quoteId, duplicateFromId }: QuoteFormPro
       if (error) throw error;
     },
     onSuccess: () => {
+      draft.clear();
       queryClient.invalidateQueries({ queryKey: ['quotes', activeCompany?.id] });
       queryClient.invalidateQueries({ queryKey: ['next_quote_number', activeCompany?.id] });
       showSuccess(`Quote ${isEditing ? 'updated' : 'created'} successfully.`);
@@ -207,11 +225,18 @@ const QuoteForm = ({ isOpen, setIsOpen, quoteId, duplicateFromId }: QuoteFormPro
     onError: (error) => showError(`Error: ${error.message}`),
   });
 
-  const onSubmit = (values: QuoteFormValues) => mutation.mutate(values);
+  const submitLock = useRef(false);
+  // Two rapid clicks can both pass async validation before isPending
+  // re-renders; the ref closes that window so one submit posts one document.
+  const onSubmit = (values: QuoteFormValues) => {
+    if (submitLock.current) return;
+    submitLock.current = true;
+    mutation.mutate(values, { onSettled: () => { submitLock.current = false; } });
+  };
 
   return (
     <>
-      <Dialog open={isOpen} onOpenChange={setIsOpen}>
+      <FormDialog open={isOpen} onOpenChange={setIsOpen} dirty={form.formState.isDirty || mutation.isPending} onDiscard={draft.clear}>
         <DialogContent className="sm:max-w-5xl">
           <DialogHeader>
             <DialogTitle>{isEditing ? 'Edit Quote' : isDuplicating ? 'Duplicate Quote' : 'New Quote'}</DialogTitle>
@@ -285,13 +310,13 @@ const QuoteForm = ({ isOpen, setIsOpen, quoteId, duplicateFromId }: QuoteFormPro
               <DialogFooter className="pt-4">
                 <Button type="button" variant="outline" onClick={() => setIsPreviewOpen(true)}>Preview</Button>
                 <div className="flex-grow" />
-                <Button type="button" variant="outline" onClick={() => setIsOpen(false)}>Cancel</Button>
+                <DialogClose asChild><Button type="button" variant="outline">Cancel</Button></DialogClose>
                 <Button type="submit" disabled={mutation.isPending}>{mutation.isPending ? 'Saving...' : 'Save Quote'}</Button>
               </DialogFooter>
             </form>
           </Form>
         </DialogContent>
-      </Dialog>
+      </FormDialog>
       <Sheet open={isPreviewOpen} onOpenChange={setIsPreviewOpen}>
         <SheetContent className="sm:max-w-3xl w-full">
             <SheetHeader>

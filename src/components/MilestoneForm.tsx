@@ -15,6 +15,7 @@ import {
   DialogTitle,
   DialogFooter,
 } from './ui/dialog';
+import { FormDialog } from './ui/form-dialog';
 import {
   Form,
   FormControl,
@@ -113,7 +114,7 @@ const MilestoneForm = ({ isOpen, setIsOpen, projectId, milestone }: MilestoneFor
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={setIsOpen}>
+    <FormDialog open={isOpen} onOpenChange={setIsOpen} dirty={form.formState.isDirty || mutation.isPending}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>{milestone ? 'Edit Milestone' : 'Add New Milestone'}</DialogTitle>
@@ -207,7 +208,7 @@ const MilestoneForm = ({ isOpen, setIsOpen, projectId, milestone }: MilestoneFor
           </form>
         </Form>
       </DialogContent>
-    </Dialog>
+    </FormDialog>
   );
 };
 
