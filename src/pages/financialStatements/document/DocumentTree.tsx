@@ -1,5 +1,6 @@
 import type { NoteRegister } from '../../../lib/financialStatements/document/noteRegister';
 import {
+  flipChoice,
   includeChoice,
   isHidden,
   isPolicyPrinted,
@@ -251,7 +252,7 @@ export default function DocumentTree({
                       onSelect={() => onSelect({ kind: 'policy', id: p.id })}
                       onToggleHidden={() =>
                         onSetIncluded
-                          ? onSetIncluded('policy', p.policy_code, !printed, p.id)
+                          ? onSetIncluded('policy', p.policy_code, flipChoice(overrides, 'policy', p.policy_code, printed, p.id), p.id)
                           : onToggleHidden(p.id)
                       }
                     />
@@ -312,7 +313,7 @@ export default function DocumentTree({
                 onSelect={() => onSelect({ kind: 'note', id: n.id })}
                 onToggleHidden={() =>
                   onSetIncluded
-                    ? onSetIncluded('note', n.disclosure_code, !printed, n.id)
+                    ? onSetIncluded('note', n.disclosure_code, flipChoice(overrides, 'note', n.disclosure_code, printed, n.id), n.id)
                     : onToggleHidden(n.id)
                 }
               />

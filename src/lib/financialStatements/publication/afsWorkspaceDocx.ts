@@ -7,6 +7,7 @@
  * running header/footer and automatic page numbers. Uses store-method ZIP (no
  * extra dependencies; edge functions unchanged).
  */
+import { coverLogoBox, coverLogoBytes } from './coverLogo';
 import type { CanonicalDocumentView, CanonicalStatement } from './canonicalDocumentView';
 import { professionalLineLabel } from './afsProfessionalPdf';
 import {
@@ -448,7 +449,26 @@ export function renderCanonicalDocx(view: CanonicalDocumentView): Uint8Array<Arr
   const body: string[] = [];
   const add = (xml: string) => body.push(xml);
 
-  // Cover — unbranded: the entity, what the document is, the practitioner.
+  // Cover — the entity's own logo where it has one, the entity, what the
+  // document is, and the practitioner.
+  const logo = view.presentation.logo;
+  if (logo) {
+    const { w, h } = coverLogoBox(logo, 240, 130);
+    const cx = Math.round(w * 12700);
+    const cy = Math.round(h * 12700);
+    add(
+      `<w:p><w:pPr><w:jc w:val="center"/><w:spacing w:before="2400" w:after="160"/></w:pPr><w:r><w:drawing>` +
+        `<wp:inline distT="0" distB="0" distL="0" distR="0"><wp:extent cx="${cx}" cy="${cy}"/>` +
+        `<wp:docPr id="1" name="Logo"/>` +
+        `<a:graphic xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">` +
+        `<a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture">` +
+        `<pic:pic xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture">` +
+        `<pic:nvPicPr><pic:cNvPr id="1" name="logo.jpeg"/><pic:cNvPicPr/></pic:nvPicPr>` +
+        `<pic:blipFill><a:blip r:embed="rIdLogo"/><a:stretch><a:fillRect/></a:stretch></pic:blipFill>` +
+        `<pic:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="${cx}" cy="${cy}"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></pic:spPr>` +
+        `</pic:pic></a:graphicData></a:graphic></wp:inline></w:drawing></w:r></w:p>`,
+    );
+  }
   add(para(view.companyName.toUpperCase(), { style: 'Title', bold: true, size: 16, align: 'center', after: 80 }));
   if (view.presentation.registrationNumber) {
     add(para(`(Registration number ${view.presentation.registrationNumber})`, { align: 'center', after: 40 }));
@@ -457,7 +477,10 @@ export function renderCanonicalDocx(view: CanonicalDocumentView): Uint8Array<Arr
     add(para(`Trading as ${view.presentation.tradingName}`, { align: 'center', color: '595959', after: 40 }));
   }
   add(para(view.presentation.documentTitle.toUpperCase(), { bold: true, size: 13, align: 'center', after: 40 }));
-  add(para(view.presentation.coverTitle, { align: 'center', after: 200 }));
+  add(para(view.presentation.coverTitle, { align: 'center', after: view.presentation.issueDateRecorded ? 40 : 200 }));
+  if (view.presentation.issueDateRecorded) {
+    add(para(`Issued ${view.presentation.issueDateRecorded}`, { align: 'center', after: 200 }));
+  }
   for (const line of practitionerFirmLines(view)) {
     add(para(line, { align: 'center', size: 9, after: 20 }));
   }
@@ -610,7 +633,8 @@ export function renderCanonicalDocx(view: CanonicalDocumentView): Uint8Array<Arr
   const documentXml =
     `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>` +
     `<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" ` +
-    `xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">` +
+    `xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" ` +
+    `xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing">` +
     `<w:body>${body.join('')}${sectPr}</w:body></w:document>`;
 
   const documentLine = `${view.presentation.documentTitle} for the ${view.presentation.reportingPeriodLabel.charAt(0).toLowerCase()}${view.presentation.reportingPeriodLabel.slice(1)}`;
@@ -652,6 +676,7 @@ export function renderCanonicalDocx(view: CanonicalDocumentView): Uint8Array<Arr
     `<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">` +
     `<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>` +
     `<Default Extension="xml" ContentType="application/xml"/>` +
+    `<Default Extension="jpeg" ContentType="image/jpeg"/>` +
     `<Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>` +
     `<Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/>` +
     `<Override PartName="/word/header1.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.header+xml"/>` +
@@ -670,6 +695,9 @@ export function renderCanonicalDocx(view: CanonicalDocumentView): Uint8Array<Arr
     `<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>` +
     `<Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/header" Target="header1.xml"/>` +
     `<Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/footer" Target="footer1.xml"/>` +
+    (logo
+      ? `<Relationship Id="rIdLogo" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/logo.jpeg"/>`
+      : '') +
     `</Relationships>`;
 
   return zipStore({
@@ -680,5 +708,6 @@ export function renderCanonicalDocx(view: CanonicalDocumentView): Uint8Array<Arr
     'word/footer1.xml': encodeUtf8(footerXml),
     'word/document.xml': encodeUtf8(documentXml),
     'word/_rels/document.xml.rels': encodeUtf8(documentRels),
+    ...(logo ? { 'word/media/logo.jpeg': coverLogoBytes(logo) } : {}),
   });
 }

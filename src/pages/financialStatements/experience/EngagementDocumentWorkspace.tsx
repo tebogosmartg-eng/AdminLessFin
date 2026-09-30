@@ -109,6 +109,14 @@ export default function WorkspaceDocumentWorkspace({
         {/* The framework is the only thing worth saying here; the company, the
             year and the status are already in the page header above. */}
         <p className="text-sm text-muted-foreground">{model.frameworkLabel}</p>
+        <span
+          className="ml-auto mr-2 text-xs text-muted-foreground"
+          data-testid="afs-save-state"
+          data-saving={overridesApi.saving ? 'true' : 'false'}
+          aria-live="polite"
+        >
+          {overridesApi.saving ? 'Saving…' : overridesApi.error ? '' : 'All changes saved'}
+        </span>
         <Button
           variant="ghost"
           size="sm"

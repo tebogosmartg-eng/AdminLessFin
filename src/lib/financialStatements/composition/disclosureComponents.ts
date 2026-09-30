@@ -6,6 +6,7 @@
  */
 import type { DocNoteNode, DocParagraph, DocSection, DocTable } from '../document/documentModel';
 import { formatCellValue } from '../disclosures/format';
+import { printedPieces } from '../document/noteContent';
 import type { CellFormat } from '../disclosures/types';
 import type {
   CompositionNarrative,
@@ -188,11 +189,18 @@ export function buildLibraryComponent(
   };
 }
 
-/** Map a document note into typed library components. */
+/** Map a document note into typed library components, in the note's reading order. */
 export function buildDisclosureLibraryComponents(note: DocNoteNode): DisclosureLibraryComponent[] {
   const components: DisclosureLibraryComponent[] = [];
 
-  for (const section of note.sections || []) {
+  for (const piece of printedPieces(note)) {
+    if (piece.kind === 'section') addSection(piece.item);
+    else if (piece.kind === 'paragraph') addParagraph(piece.item);
+    else addTable(piece.item);
+  }
+  return components;
+
+  function addSection(section: DocSection) {
     if (section.title && section.section_code !== 'body') {
       components.push(
         buildLibraryComponent(`${section.id}:heading`, inferLibraryKind(section, null, null), {
@@ -216,8 +224,8 @@ export function buildDisclosureLibraryComponents(note: DocNoteNode): DisclosureL
     }
   }
 
-  for (const paragraph of note.paragraphs || []) {
-    if (!(paragraph.body || '').trim()) continue;
+  function addParagraph(paragraph: DocParagraph) {
+    if (!(paragraph.body || '').trim()) return;
     const kind = inferLibraryKind(null, paragraph, null);
     if (kind === 'bullet_list') {
       const items = paragraph.body
@@ -230,7 +238,7 @@ export function buildDisclosureLibraryComponents(note: DocNoteNode): DisclosureL
     }
   }
 
-  for (const table of note.tables || []) {
+  function addTable(table: DocTable) {
     const rows = tableToCompositionRows(table.columns_json, table.rows_json);
     const kinds = tableRowKinds(table.columns_json, table.rows_json);
     const libKind = inferLibraryKind(null, null, table);
@@ -242,8 +250,6 @@ export function buildDisclosureLibraryComponents(note: DocNoteNode): DisclosureL
       }),
     );
   }
-
-  return components;
 }
 
 /** Convert library components into composition disclosure components (V15 compat + V16 structure). */

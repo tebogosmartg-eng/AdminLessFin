@@ -29,6 +29,8 @@ import {
   normaliseFrameworkKey,
 } from '../framework/frameworkContent';
 import { composeCompanyPolicies } from '../framework/companyPolicies';
+import { loadCoverLogo, type CoverLogo } from '../publication/coverLogo';
+import { companyService } from '@/governance/domains/company/service';
 import type { ManualField } from '../framework/trialBalanceDisclosureMapping';
 import { applyGeneratedDisclosures } from '../disclosures/assemble';
 import type { FinancialFacts } from '../disclosures/accountIndex';
@@ -141,6 +143,11 @@ export type DocNoteNode = {
   applies?: boolean;
   /** Why it does not apply, in words the preparer reads. */
   applicability?: string;
+  /**
+   * The note's pieces in the one order they read in, set when its content is
+   * resolved for print. Absent means sections, then paragraphs, then tables.
+   */
+  pieceOrder?: Array<{ kind: 'section' | 'paragraph' | 'table'; id: string }>;
 };
 
 export type DocumentPeriod = {
@@ -195,6 +202,10 @@ export type DocumentModel = {
   disclosureReasons?: Record<string, string>;
   /** The supplementary Detailed Income Statement, built from the sealed facts. */
   detailedIncomeStatement?: SupplementarySchedule | null;
+  /** The company's logo (Company Settings) as the cover prints it. */
+  logo?: CoverLogo | null;
+  /** Where the logo is stored, for the editor to show and replace it. */
+  logoUrl?: string | null;
 };
 
 /** Lightweight mirror of disclosure-platform cross-reference rows (read-only). */
@@ -406,6 +417,15 @@ export async function loadDocumentModel(params: {
   generalInfo: EfsWorkspaceGeneralInformation | null;
 }): Promise<DocumentModel> {
   const { companyId, companyName, workspaceId, dashboard, generalInfo } = params;
+  // The company's logo (Company Settings), for the cover. A logo that cannot
+  // be read leaves the cover without one; it never stops the document.
+  const logoPromise = companyService
+    .getCompanyProfile(companyId)
+    .then(async (profile) => {
+      const logoUrl = profile?.logoUrl ?? null;
+      return { logoUrl, logo: await loadCoverLogo(logoUrl) };
+    })
+    .catch(() => ({ logoUrl: null as string | null, logo: null as CoverLogo | null }));
   const frameworkPackId = dashboard.framework?.id ?? null;
   const frameworkKey =
     dashboard.framework?.framework_key ??
@@ -570,6 +590,7 @@ export async function loadDocumentModel(params: {
     generatedDisclosures: generated.generatedCodes,
     disclosureReasons: generated.reasons,
     detailedIncomeStatement: buildDetailedIncomeStatement(factsRes, years),
+    ...(await logoPromise),
   };
 }
 

@@ -568,14 +568,30 @@ test('Editor: paragraphs and tables can be added, moved and removed', async ({ p
     await expect(paragraphs.first().locator('textarea')).toHaveValue(firstBefore);
 
     // ── Reorder ────────────────────────────────────────────────────────────
+    // A note's pieces — sections, paragraphs, tables — move through one
+    // sequence, so a step down can take a paragraph past a table. Step the
+    // first paragraph down until the second paragraph is above it.
     const secondBefore = await paragraphs.nth(1).locator('textarea').inputValue();
-    await paragraphs.first().getByTestId('afs-piece-down').click();
+    for (let step = 0; step < 8; step += 1) {
+      if ((await paragraphs.first().locator('textarea').inputValue()) === secondBefore) break;
+      const moving = paragraphs.filter({ has: page.locator('textarea') }).nth(
+        await paragraphs.evaluateAll(
+          (els, v) => els.findIndex((el) => (el.querySelector('textarea') as HTMLTextAreaElement | null)?.value === v),
+          firstBefore,
+        ),
+      );
+      await moving.getByTestId('afs-piece-down').click();
+      await page.waitForTimeout(400);
+    }
     await expect(paragraphs.first().locator('textarea')).toHaveValue(secondBefore, {
       timeout: 15_000,
     });
     await expect(paragraphs.nth(1).locator('textarea')).toHaveValue(firstBefore);
 
     // A reordering is part of the document, so it outlives the browser.
+    await expect(page.getByTestId('afs-save-state')).toHaveAttribute('data-saving', 'false', {
+      timeout: 60_000,
+    });
     await page.reload();
     await waitForRouteSettled(page);
     await openDocument(page);
@@ -588,19 +604,22 @@ test('Editor: paragraphs and tables can be added, moved and removed', async ({ p
     await expect(page.getByTestId('afs-paragraph').nth(1).locator('textarea')).toHaveValue(
       firstBefore,
     );
-    await page.getByTestId('afs-paragraph').nth(1).getByTestId('afs-piece-up').click();
+    for (let step = 0; step < 8; step += 1) {
+      if ((await page.getByTestId('afs-paragraph').first().locator('textarea').inputValue()) === firstBefore) break;
+      await page.getByTestId('afs-paragraph').nth(1).getByTestId('afs-piece-up').click();
+      await page.waitForTimeout(400);
+    }
     await expect(page.getByTestId('afs-paragraph').first().locator('textarea')).toHaveValue(
       firstBefore,
       { timeout: 15_000 },
     );
 
-    // The ends of the note are the ends: nothing moves off them.
-    await expect(
-      page.getByTestId('afs-paragraph').first().getByTestId('afs-piece-up'),
-    ).toBeDisabled();
-    await expect(
-      page.getByTestId('afs-paragraph').last().getByTestId('afs-piece-down'),
-    ).toBeDisabled();
+    // The ends of the note are the ends: nothing moves off them. Sections,
+    // paragraphs and tables share one sequence, so the ends are the note's
+    // first and last pieces, whatever kind they are.
+    const pieces = page.getByTestId('afs-note-pieces');
+    await expect(pieces.getByTestId('afs-piece-up').first()).toBeDisabled();
+    await expect(pieces.getByTestId('afs-piece-down').last()).toBeDisabled();
 
     await page.screenshot({ path: 'tests/e2e/artifacts/disc-10-paragraphs.png', fullPage: true });
 

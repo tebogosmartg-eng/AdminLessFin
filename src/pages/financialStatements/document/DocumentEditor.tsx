@@ -13,6 +13,7 @@ import type {
   DocumentModel,
 } from '../../../lib/financialStatements/document/documentModel';
 import {
+  flipChoice,
   includeChoice,
   isPolicyPrinted,
   lineLabelKey,
@@ -23,6 +24,9 @@ import {
 import type { DocumentOverridesApi } from '../../../lib/financialStatements/document/documentStore';
 import { statementLineLabel } from '../../../lib/financialStatements/composition/compose';
 import { Switch } from '../../../components/ui/switch';
+import { supabase } from '../../../integrations/supabase/client';
+import { companyService } from '../../../governance/domains/company/service';
+import { useAuth } from '../../../contexts/AuthContext';
 import {
   deleteNoteContent,
   isStoredRow,
@@ -32,8 +36,10 @@ import {
 import {
   isKeyHidden,
   nextPlacement,
-  orderedParagraphs,
-  orderedTables,
+  movedPieceOrder,
+  orderedPieces,
+  sectionKey,
+  stableKey,
   paragraphKey,
   reorderedPlacements,
   tableKey,
@@ -795,7 +801,14 @@ function IncludeSwitch({
           data-testid="afs-editor-include-switch"
           checked={printed}
           disabled={ctx.locked}
-          onCheckedChange={(on) => ctx.overridesApi.setIncluded(kind, code, on, nodeId)}
+          onCheckedChange={() =>
+            ctx.overridesApi.setIncluded(
+              kind,
+              code,
+              flipChoice(ctx.overridesApi.overrides, kind, code, printed, nodeId),
+              nodeId,
+            )
+          }
         />
       </div>
       {!printed && choice == null && offReason ? (
@@ -1271,30 +1284,33 @@ function FrontSectionEditor({ sectionId, ctx }: { sectionId: string; ctx: Editor
  */
 function PieceControls({
   ctx,
+  note,
   kind,
   id,
   pieceKey,
-  siblingKeys,
   noun,
 }: {
   ctx: EditorContext;
+  note: DocNoteNode;
   kind: NoteContentKind;
   /** The row id, or a synthetic one for content the framework generated. */
   id: string;
   /** What this piece's placement is remembered against. */
   pieceKey: string;
-  /** Every sibling's key, in the order they are shown. */
-  siblingKeys: string[];
   noun: string;
 }) {
   const [confirming, setConfirming] = useState(false);
   const hidden = isKeyHidden(ctx.overridesApi.overrides, pieceKey);
-  const stored = isStoredRow(id);
+  // Sections have no delete; taking one out withholds it, like generated wording.
+  const stored = isStoredRow(id) && kind !== 'section';
+  // Every piece of the note — sections, paragraphs, tables — moves through
+  // the one sequence the note reads in, so a paragraph can go below a table.
+  const siblingKeys = orderedPieces(note, ctx.overridesApi.overrides).map((p) => p.key);
   const position = siblingKeys.indexOf(pieceKey);
 
   const move = (direction: -1 | 1) => {
-    const placements = reorderedPlacements(siblingKeys, position, direction);
-    if (placements) ctx.overridesApi.setOrders(placements);
+    const next = movedPieceOrder(siblingKeys, position, direction);
+    if (next) ctx.overridesApi.setPieceOrder(note.disclosure_code, next);
   };
 
   const remove = useMutation({
@@ -1421,12 +1437,10 @@ function ParagraphEditor({
   ctx,
   note,
   paragraph,
-  siblings,
 }: {
   ctx: EditorContext;
   note: DocNoteNode;
   paragraph: DocParagraph;
-  siblings: DocParagraph[];
 }) {
   const [body, setBody] = useState(paragraph.body);
   useEffect(() => setBody(paragraph.body), [paragraph.id, paragraph.body]);
@@ -1472,8 +1486,8 @@ function ParagraphEditor({
             ctx={ctx}
             kind="paragraph"
             id={paragraph.id}
+            note={note}
             pieceKey={key}
-            siblingKeys={siblings.map((s) => paragraphKey(note, s))}
             noun="Paragraph"
           />
         </div>
@@ -1498,8 +1512,14 @@ function SectionEditor({
     setBody(section.body);
   }, [section.id, section.title, section.body]);
   const save = useContentSave(ctx, note, 'section');
+  const key = sectionKey(note, section);
+  const hidden = isKeyHidden(ctx.overridesApi.overrides, key);
   return (
-    <div className="space-y-2 rounded-md border p-3">
+    <div
+      className={cn('space-y-2 rounded-md border p-3', hidden && 'opacity-60')}
+      data-testid="afs-section"
+      data-hidden={hidden ? 'true' : undefined}
+    >
       <Input
         value={title}
         readOnly={ctx.locked}
@@ -1529,6 +1549,9 @@ function SectionEditor({
           {save.isPending ? 'Saving...' : 'Save section'}
         </Button>
         <ContentOriginBadge generated={!isStoredRow(section.id)} />
+        <div className="ml-auto">
+          <PieceControls ctx={ctx} note={note} kind="section" id={section.id} pieceKey={key} noun="Section" />
+        </div>
       </div>
     </div>
   );
@@ -1616,12 +1639,10 @@ function TableEditor({
   ctx,
   note,
   table,
-  siblings,
 }: {
   ctx: EditorContext;
   note: DocNoteNode;
   table: DocTable;
-  siblings: DocTable[];
 }) {
   const [title, setTitle] = useState(table.title);
   const [grid, setGrid] = useState<string[][]>(() => toGrid(table.rows_json));
@@ -1675,8 +1696,8 @@ function TableEditor({
             ctx={ctx}
             kind="table"
             id={table.id}
+            note={note}
             pieceKey={tableKey(note, table)}
-            siblingKeys={siblings.map((s) => tableKey(note, s))}
             noun="Table"
           />
         </div>
@@ -1836,12 +1857,10 @@ function DisclosureTableEditor({
   ctx,
   note,
   table,
-  siblings,
 }: {
   ctx: EditorContext;
   note: DocNoteNode;
   table: DocTable;
-  siblings: DocTable[];
 }) {
   const initial = asGeneratedTable(table);
   const [working, setWorking] = useState<GeneratedTable | null>(initial);
@@ -1926,8 +1945,8 @@ function DisclosureTableEditor({
             ctx={ctx}
             kind="table"
             id={table.id}
+            note={note}
             pieceKey={key}
-            siblingKeys={siblings.map((s) => tableKey(note, s))}
             noun="Table"
           />
         </div>
@@ -2035,8 +2054,17 @@ function starterTable(): { columns: unknown[]; rows: unknown[] } {
 
 function NoteEditor({ note, ctx }: { note: DocNoteNode; ctx: EditorContext }) {
   const overrides = ctx.overridesApi.overrides;
-  const paragraphs = orderedParagraphs(note, overrides);
-  const tables = orderedTables(note, overrides);
+  // Everything in the note, in the one order it prints in.
+  const pieces = orderedPieces(note, overrides);
+  const paragraphs = pieces.filter((p) => p.kind === 'paragraph').map((p) => p.item as DocParagraph);
+  const tables = pieces.filter((p) => p.kind === 'table').map((p) => p.item as DocTable);
+  // Something added goes at the end of the note, below everything already
+  // in it, from where it can be moved anywhere.
+  const appendToOrder = (kind: 'paragraph' | 'table', code: string) =>
+    ctx.overridesApi.setPieceOrder(note.disclosure_code, [
+      ...pieces.map((p) => p.key),
+      stableKey(note.disclosure_code, kind, code),
+    ]);
 
   /**
    * Adding goes through the same route as every other edit.
@@ -2049,7 +2077,7 @@ function NoteEditor({ note, ctx }: { note: DocNoteNode; ctx: EditorContext }) {
    * row first where it has to.
    */
   const addParagraph = useMutation({
-    mutationFn: () =>
+    mutationFn: (code: string) =>
       saveNoteContent({
         companyId: ctx.companyId,
         workspaceId: ctx.workspaceId,
@@ -2057,8 +2085,8 @@ function NoteEditor({ note, ctx }: { note: DocNoteNode; ctx: EditorContext }) {
         note,
         kind: 'paragraph',
         // A code of its own, so it is added rather than overwriting another.
-        id: `${note.id}:P-new-${Date.now()}`,
-        code: `P${Date.now()}`,
+        id: `${note.id}:P-new-${code}`,
+        code,
         body: '',
         sortOrder: nextPlacement(
           paragraphs.map((p) => paragraphKey(note, p)),
@@ -2066,7 +2094,8 @@ function NoteEditor({ note, ctx }: { note: DocNoteNode; ctx: EditorContext }) {
           overrides,
         ),
       }),
-    onSuccess: (res) => {
+    onSuccess: (res, code) => {
+      appendToOrder('paragraph', code);
       showSuccess('Paragraph added');
       if (res.disclosureInstanceId) ctx.onNoteStored?.(res.disclosureInstanceId);
       ctx.onSaved();
@@ -2075,7 +2104,7 @@ function NoteEditor({ note, ctx }: { note: DocNoteNode; ctx: EditorContext }) {
   });
 
   const addTable = useMutation({
-    mutationFn: () => {
+    mutationFn: (code: string) => {
       const starter = starterTable();
       return saveNoteContent({
         companyId: ctx.companyId,
@@ -2083,8 +2112,8 @@ function NoteEditor({ note, ctx }: { note: DocNoteNode; ctx: EditorContext }) {
         frameworkPackId: ctx.model.frameworkPackId,
         note,
         kind: 'table',
-        id: `${note.id}:T-new-${Date.now()}`,
-        code: `T${Date.now()}`,
+        id: `${note.id}:T-new-${code}`,
+        code,
         title: 'New table',
         columns_json: starter.columns,
         rows_json: starter.rows,
@@ -2095,7 +2124,8 @@ function NoteEditor({ note, ctx }: { note: DocNoteNode; ctx: EditorContext }) {
         ),
       });
     },
-    onSuccess: (res) => {
+    onSuccess: (res, code) => {
+      appendToOrder('table', code);
       showSuccess('Table added');
       if (res.disclosureInstanceId) ctx.onNoteStored?.(res.disclosureInstanceId);
       ctx.onSaved();
@@ -2141,68 +2171,53 @@ function NoteEditor({ note, ctx }: { note: DocNoteNode; ctx: EditorContext }) {
 
         <ManualFieldsNotice ctx={ctx} note={note} />
 
-        {note.sections.length > 0 && (
-          <div className="space-y-2">
-            <Label>Sections</Label>
-            {note.sections.map((section) => (
-              <SectionEditor key={section.id} ctx={ctx} note={note} section={section} />
-            ))}
+        <div className="space-y-3" data-testid="afs-note-pieces">
+          <div>
+            <Label>Contents of this note</Label>
+            <p className="text-xs text-muted-foreground">
+              In the order they print. Move any section, paragraph or table up or down, past any
+              other.
+            </p>
           </div>
-        )}
-
-        <div className="space-y-2">
-          <Label>Paragraphs</Label>
-          {paragraphs.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No paragraphs yet.</p>
+          {pieces.length === 0 ? (
+            <p className="text-sm text-muted-foreground">Nothing in this note yet.</p>
           ) : (
-            paragraphs.map((paragraph) => (
-              <ParagraphEditor
-                key={paragraph.id}
-                ctx={ctx}
-                note={note}
-                paragraph={paragraph}
-                siblings={paragraphs}
-              />
-            ))
+            pieces.map((piece) =>
+              piece.kind === 'section' ? (
+                <SectionEditor key={piece.key} ctx={ctx} note={note} section={piece.item} />
+              ) : piece.kind === 'paragraph' ? (
+                <ParagraphEditor key={piece.key} ctx={ctx} note={note} paragraph={piece.item} />
+              ) : asGeneratedTable(piece.item) ? (
+                // A table the disclosure engine built is edited as a
+                // spreadsheet; anything older keeps the plain editor.
+                <DisclosureTableEditor key={piece.key} ctx={ctx} note={note} table={piece.item} />
+              ) : (
+                <TableEditor key={piece.key} ctx={ctx} note={note} table={piece.item} />
+              ),
+            )
           )}
-          <Button
-            variant="outline"
-            size="sm"
-            data-testid="afs-add-paragraph"
-            onClick={() => addParagraph.mutate()}
-            disabled={addParagraph.isPending || ctx.locked}
-          >
-            <Plus className="mr-2 h-4 w-4" />
-            {addParagraph.isPending ? 'Adding…' : 'Add paragraph'}
-          </Button>
-        </div>
-
-        <div className="space-y-4">
-          {tables.map((table) =>
-            // A table the disclosure engine built is edited as a spreadsheet;
-            // anything older keeps the plain editor until it is regenerated.
-            asGeneratedTable(table) ? (
-              <DisclosureTableEditor
-                key={table.id}
-                ctx={ctx}
-                note={note}
-                table={table}
-                siblings={tables}
-              />
-            ) : (
-              <TableEditor key={table.id} ctx={ctx} note={note} table={table} siblings={tables} />
-            ),
-          )}
-          <Button
-            variant="outline"
-            size="sm"
-            data-testid="afs-add-table"
-            onClick={() => addTable.mutate()}
-            disabled={addTable.isPending || ctx.locked}
-          >
-            <Plus className="mr-2 h-4 w-4" />
-            {addTable.isPending ? 'Adding…' : 'Add table'}
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              data-testid="afs-add-paragraph"
+              onClick={() => addParagraph.mutate(`P${Date.now()}`)}
+              disabled={addParagraph.isPending || ctx.locked}
+            >
+              <Plus className="mr-2 h-4 w-4" />
+              {addParagraph.isPending ? 'Adding…' : 'Add paragraph'}
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              data-testid="afs-add-table"
+              onClick={() => addTable.mutate(`T${Date.now()}`)}
+              disabled={addTable.isPending || ctx.locked}
+            >
+              <Plus className="mr-2 h-4 w-4" />
+              {addTable.isPending ? 'Adding…' : 'Add table'}
+            </Button>
+          </div>
         </div>
 
         <NoteLineItems
@@ -2324,14 +2339,104 @@ function FrameworkSelector({
   );
 }
 
+/**
+ * The entity's logo on the cover. It is the company's own branding (the same
+ * logo its invoices carry), so replacing it here replaces it there too. The
+ * preparer can also leave it off this set of statements.
+ */
+function CoverLogoControl({ ctx }: { ctx: EditorContext }) {
+  const { refreshProfile } = useAuth();
+  const [uploading, setUploading] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const printed = includeChoice(ctx.overridesApi.overrides, 'section', 'cover:logo') !== false;
+  const logoUrl = ctx.model.logoUrl ?? null;
+
+  const upload = async (file: File) => {
+    if (!/^image\//.test(file.type)) {
+      showError('Choose an image file (PNG, JPEG, WebP or SVG).');
+      return;
+    }
+    setUploading(true);
+    try {
+      const ext = (file.name.split('.').pop() || 'png').toLowerCase();
+      const path = `${ctx.companyId}/logo-${Date.now()}.${ext}`;
+      const { error } = await supabase.storage.from('attachments').upload(path, file, { upsert: true });
+      if (error) throw new Error(`The logo could not be uploaded: ${error.message}`);
+      const { data } = supabase.storage.from('attachments').getPublicUrl(path);
+      const result = await companyService.updateCompanyProfile(ctx.companyId, { logoUrl: data.publicUrl });
+      if (!result.success) throw new Error(result.error || 'The logo could not be saved.');
+      await refreshProfile?.();
+      showSuccess('Logo saved. It prints on the cover and on your invoices.');
+      ctx.onSaved();
+    } catch (e) {
+      showError(e instanceof Error ? e.message : 'The logo could not be saved.');
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  return (
+    <div className="space-y-3 rounded-md border p-3" data-testid="afs-cover-logo">
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <Label className="text-sm">Company logo on the cover</Label>
+          <p className="text-xs text-muted-foreground">
+            {!logoUrl
+              ? 'No logo yet. Upload one to print it above the company name.'
+              : ctx.model.logo
+                ? printed
+                  ? 'Printed centred above the company name.'
+                  : 'Switched off by you: the cover prints without it.'
+                : 'The logo could not be read, so the cover prints without it. Try uploading it again.'}
+          </p>
+        </div>
+        <Switch
+          data-testid="afs-cover-logo-switch"
+          checked={printed && !!ctx.model.logo}
+          disabled={ctx.locked || !ctx.model.logo}
+          onCheckedChange={(on) => ctx.overridesApi.setIncluded('section', 'cover:logo', on ? null : false)}
+        />
+      </div>
+      {logoUrl ? (
+        <div className="flex justify-center rounded border bg-white p-4">
+          <img src={logoUrl} alt="Company logo" className="max-h-28 max-w-[16rem] object-contain" data-testid="afs-cover-logo-image" />
+        </div>
+      ) : null}
+      <input
+        ref={inputRef}
+        type="file"
+        accept="image/png,image/jpeg,image/webp,image/svg+xml"
+        className="hidden"
+        data-testid="afs-cover-logo-input"
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          if (file) void upload(file);
+          e.target.value = '';
+        }}
+      />
+      <Button
+        variant="outline"
+        size="sm"
+        disabled={ctx.locked || uploading}
+        onClick={() => inputRef.current?.click()}
+      >
+        {uploading ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <Plus className="mr-1 h-4 w-4" />}
+        {logoUrl ? 'Replace logo' : 'Upload logo'}
+      </Button>
+    </div>
+  );
+}
+
 function CoverEditor({
   model,
   workspaceId,
   onSaved,
+  ctx,
 }: {
   model: DocumentModel;
   workspaceId: string;
   onSaved: () => void;
+  ctx: EditorContext;
 }) {
   const display = corporateDisplayFromModel(model);
   const rows: Array<[string, React.ReactNode]> = [
@@ -2358,7 +2463,8 @@ function CoverEditor({
           flows straight into the preview and the PDF.
         </CardDescription>
       </CardHeader>
-      <CardContent>
+      <CardContent className="space-y-4">
+        <CoverLogoControl ctx={ctx} />
         <dl className="grid gap-2 text-sm">
           {rows.map(([k, v]) => (
             <div
@@ -2495,7 +2601,7 @@ export default function DocumentEditor({
   const kind = selection.kind;
 
   if (kind === 'cover')
-    return <CoverEditor model={model} workspaceId={workspaceId} onSaved={onSaved} />;
+    return <CoverEditor model={model} workspaceId={workspaceId} onSaved={onSaved} ctx={ctx} />;
   // The entity's own details are part of the document, so they are edited from
   // the document rather than from a separate "Information" tab.
   if (kind === 'information') {

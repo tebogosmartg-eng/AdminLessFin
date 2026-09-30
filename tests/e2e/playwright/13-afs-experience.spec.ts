@@ -317,7 +317,10 @@ test('presentation belongs to the engagement, not to one browser', async ({ page
   await expect(note).toBeVisible({ timeout: 60_000 });
   // Hiding a note drops it from the numbering, so match on the title alone; a
   // policy can carry the same title, hence the note-specific test id.
-  const title = (await note.innerText()).trim().replace(/^Note\s+\d+\.\s*/, '');
+  // The label alone: a row can also carry a small badge (on, off, edited).
+  const title = (await note.evaluate((el) => el.firstChild?.textContent ?? ''))
+    .trim()
+    .replace(/^Note\s+\d+\.\s*/, '');
   const noteByTitle = (scope: typeof tree) =>
     scope.getByTestId('afs-tree-note').filter({ hasText: title }).first();
   const toggle = () => noteByTitle(tree).locator('xpath=following-sibling::button[1]').click();

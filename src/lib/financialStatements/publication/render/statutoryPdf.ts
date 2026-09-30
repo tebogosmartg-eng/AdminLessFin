@@ -9,6 +9,7 @@
  * statement and notes page, whole-Rand figures, and supplementary schedules
  * fenced off behind their own disclaimer.
  */
+import { coverLogoBox } from '../coverLogo';
 import {
   asciiOnly,
   assemblePdf,
@@ -370,6 +371,13 @@ function buildCover(view: CanonicalDocumentView, meta: DocMeta): PdfPage {
   const cx = PAGE_W / 2;
 
   let y = 620;
+  // The entity's own logo, centred above its name — the entity's branding,
+  // never the software's.
+  const logo = view.presentation.logo;
+  if (logo) {
+    const { w, h } = coverLogoBox(logo, 240, 130);
+    page.image(logo, cx - w / 2, y + 30, w, h);
+  }
   page.textCenter(cx, y, asciiOnly(view.companyName).toUpperCase(), { size: 15, font: 'bold' });
   y -= 20;
   if (meta.registrationNumber) {
@@ -384,6 +392,10 @@ function buildCover(view: CanonicalDocumentView, meta: DocMeta): PdfPage {
   page.textCenter(cx, y, view.presentation.documentTitle.toUpperCase(), { size: 12.5, font: 'bold' });
   y -= 18;
   page.textCenter(cx, y, view.presentation.coverTitle, { size: 11 });
+  if (view.presentation.issueDateRecorded) {
+    y -= 16;
+    page.textCenter(cx, y, `Issued ${view.presentation.issueDateRecorded}`, { size: 11 });
+  }
 
   const firm = practitionerFirmLines(view);
   let fy = 120;

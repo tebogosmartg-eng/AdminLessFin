@@ -63,6 +63,12 @@ export type DocOverrides = {
    * removes the part; absent keeps what the engine composed.
    */
   policyParts: Record<string, { table?: string[][] | null; bodyAfter?: string | null }>;
+  /**
+   * A note's pieces — sections, paragraphs and tables together — in the order
+   * the preparer arranged them, by disclosure code. Absent means the note
+   * reads sections, then paragraphs, then tables.
+   */
+  pieceOrder: Record<string, string[]>;
   updatedAt: string;
 };
 
@@ -137,6 +143,26 @@ export function resolveInclusion(
   return { ...overrides, hidden };
 }
 
+/**
+ * What flipping a switch records. Where the preparer has made a choice (or
+ * hidden the node the older way), flipping it undoes that choice — back to
+ * the engine's default, which is the other state — rather than recording a
+ * second choice that merely agrees with the engine. Otherwise it records the
+ * new state.
+ */
+export function flipChoice(
+  overrides: DocOverrides,
+  kind: IncludeKind,
+  code: string,
+  printedNow: boolean,
+  nodeId?: string,
+): boolean | null {
+  const choice = includeChoice(overrides, kind, code);
+  if (choice != null) return null;
+  if (nodeId && isHidden(overrides, nodeId)) return null;
+  return !printedNow;
+}
+
 /** Codes of the notes the preparer switched on. */
 export function includedNoteCodes(overrides: DocOverrides): Set<string> {
   return new Set(
@@ -162,6 +188,7 @@ export function emptyOverrides(): DocOverrides {
     include: {},
     lineLabels: {},
     policyParts: {},
+    pieceOrder: {},
     updatedAt: new Date().toISOString(),
   };
 }
@@ -180,6 +207,7 @@ function normalise(parsed: Partial<DocOverrides> | null | undefined): DocOverrid
     include: parsed?.include || {},
     lineLabels: parsed?.lineLabels || {},
     policyParts: parsed?.policyParts || {},
+    pieceOrder: parsed?.pieceOrder || {},
   };
 }
 
@@ -282,24 +310,54 @@ export function useDocumentOverrides(workspaceId: string, companyId?: string) {
     };
   }, [workspaceId, companyId]);
 
+  // Saves go one at a time, and each sends the latest state. Every save
+  // carries the whole presentation, so two in flight at once could land out
+  // of order and a slow earlier one overwrite a later change — moving a
+  // paragraph three places quickly could come back two places moved.
+  const inFlight = useRef(false);
+  const queued = useRef<DocOverrides | null>(null);
+  // Whether a change is still on its way to the server — shown to the
+  // preparer, and a reason to warn before they leave the page.
+  const [saving, setSaving] = useState(false);
+  const flush = useCallback(() => {
+    if (inFlight.current || !companyId || !workspaceId) return;
+    if (!queued.current) {
+      setSaving(false);
+      return;
+    }
+    const body = queued.current;
+    queued.current = null;
+    inFlight.current = true;
+    setSaving(true);
+    invokeFinancialStatements(companyId, 'SAVE_DOCUMENT_PRESENTATION', {
+      workspace_id: workspaceId,
+      overrides: body,
+    })
+      .then(() => setError(null))
+      .catch((e: unknown) =>
+        setError(e instanceof Error ? e.message : 'This change could not be saved.'),
+      )
+      .finally(() => {
+        inFlight.current = false;
+        flush();
+      });
+  }, [companyId, workspaceId]);
+
   const mutate = useCallback(
     (updater: (prev: DocOverrides) => DocOverrides) => {
       setOverrides((prev) => {
         const next = { ...updater(prev), updatedAt: new Date().toISOString() };
         if (companyId && workspaceId && loaded.current === workspaceId) {
-          invokeFinancialStatements(companyId, 'SAVE_DOCUMENT_PRESENTATION', {
-            workspace_id: workspaceId,
-            overrides: next,
-          })
-            .then(() => setError(null))
-            .catch((e: unknown) =>
-              setError(e instanceof Error ? e.message : 'This change could not be saved.'),
-            );
+          queued.current = next;
+          queueMicrotask(() => {
+            setSaving(true);
+            flush();
+          });
         }
         return next;
       });
     },
-    [workspaceId, companyId],
+    [workspaceId, companyId, flush],
   );
 
   /**
@@ -486,6 +544,16 @@ export function useDocumentOverrides(workspaceId: string, companyId?: string) {
     [mutate],
   );
 
+  /** Arrange a note's pieces — its whole sequence, by stable piece key. */
+  const setPieceOrder = useCallback(
+    (disclosureCode: string, keys: string[]) =>
+      mutate((prev) => ({
+        ...prev,
+        pieceOrder: { ...(prev.pieceOrder || {}), [String(disclosureCode || 'note').toUpperCase()]: keys },
+      })),
+    [mutate],
+  );
+
   /** Start a note on a new page, or let it follow on. */
   const setPageBreak = useCallback(
     (noteId: string, breakBefore: boolean) =>
@@ -498,13 +566,26 @@ export function useDocumentOverrides(workspaceId: string, companyId?: string) {
     [mutate],
   );
 
+  // Leaving while a change is still being saved would lose it: ask first.
+  useEffect(() => {
+    if (!saving) return;
+    const warn = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = '';
+    };
+    window.addEventListener('beforeunload', warn);
+    return () => window.removeEventListener('beforeunload', warn);
+  }, [saving]);
+
   return {
     overrides,
     error,
+    saving,
     setLine,
     setNarrative,
     setPageBreak,
     setIncluded,
+    setPieceOrder,
     setLineLabel,
     setPolicyPart,
     setHidden,

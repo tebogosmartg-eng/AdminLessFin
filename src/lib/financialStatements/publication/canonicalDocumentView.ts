@@ -26,7 +26,7 @@ import {
 import { buildNoteRegister, registerFromComposition } from '../document/noteRegister';
 import type { NumberedNote } from '../document/renumber';
 import { includeChoice, isHidden, resolvedTitle, type DocOverrides } from '../document/documentStore';
-import { resolveNoteContent } from '../document/noteContent';
+import { printedPieces, resolveNoteContent } from '../document/noteContent';
 import {
   displaySignatureField,
   SIGNATURE_PLACEHOLDERS,
@@ -35,6 +35,7 @@ import {
 import { resolveBrandIdentity, type BrandIdentity } from './branding';
 import type { CompositionDocument, CompositionPolicy } from '../composition/types';
 import { statementLineLabel } from '../composition/compose';
+import type { CoverLogo } from './coverLogo';
 import { provideCorporateInformation } from '../corporateInformation';
 import { corporateDisplayFromModel } from '../corporateInformation/accessors';
 import type { CorporateInformationModel } from '../corporateInformation';
@@ -193,6 +194,13 @@ export type CanonicalPresentationMeta = {
   reportingPeriodLabel: string;
   reportingDateLong: string | null;
   issueDateLong: string;
+  /** The engagement's issue date where one is recorded (the cover prints it). */
+  issueDateRecorded: string | null;
+  /**
+   * The entity's own logo for the cover, from Company Settings. Null where
+   * there is none or the preparer switched it off.
+   */
+  logo: CoverLogo | null;
   /** Configurable brand identity (presentation only — never statutory content). */
   branding: BrandIdentity;
   /** Entity particulars used to complete statutory front matter professionally. */
@@ -222,16 +230,20 @@ function buildNoteBlocks(
 ): CanonicalTextBlock[] {
   const blocks: CanonicalTextBlock[] = [];
 
-  for (const section of note.sections) {
-    if (section.title && section.section_code !== 'body') {
-      blocks.push({ type: 'paragraph', text: rewrite(section.title), bold: true });
+  for (const piece of printedPieces(note)) {
+    if (piece.kind === 'section') {
+      const section = piece.item;
+      if (section.title && section.section_code !== 'body') {
+        blocks.push({ type: 'paragraph', text: rewrite(section.title), bold: true });
+      }
+      if (section.body.trim()) blocks.push({ type: 'paragraph', text: rewrite(section.body) });
+      continue;
     }
-    if (section.body.trim()) blocks.push({ type: 'paragraph', text: rewrite(section.body) });
-  }
-  for (const paragraph of note.paragraphs) {
-    if (paragraph.body.trim()) blocks.push({ type: 'paragraph', text: rewrite(paragraph.body) });
-  }
-  for (const table of note.tables) {
+    if (piece.kind === 'paragraph') {
+      if (piece.item.body.trim()) blocks.push({ type: 'paragraph', text: rewrite(piece.item.body) });
+      continue;
+    }
+    const table = piece.item;
     const rows = tableToRows(table.columns_json, table.rows_json).map((row) =>
       row.map((cell) => rewrite(cell)),
     );
@@ -541,6 +553,8 @@ export function prepareCanonicalDocumentView(
       corporateInformation.engagement.issueDate.formatted ||
       formatLongDate(new Date().toISOString()) ||
       '',
+    issueDateRecorded: corporateInformation.engagement.issueDate.formatted || null,
+    logo: includeChoice(overrides, 'section', 'cover:logo') === false ? null : model.logo ?? null,
     branding: resolveBrandIdentity(),
     natureOfBusiness: corporateInformation.entityIdentity.natureOfBusiness.formatted,
     directors,

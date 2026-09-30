@@ -105,20 +105,91 @@ export function orderedSections(note: DocNoteNode, overrides: DocOverrides): Doc
   return ordered(note.sections, overrides, (s) => keyOfSection(note, s), (s) => s.sort_order);
 }
 
+export function sectionKey(note: DocNoteNode, s: DocSection): string {
+  return keyOfSection(note, s);
+}
+
+/** One piece of a note — a section, a paragraph or a table — in reading order. */
+export type NotePiece =
+  | { kind: 'section'; key: string; item: DocSection }
+  | { kind: 'paragraph'; key: string; item: DocParagraph }
+  | { kind: 'table'; key: string; item: DocTable };
+
+/**
+ * Every piece of a note in the one order it reads in, including anything
+ * withheld — for the Editor.
+ *
+ * Until the preparer moves a piece across kinds, a note reads as it always
+ * has: its sections, then its paragraphs, then its tables, each in their own
+ * order. Once they do, the note's whole sequence is remembered
+ * (`overrides.pieceOrder`, by disclosure code), so a paragraph can sit below
+ * the table it explains. A piece that arrives later — a new paragraph, a
+ * table the engine has just built — follows the arranged ones.
+ */
+export function orderedPieces(note: DocNoteNode, overrides: DocOverrides): NotePiece[] {
+  const natural: NotePiece[] = [
+    ...orderedSections(note, overrides).map((item) => ({ kind: 'section' as const, key: keyOfSection(note, item), item })),
+    ...orderedParagraphs(note, overrides).map((item) => ({ kind: 'paragraph' as const, key: keyOfParagraph(note, item), item })),
+    ...orderedTables(note, overrides).map((item) => ({ kind: 'table' as const, key: keyOfTable(note, item), item })),
+  ];
+  const arranged = overrides.pieceOrder?.[String(note.disclosure_code || 'note').toUpperCase()];
+  if (!arranged?.length) return natural;
+  const rank = new Map(arranged.map((key, i) => [key, i]));
+  return natural
+    .map((piece, i) => ({ piece, i, r: rank.get(piece.key) }))
+    .sort((a, b) => {
+      if (a.r != null && b.r != null) return a.r - b.r;
+      if (a.r != null) return -1;
+      if (b.r != null) return 1;
+      return a.i - b.i;
+    })
+    .map((e) => e.piece);
+}
+
+/**
+ * A note's printed pieces in reading order. A note that has been through
+ * `resolveNoteContent` carries its order; one that has not reads sections,
+ * paragraphs, tables.
+ */
+export function printedPieces(note: DocNoteNode): NotePiece[] {
+  const natural: NotePiece[] = [
+    ...(note.sections || []).map((item) => ({ kind: 'section' as const, key: item.id, item })),
+    ...(note.paragraphs || []).map((item) => ({ kind: 'paragraph' as const, key: item.id, item })),
+    ...(note.tables || []).map((item) => ({ kind: 'table' as const, key: item.id, item })),
+  ];
+  if (!note.pieceOrder?.length) return natural;
+  const byRef = new Map(natural.map((p) => [`${p.kind}:${p.item.id}`, p]));
+  const out: NotePiece[] = [];
+  for (const ref of note.pieceOrder) {
+    const piece = byRef.get(`${ref.kind}:${ref.id}`);
+    if (piece) {
+      out.push(piece);
+      byRef.delete(`${ref.kind}:${ref.id}`);
+    }
+  }
+  return [...out, ...byRef.values()];
+}
+
 /** In reading order with withheld content removed — for everything printed. */
 export function resolveNoteContent(note: DocNoteNode, overrides: DocOverrides): DocNoteNode {
+  const visible = orderedPieces(note, overrides).filter((p) => !isKeyHidden(overrides, p.key));
   return {
     ...note,
-    sections: orderedSections(note, overrides).filter(
-      (s) => !isKeyHidden(overrides, keyOfSection(note, s)),
-    ),
-    paragraphs: orderedParagraphs(note, overrides).filter(
-      (p) => !isKeyHidden(overrides, keyOfParagraph(note, p)),
-    ),
-    tables: orderedTables(note, overrides).filter(
-      (t) => !isKeyHidden(overrides, keyOfTable(note, t)),
-    ),
+    sections: visible.filter((p) => p.kind === 'section').map((p) => p.item as DocSection),
+    paragraphs: visible.filter((p) => p.kind === 'paragraph').map((p) => p.item as DocParagraph),
+    tables: visible.filter((p) => p.kind === 'table').map((p) => p.item as DocTable),
+    pieceOrder: visible.map((p) => ({ kind: p.kind, id: p.item.id })),
   };
+}
+
+/** The note's whole sequence after moving one piece up or down, or null off either end. */
+export function movedPieceOrder(keys: string[], from: number, direction: -1 | 1): string[] | null {
+  const to = from + direction;
+  if (from < 0 || to < 0 || to >= keys.length) return null;
+  const moved = [...keys];
+  const [key] = moved.splice(from, 1);
+  moved.splice(to, 0, key);
+  return moved;
 }
 
 /**

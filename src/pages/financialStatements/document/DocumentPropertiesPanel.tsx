@@ -1,5 +1,6 @@
 import type { NoteRegister } from '../../../lib/financialStatements/document/noteRegister';
 import {
+  flipChoice,
   includeChoice,
   isHidden,
   isPolicyPrinted,
@@ -108,9 +109,11 @@ export default function DocumentPropertiesPanel({
       ? policy.applicability
       : undefined;
   const setPrinted = (printed: boolean) => {
-    if (note) overridesApi.setIncluded('note', note.disclosure_code, printed, note.id);
-    else if (policy) overridesApi.setIncluded('policy', policy.policy_code, printed, policy.id);
-    else overridesApi.setHidden(node.id, !printed);
+    if (note) {
+      overridesApi.setIncluded('note', note.disclosure_code, flipChoice(overrides, 'note', note.disclosure_code, printedNow, note.id), note.id);
+    } else if (policy) {
+      overridesApi.setIncluded('policy', policy.policy_code, flipChoice(overrides, 'policy', policy.policy_code, printedNow, policy.id), policy.id);
+    } else overridesApi.setHidden(node.id, !printed);
   };
   const resetToEngine = () => {
     if (note) overridesApi.setIncluded('note', note.disclosure_code, null, note.id);

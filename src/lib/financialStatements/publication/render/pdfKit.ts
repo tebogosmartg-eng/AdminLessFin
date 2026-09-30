@@ -131,11 +131,25 @@ export type PdfAnchor = { name: string; y: number };
 /** A clickable area on a page that jumps to a named anchor. */
 export type PdfLink = { x1: number; y1: number; x2: number; y2: number; to: string };
 
+/** A JPEG to draw: baseline JPEG bytes as a binary string, and its pixel size. */
+export type PdfJpeg = { jpeg: string; width: number; height: number };
+
 /** A single PDF page as an ordered list of content-stream operators. */
 export class PdfPage {
   ops: string[] = [];
   anchors: PdfAnchor[] = [];
   links: PdfLink[] = [];
+  /** Images this page draws, by the resource name its content stream uses. */
+  images: Array<{ name: string; image: PdfJpeg }> = [];
+
+  /** Draw a JPEG with its bottom-left corner at (x, y), `w` by `h` points. */
+  image(image: PdfJpeg, x: number, y: number, w: number, h: number): void {
+    const name = `Im${this.images.length + 1}`;
+    this.images.push({ name, image });
+    this.ops.push(
+      `q ${w.toFixed(2)} 0 0 ${h.toFixed(2)} ${x.toFixed(2)} ${y.toFixed(2)} cm /${name} Do Q`,
+    );
+  }
 
   /** Name this position on the page so a link elsewhere can reach it. */
   anchor(name: string, y: number): void {
@@ -208,14 +222,25 @@ export function assemblePdf(pages: PdfPage[]): string {
   push('%PDF-1.4\n');
 
   // Fixed font objects: 3=Helvetica, 4=Helvetica-Bold, 5=Helvetica-Oblique.
-  const pageObjs: Array<{ id: number; contentId: number; annotIds: number[] }> = [];
+  const pageObjs: Array<{ id: number; contentId: number; annotIds: number[]; xobjects: string }> = [];
   const contentObjs: Array<{ id: number; stream: string }> = [];
+  const imageObjs: Array<{ id: number; image: PdfJpeg }> = [];
   let nextId = 6;
   for (const page of pages) {
     const contentId = nextId++;
     const pageId = nextId++;
     contentObjs.push({ id: contentId, stream: page.ops.join('\n') });
-    pageObjs.push({ id: pageId, contentId, annotIds: [] });
+    const refs = page.images.map((im) => {
+      const id = nextId++;
+      imageObjs.push({ id, image: im.image });
+      return `/${im.name} ${id} 0 R`;
+    });
+    pageObjs.push({
+      id: pageId,
+      contentId,
+      annotIds: [],
+      xobjects: refs.length ? ` /XObject << ${refs.join(' ')} >>` : '',
+    });
   }
 
   // Internal links. Anchors are resolved only now, once the page order is
@@ -253,11 +278,19 @@ export function assemblePdf(pages: PdfPage[]): string {
   contentObjs.forEach((c) => {
     addObj(c.id, `<< /Length ${c.stream.length} >>\nstream\n${c.stream}\nendstream`);
   });
+  // The document is a binary string, one character per byte, so a JPEG's
+  // bytes go in as they are and its length is its character count.
+  imageObjs.forEach((o) => {
+    addObj(
+      o.id,
+      `<< /Type /XObject /Subtype /Image /Width ${o.image.width} /Height ${o.image.height} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${o.image.jpeg.length} >>\nstream\n${o.image.jpeg}\nendstream`,
+    );
+  });
   pageObjs.forEach((p) => {
     const annots = p.annotIds.length ? ` /Annots [${p.annotIds.map((id) => `${id} 0 R`).join(' ')}]` : '';
     addObj(
       p.id,
-      `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${PAGE_W} ${PAGE_H}] /Resources << /Font << /F1 3 0 R /F2 4 0 R /F3 5 0 R >> >> /Contents ${p.contentId} 0 R${annots} >>`,
+      `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${PAGE_W} ${PAGE_H}] /Resources << /Font << /F1 3 0 R /F2 4 0 R /F3 5 0 R >>${p.xobjects} >> /Contents ${p.contentId} 0 R${annots} >>`,
     );
   });
   annotObjs.forEach((a) => addObj(a.id, a.body));
