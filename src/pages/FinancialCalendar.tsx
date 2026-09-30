@@ -42,6 +42,8 @@ import LifecycleContextBadge from '../components/boe/LifecycleContextBadge';
 import { EmptyState } from '../components/EmptyState';
 import { Skeleton } from '../components/ui/skeleton';
 import { Badge } from '../components/ui/badge';
+import { Alert, AlertDescription } from '../components/ui/alert';
+import { complianceObligationRoute, useComplianceCalendarEvents } from '../compliance/calendarSource';
 
 type EventType =
   | 'invoice'
@@ -51,7 +53,9 @@ type EventType =
   | 'recurring_bill'
   | 'payroll_review'
   | 'claim_deadline'
-  | 'payslip_release';
+  | 'payslip_release'
+  | 'compliance_due'
+  | 'compliance_expiry';
 
 type CalendarEvent = {
   id: string;
@@ -61,7 +65,11 @@ type CalendarEvent = {
   status: string;
   amount?: number;
   description?: string;
+  /** Compliance events carry the server's time signal (Africa/Johannesburg). */
+  signal?: string;
 };
+
+const isComplianceEvent = (e: CalendarEvent) => e.type === 'compliance_due' || e.type === 'compliance_expiry';
 
 const EVENT_META: Record<
   EventType,
@@ -115,11 +123,24 @@ const EVENT_META: Record<
       'bg-indigo-50 text-indigo-700 border-indigo-200 dark:bg-indigo-950/30 dark:text-indigo-300',
     direction: 'neutral',
   },
+  compliance_due: {
+    label: 'Compliance deadline',
+    color:
+      'bg-violet-50 text-violet-800 border-violet-200 dark:bg-violet-950/30 dark:text-violet-300 dark:border-violet-800',
+    direction: 'neutral',
+  },
+  compliance_expiry: {
+    label: 'Certificate expiry',
+    color:
+      'bg-violet-50 text-violet-700 border-dashed border-violet-300 dark:bg-violet-950/30 dark:text-violet-300',
+    direction: 'neutral',
+  },
 };
 
 const ALL_EVENT_TYPES = Object.keys(EVENT_META) as EventType[];
 
 function isEventOverdue(event: CalendarEvent): boolean {
+  if (isComplianceEvent(event)) return event.signal === 'overdue' || event.signal === 'expired';
   if (event.status === 'paid' || event.status === 'void' || event.status === 'scheduled') {
     return false;
   }
@@ -157,6 +178,12 @@ const FinancialCalendar = () => {
     enabled: !!activeCompany,
   });
 
+  const visualRange = {
+    start: format(startOfWeek(startOfMonth(currentMonth)), 'yyyy-MM-dd'),
+    end: format(endOfWeek(endOfMonth(currentMonth)), 'yyyy-MM-dd'),
+  };
+  const compliance = useComplianceCalendarEvents(visualRange.start, visualRange.end);
+
   const { data: payrollWorkspace } = useQuery({
     ...payrollWorkspaceQuery(activeCompany!.id),
     enabled: !!activeCompany,
@@ -177,7 +204,15 @@ const FinancialCalendar = () => {
       amount: 'amount' in e ? (e as { amount?: number }).amount : undefined,
       description: 'description' in e ? (e as { description?: string }).description : undefined,
     }));
-    const merged: CalendarEvent[] = [...events, ...supplemental];
+    const complianceEvents: CalendarEvent[] = (compliance.data ?? []).map((e) => ({
+      id: e.id,
+      title: e.title,
+      date: e.date,
+      type: e.type,
+      status: e.status,
+      signal: e.signal,
+    }));
+    const merged: CalendarEvent[] = [...events, ...supplemental, ...complianceEvents];
     const seen = new Set<string>();
     return merged.filter((e) => {
       const key = `${e.type}-${e.id}-${e.date}`;
@@ -185,7 +220,7 @@ const FinancialCalendar = () => {
       seen.add(key);
       return true;
     });
-  }, [events, payrollWorkspace, expenseClaims]);
+  }, [events, payrollWorkspace, expenseClaims, compliance.data]);
 
   const filteredEvents = useMemo(
     () => allEvents.filter((event) => activeFilters.has(event.type)),
@@ -260,8 +295,15 @@ const FinancialCalendar = () => {
   });
 
   const handleEventClick = (event: CalendarEvent) => {
+    if (isComplianceEvent(event)) {
+      navigate(complianceObligationRoute(event.id));
+      return;
+    }
     navigateToCalendarEvent(navigate, event.type as CalendarEventType, event.id);
   };
+
+  // Members never receive compliance events; the filter chips follow suit.
+  const visibleEventTypes = compliance.enabled ? ALL_EVENT_TYPES : ALL_EVENT_TYPES.filter((t) => !t.startsWith('compliance_'));
 
   return (
     <div className="section-stack">
@@ -356,8 +398,18 @@ const FinancialCalendar = () => {
         )}
       </section>
 
+      {compliance.enabled && compliance.isError && (
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription className="flex flex-wrap items-center justify-between gap-3">
+            <span>Compliance deadlines could not be loaded, so they are missing from this month. Everything else is shown.</span>
+            <Button size="sm" variant="outline" onClick={() => compliance.refetch()}>Retry</Button>
+          </AlertDescription>
+        </Alert>
+      )}
+
       <div className="flex flex-wrap gap-2" role="group" aria-label="Event type filters">
-        {ALL_EVENT_TYPES.map((type) => {
+        {visibleEventTypes.map((type) => {
           const active = activeFilters.has(type);
           return (
             <Button

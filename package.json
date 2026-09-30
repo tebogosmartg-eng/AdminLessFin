@@ -26,6 +26,7 @@
     "certify:eam": "npx --yes tsx tests/e2e/run-eam-certification.ts",
     "test:eam": "vitest run tests/unit/eam-v164-certification.test.ts",
     "guard:cfa": "npx --yes tsx scripts/cfaArchitectureGuard.ts",
+    "compliance:content": "npx --yes tsx scripts/complianceContentSeed.ts",
     "certify:cfa-gov": "npm run guard:cfa && vitest run tests/unit/cfa-architecture-governance.test.ts tests/unit/cfa-convergence-consumers.test.ts tests/unit/canonical-financial-aggregation.test.ts",
     "seed:eam": "npx --yes tsx scripts/seed-eam-enterprise.ts",
     "forensics:employee-number": "npx --yes tsx scripts/employeeNumberForensics.ts",

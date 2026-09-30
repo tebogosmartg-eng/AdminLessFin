@@ -7,6 +7,7 @@ import ErrorBoundary from "./components/ErrorBoundary";
 import FinancialStatementsGate from "./components/financialStatements/FinancialStatementsGate";
 import FinancialCloseGate from "./components/financialClose/FinancialCloseGate";
 import AccountingReadyGate from "./components/accounting/AccountingReadyGate";
+import ComplianceGate from "./compliance/ComplianceGate";
 
 // Phase P1.1 — delivery layer only. Auth entry points (Landing/AuthPage) and
 // the trivial NotFound page stay eagerly imported: they're what an
@@ -149,6 +150,10 @@ const AssetReports = lazy(() => import("./pages/AssetReports"));
 const TaxRates = lazy(() => import("./pages/TaxRates"));
 const Import = lazy(() => import("./pages/Import"));
 const BetaAnalyticsDashboard = lazy(() => import("./pages/admin/BetaAnalyticsDashboard"));
+// Compliance & Governance (ADR-0004) — flag-gated, owner/admin only.
+const ComplianceHome = lazy(() => import("./compliance/pages/ComplianceHome"));
+const ComplianceQuestionnaire = lazy(() => import("./compliance/pages/ComplianceQuestionnaire"));
+const ComplianceObligation = lazy(() => import("./compliance/pages/ComplianceObligation"));
 
 export const AppRouter = () => {
   return (
@@ -332,6 +337,9 @@ export const AppRouter = () => {
           <Route path="/assets/reports" element={<AssetReports />} />
           <Route path="/tax-rates" element={<TaxRates />} />
           <Route path="/import" element={<Import />} />
+          <Route path="/compliance" element={<ComplianceGate><ComplianceHome /></ComplianceGate>} />
+          <Route path="/compliance/questionnaire" element={<ComplianceGate><ComplianceQuestionnaire /></ComplianceGate>} />
+          <Route path="/compliance/obligations/:id" element={<ComplianceGate><ComplianceObligation /></ComplianceGate>} />
         </Route>
       </Route>
       <Route path="*" element={<NotFound />} />

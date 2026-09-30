@@ -1,6 +1,6 @@
 # Compliance & Governance — Principal Implementation Plan (Final)
 
-**Status:** Final for build. Phase 0 database checks must pass before Phase 1 starts. Not an ADR. Not certified.
+**Status:** Built (Phases 1–8 in code, all content draft). Not yet deployed. See section 22. ADR-0004 proposed. Not certified.
 **Date:** 2026-09-30 (revision 2, after review)
 **Product:** AdminLess Fin (`adminless-fin`)
 **Workspace:** `c:\Users\TebogoM\Desktop\development projects\SmartAccounting`
@@ -156,7 +156,7 @@ flowchart LR
   - `supabase/functions/compliance/` — tenant API.
   - `supabase/functions/compliance-scheduler/` — cron.
   - `supabase/functions/_shared/compliance/` — pure evaluator and date engine. The frontend must not import it.
-  - `compliance-content/` or equivalent — rule and guidance source files. Exact folder name to fix in Phase 0.
+  - `content/compliance/` — rule and guidance source files (fixed in Phase 0).
 - **Evaluation runs on the server only**, triggered by profile save, manual refresh, and the daily scheduler. Results are materialized. The UI reads rows.
 - **Industries and categories are data.** Core categories are Corporate & CIPC, Tax & SARS, Employment, Information & Privacy, B-BBEE, and General Governance. Industry packs are rule rows with an `industry_code`. Adding an industry never adds routes or components.
 - **Jurisdiction.** Every rule has a `country_code`. v1 seeds `ZA` only.
@@ -174,7 +174,7 @@ Compliance only reads from other modules. In v1 it has no business-event subscri
 - **Assets.** Reads `fixed_assets` and `asset_documents`. Evidence may reference an `asset_documents` row id.
 - **Banking, Inventory, Treasury.** Existence signals only. Evidence may reference a `loans` row id.
 - **Financial Close and Financial Statements.** No shared tables in v1.
-- **Operations calendar.** `calendar-events` adds `compliance_due` and `compliance_expiry` only when the caller is an owner or admin and the flag is on. A failure in that query returns an empty list, so the calendar never breaks.
+- **Operations calendar.** (Changed during build — see section 22.) The calendar page makes a separate, flag-gated `GET_CALENDAR` call to the `compliance` edge function, which refuses anyone but an owner or admin. `calendar-events` is not changed. If the compliance call fails, the calendar still shows everything else and says compliance dates could not be loaded. It is never a silent empty list.
 - **Work Management and Chat.** No integration in v1.
 - **Dependency direction.** Existing modules never import `src/compliance` or the compliance shared evaluator. Compliance calls only existing read paths.
 
@@ -295,7 +295,8 @@ A Vitest suite and a CI script validate the schema, checksums, and non-overlappi
   - Processes only companies with a completed profile, in pages of a fixed size.
   - Keeps a resume cursor so a timeout never repeats or skips a batch.
   - Re-evaluates facts, refreshes time signals, and opens next cycles.
-- **Idempotency.** `compliance_reminder_dispatches`, unique on `(cycle_id, offset_days, channel)`. Overdue reminders are sent once per cycle, not daily.
+- **Idempotency.** `compliance_reminder_dispatches`, unique on `(cycle_id, offset_days, channel, recipient_user_id)`. The dispatch row and its `notifications` row are written in one transaction (a service-role RPC), so a timeout can never leave a reminder recorded as sent but not delivered, or delivered twice. With the owner fallback, each owner is a separate dispatch. Overdue reminders are sent once per cycle, not daily.
+- **Recipient check at send time.** `company_users` has no status column; removing a person deletes the row, and demotion changes `role`. The scheduler therefore checks the responsible user's role at send time (the same test as `is_admin_of`) rather than relying on a foreign key, and falls back to the owners when it fails.
 - **Delivery.** A row in the existing `notifications` table for the responsible owner or admin (or the owners, as the fallback), with `link_to` set to `/compliance/obligations/:id`. The bell needs no change once Phase 0 confirms RLS.
 - **Calendar.** Admin-only event types in `calendar-events`.
 - **Email** is deferred. The existing senders are document emails, not general notifications.
@@ -321,7 +322,7 @@ Each rule's `review_due` date feeds an internal "stale content" report, run in C
 
 Table names are proposals; ownership and tenancy are fixed.
 
-**Platform tables** (no `company_id`). RLS allows authenticated SELECT on published rows only. Only the seed script, using the service role, writes.
+**Platform tables** (no `company_id`). RLS on with **no** policies (changed during build): rule conditions never reach the browser, so only the edge functions read them, with the service role. Only the seed SQL writes.
 
 - `compliance_authorities` — code, name, country, website.
 - `compliance_categories` — the six core categories.
@@ -338,7 +339,7 @@ Table names are proposals; ownership and tenancy are fixed.
 - `compliance_obligation_cycles` — obligation id, `period_key` or term dates, `due_date`, `expiry_date`, status, time signal, completion fields, rule and guidance versions. Unique `(obligation_id, period_key)`.
 - `compliance_cycle_events` — append-only history: actor, event type, before and after, rule version.
 - `compliance_evidence` — cycle id, kind, storage key or source reference, metadata, soft-delete fields.
-- `compliance_reminder_dispatches` — idempotency keys and `sent_at`.
+- `compliance_reminder_dispatches` — unique `(cycle_id, offset_days, channel, recipient_user_id)`, `notification_id`, and `sent_at`.
 
 **Indexes.**
 
@@ -528,10 +529,124 @@ Phase 0 → 1 → 2 → 3 → 4 → 5, then 6 → 7 → 8.
 - **First industry pack.** Needed before Phase 7.
 - **Whether members get read-only access later.** Deferred; it would need a new decision.
 
-**INVESTIGATION REQUIRED in Phase 0:**
+**Phase 0 investigation:** complete. See section 21.
 
-- `is_company_member` and `is_admin_of` definitions.
-- `notifications` RLS.
-- `process_audit_log()` company attribution.
-- Production storage bucket settings.
-- The Edge Function time limit for scheduler batch sizing.
+## 21. Phase 0 findings (2026-09-30)
+
+These were read-only catalog queries against the linked production project "Smart Accounting" (`zaulhnpohrgqqodvzhxp`) using `supabase db query --linked`. Nothing was changed.
+
+**Permission helpers.** Both exist and are safe to use in new RLS policies.
+
+- `public.is_company_member(p_company_id uuid)` — `SECURITY DEFINER`, `search_path = public`. True when a `company_users` row exists for `auth.uid()`.
+- `public.is_admin_of(p_company_id uuid)` — `SECURITY DEFINER`, `search_path = public`. True when that row's role is `owner` or `admin`.
+- Decision: tenant compliance tables use `is_admin_of(company_id)` for SELECT, with no write policies for `authenticated`.
+- `company_users` has only `company_id`, `user_id`, `role`. No status column: removal deletes the row. Roles in use today are `owner` and `member`; no company has an `admin` yet, so v1 is owner-only in practice.
+
+**Audit trigger.** `public.process_audit_log()` takes the company from a `company_id` column, so a compliance table with `company_id` needs no change to the function. The trigger is attached per table, so each new tenant table must attach it explicitly in its migration (section 2).
+
+- It records `changed_by = auth.uid()`. That is **NULL** for writes made by an Edge Function using the service role. Decision: `compliance_cycle_events` stores `actor_user_id` explicitly, and it is the authoritative history. `audit_logs` is supporting forensics only.
+- It copies full old and new rows into `audit_logs`. Compliance rows must never hold file contents or secrets.
+- `audit_logs` SELECT is limited to owner/admin by the policy "Admins can view audit logs". The membership-only gap is in the `settings` edge method, not in RLS.
+
+**Notifications.** Usable as the reminder sink with no RLS change.
+
+- RLS is on. SELECT policy "Users can only see their own notifications" (`auth.uid() = user_id`). UPDATE policy "Users can update their own notifications".
+- There is no INSERT or DELETE policy, so RLS refuses those for `authenticated` (the table-level grants are the Supabase default and do not bypass RLS). Only the service role can create rows. That matches the scheduler design.
+- Columns are `id`, `created_at`, `user_id`, `company_id`, `content`, `link_to`, `is_read`. There is no type or dedupe key, so reminder idempotency lives in `compliance_reminder_dispatches`, and `content` must be self-contained plain text.
+- `notifications` is in the `supabase_realtime` publication.
+- `NotificationBell.tsx` filters by `user_id` and `active company_id`. A reminder for company A does not appear while the user is in company B.
+
+**Storage buckets (live).**
+
+- `attachments` — public, 50 MB limit, MIME allow-list.
+- `avatars` — public, no size or MIME limit. This is a new weakness, not in repo migrations.
+- `chat_attachments` — private.
+- Decision confirmed: create a new private `compliance-evidence` bucket in Phase 4.
+
+**Cron (live).** `prod-process-recurring-bills-hourly`, `prod-process-recurring-entries-hourly`, `prod-process-recurring-invoices-hourly`, `prod-run-depreciation-daily`. No compliance job yet; one daily job is added in Phase 5.
+
+**Edge Function limits** (from [Supabase docs](https://supabase.com/docs/guides/functions/limits)):
+
+- 150 s wall clock on the free plan, 400 s on paid plans.
+- 150 s request idle timeout.
+- **2 s CPU per request**.
+- 256 MB memory.
+- 100 functions on the free plan. The repo has 62, so two new functions fit.
+
+`docs/rc1/KNOWN_ISSUES.md` records the project as being on the free plan. Decisions:
+
+- The scheduler processes a small fixed page of companies per invocation (start at 25) and stores a cursor.
+- Evaluation must stay a cheap pure function, well inside the CPU budget.
+- Page size is tuned in Phase 5 from measured CPU time.
+
+**Content folder.** Fixed as `content/compliance/`, organised by country, then category or industry, then rule code.
+
+- Validated by `tests/unit/compliance-content.test.ts`.
+- Published by `scripts/complianceContentSeed.ts`.
+- Kept outside `src/` so rule conditions are never bundled into the browser.
+
+**ADR.** [docs/adr/ADR-0004-compliance-governance-module-boundaries.md](../adr/ADR-0004-compliance-governance-module-boundaries.md), status PROPOSED until the owner signs it off.
+
+**New or confirmed existing weaknesses** (to fix separately, outside this module):
+
+- `calendar-events` returns payroll run dates to members (membership check only).
+- `settings` `GET_AUDIT_LOGS` checks membership only. RLS would block direct reads, but the Edge Function uses the service role.
+- `avatars` bucket is public with no size or MIME limit.
+- `notifications` UPDATE policy has no `WITH CHECK`, so `USING` is applied to the new row: a user can edit the text, link, or company of their own notifications, but cannot hand one to another user. Low risk (self only).
+
+**Re-verified** by a second read-only catalog query on 2026-09-30 during plan review. Every finding above matched the live database. No compliance tables or objects exist yet.
+
+## 22. Build status and deployment (2026-09-30)
+
+### What was built
+
+| Area | Where |
+| --- | --- |
+| Engine (pure, server-only): conditions, date engine, schedules, materializer, actions, signals, access, facts | `supabase/functions/_shared/compliance/` |
+| Data access and the single change path (read → act → materialize → one transactional RPC, retried on concurrent change) | `_shared/compliance/store.ts`, `service.ts` |
+| Tenant API (owner/admin only, every method) | `supabase/functions/compliance/` |
+| Daily scheduler (service role only, paged, resumable, exactly-once reminders) | `supabase/functions/compliance-scheduler/` |
+| Schema, private bucket, RPCs | `supabase/migrations/20261001100000_compliance_governance_module.sql` |
+| Content: 15 South African rules with guidance, 6 categories, 13 industries, 5 authorities, public holidays 2025–2030 | `content/compliance/`, lock in `checksums.lock.json` |
+| Validate / relock / publish content | `npm run compliance:content -- --check \| --update-lock \| --sql [--include-drafts]` |
+| UI: questionnaire, obligations, obligation detail (guidance, periods, proof, history, override, responsible person, reminders, certificate terms) | `src/compliance/` |
+| Calendar adapter | `src/compliance/calendarSource.ts`, used by `src/pages/FinancialCalendar.tsx` |
+| Tests | `tests/unit/compliance-engine.test.ts`, `tests/unit/compliance-content.test.ts`, `tests/integration/compliance-isolation.test.ts`, `tests/e2e/playwright/20-compliance.spec.ts`, live probe `tools/compliance/probe-compliance-live.ts` |
+
+Rules shipped (19, all **draft**, awaiting a named reviewer): CIPC annual return; beneficial ownership; VAT201; EMP201; EMP501 interim and annual; ITR14; provisional tax (both payments); Compensation Fund return of earnings; letter of good standing (certificate); EEA2/EEA4; Information Officer registration (once-off); B-BBEE certificate (certificate); annual financial statements; and the first activity pack (Phase 7) in `content/compliance/za/activities.ts` — PSIRA registration, food-premises Certificate of Acceptability, CIDB contractor registration, early childhood development registration. The pack is keyed on the questionnaire's activity answers rather than one industry code, so a business gets every rule that fits what it does; industry-coded packs remain supported.
+
+### Deviations from the plan, and why
+
+- **Calendar.** Compliance dates come from a separate `GET_CALENDAR` call to the `compliance` function, not from a new source inside `calendar-events`. No existing edge function changes; the owner/admin check is the compliance function's own; a failure shows its own notice without affecting the rest of the calendar.
+- **Platform tables have no SELECT policy** for `authenticated` (the plan allowed reading published rows). Reading them through REST would expose rule conditions; the API returns everything the UI needs.
+- **Checksums** live in `content/compliance/checksums.lock.json` rather than inside each rule, so editing a draft does not mean hand-editing a hash. Published entries can never be relocked.
+- **A cycle status `cancelled`** ("withdrawn") was added: a period is withdrawn, never deleted, when an obligation stops applying or an anchor date is corrected.
+- **Schedule types** `once_off` and `periodic` with `from_vat_filing_frequency` were added; the questionnaire asks the VAT filing frequency when the company is VAT-registered.
+- **The allowlist narrows** the pilot; it never grants access to a member (unlike the Financial Close allowlist).
+
+### Verified before deploy
+
+- Typecheck, lint (0 errors), strict `tsc` of the engine/content/seed, esbuild bundle of both edge functions, 1350 unit tests, 15 integration tests, `guard:cfa`, production build (the three pages are separate lazy chunks).
+- **Live rehearsal** of the migration in a transaction that always aborts: plan RPC applies and converts arrays; stale state and cross-company rows refused; reminder sent exactly once; a member refused as a recipient; history cannot be updated or deleted; published rules immutable; bucket private; `authenticated` cannot call the RPC or write the tables; audit trail written.
+- **Live rehearsal** of the content seed, run twice in one aborting transaction: 15 rules, 15 guidance, 79 holidays, no duplicates.
+
+### Deployment runbook (not yet run)
+
+1. `npx supabase db push --linked --yes` — applies `20261001100000`.
+2. `npx supabase functions deploy compliance compliance-scheduler --project-ref zaulhnpohrgqqodvzhxp`.
+3. Publish content. Reviewed rules only: `npm run compliance:content -- --sql > seed.sql`. For a pilot with the unreviewed drafts (the app then says so on every screen): `npm run compliance:content -- --sql --include-drafts > seed.sql`. Then `npx supabase db query --linked -f seed.sql`.
+4. Create the daily job in the SQL editor, the same way as the existing jobs (the key stays in the database, never in the repo):
+   `SELECT cron.schedule('prod-compliance-scheduler-hourly', '20 * * * *', $$ SELECT net.http_post(url := 'https://zaulhnpohrgqqodvzhxp.supabase.co/functions/v1/compliance-scheduler', headers := jsonb_build_object('Content-Type','application/json','Authorization','Bearer <service-role-key>','apikey','<service-role-key>'), body := '{}'::jsonb, timeout_milliseconds := 150000) $$);`
+   It runs hourly so a day's run can continue from its cursor; after the day finishes, each call returns at once.
+5. `npx supabase gen types typescript --linked > src/integrations/supabase/database.types.ts` (the UI does not read these tables, so this is housekeeping).
+6. Enable the pilot: `VITE_COMPLIANCE_MODULE=true`, `VITE_COMPLIANCE_NAV_SIDEBAR=true`, and `VITE_COMPLIANCE_ALLOWLIST=<pilot emails>` in the Vercel environment, then redeploy.
+7. Verify: `npx tsx tools/compliance/probe-compliance-live.ts`, then build with the flags on and run `npx playwright test 20-compliance --project=chromium-desktop`.
+
+### Still open
+
+- **Content review** (decision): every rule is a draft until a named reviewer signs it off; a reviewed text becomes version 2.
+- **Evidence retention and purge** (decision, POPIA): only soft delete exists; nothing is purged.
+- **Deployment**: steps 1–7 of the runbook have not been run (the production deploy needs the owner's go-ahead in the terminal).
+- **Ad hoc public holidays** (e.g. election days) must be added to the content when gazetted.
+- **Email reminders** are deferred; reminders are in-app only.
+- Existing weaknesses from section 21 remain for separate fixes.

@@ -29,6 +29,7 @@ import {
 import { shouldShowFinancialStatementsNav } from '../lib/financialStatements/flags';
 import { isBetaAnalyticsAdmin } from '../lib/analytics/betaAllowlist';
 import { shouldShowFinancialCloseNav } from '../lib/financialClose/flags';
+import { shouldShowComplianceNav } from '../compliance/flags';
 
 const queries = {
   accountsQuery, assetCategoriesQuery, bankAccountsQuery, bankTransactionsQuery, bankTransfersQuery,
@@ -95,6 +96,12 @@ export const SidebarNav = ({ className, onNavigate }: SidebarNavProps) => {
     userId: session?.user?.id || profile?.id,
   });
   const showFinancialCloseNav = shouldShowFinancialCloseNav({
+    role,
+    userEmail: session?.user?.email,
+    userId: session?.user?.id || profile?.id,
+  });
+
+  const showComplianceNav = shouldShowComplianceNav({
     role,
     userEmail: session?.user?.email,
     userId: session?.user?.id || profile?.id,
@@ -246,6 +253,12 @@ export const SidebarNav = ({ className, onNavigate }: SidebarNavProps) => {
       icon: FileSignature,
       prefetch: () => {},
     },
+  ];
+
+  /** Compliance & Governance (ADR-0004) — static links, no prefetch. */
+  const complianceLinks = [
+    { to: '/compliance', label: 'Obligations', icon: ShieldCheck, prefetch: () => {} },
+    { to: '/compliance/questionnaire', label: 'Compliance Profile', icon: ClipboardList, prefetch: () => {} },
   ];
 
   const inventoryLinks = [
@@ -408,8 +421,18 @@ export const SidebarNav = ({ className, onNavigate }: SidebarNavProps) => {
         />
       )}
 
-      <NavGroup 
-        title="Reports" 
+      {showComplianceNav && (
+        <NavGroup
+          title="Compliance & Governance"
+          icon={ShieldCheck}
+          links={complianceLinks}
+          defaultOpen={pathname.startsWith('/compliance')}
+          onNavigate={onNavigate}
+        />
+      )}
+
+      <NavGroup
+        title="Reports"
         icon={FileText} 
         links={[...reportsLinks, ...adminReportsLinks]} 
         defaultOpen={reportsLinks.some(l => pathname.startsWith(l.to)) || adminReportsLinks.some(l => pathname.startsWith(l.to))}
