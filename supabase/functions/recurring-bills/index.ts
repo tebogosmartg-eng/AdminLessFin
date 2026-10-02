@@ -11,9 +11,40 @@ import {
 
 const corsHeaders = ENTERPRISE_CORS_HEADERS
 
-serve(withEnterprisePlatform('recurring-bills', 'tenant', async (req, _ctx) => {
+serve(withEnterprisePlatform('recurring-bills', 'tenant-or-service', async (req, _ctx) => {
 
   try {
+    // Scheduler: only the exact service-role key, and only PROCESS_DUE, for
+    // every company with a due profile.
+    const bearer = (req.headers.get('Authorization') ?? '').replace(/^Bearer\s+/i, '').trim();
+    const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
+    if (serviceKey && bearer === serviceKey) {
+      const body = await req.json().catch(() => ({}));
+      if (body.method !== 'PROCESS_DUE') throw new Error('Permission denied.');
+      const supabaseAdmin = createClient(Deno.env.get('SUPABASE_URL') ?? '', serviceKey);
+      const today = new Date().toISOString().split('T')[0];
+      const { data: due, error: dueError } = await supabaseAdmin
+        .from('recurring_bills')
+        .select('company_id')
+        .eq('status', 'active')
+        .lte('next_run_date', today);
+      if (dueError) throw dueError;
+      const companies = [...new Set((due ?? []).map((r) => r.company_id))];
+      const results = [];
+      for (const companyId of companies) {
+        try {
+          results.push({ company_id: companyId, ...(await processDueBills(supabaseAdmin, companyId)) });
+        } catch (e) {
+          console.error(`Recurring bills failed for company ${companyId}`, e);
+          results.push({ company_id: companyId, processed: 0, error: 'failed' });
+        }
+      }
+      return new Response(JSON.stringify({ companies: companies.length, results }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 200,
+      });
+    }
+
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_ANON_KEY') ?? '',
@@ -108,86 +139,7 @@ serve(withEnterprisePlatform('recurring-bills', 'tenant', async (req, _ctx) => {
         break;
 
       case 'PROCESS_DUE':
-        const today = new Date().toISOString().split('T')[0];
-        
-        const { data: dueProfiles, error: fetchError } = await supabaseAdmin
-          .from('recurring_bills')
-          .select('*, recurring_bill_items(*)')
-          .eq('company_id', company_id)
-          .eq('status', 'active')
-          .lte('next_run_date', today);
-        
-        if (fetchError) throw fetchError;
-
-        // Fetch Accounts Payable control account by role
-        const { data: apAccount } = await supabaseAdmin
-          .from('chart_of_accounts')
-          .select('id')
-          .eq('company_id', company_id)
-          .eq('type', 'Liability')
-          .eq('account_role', 'trade_payable')
-          .limit(1)
-          .maybeSingle();
-        
-        if (!apAccount) {
-            console.error(`Skipping bills for company ${company_id}: No AP Account found.`);
-            data = { processed: 0, error: "AP Account not found" };
-            break;
-        }
-
-        let processedCount = 0;
-
-        for (const profile of dueProfiles) {
-          const billDate = profile.next_run_date;
-          const dueDate = format(addDays(new Date(billDate), 30), 'yyyy-MM-dd'); // Default 30 day terms
-
-          const p_items = profile.recurring_bill_items.map(item => ({
-            product_id: item.product_id,
-            quantity: item.quantity,
-            unit_cost: item.unit_cost,
-            expense_account_id: item.expense_account_id
-          }));
-
-          // Use the existing bill creation RPC
-          const { error: billError } = await supabaseAdmin.rpc('record_bill_with_inventory', {
-            p_company_id: company_id,
-            p_vendor_id: profile.vendor_id,
-            p_bill_date: billDate,
-            p_due_date: dueDate,
-            p_accounts_payable_id: apAccount.id,
-            p_description: `Recurring: ${profile.profile_name}`,
-            p_items: p_items,
-          });
-
-          if (billError) {
-            console.error(`Failed to generate bill for profile ${profile.id}`, billError);
-            continue;
-          }
-
-          // Update Profile next_run_date
-          let nextDate = new Date(profile.next_run_date);
-          switch(profile.frequency) {
-            case 'daily': nextDate = addDays(nextDate, 1); break;
-            case 'weekly': nextDate = addWeeks(nextDate, 1); break;
-            case 'monthly': nextDate = addMonths(nextDate, 1); break;
-            case 'yearly': nextDate = addYears(nextDate, 1); break;
-          }
-          const nextDateStr = format(nextDate, 'yyyy-MM-dd');
-          
-          let status = 'active';
-          if (profile.end_date && new Date(profile.end_date) < nextDate) {
-            status = 'completed';
-          }
-
-          await supabaseAdmin.from('recurring_bills').update({
-            last_run_date: billDate,
-            next_run_date: nextDateStr,
-            status: status
-          }).eq('id', profile.id);
-
-          processedCount++;
-        }
-        data = { processed: processedCount };
+        data = await processDueBills(supabaseAdmin, company_id);
         break;
 
       default:
@@ -205,3 +157,95 @@ serve(withEnterprisePlatform('recurring-bills', 'tenant', async (req, _ctx) => {
     return edgeFailure(_ctx, error);
   }
 }))
+
+async function processDueBills(supabaseAdmin, company_id) {
+  const today = new Date().toISOString().split('T')[0];
+
+  const { data: dueProfiles, error: fetchError } = await supabaseAdmin
+    .from('recurring_bills')
+    .select('*, recurring_bill_items(*)')
+    .eq('company_id', company_id)
+    .eq('status', 'active')
+    .lte('next_run_date', today);
+
+  if (fetchError) throw fetchError;
+
+  // Fetch Accounts Payable control account by role
+  const { data: apAccount } = await supabaseAdmin
+    .from('chart_of_accounts')
+    .select('id')
+    .eq('company_id', company_id)
+    .eq('type', 'Liability')
+    .eq('account_role', 'trade_payable')
+    .limit(1)
+    .maybeSingle();
+
+  if (!apAccount) {
+    console.error(`Skipping bills for company ${company_id}: No AP Account found.`);
+    return { processed: 0, error: "AP Account not found" };
+  }
+
+  let processedCount = 0;
+
+  for (const profile of dueProfiles) {
+    const billDate = profile.next_run_date;
+    const dueDate = format(addDays(new Date(billDate), 30), 'yyyy-MM-dd'); // Default 30 day terms
+
+    let nextDate = new Date(profile.next_run_date);
+    switch(profile.frequency) {
+      case 'daily': nextDate = addDays(nextDate, 1); break;
+      case 'weekly': nextDate = addWeeks(nextDate, 1); break;
+      case 'monthly': nextDate = addMonths(nextDate, 1); break;
+      case 'yearly': nextDate = addYears(nextDate, 1); break;
+    }
+    const nextDateStr = format(nextDate, 'yyyy-MM-dd');
+
+    let status = 'active';
+    if (profile.end_date && new Date(profile.end_date) < nextDate) {
+      status = 'completed';
+    }
+
+    // Claim the run before posting so the scheduler and a manual run cannot
+    // both post the same period.
+    const { data: claimed, error: claimError } = await supabaseAdmin
+      .from('recurring_bills')
+      .update({ last_run_date: billDate, next_run_date: nextDateStr, status })
+      .eq('id', profile.id)
+      .eq('status', 'active')
+      .eq('next_run_date', billDate)
+      .select('id');
+    if (claimError) throw claimError;
+    if (!claimed?.length) continue;
+
+    const p_items = profile.recurring_bill_items.map(item => ({
+      product_id: item.product_id,
+      quantity: item.quantity,
+      unit_cost: item.unit_cost,
+      expense_account_id: item.expense_account_id
+    }));
+
+    // Use the existing bill creation RPC
+    const { error: billError } = await supabaseAdmin.rpc('record_bill_with_inventory', {
+      p_company_id: company_id,
+      p_vendor_id: profile.vendor_id,
+      p_bill_date: billDate,
+      p_due_date: dueDate,
+      p_accounts_payable_id: apAccount.id,
+      p_description: `Recurring: ${profile.profile_name}`,
+      p_items: p_items,
+    });
+
+    if (billError) {
+      console.error(`Failed to generate bill for profile ${profile.id}`, billError);
+      await supabaseAdmin
+        .from('recurring_bills')
+        .update({ last_run_date: profile.last_run_date, next_run_date: billDate, status: 'active' })
+        .eq('id', profile.id)
+        .eq('next_run_date', nextDateStr);
+      continue;
+    }
+
+    processedCount++;
+  }
+  return { processed: processedCount };
+}

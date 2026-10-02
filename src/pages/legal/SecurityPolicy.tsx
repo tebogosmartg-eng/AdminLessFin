@@ -3,14 +3,14 @@ import { ShieldCheck, Lock, KeyRound, ScrollText, Server, Users } from 'lucide-r
 import { MarketingShell, LegalBody, LegalSection } from '../../components/marketing/MarketingShell';
 import { BRAND } from '../../config/brand';
 
-const LAST_UPDATED = 'Last updated: 29 July 2026';
+const LAST_UPDATED = 'Last updated: 1 October 2026';
 
 const CONTROLS = [
   { icon: Lock, title: 'Encryption', desc: 'Data is encrypted in transit (TLS) and at rest on our managed cloud infrastructure.' },
   { icon: Users, title: 'Tenant separation', desc: 'Row-level security scopes every query to your company. Users only see data for workspaces they belong to.' },
   { icon: KeyRound, title: 'Role-based access', desc: 'Permissions control who can view, post, approve or manage sensitive financial workflows.' },
   { icon: ScrollText, title: 'Audit trail', desc: 'Key actions are recorded so changes to financial records can be reviewed.' },
-  { icon: Server, title: 'Managed infrastructure', desc: 'Hosted on reputable cloud infrastructure with automated backups of your data.' },
+  { icon: Server, title: 'Managed infrastructure', desc: 'Hosted on managed cloud infrastructure. Backup and recovery verification is a requirement before general availability.' },
   { icon: ShieldCheck, title: 'Authenticated access', desc: 'Every request is authenticated, and edge services verify company membership before returning data.' },
 ];
 

@@ -4,7 +4,7 @@ Use this guide after cloning the repo or returning after a long break (e.g. movi
 
 ## Prerequisites
 
-- Node.js 18+
+- Node.js 22+ (matches CI and the current router/test dependencies)
 - npm
 - [Supabase CLI](https://supabase.com/docs/guides/cli) (for edge function deploys)
 

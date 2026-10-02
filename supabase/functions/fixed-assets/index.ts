@@ -1171,10 +1171,8 @@ serve(withEnterprisePlatform('fixed-assets', 'tenant', async (req, _ctx) => {
       case 'RUN_DEPRECIATION': {
         // Company-scoped depreciation run to a stated date. Every charge is
         // posted through posting_engine_submit under the fixed_assets module
-        // (the only module the depreciation accounts accept), one journal per
-        // asset, idempotent on (asset, as-of date). Supersedes the global
-        // run-depreciation cron for interactive use: that function crosses
-        // companies and writes journal rows directly, this one does neither.
+        // (the only module the depreciation accounts accept). Both interactive
+        // and scheduled runs use the same row lock and atomic posting RPC.
         if (!isAdmin) throw new Error('Permission denied: admin required to run depreciation.');
         const asOf = String(body.as_of || '').slice(0, 10);
         if (!/^\d{4}-\d{2}-\d{2}$/.test(asOf)) throw new Error('RUN_DEPRECIATION needs as_of (YYYY-MM-DD).');
@@ -1209,88 +1207,34 @@ serve(withEnterprisePlatform('fixed-assets', 'tenant', async (req, _ctx) => {
         const { data: dueAssets, error: dueErr } = await assetQuery;
         if (dueErr) throw dueErr;
 
-        const monthEnd = (y, mIdx) => new Date(Date.UTC(y, mIdx + 1, 0)).toISOString().slice(0, 10);
         const processed = [];
         const skipped = [];
         for (const asset of dueAssets || []) {
-          if (asset.depreciation_method !== 'straight-line') {
-            skipped.push({ asset_code: asset.asset_code, reason: `method ${asset.depreciation_method} not supported` });
-            continue;
-          }
-          const monthly = straightLineMonthly(asset.purchase_cost, asset.residual_value, asset.useful_life_years);
-          if (monthly <= 0) { skipped.push({ asset_code: asset.asset_code, reason: 'nothing depreciable' }); continue; }
-
-          // Months owing: every calendar month whose end falls on or before
-          // as_of, starting with the purchase month on a first run, or the
-          // month after the last run otherwise.
-          const baseline = asset.last_depreciation_date || asset.purchase_date;
-          const base = new Date(baseline + 'T00:00:00Z');
-          let y = base.getUTCFullYear();
-          let m = base.getUTCMonth();
-          if (asset.last_depreciation_date) { m += 1; if (m > 11) { m = 0; y += 1; } }
-          let months = 0;
-          while (monthEnd(y, m) <= asOf) { months += 1; m += 1; if (m > 11) { m = 0; y += 1; } }
-          if (months <= 0) { skipped.push({ asset_code: asset.asset_code, reason: 'no month owing' }); continue; }
-
-          const depreciable = Number(asset.purchase_cost) - Number(asset.residual_value || 0);
-          const remaining = depreciable - Number(asset.accumulated_depreciation || 0);
-          const amount = Math.round(Math.min(monthly * months, Math.max(remaining, 0)) * 100) / 100;
-          if (amount <= 0) {
-            await supabaseAdmin.from('fixed_assets').update({ status: 'fully-depreciated' }).eq('id', asset.id).eq('company_id', company_id);
-            skipped.push({ asset_code: asset.asset_code, reason: 'fully depreciated' });
-            continue;
-          }
-
-          const { data: postingResult, error: postErr } = await supabaseAdmin.rpc('posting_engine_submit', {
-            p_request: {
-              company_id,
-              posting_date: asOf,
-              module: 'fixed_assets',
-              document_type: 'depreciation_run',
-              idempotency_key: `fixed_assets:depreciation:${asset.id}:${asOf}`,
-              description: `Depreciation on ${asset.description} (${asset.asset_code}) to ${asOf}`,
-              created_by: user.id,
-              lines: [
-                { account_id: asset.depreciation_expense_account_id, debit: amount, credit: 0 },
-                { account_id: asset.accumulated_depreciation_account_id, debit: 0, credit: amount },
-              ],
-            },
-            p_mode: 'commit',
+          const { data: postingResult, error: postErr } = await supabaseAdmin.rpc('depreciate_fixed_asset_atomic', {
+            p_asset_id: asset.id,
+            p_as_of: asOf,
+            p_company_id: company_id,
+            p_actor_user_id: user.id,
           });
-          if (postErr) { skipped.push({ asset_code: asset.asset_code, reason: postErr.message }); continue; }
-          if (postingResult && postingResult.posting_status === 'duplicate') {
-            skipped.push({ asset_code: asset.asset_code, reason: 'already posted for this date' });
+          if (postErr) {
+            skipped.push({ asset_code: asset.asset_code, reason: postErr.message });
             continue;
           }
-
-          const newAccumulated = Number(asset.accumulated_depreciation || 0) + amount;
-          const asOfYear = Number(asOf.slice(0, 4));
-          const priorYtd = asset.depreciation_ytd_year === asOfYear ? Number(asset.depreciation_ytd || 0) : 0;
-          const { error: updErr } = await supabaseAdmin
-            .from('fixed_assets')
-            .update({
-              accumulated_depreciation: newAccumulated,
-              last_depreciation_date: asOf,
-              depreciation_ytd: priorYtd + amount,
-              depreciation_ytd_year: asOfYear,
-              status: newAccumulated >= depreciable ? 'fully-depreciated' : 'active',
-              updated_at: new Date().toISOString(),
-            })
-            .eq('id', asset.id)
-            .eq('company_id', company_id);
-          if (updErr) {
-            skipped.push({ asset_code: asset.asset_code, reason: `posted but register update failed: ${updErr.message}` });
+          if (postingResult?.posting_status !== 'committed') {
+            skipped.push({ asset_code: asset.asset_code, reason: postingResult?.reason || 'already processed' });
             continue;
           }
-
           await recordLifecycle(supabaseAdmin, {
             company_id, asset_id: asset.id, event_type: 'depreciated',
             user_id: user.id, user_name: actorName,
             reason: `Depreciation run to ${asOf}`,
-            reference: postingResult?.journal_id || null,
-            metadata: { amount, months, as_of: asOf, journal_entry_id: postingResult?.journal_id || null },
+            reference: postingResult.journal_id || null,
+            metadata: { amount: postingResult.amount, months: postingResult.months, as_of: asOf,
+              journal_entry_id: postingResult.journal_id || null },
           });
-          processed.push({ asset_code: asset.asset_code, description: asset.description, months, amount, journal_id: postingResult?.journal_id || null });
+          processed.push({ asset_code: asset.asset_code, description: asset.description,
+            amount: postingResult.amount, months: postingResult.months,
+            journal_entry_id: postingResult.journal_id });
         }
         data = {
           as_of: asOf,

@@ -1,6 +1,6 @@
 # Compliance & Governance — Principal Implementation Plan (Final)
 
-**Status:** Built (Phases 1–8 in code, all content draft). Not yet deployed. See section 22. ADR-0004 proposed. Not certified.
+**Status:** DEPLOYED to production 2026-10-02 and verified live (migration, both edge functions, 19 draft rules seeded with matching checksums, hourly scheduler running — first run: 2 companies, 22 reminders; security probe 12/12; browser journey green). Content remains DRAFT pending a named reviewer. Frontend visibility still needs the `VITE_COMPLIANCE_*` flags in Vercel. ADR-0004 proposed. Not certified.
 **Date:** 2026-09-30 (revision 2, after review)
 **Product:** AdminLess Fin (`adminless-fin`)
 **Workspace:** `c:\Users\TebogoM\Desktop\development projects\SmartAccounting`
@@ -607,7 +607,7 @@ These were read-only catalog queries against the linked production project "Smar
 | Tenant API (owner/admin only, every method) | `supabase/functions/compliance/` |
 | Daily scheduler (service role only, paged, resumable, exactly-once reminders) | `supabase/functions/compliance-scheduler/` |
 | Schema, private bucket, RPCs | `supabase/migrations/20261001100000_compliance_governance_module.sql` |
-| Content: 15 South African rules with guidance, 6 categories, 13 industries, 5 authorities, public holidays 2025–2030 | `content/compliance/`, lock in `checksums.lock.json` |
+| Content: 19 South African rules with guidance, 7 categories, 13 industries, 9 authorities, public holidays 2025–2030 | `content/compliance/`, lock in `checksums.lock.json` |
 | Validate / relock / publish content | `npm run compliance:content -- --check \| --update-lock \| --sql [--include-drafts]` |
 | UI: questionnaire, obligations, obligation detail (guidance, periods, proof, history, override, responsible person, reminders, certificate terms) | `src/compliance/` |
 | Calendar adapter | `src/compliance/calendarSource.ts`, used by `src/pages/FinancialCalendar.tsx` |
@@ -630,23 +630,35 @@ Rules shipped (19, all **draft**, awaiting a named reviewer): CIPC annual return
 - **Live rehearsal** of the migration in a transaction that always aborts: plan RPC applies and converts arrays; stale state and cross-company rows refused; reminder sent exactly once; a member refused as a recipient; history cannot be updated or deleted; published rules immutable; bucket private; `authenticated` cannot call the RPC or write the tables; audit trail written.
 - **Live rehearsal** of the content seed, run twice in one aborting transaction: 15 rules, 15 guidance, 79 holidays, no duplicates.
 
-### Deployment runbook (not yet run)
+### Deployment runbook (run 2026-09-30, except steps 4b, 5 and 6)
 
-1. `npx supabase db push --linked --yes` — applies `20261001100000`.
-2. `npx supabase functions deploy compliance compliance-scheduler --project-ref zaulhnpohrgqqodvzhxp`.
-3. Publish content. Reviewed rules only: `npm run compliance:content -- --sql > seed.sql`. For a pilot with the unreviewed drafts (the app then says so on every screen): `npm run compliance:content -- --sql --include-drafts > seed.sql`. Then `npx supabase db query --linked -f seed.sql`.
-4. Create the daily job in the SQL editor, the same way as the existing jobs (the key stays in the database, never in the repo):
-   `SELECT cron.schedule('prod-compliance-scheduler-hourly', '20 * * * *', $$ SELECT net.http_post(url := 'https://zaulhnpohrgqqodvzhxp.supabase.co/functions/v1/compliance-scheduler', headers := jsonb_build_object('Content-Type','application/json','Authorization','Bearer <service-role-key>','apikey','<service-role-key>'), body := '{}'::jsonb, timeout_milliseconds := 150000) $$);`
+1. `npx supabase db push --linked --yes` — applies `20261001100000`. **Done.**
+2. `npx supabase functions deploy compliance compliance-scheduler --project-ref zaulhnpohrgqqodvzhxp`. **Done.**
+3. Publish content. In Windows PowerShell `npm run ... -- --sql` loses the flags and npm's banner lands in the file, so call the script directly and write without a BOM:
+   `npx --yes tsx scripts/complianceContentSeed.ts --sql --include-drafts` (drop `--include-drafts` for reviewed rules only), save the output as UTF-8 without BOM, then `npx supabase db query --linked -f seed.sql`. **Done** with drafts: 19 rules (all `reviewed = false`), 19 guidance, 79 holidays, 7 categories, 13 industries, 9 authorities; `compliance-evidence` bucket private.
+4. Scheduler job. **Done:** job `prod-compliance-scheduler-hourly`, `40 * * * *`. The job reads the key from Supabase Vault at run time, so the key is never in SQL, the repo or `cron.job`:
+   `headers := jsonb_build_object('Content-Type','application/json','Authorization','Bearer ' || (SELECT decrypted_secret FROM vault.decrypted_secrets WHERE name = 'service_role_key'))`.
    It runs hourly so a day's run can continue from its cursor; after the day finishes, each call returns at once.
+   4b. **Owner action:** create the secret once in the SQL editor: `select vault.create_secret('<service role key>', 'service_role_key', 'pg_cron to Edge Functions');`. Until then every call returns 401 (check `select status_code, created from net._http_response order by created desc limit 5;`).
 5. `npx supabase gen types typescript --linked > src/integrations/supabase/database.types.ts` (the UI does not read these tables, so this is housekeeping).
-6. Enable the pilot: `VITE_COMPLIANCE_MODULE=true`, `VITE_COMPLIANCE_NAV_SIDEBAR=true`, and `VITE_COMPLIANCE_ALLOWLIST=<pilot emails>` in the Vercel environment, then redeploy.
-7. Verify: `npx tsx tools/compliance/probe-compliance-live.ts`, then build with the flags on and run `npx playwright test 20-compliance --project=chromium-desktop`.
+6. **Owner action:** enable the pilot: `VITE_COMPLIANCE_MODULE=true`, `VITE_COMPLIANCE_NAV_SIDEBAR=true`, and `VITE_COMPLIANCE_ALLOWLIST=<pilot emails>` in the Vercel environment, then redeploy.
+7. Verify. **Done:** the live probe passed 12/12 (the plain-member check was skipped because the E2E user is not a plain member of any company). With the flags on, `npx playwright test 20-compliance --project=chromium-desktop` passed 4/4 on three runs in a row; the test now reopens earlier completions first, so it can be repeated on the same company.
+
+### Found during deployment: recurring invoices and bills never ran on schedule
+
+The existing jobs send the **anon** key. Depreciation (job 5) and recurring journals (job 6) still work, because `system` functions only log an unrecognised key. Recurring invoices (job 7) and recurring bills (job 8) returned 401 on every run: both functions accepted only a signed-in user and one `company_id` per call, so a scheduled call could never succeed, whatever the key.
+
+Fixed 2026-10-01 (owner approved):
+- Both functions now have a scheduler path. It is taken only when the bearer token equals the service-role key exactly, and only for `PROCESS_DUE`; it runs the due profiles of every company. The signed-in path is unchanged.
+- Each profile run is claimed (its `next_run_date` moves on, conditionally) before the invoice or bill is posted, so a scheduled run and a manual run cannot post the same period twice; the claim is undone if posting fails.
+- Jobs 7 and 8 read the key from the vault, like job 9. They start working once step 4b is done. Jobs 5 and 6 were left on their current key because they work; move them to the vault after step 4b if wanted.
 
 ### Still open
 
 - **Content review** (decision): every rule is a draft until a named reviewer signs it off; a reviewed text becomes version 2.
 - **Evidence retention and purge** (decision, POPIA): only soft delete exists; nothing is purged.
-- **Deployment**: steps 1–7 of the runbook have not been run (the production deploy needs the owner's go-ahead in the terminal).
+- **ADR-0004** is still PROPOSED.
+- **Deployment**: steps 4b and 6 are owner actions; step 5 is optional.
 - **Ad hoc public holidays** (e.g. election days) must be added to the content when gazetted.
 - **Email reminders** are deferred; reminders are in-app only.
 - Existing weaknesses from section 21 remain for separate fixes.

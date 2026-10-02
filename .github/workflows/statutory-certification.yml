@@ -27,7 +27,10 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: TypeScript build
+      - name: TypeScript checking
+        run: npm run typecheck
+
+      - name: Production build
         run: npm run build
 
       - name: Lint
@@ -38,6 +41,9 @@ jobs:
 
       - name: Integration tests
         run: npm run test:integration
+
+      - name: UI component tests
+        run: npm run test:dom
 
       - name: Statutory certification suite
         run: |

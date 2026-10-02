@@ -16,7 +16,7 @@ import {
   type PlatformErrorEnvelope,
 } from "./platformError.ts";
 
-export const ENTERPRISE_EDGE_PLATFORM_VERSION = "4.2.1";
+export const ENTERPRISE_EDGE_PLATFORM_VERSION = "4.2.2";
 
 /** Certified CORS + security headers — identical for every function. */
 export const ENTERPRISE_CORS_HEADERS: Record<string, string> = {
@@ -31,6 +31,8 @@ export const ENTERPRISE_CORS_HEADERS: Record<string, string> = {
 export type EdgeAuthMode =
   /** JWT user + company_users membership (default product APIs). */
   | "tenant"
+  /** A restricted scheduler operation alongside authenticated tenant APIs. */
+  | "tenant-or-service"
   /** Service-role / cron jobs — no end-user JWT. */
   | "system"
   /** Internal invoke with service role bearer (email senders). */
@@ -242,18 +244,16 @@ export async function requireCompanyMembership(
 
 /**
  * Service-mode gate: Authorization bearer must equal service role key.
- * Rate-limiting readiness: logs invoke for future quota hooks.
+ * Missing, malformed, and user tokens are rejected before administrator access.
  */
 export function requireServiceRole(req: Request, ctx: EdgeRequestContext) {
   const auth = req.headers.get("Authorization") ?? "";
   const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
-  const token = auth.replace(/^Bearer\s+/i, "").trim();
+  const token = /^Bearer\s+(\S+)$/i.exec(auth)?.[1] ?? "";
   if (!serviceKey || token !== serviceKey) {
     throw new Error("User not authenticated.");
   }
   platformLog(ctx, "auth.service_role_resolved");
-  // Rate limiting readiness hook (no enforcement yet — observability only)
-  platformLog(ctx, "ratelimit.observe", { bucket: `service:${ctx.functionName}` });
 }
 
 export async function parseJsonBody(req: Request): Promise<Record<string, unknown>> {
@@ -317,9 +317,6 @@ export async function bootstrapTenantRequest(req: Request, ctx: EdgeRequestConte
   const companyId = (body.company_id as string) || undefined;
   await requireCompanyMembership(supabase, user.id, companyId, ctx);
   if (typeof body.method === "string") ctx.requestMethod = body.method;
-  platformLog(ctx, "ratelimit.observe", {
-    bucket: `tenant:${ctx.companyId}:${ctx.functionName}`,
-  });
   const admin = createAdminClient();
   const erp = await resolveErpContext(admin, user.id, companyId as string, ctx);
   return { user, supabase, admin, body, company_id: companyId as string, erp };
@@ -327,20 +324,31 @@ export async function bootstrapTenantRequest(req: Request, ctx: EdgeRequestConte
 
 /** System/cron bootstrap — service admin only. */
 export function bootstrapSystemRequest(req: Request, ctx: EdgeRequestContext) {
-  // Prefer service-role bearer when present; allow legacy cron invokes without JWT
-  // but always log for audit. Production schedulers should send service role.
-  const auth = req.headers.get("Authorization");
-  if (auth) {
-    try {
-      requireServiceRole(req, ctx);
-    } catch {
-      platformLog(ctx, "auth.system_legacy_unauthenticated_invoke");
-    }
-  } else {
-    platformLog(ctx, "auth.system_legacy_unauthenticated_invoke");
-  }
+  requireServiceRole(req, ctx);
   const admin = createAdminClient();
   return { admin };
+}
+
+/** Shared, database-backed quota: every isolate uses the same counter. */
+async function enforceRequestQuota(ctx: EdgeRequestContext): Promise<Response | null> {
+  const configured = Number(Deno.env.get("EDGE_REQUESTS_PER_MINUTE") ?? "180");
+  const limit = Number.isInteger(configured) && configured > 0 && configured <= 10000 ? configured : 180;
+  const { data, error } = await createAdminClient().rpc("consume_edge_request_quota", {
+    p_bucket: `${ctx.functionName}:${ctx.userId ?? "service"}`,
+    p_limit: limit,
+  });
+  if (error || !data || typeof data.allowed !== "boolean") {
+    platformLogError(ctx, "ratelimit.unavailable", error ?? new Error("Invalid quota response"));
+    return edgeFailure(ctx, new Error("Request protection is temporarily unavailable."), {
+      code: "REQUEST_PROTECTION_UNAVAILABLE", retryable: true,
+    }, 503);
+  }
+  if (data.allowed) return null;
+  const response = edgeFailure(ctx, new Error("Too many requests. Try again shortly."), {
+    code: "RATE_LIMIT_EXCEEDED", retryable: true,
+  }, 429);
+  response.headers.set("Retry-After", String(Math.max(1, Number(data.retry_after_seconds) || 60)));
+  return response;
 }
 
 /**
@@ -358,6 +366,18 @@ export function withEnterprisePlatform(
     if (req.method === "OPTIONS") return optionsResponse(ctx);
 
     try {
+      // authMode is a security boundary, not merely a logging label.
+      // OPTIONS stays public; no other request reaches a handler before auth.
+      const configuredServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+      const isServiceToken = authMode === "tenant-or-service" && !!configuredServiceKey &&
+        /^Bearer\s+(\S+)$/i.exec(req.headers.get("Authorization") ?? "")?.[1] === configuredServiceKey;
+      if (authMode === "system" || authMode === "service" || isServiceToken) {
+        requireServiceRole(req, ctx);
+      } else {
+        await requireAuthenticatedUser(req, ctx);
+      }
+      const quotaResponse = await enforceRequestQuota(ctx);
+      if (quotaResponse) return quotaResponse;
       const res = await handler(req, ctx);
       const headers = new Headers(res.headers);
       for (const [k, v] of Object.entries(ENTERPRISE_CORS_HEADERS)) {

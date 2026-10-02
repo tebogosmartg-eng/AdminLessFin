@@ -2,18 +2,55 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0'
 import { addDays, addWeeks, addMonths, addYears, format } from "https://esm.sh/date-fns@3.6.0";
+import { withEnterprisePlatform } from '../_shared/enterpriseEdgePlatform.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-serve(async (req) => {
+serve(withEnterprisePlatform('recurring-invoices', 'tenant-or-service', async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders })
   }
 
   try {
+    // Scheduler: only the exact service-role key, and only PROCESS_DUE, for
+    // every company with a due profile.
+    const bearer = (req.headers.get('Authorization') ?? '').replace(/^Bearer\s+/i, '').trim();
+    const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
+    if (serviceKey && bearer === serviceKey) {
+      const body = await req.json().catch(() => ({}));
+      if (body.method !== 'PROCESS_DUE') {
+        return new Response(JSON.stringify({ error: 'Permission denied.' }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 403,
+        });
+      }
+      const supabaseAdmin = createClient(Deno.env.get('SUPABASE_URL') ?? '', serviceKey);
+      const today = new Date().toISOString().split('T')[0];
+      const { data: due, error: dueError } = await supabaseAdmin
+        .from('recurring_invoices')
+        .select('company_id')
+        .eq('status', 'active')
+        .lte('next_run_date', today);
+      if (dueError) throw dueError;
+      const companies = [...new Set((due ?? []).map((r) => r.company_id))];
+      const results = [];
+      for (const companyId of companies) {
+        try {
+          results.push({ company_id: companyId, ...(await processDueInvoices(supabaseAdmin, companyId)) });
+        } catch (e) {
+          console.error(`Recurring invoices failed for company ${companyId}`, e);
+          results.push({ company_id: companyId, processed: 0, error: 'failed' });
+        }
+      }
+      return new Response(JSON.stringify({ companies: companies.length, results }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 200,
+      });
+    }
+
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_ANON_KEY') ?? '',
@@ -123,108 +160,7 @@ serve(async (req) => {
         break;
 
       case 'PROCESS_DUE':
-        const today = new Date().toISOString().split('T')[0];
-        
-        const { data: dueProfiles, error: fetchError } = await supabaseAdmin
-          .from('recurring_invoices')
-          .select('*, recurring_invoice_items(*)')
-          .eq('company_id', company_id)
-          .eq('status', 'active')
-          .lte('next_run_date', today);
-        
-        if (fetchError) throw fetchError;
-
-        // Pre-fetch default control accounts by account_role
-        const arAccountId = await getAccountIdByRole(supabaseAdmin, company_id, 'trade_receivable');
-        const taxAccountId = await getAccountIdByRole(supabaseAdmin, company_id, 'output_vat')
-          ?? await getAccountIdByRole(supabaseAdmin, company_id, 'vat_control');
-        const invAccountId = await getAccountIdByRole(supabaseAdmin, company_id, 'inventory_asset');
-
-        let processedCount = 0;
-
-        for (const profile of dueProfiles) {
-          // Check if we need tax/inventory accounts for this profile
-          const needsTax = profile.recurring_invoice_items.some(i => i.tax_rate_id);
-          // Simple check for inventory (in a real app we'd check the product type, but here we check if a helper account is needed)
-          
-          if (!arAccountId) {
-            console.error(`Skipping profile ${profile.id}: No AR Account found.`);
-            continue;
-          }
-          if (needsTax && !taxAccountId) {
-             console.error(`Skipping profile ${profile.id}: Items have tax but no Tax Payable account found.`);
-             continue;
-          }
-
-          // Generate Invoice Number
-          const { data: lastInv } = await supabaseAdmin
-            .from('invoices')
-            .select('invoice_number')
-            .eq('company_id', company_id)
-            .order('created_at', { ascending: false })
-            .limit(1)
-            .single();
-          
-          let nextNum = 1;
-          if (lastInv && lastInv.invoice_number) {
-             const matches = lastInv.invoice_number.match(/INV-(\d+)/);
-             if (matches && matches[1]) nextNum = parseInt(matches[1]) + 1;
-          }
-          const invNum = `INV-${String(nextNum).padStart(5, '0')}`;
-
-          const invoiceDate = profile.next_run_date;
-          const dueDate = format(addDays(new Date(invoiceDate), 30), 'yyyy-MM-dd'); 
-
-          const rpcItems = profile.recurring_invoice_items.map(item => ({
-            product_id: item.product_id,
-            quantity: item.quantity,
-            unit_price: item.unit_price,
-            income_account_id: item.income_account_id,
-            tax_rate_id: item.tax_rate_id
-          }));
-
-          const { error: invError } = await supabaseAdmin.rpc('create_invoice_with_taxes', {
-            p_company_id: company_id,
-            p_customer_id: profile.customer_id,
-            p_invoice_date: invoiceDate,
-            p_due_date: dueDate,
-            p_invoice_number: invNum,
-            p_ar_account_id: arAccountId,
-            p_inventory_asset_account_id: invAccountId, // Might be null, RPC handles if not strictly required by items
-            p_tax_payable_account_id: taxAccountId,     // Might be null, RPC handles if not strictly required
-            p_description: `Recurring: ${profile.profile_name}`,
-            p_items: rpcItems
-          });
-
-          if (invError) {
-            console.error(`Failed to generate invoice for profile ${profile.id}`, invError);
-            continue;
-          }
-
-          // Update Profile next_run_date
-          let nextDate = new Date(profile.next_run_date);
-          switch(profile.frequency) {
-            case 'daily': nextDate = addDays(nextDate, 1); break;
-            case 'weekly': nextDate = addWeeks(nextDate, 1); break;
-            case 'monthly': nextDate = addMonths(nextDate, 1); break;
-            case 'yearly': nextDate = addYears(nextDate, 1); break;
-          }
-          const nextDateStr = format(nextDate, 'yyyy-MM-dd');
-          
-          let status = 'active';
-          if (profile.end_date && new Date(profile.end_date) < nextDate) {
-            status = 'completed';
-          }
-
-          await supabaseAdmin.from('recurring_invoices').update({
-            last_run_date: invoiceDate,
-            next_run_date: nextDateStr,
-            status: status
-          }).eq('id', profile.id);
-
-          processedCount++;
-        }
-        data = { processed: processedCount };
+        data = await processDueInvoices(supabaseAdmin, company_id);
         break;
 
       default:
@@ -246,7 +182,121 @@ serve(async (req) => {
       status: /not authenticated/i.test(message) ? 401 : 500,
     });
   }
-})
+}))
+
+async function processDueInvoices(supabaseAdmin, company_id) {
+  const today = new Date().toISOString().split('T')[0];
+
+  const { data: dueProfiles, error: fetchError } = await supabaseAdmin
+    .from('recurring_invoices')
+    .select('*, recurring_invoice_items(*)')
+    .eq('company_id', company_id)
+    .eq('status', 'active')
+    .lte('next_run_date', today);
+
+  if (fetchError) throw fetchError;
+
+  // Pre-fetch default control accounts by account_role
+  const arAccountId = await getAccountIdByRole(supabaseAdmin, company_id, 'trade_receivable');
+  const taxAccountId = await getAccountIdByRole(supabaseAdmin, company_id, 'output_vat')
+    ?? await getAccountIdByRole(supabaseAdmin, company_id, 'vat_control');
+  const invAccountId = await getAccountIdByRole(supabaseAdmin, company_id, 'inventory_asset');
+
+  let processedCount = 0;
+
+  for (const profile of dueProfiles) {
+    // Check if we need tax/inventory accounts for this profile
+    const needsTax = profile.recurring_invoice_items.some(i => i.tax_rate_id);
+
+    if (!arAccountId) {
+      console.error(`Skipping profile ${profile.id}: No AR Account found.`);
+      continue;
+    }
+    if (needsTax && !taxAccountId) {
+      console.error(`Skipping profile ${profile.id}: Items have tax but no Tax Payable account found.`);
+      continue;
+    }
+
+    const invoiceDate = profile.next_run_date;
+    const dueDate = format(addDays(new Date(invoiceDate), 30), 'yyyy-MM-dd');
+
+    let nextDate = new Date(profile.next_run_date);
+    switch(profile.frequency) {
+      case 'daily': nextDate = addDays(nextDate, 1); break;
+      case 'weekly': nextDate = addWeeks(nextDate, 1); break;
+      case 'monthly': nextDate = addMonths(nextDate, 1); break;
+      case 'yearly': nextDate = addYears(nextDate, 1); break;
+    }
+    const nextDateStr = format(nextDate, 'yyyy-MM-dd');
+
+    let status = 'active';
+    if (profile.end_date && new Date(profile.end_date) < nextDate) {
+      status = 'completed';
+    }
+
+    // Claim the run before posting so the scheduler and a manual run cannot
+    // both post the same period.
+    const { data: claimed, error: claimError } = await supabaseAdmin
+      .from('recurring_invoices')
+      .update({ last_run_date: invoiceDate, next_run_date: nextDateStr, status })
+      .eq('id', profile.id)
+      .eq('status', 'active')
+      .eq('next_run_date', invoiceDate)
+      .select('id');
+    if (claimError) throw claimError;
+    if (!claimed?.length) continue;
+
+    // Generate Invoice Number
+    const { data: lastInv } = await supabaseAdmin
+      .from('invoices')
+      .select('invoice_number')
+      .eq('company_id', company_id)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .single();
+
+    let nextNum = 1;
+    if (lastInv && lastInv.invoice_number) {
+      const matches = lastInv.invoice_number.match(/INV-(\d+)/);
+      if (matches && matches[1]) nextNum = parseInt(matches[1]) + 1;
+    }
+    const invNum = `INV-${String(nextNum).padStart(5, '0')}`;
+
+    const rpcItems = profile.recurring_invoice_items.map(item => ({
+      product_id: item.product_id,
+      quantity: item.quantity,
+      unit_price: item.unit_price,
+      income_account_id: item.income_account_id,
+      tax_rate_id: item.tax_rate_id
+    }));
+
+    const { error: invError } = await supabaseAdmin.rpc('create_invoice_with_taxes', {
+      p_company_id: company_id,
+      p_customer_id: profile.customer_id,
+      p_invoice_date: invoiceDate,
+      p_due_date: dueDate,
+      p_invoice_number: invNum,
+      p_ar_account_id: arAccountId,
+      p_inventory_asset_account_id: invAccountId, // Might be null, RPC handles if not strictly required by items
+      p_tax_payable_account_id: taxAccountId,     // Might be null, RPC handles if not strictly required
+      p_description: `Recurring: ${profile.profile_name}`,
+      p_items: rpcItems
+    });
+
+    if (invError) {
+      console.error(`Failed to generate invoice for profile ${profile.id}`, invError);
+      await supabaseAdmin
+        .from('recurring_invoices')
+        .update({ last_run_date: profile.last_run_date, next_run_date: invoiceDate, status: 'active' })
+        .eq('id', profile.id)
+        .eq('next_run_date', nextDateStr);
+      continue;
+    }
+
+    processedCount++;
+  }
+  return { processed: processedCount };
+}
 
 // Resolve control accounts by canonical account_role (never display name).
 async function getAccountIdByRole(supabase, company_id, role) {

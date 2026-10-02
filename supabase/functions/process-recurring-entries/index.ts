@@ -1,111 +1,36 @@
 // @ts-nocheck
-import { serve } from "https://deno.land/std@0.190.0/http/server.ts"
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0'
-import { addDays, addWeeks, addMonths, addYears } from "https://esm.sh/date-fns@3.6.0";
-import {
-  ENTERPRISE_CORS_HEADERS,
-  withEnterprisePlatform,
-  edgeFailure,
-} from '../_shared/enterpriseEdgePlatform.ts'
+import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
+import { createAdminClient, withEnterprisePlatform, edgeSuccess, edgeFailure } from '../_shared/enterpriseEdgePlatform.ts';
 
-
-const corsHeaders = ENTERPRISE_CORS_HEADERS
-
-serve(withEnterprisePlatform('process-recurring-entries', 'system', async (_req, _ctx) => {
-
+serve(withEnterprisePlatform('process-recurring-entries', 'system', async (_req, ctx) => {
   try {
-    // Use the service role key to perform admin-level operations.
-    const supabaseAdmin = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-    );
-
-    const today = new Date().toISOString().split('T')[0];
-
-    // 1. Find all recurring entries that are due to be processed.
-    const { data: dueEntries, error: fetchError } = await supabaseAdmin
-      .from('recurring_journal_entries')
-      .select('*, recurring_journal_entry_items(*)')
-      .lte('next_run_date', today);
-
-    if (fetchError) throw fetchError;
-
-    if (!dueEntries || dueEntries.length === 0) {
-      return new Response(JSON.stringify({ message: "No recurring entries to process." }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 200,
+    const admin = createAdminClient();
+    const today = new Date().toISOString().slice(0, 10);
+    const { data: entries, error } = await admin.from('recurring_journal_entries')
+      .select('id, next_run_date').lte('next_run_date', today);
+    if (error) throw error;
+    let processed = 0;
+    const failures = [];
+    for (const entry of entries ?? []) {
+      const result = await admin.rpc('process_recurring_journal_atomic', {
+        p_entry_id: entry.id, p_scheduled_for: entry.next_run_date,
+      });
+      if (result.error) {
+        failures.push({ entry_id: entry.id, message: result.error.message });
+      } else if (['committed', 'duplicate'].includes(result.data?.posting_status)) {
+        processed++;
+      }
+    }
+    if (failures.length) {
+      return edgeFailure(ctx, new Error('Some recurring journal postings failed.'), {
+        code: 'SCHEDULED_POSTING_FAILED', retryable: true,
+        technicalMessage: JSON.stringify({ processed, failures }),
       });
     }
-
-    let processedCount = 0;
-
-    // 2. Process each due entry.
-    for (const entry of dueEntries) {
-      // Create the new journal entry from the template.
-      const { data: newJournalEntry, error: journalError } = await supabaseAdmin
-        .from('journal_entries')
-        .insert({
-          company_id: entry.company_id,
-          entry_date: entry.next_run_date,
-          description: `(Recurring) ${entry.description}`,
-        })
-        .select('id')
-        .single();
-
-      if (journalError) {
-        console.error(`Failed to create journal entry for recurring entry ${entry.id}:`, journalError);
-        continue; // Skip to the next one.
-      }
-
-      // Create the associated debit and credit items.
-      const itemsToInsert = entry.recurring_journal_entry_items.map(item => ({
-        journal_entry_id: newJournalEntry.id,
-        account_id: item.account_id,
-        type: item.type,
-        amount: item.amount,
-      }));
-
-      const { error: itemsError } = await supabaseAdmin
-        .from('journal_entry_items')
-        .insert(itemsToInsert);
-
-      if (itemsError) {
-        console.error(`Failed to create journal items for recurring entry ${entry.id}:`, itemsError);
-        continue;
-      }
-
-      // 3. Calculate the next run date based on the frequency.
-      const currentNextRunDate = new Date(entry.next_run_date);
-      let newNextRunDate;
-      switch (entry.frequency) {
-        case 'daily': newNextRunDate = addDays(currentNextRunDate, 1); break;
-        case 'weekly': newNextRunDate = addWeeks(currentNextRunDate, 1); break;
-        case 'monthly': newNextRunDate = addMonths(currentNextRunDate, 1); break;
-        case 'yearly': newNextRunDate = addYears(currentNextRunDate, 1); break;
-        default: continue;
-      }
-
-      // 4. Update the recurring entry with the new date, or delete if it has expired.
-      if (entry.end_date && newNextRunDate > new Date(entry.end_date)) {
-        // The recurring entry has completed its cycle.
-        await supabaseAdmin.from('recurring_journal_entries').delete().eq('id', entry.id);
-      } else {
-        // Schedule the next run.
-        await supabaseAdmin
-          .from('recurring_journal_entries')
-          .update({ next_run_date: newNextRunDate.toISOString().split('T')[0] })
-          .eq('id', entry.id);
-      }
-      
-      processedCount++;
-    }
-
-    return new Response(JSON.stringify({ message: `Successfully processed ${processedCount} recurring entries.` }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      status: 200,
+    return edgeSuccess(ctx, {
+      message: entries?.length ? `Successfully processed ${processed} recurring entries.` : 'No recurring entries to process.',
     });
-
   } catch (error) {
-    return edgeFailure(_ctx, error);
+    return edgeFailure(ctx, error);
   }
-}))
+}));

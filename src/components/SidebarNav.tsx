@@ -255,12 +255,6 @@ export const SidebarNav = ({ className, onNavigate }: SidebarNavProps) => {
     },
   ];
 
-  /** Compliance & Governance (ADR-0004) — static links, no prefetch. */
-  const complianceLinks = [
-    { to: '/compliance', label: 'Obligations', icon: ShieldCheck, prefetch: () => {} },
-    { to: '/compliance/questionnaire', label: 'Compliance Profile', icon: ClipboardList, prefetch: () => {} },
-  ];
-
   const inventoryLinks = [
     { to: '/inventory', label: 'Command Centre', icon: Package, prefetch: () => prefetch(queries.inventoryAnalyticsQuery) },
     { to: '/inventory/register', label: 'Inventory Register', icon: ClipboardList, prefetch: () => prefetch(queries.inventoryRegisterQuery) },
@@ -421,16 +415,6 @@ export const SidebarNav = ({ className, onNavigate }: SidebarNavProps) => {
         />
       )}
 
-      {showComplianceNav && (
-        <NavGroup
-          title="Compliance & Governance"
-          icon={ShieldCheck}
-          links={complianceLinks}
-          defaultOpen={pathname.startsWith('/compliance')}
-          onNavigate={onNavigate}
-        />
-      )}
-
       <NavGroup
         title="Reports"
         icon={FileText} 
@@ -455,7 +439,21 @@ export const SidebarNav = ({ className, onNavigate }: SidebarNavProps) => {
           Import Data
         </NavLink>
       )}
-      
+
+      {/* Compliance & Governance (ADR-0004) — a single top-level entry, no
+          submenu: /compliance routes the user itself (questionnaire first,
+          then obligations). Visible only when VITE_COMPLIANCE_MODULE and
+          VITE_COMPLIANCE_NAV_SIDEBAR are on AND the user passes
+          canAccessCompliance (owner/admin, optionally narrowed by the
+          allowlist). The route gate and the edge function enforce the same
+          rule, so this link never grants access by itself. */}
+      {showComplianceNav && (
+        <NavLink to="/compliance" className={navLinkClasses} onClick={onNavigate}>
+          <ShieldCheck className="mr-3 h-5 w-5" />
+          Compliance & Governance
+        </NavLink>
+      )}
+
       <div className="pt-4 mt-auto space-y-1">
         {isBetaAnalyticsAdmin(user?.email) && (
           <NavLink to="/admin/beta-analytics" className={navLinkClasses} onClick={onNavigate}>

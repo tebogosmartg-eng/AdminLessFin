@@ -18,7 +18,10 @@ vi.mock('@/utils/toast', () => ({ showError, showSuccess: vi.fn() }));
 vi.mock('@/hooks/useEnterpriseIdentity', () => ({
   useEnterpriseIdentity: () => ({ identity: { name: 'Acme (Pty) Ltd' } }),
 }));
-vi.mock('react-router-dom', () => ({ useNavigate: () => vi.fn() }));
+vi.mock('react-router-dom', () => ({
+  useNavigate: () => vi.fn(),
+  useLocation: () => ({ pathname: '/dashboard' }),
+}));
 vi.mock('@/contexts/AuthContext', () => ({
   useAuth: () => ({
     activeCompany: { id: 'c1', name: 'Acme (Pty) Ltd' },
@@ -44,7 +47,7 @@ describe('RB-004 — company switch failure handling', () => {
     switchCompany.mockRejectedValue(new Error('edge 500'));
 
     render(<CompanySwitcher />);
-    await user.click(screen.getByRole('button', { name: /acme/i }));
+    await user.click(screen.getByTestId('company-switcher'));
     await user.click(await screen.findByText('Beta Holdings'));
 
     // The rejection is caught and surfaced, not swallowed.
@@ -56,7 +59,7 @@ describe('RB-004 — company switch failure handling', () => {
     switchCompany.mockResolvedValue(undefined);
 
     render(<CompanySwitcher />);
-    await user.click(screen.getByRole('button', { name: /acme/i }));
+    await user.click(screen.getByTestId('company-switcher'));
     await user.click(await screen.findByText('Beta Holdings'));
 
     await vi.waitFor(() => expect(switchCompany).toHaveBeenCalledWith('c2'));

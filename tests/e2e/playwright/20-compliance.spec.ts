@@ -43,17 +43,20 @@ async function openCompliance(page: import('@playwright/test').Page) {
 async function answerQuestionnaire(page: import('@playwright/test').Page) {
   await expect(page.getByRole('heading', { name: 'Compliance profile' })).toBeVisible({ timeout: 30_000 });
 
+  // The header company switcher is also a combobox, so stay inside the page body.
+  const main = page.getByRole('main');
+
   // Step 1 — the business.
-  await page.getByRole('combobox').first().click();
+  await main.getByRole('combobox').first().click();
   await page.getByRole('option', { name: /Private company/ }).click();
-  await page.locator('input[type="date"]').fill('2019-03-15');
-  await page.getByRole('combobox').nth(1).click();
+  await main.locator('input[type="date"]').fill('2019-03-15');
+  await main.getByRole('combobox').nth(1).click();
   await page.getByRole('option', { name: 'General business' }).click();
-  await page.getByRole('button', { name: 'Next' }).click();
+  await main.getByRole('button', { name: 'Next' }).click();
   await expect(page).toHaveURL(/step=activities/);
 
   // Step 2 — activities: none of the special ones; personal information yes.
-  const groups = page.getByRole('radiogroup');
+  const groups = main.getByRole('radiogroup');
   const count = await groups.count();
   for (let i = 0; i < count - 1; i++) await groups.nth(i).getByRole('radio').nth(1).click();
   await groups.nth(count - 1).getByRole('radio').first().click();
@@ -65,11 +68,11 @@ async function answerQuestionnaire(page: import('@playwright/test').Page) {
   if (await registered.count()) await registered.click();
   const premises = page.getByText('Does the business operate from its own premises');
   if (await premises.count()) {
-    await page.getByRole('radiogroup').first().getByRole('radio').first().click();
+    await main.getByRole('radiogroup').first().getByRole('radio').first().click();
   }
   const employs = page.getByText('Does the business employ anyone?');
   if (await employs.count()) {
-    await page.getByRole('radiogroup').last().getByRole('radio').nth(1).click();
+    await main.getByRole('radiogroup').last().getByRole('radio').nth(1).click();
   }
   await page.getByRole('button', { name: /Save and see my obligations/ }).click();
   await expect(page).toHaveURL(/\/compliance$/, { timeout: 45_000 });
@@ -80,7 +83,11 @@ test.describe.configure({ mode: 'serial' });
 test.describe('Compliance & Governance', () => {
   test('profile → obligations with server-computed dates', async ({ page, diagnostics }) => {
     await openCompliance(page);
-    if (/questionnaire/.test(page.url())) {
+    // /compliance redirects to the questionnaire only after the overview loads.
+    const home = page.getByRole('heading', { name: 'Compliance & Governance', exact: true });
+    const questionnaire = page.getByRole('heading', { name: 'Compliance profile', exact: true });
+    await expect(home.or(questionnaire)).toBeVisible({ timeout: 30_000 });
+    if (await questionnaire.isVisible()) {
       await answerQuestionnaire(page);
     } else {
       // Already profiled: saving the answers again must be harmless.
@@ -106,31 +113,52 @@ test.describe('Compliance & Governance', () => {
     await expect(page.getByRole('heading', { name: 'What is this?' })).toBeVisible();
     await expect(page.getByText(/not legal or tax advice/i).first()).toBeVisible();
     await page.keyboard.press('Escape');
+    await expect(page.getByRole('heading', { name: 'What is this?' })).toBeHidden();
+    await expect(page.getByTestId('compliance-period').first()).toBeVisible({ timeout: 20_000 });
+
+    // Earlier runs leave periods completed, and only one upcoming period is
+    // ever shown, so reopen everything and work on the oldest period.
+    const reopenButtons = page.getByRole('button', { name: 'Reopen', exact: true });
+    for (let n = await reopenButtons.count(); n > 0; n = await reopenButtons.count()) {
+      await reopenButtons.last().click();
+      const re = page.getByRole('dialog', { name: /Reopen this period/ });
+      await re.getByLabel(/Reason/).fill('E2E: reset');
+      await re.getByRole('button', { name: 'Reopen' }).click();
+      await expect(re).toBeHidden({ timeout: 30_000 });
+      await expect(reopenButtons).toHaveCount(n - 1, { timeout: 30_000 });
+    }
 
     const openPeriod = page
       .getByTestId('compliance-period')
       .filter({ has: page.getByRole('button', { name: 'Mark completed' }) })
-      .first();
+      .last();
     await expect(openPeriod).toBeVisible();
     const periodTitle = (await openPeriod.getByTestId('compliance-period-title').innerText()).trim();
+
+    const removeButtons = openPeriod.getByRole('button', { name: /^Remove / });
+    for (let n = await removeButtons.count(); n > 0; n = await removeButtons.count()) {
+      await removeButtons.first().click();
+      const rm = page.getByRole('dialog', { name: /Remove this proof/ });
+      await rm.getByLabel(/Reason/).fill('E2E: reset');
+      await rm.getByRole('button', { name: 'Remove' }).click();
+      await expect(rm).toBeHidden({ timeout: 30_000 });
+      await expect(removeButtons).toHaveCount(n - 1, { timeout: 30_000 });
+    }
     const completedBefore = await page.locator('[data-testid="compliance-period"][data-status="completed"]').count();
 
     // The rule requires proof: completing without it is refused by the server.
-    const proofCount = await openPeriod.getByRole('button', { name: /^Remove / }).count();
-    if (proofCount === 0) {
-      await openPeriod.getByRole('button', { name: 'Mark completed' }).click();
-      const dlg = page.getByRole('dialog', { name: /Mark this period completed/ });
-      await dlg.getByRole('button', { name: 'Mark completed' }).click();
-      await expect(dlg.getByRole('alert')).toContainText(/proof/i, { timeout: 20_000 });
-      await dlg.getByRole('button', { name: 'Cancel' }).click();
+    await openPeriod.getByRole('button', { name: 'Mark completed' }).click();
+    const refused = page.getByRole('dialog', { name: /Mark this period completed/ });
+    await refused.getByRole('button', { name: 'Mark completed' }).click();
+    await expect(refused.getByRole('alert')).toContainText(/proof/i, { timeout: 20_000 });
+    await refused.getByRole('button', { name: 'Cancel' }).click();
 
-      await openPeriod.getByRole('button', { name: 'Upload' }).click();
-      const up = page.getByRole('dialog', { name: 'Upload proof' });
-      await up.locator('input[type="file"]').setInputFiles({ name: 'cipc-confirmation.pdf', mimeType: 'application/pdf', buffer: PDF });
-      await up.getByRole('button', { name: 'Upload' }).click();
-      await expect(up).toBeHidden({ timeout: 45_000 });
-      await expect(openPeriod.getByText('cipc-confirmation')).toBeVisible({ timeout: 20_000 });
-    }
+    await openPeriod.getByRole('button', { name: 'Upload' }).click();
+    const up = page.getByRole('dialog', { name: 'Upload proof' });
+    await up.locator('input[type="file"]').setInputFiles({ name: 'cipc-confirmation.pdf', mimeType: 'application/pdf', buffer: PDF });
+    await up.getByRole('button', { name: 'Upload' }).click();
+    await expect(up).toBeHidden({ timeout: 45_000 });
+    await expect(openPeriod.getByRole('button', { name: 'Remove cipc-confirmation' })).toBeVisible({ timeout: 20_000 });
 
     await openPeriod.getByRole('button', { name: 'Mark completed' }).click();
     const dlg = page.getByRole('dialog', { name: /Mark this period completed/ });

@@ -311,6 +311,19 @@ describe('tenant safety of the context', () => {
     expect(fn.indexOf(".from('company_users')")).toBeLessThan(fn.indexOf('switch (method)'));
   });
 
+  it.each([
+    ['supabase/functions/recurring-invoices/index.ts', 'create_invoice_with_taxes'],
+    ['supabase/functions/recurring-bills/index.ts', 'record_bill_with_inventory'],
+  ])('%s: the scheduler path needs the exact service key, only runs PROCESS_DUE, and claims each run before posting', (path, rpc) => {
+    const fn = read(path);
+    const scheduler = fn.slice(fn.indexOf('if (serviceKey && bearer === serviceKey)'), fn.indexOf('supabase.auth.getUser()'));
+    expect(scheduler).toContain("body.method !== 'PROCESS_DUE'");
+    expect(scheduler).not.toContain("body.company_id");
+    const processDue = fn.slice(fn.indexOf('async function processDue'));
+    expect(processDue.indexOf(".eq('next_run_date', ")).toBeGreaterThan(-1);
+    expect(processDue.indexOf(".eq('next_run_date', ")).toBeLessThan(processDue.indexOf(rpc));
+  });
+
   it('the profile update only writes the user\'s own editable fields', () => {
     const fn = read('supabase/functions/settings/index.ts');
     const upd = fn.slice(fn.indexOf("method === 'UPDATE_PROFILE'"), fn.indexOf("method === 'SWITCH_COMPANY'"));

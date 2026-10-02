@@ -43,7 +43,7 @@ const App = () => (
     <TooltipProvider>
       <Toaster />
       <Sonner />
-      <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+      <BrowserRouter>
         {/* RB-006: outer app-level boundary wraps the ENTIRE provider stack.
             A render throw in AuthProvider / ReportingPeriodProvider /
             AnalyticsBootstrap now degrades to a recoverable fallback instead of
