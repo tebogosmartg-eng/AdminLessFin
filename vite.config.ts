@@ -60,7 +60,11 @@ function vendorChunk(id: string): string | undefined {
   // Lazy-only clusters (zero eager consumers, confirmed via the same
   // walker) — grouped by which route-level feature actually pulls them in,
   // so visiting one feature never downloads another's dependencies.
-  if (/node_modules\/(jspdf|jspdf-autotable|html2canvas|dompurify|canvg|core-js|raf|rgbcolor|stackblur-canvas|svg-pathdata|fast-png|iobuffer|pako|fflate|performance-now)\//.test(id)) return "vendor-pdf";
+  if (/node_modules\/(jspdf|jspdf-autotable|html2canvas|dompurify|canvg|core-js|raf|rgbcolor|stackblur-canvas|svg-pathdata|fast-png|iobuffer|pako|performance-now)\//.test(id)) return "vendor-pdf";
+  // fflate is shared by jsPDF and the Excel import reader; its own lazy chunk
+  // keeps either feature from downloading the other.
+  if (/node_modules\/fflate\//.test(id)) return "vendor-fflate";
+  if (/node_modules\/(read-excel-file|saxen|unzipper-esm|worker-f|graceful-fs|node-int64)\//.test(id)) return "vendor-xlsx";
   if (/node_modules\/tesseract\.js\//.test(id)) return "vendor-ocr";
   if (/node_modules\/(jsbarcode|qrcode|dijkstrajs)\//.test(id)) return "vendor-codes";
   if (/node_modules\/(recharts|d3-[a-z-]+|react-smooth|recharts-scale|decimal\.js-light|victory-vendor|internmap|eventemitter3|tiny-invariant|fast-equals|react-transition-group|dom-helpers)\//.test(id)) return "vendor-recharts";

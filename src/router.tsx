@@ -149,6 +149,7 @@ const AssetMaintenanceDashboard = lazy(() => import("./pages/AssetMaintenanceDas
 const AssetReports = lazy(() => import("./pages/AssetReports"));
 const TaxRates = lazy(() => import("./pages/TaxRates"));
 const Import = lazy(() => import("./pages/Import"));
+const SwitchToAdminLess = lazy(() => import("./pages/SwitchToAdminLess"));
 const BetaAnalyticsDashboard = lazy(() => import("./pages/admin/BetaAnalyticsDashboard"));
 // Compliance & Governance (ADR-0004) — flag-gated, owner/admin only.
 const ComplianceHome = lazy(() => import("./compliance/pages/ComplianceHome"));
@@ -337,6 +338,7 @@ export const AppRouter = () => {
           <Route path="/assets/reports" element={<AssetReports />} />
           <Route path="/tax-rates" element={<TaxRates />} />
           <Route path="/import" element={<Import />} />
+          <Route path="/import/switch" element={<SwitchToAdminLess />} />
           <Route path="/compliance" element={<ComplianceGate><ComplianceHome /></ComplianceGate>} />
           <Route path="/compliance/questionnaire" element={<ComplianceGate><ComplianceQuestionnaire /></ComplianceGate>} />
           <Route path="/compliance/obligations/:id" element={<ComplianceGate><ComplianceObligation /></ComplianceGate>} />

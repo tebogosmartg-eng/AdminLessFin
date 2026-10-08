@@ -29,20 +29,24 @@ test.describe('Exports — CSV download', () => {
 });
 
 test.describe('Imports — data import UI', () => {
-  test('Import page renders and "Download Template" triggers a download', async ({ page, diagnostics }) => {
+  test('Import page lists every import type and a template downloads from the upload step', async ({ page, diagnostics }) => {
     await page.goto('/import');
     await waitForRouteSettled(page);
     await expectNoErrorBoundary(page);
 
     await expect(page.getByRole('heading', { name: /import data/i })).toBeVisible({ timeout: 20_000 });
-    // The CSV upload control is present and ready to accept a file.
-    await expect(page.locator('input[type="file"]')).toBeVisible();
+    for (const type of ['customers', 'vendors', 'products', 'chart_of_accounts', 'invoices', 'bills',
+      'customer_payments', 'supplier_payments', 'bank_transactions', 'journal_entries', 'opening_balances']) {
+      await expect(page.getByTestId(`import-type-${type}`)).toBeVisible({ timeout: 20_000 });
+    }
 
+    await page.getByTestId('import-type-customers').click();
+    await expect(page.getByTestId('import-file-input')).toBeAttached();
     const [download] = await Promise.all([
       page.waitForEvent('download', { timeout: 20_000 }),
-      page.getByRole('button', { name: /download template/i }).click(),
+      page.getByRole('button', { name: /download a template/i }).click(),
     ]);
-    expect(download.suggestedFilename()).toMatch(/\.csv$/i);
+    expect(download.suggestedFilename()).toMatch(/customers-import-template\.csv$/i);
 
     expect(diagnostics.pageErrors, diagnostics.pageErrors.join('\n')).toEqual([]);
   });
