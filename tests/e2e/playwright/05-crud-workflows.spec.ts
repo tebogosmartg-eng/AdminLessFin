@@ -730,22 +730,6 @@ test.describe('Fixed Assets — UI acquire (create) workflow', () => {
       }
     });
 
-    // A category is required and the ready company may not have one yet —
-    // exactly a first-time user's path: set the category up first.
-    await page.goto('/asset-categories');
-    await waitForRouteSettled(page);
-    const hasCategory = await page
-      .getByRole('row')
-      .nth(1)
-      .isVisible()
-      .catch(() => false);
-    if (!hasCategory) {
-      await page.getByRole('button', { name: /new category/i }).first().click();
-      await page.getByLabel('Category Name').fill(`E2E Plant ${stamp}`);
-      await page.getByRole('button', { name: /save/i }).click();
-      await expect(page.getByRole('row').filter({ hasText: 'E2E Plant' }).first()).toBeVisible({ timeout: 20_000 });
-    }
-
     await page.goto('/fixed-assets');
     await waitForRouteSettled(page);
     await expectNoErrorBoundary(page);
@@ -755,7 +739,20 @@ test.describe('Fixed Assets — UI acquire (create) workflow', () => {
     await expect(page.getByRole('heading', { name: /acquire new asset/i })).toBeVisible();
 
     await page.getByLabel('Description', { exact: true }).fill(desc);
-    await selectFirstOption(page, /category/i);
+    // A category is required. The picker reads "Loading…" (and is disabled) until
+    // the company's categories arrive, so this waits for the real list. Use an
+    // existing category; only a company with none creates one inline, as a
+    // first-time user would.
+    await page.getByRole('combobox', { name: /select asset category/i }).click({ timeout: 30_000 });
+    const existing = page.getByRole('option').filter({ hasNotText: /^Create / });
+    if (await existing.count()) {
+      await existing.first().click();
+    } else {
+      await page.getByRole('option', { name: /^Create / }).click();
+      await page.getByLabel(/category name/i).fill(`E2E Plant ${stamp}`);
+      await page.getByRole('button', { name: /create category/i }).click();
+      await expect(page.getByRole('heading', { name: /new asset category/i })).toBeHidden({ timeout: 20_000 });
+    }
     await page.getByLabel('Purchase Date').fill('2026-01-15');
     await page.getByLabel('Purchase Cost').fill('5000');
     await selectFirstOption(page, /asset account/i);

@@ -146,7 +146,7 @@ const AssetForm = ({ isOpen, setIsOpen, assetId }: AssetFormProps) => {
 
   const { data: vendors } = useQuery<Vendor[]>({ ...vendorsQuery(activeCompany!.id), enabled: !!activeCompany });
   const { data: employees } = useQuery<Employee[]>({ ...employeesQuery(activeCompany!.id), enabled: !!activeCompany });
-  const { data: categories } = useQuery<AssetCategoryIntelligence[]>({
+  const { data: categories, isLoading: categoriesLoading } = useQuery<AssetCategoryIntelligence[]>({
     ...assetCategoriesQuery(activeCompany!.id),
     enabled: !!activeCompany,
   });
@@ -332,6 +332,7 @@ const AssetForm = ({ isOpen, setIsOpen, assetId }: AssetFormProps) => {
                     <SmartSelect
                       entityLabel="asset category"
                       options={categoryOptions}
+                      isLoading={categoriesLoading}
                       value={field.value}
                       onChange={(v) => {
                         field.onChange(v);

@@ -105,12 +105,12 @@ const InvoiceForm = ({ isOpen, setIsOpen, invoiceId, duplicateFromId, initialCus
     },
   });
 
-  const { data: customers } = useQuery<Customer[]>({ 
+  const { data: customers, isLoading: customersLoading } = useQuery<Customer[]>({ 
     ...customersQuery(activeCompany!.id),
     enabled: !!activeCompany 
   });
   
-  const { data: products } = useQuery<Product[]>({ 
+  const { data: products, isLoading: productsLoading } = useQuery<Product[]>({ 
     queryKey: ['products', activeCompany?.id],
     queryFn: async () => {
         if (!activeCompany) return [];
@@ -123,7 +123,7 @@ const InvoiceForm = ({ isOpen, setIsOpen, invoiceId, duplicateFromId, initialCus
     enabled: !!activeCompany 
   });
 
-  const { data: accounts } = useQuery<Account[]>({ 
+  const { data: accounts, isLoading: accountsLoading } = useQuery<Account[]>({ 
     queryKey: ['accounts', activeCompany?.id],
     queryFn: async () => {
         if (!activeCompany) return [];
@@ -136,8 +136,8 @@ const InvoiceForm = ({ isOpen, setIsOpen, invoiceId, duplicateFromId, initialCus
     enabled: !!activeCompany 
   });
 
-  const { data: projects } = useQuery<Project[]>({ ...projectsQuery(activeCompany!.id), enabled: !!activeCompany });
-  const { data: taxRates } = useQuery<TaxRate[]>({ ...taxRatesQuery(activeCompany!.id), enabled: !!activeCompany });
+  const { data: projects, isLoading: projectsLoading } = useQuery<Project[]>({ ...projectsQuery(activeCompany!.id), enabled: !!activeCompany });
+  const { data: taxRates, isLoading: taxRatesLoading } = useQuery<TaxRate[]>({ ...taxRatesQuery(activeCompany!.id), enabled: !!activeCompany });
   
   const incomeAccounts = accounts?.filter(a => a.type === 'Income');
   const assetAccounts = accounts?.filter(a => a.type === 'Asset');
@@ -479,6 +479,7 @@ const InvoiceForm = ({ isOpen, setIsOpen, invoiceId, duplicateFromId, initialCus
                     <SmartSelect
                       entityLabel="customer"
                       options={customerOptions}
+                      isLoading={customersLoading}
                       value={field.value}
                       onChange={field.onChange}
                       recentScope={`customer:${companyId}`}
@@ -521,6 +522,7 @@ const InvoiceForm = ({ isOpen, setIsOpen, invoiceId, duplicateFromId, initialCus
                             entityLabel="item"
                             placeholder="Select item"
                             options={productOptions}
+                            isLoading={productsLoading}
                             value={field.value}
                             onChange={(value) => { field.onChange(value); handleProductSelect(value, index); }}
                             recentScope={`product:${companyId}`}
@@ -538,6 +540,7 @@ const InvoiceForm = ({ isOpen, setIsOpen, invoiceId, duplicateFromId, initialCus
                             entityLabel="tax code"
                             placeholder="-"
                             options={taxRateOptions}
+                            isLoading={taxRatesLoading}
                             value={field.value}
                             onChange={field.onChange}
                             recentScope={`tax:${companyId}`}
@@ -553,6 +556,7 @@ const InvoiceForm = ({ isOpen, setIsOpen, invoiceId, duplicateFromId, initialCus
                             entityLabel="income account"
                             placeholder="Account"
                             options={incomeAccountOptions}
+                            isLoading={accountsLoading}
                             value={field.value}
                             onChange={field.onChange}
                             allowClear={false}
@@ -568,6 +572,7 @@ const InvoiceForm = ({ isOpen, setIsOpen, invoiceId, duplicateFromId, initialCus
                             entityLabel="project"
                             placeholder="-"
                             options={projectOptions}
+                            isLoading={projectsLoading}
                             value={field.value}
                             onChange={field.onChange}
                             recentScope={`project:${companyId}`}
