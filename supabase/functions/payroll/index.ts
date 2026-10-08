@@ -213,6 +213,28 @@ function buildRunSummary(payslips, allItems, run, previousNetPay = null) {
   };
 }
 
+/**
+ * Changing payslips after approval withdraws the approval: what was approved is no
+ * longer what would be paid. Returns true when an approval was cleared.
+ */
+async function clearRunApproval(supabaseAdmin, { companyId, runId, userId, reason }) {
+  const { data: cleared, error } = await supabaseAdmin
+    .from('payroll_runs')
+    .update({ approved_at: null, approved_by: null })
+    .eq('id', runId)
+    .eq('company_id', companyId)
+    .eq('status', 'draft')
+    .not('approved_at', 'is', null)
+    .select('id');
+  if (error) throw error;
+  if (!cleared?.length) return false;
+  await logPayrollAudit(supabaseAdmin, {
+    company_id: companyId, payroll_run_id: runId, event_type: 'approval_withdrawn',
+    event_data: { reason }, created_by: userId,
+  });
+  return true;
+}
+
 serve(withEnterprisePlatform('payroll', 'tenant', async (req, _ctx) => {
 
   try {
@@ -347,6 +369,12 @@ serve(withEnterprisePlatform('payroll', 'tenant', async (req, _ctx) => {
       case 'GENERATE_PAYSLIPS': {
         const genRun = await fetchPayrollRun(supabaseAdmin, body.runId, company_id);
         if (isFinalizedRun(genRun.status)) throw new Error('Cannot regenerate payslips for a finalized payroll run.');
+        if (genRun.status !== 'draft') {
+          throw new Error(`Payslips can only be regenerated while the run is a draft (run is ${genRun.status}).`);
+        }
+        const approvalCleared = await clearRunApproval(supabaseAdmin, {
+          companyId: company_id, runId: body.runId, userId: user.id, reason: 'payslips_regenerated',
+        });
 
         const generationResult = await generatePayslipsWithRulesEngine(supabaseAdmin, {
           companyId: company_id,
@@ -355,7 +383,7 @@ serve(withEnterprisePlatform('payroll', 'tenant', async (req, _ctx) => {
           createdBy: user.id,
         });
 
-        data = generationResult;
+        data = { ...generationResult, approval_cleared: approvalCleared };
         error = null;
 
         await logPayrollAudit(supabaseAdmin, {
@@ -612,6 +640,9 @@ serve(withEnterprisePlatform('payroll', 'tenant', async (req, _ctx) => {
         if (payslipRun.payroll_runs?.status !== 'draft') {
           throw new Error('Cannot edit payslips once a payroll run has left draft.');
         }
+        const editApprovalCleared = await clearRunApproval(supabaseAdmin, {
+          companyId: company_id, runId: payslipRun.payroll_run_id, userId: user.id, reason: 'payslip_edited',
+        });
         const { data: existingItems, error: existingItemsError } = await supabaseAdmin
           .from('payslip_items')
           .select('description, type, amount, component_code, irp5_code')
@@ -643,6 +674,7 @@ serve(withEnterprisePlatform('payroll', 'tenant', async (req, _ctx) => {
           total_deductions: deductions,
           net_pay: netPay,
         }).eq('id', payslipId).eq('company_id', company_id));
+        if (!error) data = { approval_cleared: editApprovalCleared };
         break;
       }
 
@@ -680,6 +712,15 @@ serve(withEnterprisePlatform('payroll', 'tenant', async (req, _ctx) => {
             message: 'This payroll run has already been finalized.',
             recovery: 'Refresh the page to view posted outputs.',
             status: 409,
+          });
+        }
+
+        if (!runToFinalize.approved_at && !runToFinalize.journal_entry_id) {
+          throw new PayrollDomainError({
+            stage: 'validation',
+            code: 'NOT_APPROVED',
+            message: 'Approve the payroll run before processing it.',
+            recovery: 'Review the payslips, approve the run, then process.',
           });
         }
 

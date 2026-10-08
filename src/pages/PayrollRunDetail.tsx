@@ -6,6 +6,16 @@ import { Button } from '../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/table';
 import { Alert, AlertDescription, AlertTitle } from '../components/ui/alert';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '../components/ui/alert-dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { Badge } from '../components/ui/badge';
 import { Skeleton } from '../components/ui/skeleton';
@@ -149,7 +159,7 @@ const PayrollRunDetail = () => {
 
   const workflowRun = useMemo<PayrollRun | undefined>(() => {
     if (!run) return undefined;
-    if (run.approved_at || !clientApprovedAt) return run;
+    if (run.approved_at || !clientApprovedAt || 'approved_at' in run) return run;
     return { ...run, approved_at: clientApprovedAt };
   }, [run, clientApprovedAt]);
 
@@ -200,12 +210,27 @@ const PayrollRunDetail = () => {
       });
       return result.data;
     },
-    onSuccess: () => {
+    onSuccess: (result) => {
+      const approvalCleared = (result as { approval_cleared?: boolean } | undefined)?.approval_cleared;
+      if (id) sessionStorage.removeItem(payrollApprovalStorageKey(id));
+      setClientApprovedAt(null);
+      setConfirmRegenerate(false);
       invalidateRun();
-      showSuccess('Payslips generated successfully.');
+      showSuccess(approvalCleared
+        ? 'Payslips regenerated. The approval was withdrawn — review and approve the run again.'
+        : 'Payslips generated successfully.');
     },
-    onError: (error: Error) => showError(error.message),
+    onError: (error: Error) => {
+      setConfirmRegenerate(false);
+      showError(error.message);
+    },
   });
+
+  const [confirmRegenerate, setConfirmRegenerate] = useState(false);
+  const regenerate = () => {
+    if (isRunApproved(workflowRun ?? run!)) setConfirmRegenerate(true);
+    else generatePayslipsMutation.mutate();
+  };
 
   const approveRunMutation = useMutation({
     mutationFn: async () => {
@@ -541,7 +566,7 @@ const PayrollRunDetail = () => {
             <CardHeader>
               <CardTitle>Period inputs</CardTitle>
               <CardDescription>
-                Bonus, subsistence, and once-off allowances for this run. A period input replaces the standing package for the same component. Regenerate payslips after saving.
+                Travel, bonus, subsistence, once-off allowances and benefits for this run only. A period input replaces the employee's standing pay package for the same component. Standing amounts belong on the employee's pay package. Regenerate payslips after saving.
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -577,10 +602,32 @@ const PayrollRunDetail = () => {
         {payslips && payslips.length > 0 && (
           <Card>
             <CardHeader>
-              <CardTitle>Payslips ({payslips.length})</CardTitle>
-              {currentStep === 'review' && (
-                <CardDescription>Step 2: Review each payslip before approval.</CardDescription>
-              )}
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div className="space-y-1.5">
+                  <CardTitle>Payslips ({payslips.length})</CardTitle>
+                  {currentStep === 'review' && (
+                    <CardDescription>Step 2: Review each payslip before approval.</CardDescription>
+                  )}
+                  {run.status === 'draft' && (
+                    <CardDescription>
+                      Changed a pay package, period input or employee? Regenerate to recalculate every payslip.
+                    </CardDescription>
+                  )}
+                </div>
+                {run.status === 'draft' && (
+                  <Button
+                    variant="outline"
+                    onClick={regenerate}
+                    disabled={generatePayslipsMutation.isPending}
+                    data-testid="regenerate-payslips"
+                  >
+                    {generatePayslipsMutation.isPending
+                      ? <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      : <PlayCircle className="mr-2 h-4 w-4" />}
+                    Regenerate payslips
+                  </Button>
+                )}
+              </div>
             </CardHeader>
             <CardContent>
               <Table>
@@ -747,6 +794,23 @@ const PayrollRunDetail = () => {
         )}
       </div>
 
+      <AlertDialog open={confirmRegenerate} onOpenChange={setConfirmRegenerate}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Regenerate approved payslips?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Every payslip in this run is recalculated from the current pay packages and period inputs.
+              The approval is withdrawn, so the run must be reviewed and approved again before it is processed.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={() => generatePayslipsMutation.mutate()} data-testid="confirm-regenerate">
+              Regenerate and withdraw approval
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
       {selectedPayslipId && (
         <PayslipDialog isOpen={isPayslipDialogOpen} setIsOpen={setIsPayslipDialogOpen} payslipId={selectedPayslipId} />
       )}

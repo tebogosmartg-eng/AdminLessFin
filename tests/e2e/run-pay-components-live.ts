@@ -187,7 +187,7 @@ async function main() {
   const edit = await invoke(supabase, 'payroll', { method: 'UPDATE_PAYSLIP', company_id: companyId, payslipId: slipHead.id, items: tampered });
   check('Direct PAYE edit refused', !!edit.error && /read-only/.test(edit.error), edit.error);
 
-  // 9. Approve and finalise, then inputs are frozen and the journal balances.
+  // 9. Approve, then add an allowance after approval: regeneration must work and withdraw the approval.
   const approve = await invoke(supabase, 'payroll', { method: 'APPROVE_RUN', company_id: companyId, runId });
   check('Run approved', !approve.error, approve.error);
   const coa = await invoke<Array<{ id: string; name: string; type: string }>>(supabase, 'chart-of-accounts', { method: 'GET', company_id: companyId });
@@ -195,6 +195,28 @@ async function main() {
   const wage = accounts.find((a) => a.type === 'Expense' && /wage|salary|payroll/i.test(a.name));
   const bank = accounts.find((a) => a.type === 'Asset' && /bank|cash/i.test(a.name));
   const liability = accounts.find((a) => a.type === 'Liability' && /payroll|statutory|paye|uif/i.test(a.name)) ?? accounts.find((a) => a.type === 'Liability');
+
+  const late = await supabase.from('payroll_period_inputs').insert({
+    company_id: companyId, payroll_run_id: runId, employee_id: employeeId, component_code: 'other_cash',
+    config: { amount: 1500, taxable: true, label: 'Tools allowance', onceOff: true },
+  });
+  check('Allowance added after approval (run still draft)', !late.error, late.error?.message);
+  const regen = await invoke<{ generated: number; approval_cleared?: boolean }>(supabase, 'payroll', { method: 'GENERATE_PAYSLIPS', company_id: companyId, runId });
+  check('Payslips regenerate after approval', !!regen.data, regen.error);
+  check('Regeneration withdraws the approval', regen.data?.approval_cleared === true, regen.data?.approval_cleared);
+  const afterRegen = await invoke<{ run: { approved_at: string | null }; payslips: Array<{ id: string; employee_id: string; total_earnings: number }> }>(
+    supabase, 'payroll', { method: 'GET_RUN_DETAIL', company_id: companyId, runId });
+  check('Run shows as not approved', afterRegen.data?.run?.approved_at == null, afterRegen.data?.run?.approved_at);
+  const regenSlip = afterRegen.data?.payslips?.find((p) => p.employee_id === employeeId);
+  check('New allowance is on the regenerated payslip', near(Number(regenSlip?.total_earnings), cashGross + 1500), regenSlip?.total_earnings);
+  const unapproved = await invoke(supabase, 'payroll', {
+    method: 'FINALIZE_RUN', company_id: companyId, runId, wageAccountId: wage?.id, bankAccountId: bank?.id, liabilityAccountId: liability?.id,
+  });
+  check('Processing refused until re-approved', !!unapproved.error && /Approve the payroll run/.test(unapproved.error), unapproved.error);
+  const reapprove = await invoke(supabase, 'payroll', { method: 'APPROVE_RUN', company_id: companyId, runId });
+  check('Run re-approved', !reapprove.error, reapprove.error);
+
+  // 10. Finalise, then inputs are frozen and the journal balances.
   const fin = await invoke<{ journal_entry_id: string }>(supabase, 'payroll', {
     method: 'FINALIZE_RUN', company_id: companyId, runId, wageAccountId: wage?.id, bankAccountId: bank?.id, liabilityAccountId: liability?.id,
   });
