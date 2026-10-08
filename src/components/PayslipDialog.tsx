@@ -15,11 +15,14 @@ import { Trash2 } from 'lucide-react';
 import { Skeleton } from './ui/skeleton';
 import { formatCurrency } from '../lib/utils';
 import { useAuth } from '../contexts/AuthContext';
+import { isCalculatedPayslipLine } from '../lib/payrollRulesEngine/payComponents';
 
 const payslipItemSchema = z.object({
   description: z.string().min(1, "Description is required."),
-  type: z.enum(['earning', 'deduction']),
-  amount: z.coerce.number().min(0.01, "Amount must be positive."),
+  type: z.enum(['earning', 'deduction', 'taxable_benefit', 'employer_contribution', 'company_contribution', 'reimbursement']),
+  amount: z.coerce.number().min(0, "Amount cannot be negative."),
+  component_code: z.string().nullable().optional(),
+  irp5_code: z.string().nullable().optional(),
 });
 
 const payslipSchema = z.object({
@@ -30,7 +33,13 @@ type PayslipFormValues = z.infer<typeof payslipSchema>;
 
 type PayslipEditData = {
   payroll_run_id: string;
-  payslip_items: { description: string; type: 'earning' | 'deduction'; amount: number }[];
+  payslip_items: {
+    description: string;
+    type: 'earning' | 'deduction' | 'taxable_benefit' | 'employer_contribution' | 'company_contribution' | 'reimbursement';
+    amount: number;
+    component_code?: string | null;
+    irp5_code?: string | null;
+  }[];
   employees: { first_name: string; last_name: string };
 };
 
@@ -67,12 +76,18 @@ const PayslipDialog = ({ isOpen, setIsOpen, payslipId }: PayslipDialogProps) => 
   useDialogFormReset(isOpen, payslipData ? `edit:${payslipId}` : `pending:${payslipId}`, () => {
     if (payslipData) {
       form.reset({
-        items: payslipData.payslip_items.map(({ description, type, amount }) => ({ description, type, amount })),
+        items: payslipData.payslip_items.map(({ description, type, amount, component_code, irp5_code }) => ({
+          description,
+          type,
+          amount,
+          component_code: component_code ?? null,
+          irp5_code: irp5_code ?? null,
+        })),
       });
     }
   });
 
-  const { fields, append, remove } = useFieldArray({ control: form.control, name: "items" });
+  const { fields, remove } = useFieldArray({ control: form.control, name: "items" });
 
   const mutation = useMutation({
     mutationFn: async (values: PayslipFormValues) => {
@@ -81,7 +96,13 @@ const PayslipDialog = ({ isOpen, setIsOpen, payslipId }: PayslipDialogProps) => 
         method: 'UPDATE_PAYSLIP',
         company_id: activeCompany.id,
         payslipId: payslipId,
-        items: values.items,
+        items: values.items.map(({ description, type, amount, component_code, irp5_code }) => ({
+          description,
+          type,
+          amount,
+          component_code: component_code ?? null,
+          irp5_code: irp5_code ?? null,
+        })),
       });
     },
     onSuccess: () => {
@@ -116,22 +137,34 @@ const PayslipDialog = ({ isOpen, setIsOpen, payslipId }: PayslipDialogProps) => 
         {isLoading ? <Skeleton className="h-96 w-full" /> : (
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+              <p className="text-sm text-muted-foreground">
+                Salary, allowances, benefits, PAYE, UIF, and SDL are calculated. Change them on the pay package or the run&apos;s period inputs, then regenerate.
+              </p>
               <div className="space-y-2 max-h-80 overflow-y-auto pr-2">
-                {fields.map((field, index) => (
+                {fields.map((field, index) => {
+                  const locked = isCalculatedPayslipLine({
+                    description: watchedItems[index]?.description ?? '',
+                    type: watchedItems[index]?.type ?? '',
+                    amount: Number(watchedItems[index]?.amount ?? 0),
+                    component_code: watchedItems[index]?.component_code,
+                  });
+                  return (
                   <div key={field.id} className="flex items-center gap-2">
                     <FormField control={form.control} name={`items.${index}.description`} render={({ field }) => (
-                      <FormItem className="flex-1"><FormControl><Input placeholder="Description" {...field} /></FormControl></FormItem>
+                      <FormItem className="flex-1"><FormControl><Input placeholder="Description" {...field} disabled={locked} /></FormControl></FormItem>
                     )} />
                     <FormField control={form.control} name={`items.${index}.type`} render={({ field }) => (
-                      <FormItem><Select onValueChange={field.onChange} value={field.value}><FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl><SelectContent><SelectItem value="earning">Earning</SelectItem><SelectItem value="deduction">Deduction</SelectItem></SelectContent></Select></FormItem>
+                      <FormItem><Select onValueChange={field.onChange} value={field.value} disabled={locked}><FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl><SelectContent><SelectItem value="earning">Earning</SelectItem><SelectItem value="deduction">Deduction</SelectItem><SelectItem value="taxable_benefit">Taxable benefit</SelectItem><SelectItem value="employer_contribution">Employer contribution</SelectItem></SelectContent></Select></FormItem>
                     )} />
                     <FormField control={form.control} name={`items.${index}.amount`} render={({ field }) => (
-                      <FormItem><FormControl><Input type="number" step="0.01" placeholder="Amount" {...field} /></FormControl></FormItem>
+                      <FormItem><FormControl><Input type="number" step="0.01" placeholder="Amount" {...field} disabled={locked} /></FormControl></FormItem>
                     )} />
-                    <Button type="button" variant="ghost" size="icon" onClick={() => remove(index)}><Trash2 className="h-4 w-4" /></Button>
+                    {!locked && (
+                      <Button type="button" variant="ghost" size="icon" onClick={() => remove(index)}><Trash2 className="h-4 w-4" /></Button>
+                    )}
                   </div>
-                ))}
-                <Button type="button" variant="outline" size="sm" onClick={() => append({ description: '', type: 'earning', amount: 0 })}>Add Line</Button>
+                  );
+                })}
               </div>
               
               <div className="space-y-2 pt-4 border-t">

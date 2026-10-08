@@ -7,6 +7,7 @@ import {
   fetchPayrollRun,
 } from '../_shared/generatePayslips.ts'
 import { buildEffectiveCompanyRules } from '../_shared/payrollRulesEngine/index.ts'
+import { payslipEditError } from '../_shared/payrollRulesEngine/payComponents.ts'
 import {
   ENTERPRISE_CORS_HEADERS,
   withEnterprisePlatform,
@@ -611,12 +612,31 @@ serve(withEnterprisePlatform('payroll', 'tenant', async (req, _ctx) => {
         if (payslipRun.payroll_runs?.status !== 'draft') {
           throw new Error('Cannot edit payslips once a payroll run has left draft.');
         }
+        const { data: existingItems, error: existingItemsError } = await supabaseAdmin
+          .from('payslip_items')
+          .select('description, type, amount, component_code, irp5_code')
+          .eq('payslip_id', payslipId);
+        if (existingItemsError) throw existingItemsError;
+        const editError = payslipEditError(existingItems ?? [], items ?? []);
+        if (editError) throw new Error(editError);
         const earnings = items.filter(i => i.type === 'earning').reduce((sum, i) => sum + i.amount, 0);
         const deductions = items.filter(i => i.type === 'deduction').reduce((sum, i) => sum + i.amount, 0);
         const netPay = earnings - deductions;
 
         await supabaseAdmin.from('payslip_items').delete().eq('payslip_id', payslipId);
-        const itemsToInsert = items.map(item => ({ ...item, payslip_id: payslipId }));
+        const itemsToInsert = items.map(item => {
+          const prior = (existingItems ?? []).find(
+            (existing) => existing.description === item.description && existing.type === item.type
+          );
+          return {
+            payslip_id: payslipId,
+            description: item.description,
+            type: item.type,
+            amount: item.amount,
+            component_code: item.component_code ?? prior?.component_code ?? null,
+            irp5_code: item.irp5_code ?? prior?.irp5_code ?? null,
+          };
+        });
         await supabaseAdmin.from('payslip_items').insert(itemsToInsert);
         ({ data, error } = await supabaseAdmin.from('payslips').update({
           total_earnings: earnings,

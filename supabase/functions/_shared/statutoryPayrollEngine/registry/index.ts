@@ -69,6 +69,9 @@ export function mapDbRowToRuleSet(row: Record<string, unknown>): StatutoryRuleSe
     travelPrescribedRatePerKm: builtin?.travelPrescribedRatePerKm ?? 4.76,
     travelDeemedTaxableNoLogbook: builtin?.travelDeemedTaxableNoLogbook ?? 0.8,
     travelDeemedTaxableMainlyBusiness: builtin?.travelDeemedTaxableMainlyBusiness ?? 0.2,
+    // No guessed fallback: an unknown year refuses subsistence rather than exempting the wrong amount.
+    subsistenceDomesticDaily: builtin?.subsistenceDomesticDaily ?? 0,
+    subsistenceIncidentalDaily: builtin?.subsistenceIncidentalDaily ?? 0,
     severanceExemptionLifetime: builtin?.severanceExemptionLifetime ?? 500000,
     officialInterestRateAnnual: builtin?.officialInterestRateAnnual ?? 0.085,
     vehicleFringeRateEmployerCosts: builtin?.vehicleFringeRateEmployerCosts ?? 0.035,

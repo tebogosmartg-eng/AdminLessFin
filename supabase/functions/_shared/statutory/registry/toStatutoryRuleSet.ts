@@ -20,6 +20,7 @@ export function legislationToStatutoryRuleSet(
     travel,
     fringeBenefits,
     thresholds,
+    allowances,
   } = legislation;
 
   return {
@@ -60,6 +61,8 @@ export function legislationToStatutoryRuleSet(
     deathBenefitExemption: unwrap(retirement.deathBenefitExemption),
     rebateSecondaryAge: unwrap(thresholds.secondaryRebateAge),
     rebateTertiaryAge: unwrap(thresholds.tertiaryRebateAge),
+    subsistenceDomesticDaily: unwrap(allowances.subsistenceDomesticDaily),
+    subsistenceIncidentalDaily: unwrap(allowances.subsistenceIncidentalDaily),
     legislationReference: `${metadata.authority}; ${metadata.budgetReference}; ${metadata.gazetteReference}`,
   };
 }

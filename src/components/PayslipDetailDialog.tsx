@@ -81,7 +81,7 @@ const PayslipDetailDialog = ({ isOpen, setIsOpen, payslipId }: PayslipDetailDial
   });
 
   const items = payslipData?.payslip_items ?? [];
-  const { earnings, deductions, employerContributions } = classifyPayslipItems(items);
+  const { earnings, taxableBenefits, deductions, employerContributions } = classifyPayslipItems(items);
   const employerCost = payslipData ? computeEmployerCost(payslipData.total_earnings, employerContributions) : 0;
 
   const handleDownloadPdf = async () => {
@@ -182,6 +182,22 @@ const PayslipDetailDialog = ({ isOpen, setIsOpen, payslipId }: PayslipDetailDial
                 )) : <p className="text-muted-foreground">None</p>}
               </div>
             </div>
+
+            {taxableBenefits.length > 0 && (
+              <>
+                <Separator className="my-4" />
+                <div>
+                  <h4 className="font-semibold mb-1">Taxable Benefits</h4>
+                  <p className="text-muted-foreground mb-2">Included in PAYE. Not added to gross pay or net pay.</p>
+                  {taxableBenefits.map((item) => (
+                    <div key={item.id ?? item.description} className="flex justify-between">
+                      <span>{item.description}</span>
+                      <span className="font-mono">{formatCurrency(item.amount)}</span>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
 
             {employerContributions.length > 0 && (
               <>

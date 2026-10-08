@@ -8,7 +8,13 @@ import type { AuditStep } from '../types.ts';
 
 export type FringeBenefitLine = {
   benefitType: string;
+  /** Seventh Schedule cash equivalent (reported on the IRP5). */
   taxableValue: number;
+  /**
+   * Portion included in Fourth Schedule remuneration (PAYE, UIF, SDL).
+   * Equals taxableValue except a company car: 80%, or 20% at 80%+ business use.
+   */
+  remunerationValue: number;
   legislativeReference: string;
   auditTrail: AuditStep[];
 };
@@ -19,24 +25,36 @@ export function calculateFringeBenefitLine(
 ): FringeBenefitLine {
   switch (benefit.type) {
     case 'company_car': {
-      const rate = benefit.employeePaysFuel
+      const maintenancePlan = benefit.maintenancePlan ?? benefit.employeePaysFuel ?? false;
+      const rate = maintenancePlan
         ? ruleSet.vehicleFringeRateEmployeeFuel
         : ruleSet.vehicleFringeRateEmployerCosts;
       const taxable = roundCurrency(benefit.determinedValue * rate);
-      const ref = benefit.employeePaysFuel
-        ? 'Seventh Schedule para 7(1)(b) — 3.25% of determined value'
-        : 'Seventh Schedule para 7(1)(a) — 3.5% of determined value';
+      const inclusion = benefit.mainlyBusinessUse
+        ? ruleSet.travelDeemedTaxableMainlyBusiness
+        : ruleSet.travelDeemedTaxableNoLogbook;
+      const remunerationValue = roundCurrency(taxable * inclusion);
+      const ref = maintenancePlan
+        ? 'Seventh Schedule para 7(4) — 3.25% of determined value (maintenance plan); Fourth Schedule 80%/20% inclusion'
+        : 'Seventh Schedule para 7(4) — 3.5% of determined value; Fourth Schedule 80%/20% inclusion';
       return {
         benefitType: 'company_car',
         taxableValue: taxable,
+        remunerationValue,
         legislativeReference: ref,
         auditTrail: [
           createAuditStep(
             'fringe_company_car',
             'determined_value × statutory_rate',
-            { determinedValue: benefit.determinedValue, rate, employeePaysFuel: benefit.employeePaysFuel ?? false },
+            { determinedValue: benefit.determinedValue, rate, maintenancePlan },
             taxable,
             { monthlyFringe: taxable }
+          ),
+          createAuditStep(
+            'fringe_company_car_inclusion',
+            'cash_equivalent × remuneration_inclusion (80%, or 20% at 80%+ business use)',
+            { cashEquivalent: taxable, inclusion, mainlyBusinessUse: benefit.mainlyBusinessUse ?? false },
+            remunerationValue
           ),
         ],
       };
@@ -46,6 +64,7 @@ export function calculateFringeBenefitLine(
       return {
         benefitType: 'employer_insurance',
         taxableValue: taxable,
+        remunerationValue: taxable,
         legislativeReference: 'Seventh Schedule para 7(4) — premiums paid by employer',
         auditTrail: [
           createAuditStep('fringe_insurance', 'employer_premium_paid', { monthlyPremium: benefit.monthlyPremium }, taxable),
@@ -58,6 +77,7 @@ export function calculateFringeBenefitLine(
       return {
         benefitType: 'low_interest_loan',
         taxableValue: taxable,
+        remunerationValue: taxable,
         legislativeReference: 'Seventh Schedule para 7(1)(f) — (official_rate − actual_rate) × balance / 12',
         auditTrail: [
           createAuditStep(
@@ -83,6 +103,7 @@ export function calculateFringeBenefitLine(
       return {
         benefitType: 'employer_accommodation',
         taxableValue: taxable,
+        remunerationValue: taxable,
         legislativeReference: 'Seventh Schedule para 7(2) — rental value minus abatement',
         auditTrail: [
           createAuditStep(
@@ -99,6 +120,7 @@ export function calculateFringeBenefitLine(
       return {
         benefitType: 'employer_asset',
         taxableValue: taxable,
+        remunerationValue: taxable,
         legislativeReference: 'Seventh Schedule para 7(4) — value of use of employer asset',
         auditTrail: [
           createAuditStep('fringe_asset', 'monthly_value_of_use', { monthlyValueOfUse: benefit.monthlyValueOfUse }, taxable),
@@ -110,6 +132,7 @@ export function calculateFringeBenefitLine(
       return {
         benefitType: 'other',
         taxableValue: taxable,
+        remunerationValue: taxable,
         legislativeReference: benefit.legislativeReference ?? 'Seventh Schedule para 7(4)',
         auditTrail: [
           createAuditStep('fringe_other', 'declared_monthly_value', { monthlyValue: benefit.monthlyValue }, taxable),

@@ -24,10 +24,13 @@ export function runFringeBenefitEngine(ctx: StatutoryCalculationContext): Statut
 
   const auditTrail = [];
   let totalTaxable = 0;
+  let totalCashEquivalent = 0;
 
   for (const benefit of benefits) {
     const line = calculateFringeBenefitLine(benefit, ctx.ruleSet);
-    totalTaxable += line.taxableValue;
+    // PAYE is withheld on the Fourth Schedule inclusion (80/20 for a company car).
+    totalTaxable += line.remunerationValue;
+    totalCashEquivalent += line.taxableValue;
     auditTrail.push(
       ...line.auditTrail.map((step) => ({
         ...step,
@@ -47,7 +50,11 @@ export function runFringeBenefitEngine(ctx: StatutoryCalculationContext): Statut
     employeeAmount: 0,
     employerAmount: 0,
     taxableAdjustment: totalTaxable,
-    breakdown: { totalTaxableBenefits: totalTaxable, benefitCount: benefits.length },
+    breakdown: {
+      totalTaxableBenefits: totalTaxable,
+      totalCashEquivalent: roundCurrency(totalCashEquivalent),
+      benefitCount: benefits.length,
+    },
     auditTrail,
   };
 }

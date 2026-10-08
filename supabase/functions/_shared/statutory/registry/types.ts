@@ -113,6 +113,8 @@ export type ThresholdsBlock = {
 
 export type AllowancesBlock = {
   subsistenceDomesticDaily: StatutoryConstant<number>;
+  /** Domestic deemed amount when only incidental costs are paid. */
+  subsistenceIncidentalDaily: StatutoryConstant<number>;
   subsistenceForeignDaily: StatutoryConstant<number>;
 };
 

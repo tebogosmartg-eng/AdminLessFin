@@ -54,6 +54,9 @@ export const RULE_SET_2024_2025: StatutoryRuleSet = {
   effectiveTo: '2025-02-28',
   countryCode: 'ZA',
   ...COMMON_RULE_FIELDS,
+  // SARS subsistence notice effective 1 March 2024.
+  subsistenceDomesticDaily: 548,
+  subsistenceIncidentalDaily: 169,
   legislationReference: 'Income Tax Act 58 of 1962; Seventh Schedule; SARS 2024/2025',
 };
 
@@ -64,6 +67,9 @@ export const RULE_SET_2025_2026: StatutoryRuleSet = {
   effectiveTo: '2026-02-28',
   countryCode: 'ZA',
   ...COMMON_RULE_FIELDS,
+  // SARS subsistence notice effective 1 March 2025.
+  subsistenceDomesticDaily: 570,
+  subsistenceIncidentalDaily: 176,
   legislationReference: 'Income Tax Act 58 of 1962; Seventh Schedule; SARS 2025/2026',
 };
 
@@ -98,6 +104,9 @@ export const RULE_SET_2026_2027: StatutoryRuleSet = {
   travelPrescribedRatePerKm: 4.76,
   travelDeemedTaxableNoLogbook: 0.8,
   travelDeemedTaxableMainlyBusiness: 0.2,
+  // SARS Notice 7174 (GG 54218), effective 1 March 2026.
+  subsistenceDomesticDaily: 595,
+  subsistenceIncidentalDaily: 184,
   severanceExemptionLifetime: 500000,
   officialInterestRateAnnual: 0.085,
   vehicleFringeRateEmployerCosts: 0.035,

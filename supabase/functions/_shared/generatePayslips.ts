@@ -17,6 +17,11 @@ import {
 } from './statutoryPayrollEngine/pipeline.ts';
 import { buildCalculationSnapshot } from './statutoryPayrollEngine/audit.ts';
 import { taxYearConfigToRuleSet } from './statutoryPayrollEngine/adapter.ts';
+import {
+  assemblePayComponents,
+  isComponentEffective,
+  mergePayComponents,
+} from './payrollRulesEngine/payComponents.ts';
 
 const STATUTORY_RULE_IDS = new Set([
   'paye',
@@ -102,6 +107,21 @@ export async function loadPayrollRulesContext(supabaseAdmin, companyId, run) {
     (e) => !e.end_date || e.end_date >= today
   );
 
+  const [recurringResult, periodResult] = await Promise.all([
+    supabaseAdmin
+      .from('employee_pay_components')
+      .select('employee_id, component_code, config, effective_from, effective_to, active')
+      .eq('company_id', companyId)
+      .eq('active', true),
+    supabaseAdmin
+      .from('payroll_period_inputs')
+      .select('employee_id, component_code, config')
+      .eq('company_id', companyId)
+      .eq('payroll_run_id', run.id),
+  ]);
+  if (recurringResult.error) throw recurringResult.error;
+  if (periodResult.error) throw periodResult.error;
+
   return {
     companyRules,
     runOverrides,
@@ -110,6 +130,8 @@ export async function loadPayrollRulesContext(supabaseAdmin, companyId, run) {
     employeeSettingsMap,
     activeEmployees,
     catalogRows,
+    recurringComponents: recurringResult.data ?? [],
+    periodInputs: periodResult.data ?? [],
   };
 }
 
@@ -162,6 +184,30 @@ export async function generatePayslipsWithRulesEngine(supabaseAdmin, {
       runRuleOverrides: ctx.runOverrides,
     });
 
+    const ruleSet = taxYearConfigToRuleSet(ctx.taxYearConfig);
+    const recurring = (ctx.recurringComponents ?? []).filter(
+      (row) =>
+        row.employee_id === employee.id &&
+        isComponentEffective(row, run.pay_date)
+    );
+    const periodInputs = (ctx.periodInputs ?? []).filter((row) => row.employee_id === employee.id);
+    let assembly;
+    try {
+      assembly = assemblePayComponents(
+        mergePayComponents(
+          recurring.map((row) => ({ componentCode: row.component_code, config: row.config ?? {} })),
+          periodInputs.map((row) => ({ componentCode: row.component_code, config: row.config ?? {} }))
+        ),
+        ruleSet
+      );
+    } catch (err) {
+      const name = [employee.first_name, employee.last_name].filter(Boolean).join(' ') || employee.id;
+      throw new Error(`${name}: ${err instanceof Error ? err.message : String(err)}`);
+    }
+    const cashGross = roundCurrency(calculation.grossPay + assembly.cashGross);
+    const taxableEarnings = roundCurrency(calculation.grossPay + assembly.taxableBaseAddition);
+    const remuneration = roundCurrency(calculation.grossPay + assembly.remunerationAddition);
+
     const statutoryResult = executeStatutoryPipeline({
       employee: {
         id: employee.id,
@@ -177,14 +223,22 @@ export async function generatePayslipsWithRulesEngine(supabaseAdmin, {
         payPeriodEnd: run.pay_period_end,
         payDate: run.pay_date,
       },
-      grossEarnings: calculation.grossPay,
-      enabledEngines: mapRulesToStatutoryEngines(ctx.effectiveRunRules),
+      grossEarnings: cashGross,
+      taxableEarnings,
+      nonPeriodicTaxable: assembly.nonPeriodicTaxable,
+      uifRemuneration: remuneration,
+      sdlRemuneration: remuneration,
+      enabledEngines: {
+        ...mapRulesToStatutoryEngines(ctx.effectiveRunRules),
+        ...assembly.enabledEngines,
+      },
       engineConfig: buildStatutoryEngineConfig(
         ctx.companyRules,
         ctx.employeeSettingsMap[employee.id] ?? {},
         ctx.runOverrides
       ),
-      ruleSet: taxYearConfigToRuleSet(ctx.taxYearConfig),
+      components: assembly.components,
+      ruleSet,
       companyAnnualRemuneration: ctx.companyAnnualRemuneration ?? 600000,
       audit: {
         employeeNumber: employee.employee_number ?? employee.id,
@@ -204,6 +258,13 @@ export async function generatePayslipsWithRulesEngine(supabaseAdmin, {
     });
     snapshot.rules_engine_result = calculation;
     snapshot.engine_version = '3.0.2';
+    snapshot.pay_components = {
+      cashGross: assembly.cashGross,
+      taxableBaseAddition: assembly.taxableBaseAddition,
+      nonPeriodicTaxable: assembly.nonPeriodicTaxable,
+      remunerationAddition: assembly.remunerationAddition,
+      lines: assembly.lines,
+    };
 
     const basicSalary =
       calculation.lineItems.find((item) => item.ruleId === 'basic_salary')?.amount ??
@@ -217,8 +278,18 @@ export async function generatePayslipsWithRulesEngine(supabaseAdmin, {
       description: line.description,
       type: line.type,
       amount: line.amount,
+      componentCode: null,
+      irp5Code: null,
     }));
-    const persistedItems = [...nonStatutoryItems, ...statutoryItems];
+    const componentItems = assembly.lines.map((line) => ({
+      ruleId: line.componentCode,
+      description: line.description,
+      type: line.type,
+      amount: line.amount,
+      componentCode: line.componentCode,
+      irp5Code: line.irp5Code,
+    }));
+    const persistedItems = [...nonStatutoryItems, ...componentItems, ...statutoryItems];
     const totalEarnings = roundCurrency(
       persistedItems
         .filter((item) => item.type === 'earning')
@@ -253,6 +324,8 @@ export async function generatePayslipsWithRulesEngine(supabaseAdmin, {
         description: item.description,
         type: item.type,
         amount: item.amount,
+        component_code: item.componentCode ?? null,
+        irp5_code: item.irp5Code ?? null,
       }));
 
     if (itemsToInsert.length) {

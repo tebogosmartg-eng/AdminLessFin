@@ -7994,6 +7994,57 @@ export type Database = {
           },
         ]
       }
+      employee_pay_components: {
+        Row: {
+          active: boolean
+          company_id: string
+          component_code: string
+          config: Json
+          effective_from: string | null
+          effective_to: string | null
+          employee_id: string
+          id: string
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          company_id: string
+          component_code: string
+          config?: Json
+          effective_from?: string | null
+          effective_to?: string | null
+          employee_id: string
+          id?: string
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          company_id?: string
+          component_code?: string
+          config?: Json
+          effective_from?: string | null
+          effective_to?: string | null
+          employee_id?: string
+          id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "employee_pay_components_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "employee_pay_components_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       employee_timeline_events: {
         Row: {
           changed_by: string | null
@@ -11546,6 +11597,58 @@ export type Database = {
         }
         Relationships: []
       }
+      payroll_period_inputs: {
+        Row: {
+          company_id: string
+          component_code: string
+          config: Json
+          employee_id: string
+          id: string
+          payroll_run_id: string
+          updated_at: string
+        }
+        Insert: {
+          company_id: string
+          component_code: string
+          config?: Json
+          employee_id: string
+          id?: string
+          payroll_run_id: string
+          updated_at?: string
+        }
+        Update: {
+          company_id?: string
+          component_code?: string
+          config?: Json
+          employee_id?: string
+          id?: string
+          payroll_run_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payroll_period_inputs_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payroll_period_inputs_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payroll_period_inputs_payroll_run_id_fkey"
+            columns: ["payroll_run_id"]
+            isOneToOne: false
+            referencedRelation: "payroll_runs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       payroll_runs: {
         Row: {
           approved_at: string | null
@@ -11673,22 +11776,28 @@ export type Database = {
       payslip_items: {
         Row: {
           amount: number
+          component_code: string | null
           description: string
           id: string
+          irp5_code: string | null
           payslip_id: string
           type: Database["public"]["Enums"]["payslip_item_type"]
         }
         Insert: {
           amount: number
+          component_code?: string | null
           description: string
           id?: string
+          irp5_code?: string | null
           payslip_id: string
           type: Database["public"]["Enums"]["payslip_item_type"]
         }
         Update: {
           amount?: number
+          component_code?: string | null
           description?: string
           id?: string
+          irp5_code?: string | null
           payslip_id?: string
           type?: Database["public"]["Enums"]["payslip_item_type"]
         }
@@ -14351,6 +14460,7 @@ export type Database = {
         | "company_contribution"
         | "reimbursement"
         | "employer_contribution"
+        | "taxable_benefit"
       payslip_status: "draft" | "finalized" | "paid"
       user_role: "admin" | "accountant" | "user"
     }
@@ -14492,6 +14602,7 @@ export const Constants = {
         "company_contribution",
         "reimbursement",
         "employer_contribution",
+        "taxable_benefit",
       ],
       payslip_status: ["draft", "finalized", "paid"],
       user_role: ["admin", "accountant", "user"],

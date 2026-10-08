@@ -31,6 +31,7 @@ import PayslipDialog from '../components/PayslipDialog';
 import PayslipDetailDialog from '../components/PayslipDetailDialog';
 import PayrollWorkflowStepper from '../components/payroll/PayrollWorkflowStepper';
 import PayrollRunRulesPanel from '../components/payroll/PayrollRunRulesPanel';
+import { PayComponentEditor } from '../components/payroll/PayComponentEditor';
 import PayrollCommandCentre from '../components/payroll/PayrollCommandCentre';
 import LifecycleContextBadge from '../components/boe/LifecycleContextBadge';
 import { buildChatUrl } from '../lib/boe/contextualChat';
@@ -533,6 +534,25 @@ const PayrollRunDetail = () => {
 
         {run.status === 'draft' && id && (
           <PayrollRunRulesPanel key={id} runId={id} runStatus={run.status} onSaved={invalidateRun} />
+        )}
+
+        {run.status === 'draft' && id && activeCompany && (
+          <Card>
+            <CardHeader>
+              <CardTitle>Period inputs</CardTitle>
+              <CardDescription>
+                Bonus, subsistence, and once-off allowances for this run. A period input replaces the standing package for the same component. Regenerate payslips after saving.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <PayComponentEditor
+                companyId={activeCompany.id}
+                mode="period"
+                payrollRunId={id}
+                payDate={run.pay_date}
+              />
+            </CardContent>
+          </Card>
         )}
 
         {currentStep === 'validate' && (

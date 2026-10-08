@@ -49,6 +49,8 @@ const RULE_SET_2026_2027: StatutoryRuleSet = {
   travelPrescribedRatePerKm: 4.76,
   travelDeemedTaxableNoLogbook: 0.8,
   travelDeemedTaxableMainlyBusiness: 0.2,
+  subsistenceDomesticDaily: 595,
+  subsistenceIncidentalDaily: 184,
   severanceExemptionLifetime: 500000,
   officialInterestRateAnnual: 0.085,
   vehicleFringeRateEmployerCosts: 0.035,

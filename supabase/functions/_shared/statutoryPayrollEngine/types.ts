@@ -14,7 +14,8 @@ export type StatutoryEngineId =
   | 'sdl'
   | 'bonus_tax'
   | 'leave_encashment'
-  | 'termination_tax';
+  | 'termination_tax'
+  | 'subsistence';
 
 export type TaxBracket = {
   from: number;
@@ -56,6 +57,10 @@ export type StatutoryRuleSet = {
   rebateSecondaryAge: number;
   /** Tertiary rebate qualifies from this age (from SouthAfricanLegislation.thresholds). */
   rebateTertiaryAge: number;
+  /** SARS domestic deemed daily amount for meals and incidental costs (overnight). */
+  subsistenceDomesticDaily: number;
+  /** SARS domestic deemed daily amount when only incidental costs are paid (meals and lodging provided). */
+  subsistenceIncidentalDaily: number;
   legislationReference: string;
   /** @deprecated use travelDeemedTaxableMainlyBusiness */
   travelAllowanceTaxablePercent?: number;
@@ -84,7 +89,16 @@ export type StatutoryEngineResult = {
 };
 
 export type FringeBenefitInput =
-  | { type: 'company_car'; determinedValue: number; employeePaysFuel?: boolean }
+  | {
+      type: 'company_car';
+      determinedValue: number;
+      /** Vehicle bought with a maintenance plan: 3.25% instead of 3.5% (para 7(4)). */
+      maintenancePlan?: boolean;
+      /** @deprecated legacy flag that selected the 3.25% rate; use maintenancePlan. */
+      employeePaysFuel?: boolean;
+      /** Employer satisfied at least 80% business use: 20% (not 80%) goes into remuneration for PAYE, UIF and SDL. */
+      mainlyBusinessUse?: boolean;
+    }
   | { type: 'employer_insurance'; monthlyPremium: number }
   | { type: 'low_interest_loan'; loanBalance: number; actualInterestRateAnnual: number }
   | { type: 'employer_accommodation'; monthlyRentalValue: number; furnished?: boolean }
@@ -101,6 +115,15 @@ export type TravelAllowanceInput = {
 };
 
 export type BonusInput = { amount: number; method?: 'aggregate' | 'annualise' };
+
+export type SubsistenceInput = {
+  days: number;
+  amountPaid: number;
+  /** Domestic only. Foreign is refused until a SARS country-rate table exists. */
+  domestic?: boolean;
+  /** Employer provides meals and lodging, so only the incidental-costs rate is exempt. */
+  incidentalOnly?: boolean;
+};
 
 export type LeaveEncashmentInput = { days: number; dailyRate: number };
 
@@ -139,6 +162,7 @@ export type StatutoryComponents = {
   retirementContributions?: number;
   fringeBenefits?: FringeBenefitInput[];
   travelAllowance?: TravelAllowanceInput;
+  subsistence?: SubsistenceInput;
   bonus?: BonusInput;
   leaveEncashment?: LeaveEncashmentInput;
   termination?: TerminationInput;
@@ -191,6 +215,19 @@ export type StatutoryCalculationContext = {
   ruleSet: StatutoryRuleSet;
   grossEarnings: number;
   taxableEarnings: number;
+  /**
+   * UIF remuneration. Falls back to cash gross when omitted.
+   * Exempt subsistence and non-cash fringe stay out of this base.
+   */
+  uifRemuneration?: number;
+  /** SDL remuneration. Falls back to cash gross when omitted. */
+  sdlRemuneration?: number;
+  /**
+   * Annual (non-periodic) payments already inside taxableEarnings, e.g. a once-off
+   * taxable allowance. The bonus engine adds the bonus here itself. PAYE taxes these
+   * with the SARS difference method instead of annualising them.
+   */
+  nonPeriodicTaxable?: number;
   enabledEngines: EnabledEngines;
   engineConfig: Record<string, Record<string, unknown>>;
   components?: StatutoryComponents;

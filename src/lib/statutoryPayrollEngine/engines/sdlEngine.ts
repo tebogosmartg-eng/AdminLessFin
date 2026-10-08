@@ -45,7 +45,7 @@ export function runSdlEngine(ctx: StatutoryCalculationContext): StatutoryEngineR
     };
   }
 
-  const remuneration = ctx.grossEarnings;
+  const remuneration = ctx.sdlRemuneration ?? ctx.grossEarnings;
   const amount = roundCurrency(remuneration * rate);
 
   return {
@@ -60,7 +60,7 @@ export function runSdlEngine(ctx: StatutoryCalculationContext): StatutoryEngineR
     auditTrail: [
       createAuditStep(
         'sdl_levy',
-        'gross_remuneration × sdl_rate',
+        'sdl_remuneration × sdl_rate',
         {
           taxYear: ctx.ruleSet.taxYearLabel,
           ruleVersion: ctx.ruleSet.ruleVersion,

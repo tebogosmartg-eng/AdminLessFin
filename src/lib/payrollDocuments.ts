@@ -20,8 +20,10 @@ const UTF8_BOM = '\uFEFF';
 export type PayslipItem = {
   id?: string;
   description: string;
-  type: 'earning' | 'deduction' | 'employer_contribution';
+  type: 'earning' | 'deduction' | 'employer_contribution' | 'taxable_benefit';
   amount: number;
+  component_code?: string | null;
+  irp5_code?: string | null;
 };
 
 export type LeaveBalances = {
@@ -368,11 +370,12 @@ const EMPLOYER_KEYWORDS = ['uif employer', 'sdl', 'skills development', 'medical
 
 export function classifyPayslipItems(items: PayslipItem[]) {
   const earnings = items.filter((i) => i.type === 'earning');
+  const taxableBenefits = items.filter((i) => i.type === 'taxable_benefit');
   const deductions = items.filter((i) => i.type === 'deduction' && !isEmployerContribution(i.description));
   const employerContributions = items.filter(
     (i) => i.type === 'employer_contribution' || (i.type === 'deduction' && isEmployerContribution(i.description))
   );
-  return { earnings, deductions, employerContributions };
+  return { earnings, taxableBenefits, deductions, employerContributions };
 }
 
 function isEmployerContribution(description: string): boolean {
@@ -416,7 +419,7 @@ export function buildPayslipVerificationUrl(data: PayslipDocumentData): string {
 }
 
 export function buildPayslipHtml(data: PayslipDocumentData, qrDataUrl?: string): string {
-  const { earnings, deductions, employerContributions } = classifyPayslipItems(data.items);
+  const { earnings, taxableBenefits, deductions, employerContributions } = classifyPayslipItems(data.items);
   const statutory = extractStatutoryTotals(data.items);
   const employerCost = computeEmployerCost(data.total_earnings, employerContributions);
   const period = `${format(new Date(data.payPeriodStart), 'dd MMM yyyy')} – ${format(new Date(data.payPeriodEnd), 'dd MMM yyyy')}`;
@@ -511,6 +514,7 @@ export function buildPayslipHtml(data: PayslipDocumentData, qrDataUrl?: string):
       <table>${deductions.length ? deductions.map((i) => row(i.description, i.amount)).join('') : '<tr><td colspan="2" class="muted">None</td></tr>'}</table>
     </div>
   </div>
+  ${taxableBenefits.length ? `<h3>Taxable Benefits</h3><p class="muted">Included in PAYE. Not added to gross pay or net pay.</p><table>${taxableBenefits.map((i) => row(i.description, i.amount)).join('')}</table>` : ''}
   ${employerContributions.length ? `<h3>Employer Contributions</h3><table>${employerContributions.map((i) => row(i.description, i.amount)).join('')}</table>` : ''}
   <div class="statutory">
     <h3 style="margin-top:0">Statutory Summary</h3>
@@ -552,7 +556,7 @@ export async function generatePayslipPdf(data: PayslipDocumentData): Promise<jsP
   const logo = await resolveCompanyLogo(data.companyLogoUrl);
   const brandLogo = await resolveAdminLessFinLogo();
 
-  const { earnings, deductions, employerContributions } = classifyPayslipItems(data.items);
+  const { earnings, taxableBenefits, deductions, employerContributions } = classifyPayslipItems(data.items);
   const statutory = extractStatutoryTotals(data.items);
   const employerCost = computeEmployerCost(data.total_earnings, employerContributions);
   const auditRef = data.audit_reference ?? `PSL-${data.payslip_id?.slice(0, 8) ?? 'DRAFT'}`;
@@ -709,6 +713,27 @@ export async function generatePayslipPdf(data: PayslipDocumentData): Promise<jsP
     earningsEndY,
     (doc as jsPDF & { lastAutoTable?: { finalY: number } }).lastAutoTable?.finalY ?? y + 20
   ) + 6;
+
+  if (taxableBenefits.length) {
+    autoTable(doc, {
+      startY: nextY,
+      head: [['Taxable Benefits (in PAYE, not in net pay)', 'Amount']],
+      body: taxableBenefits.map((i) => [i.description, currency(i.amount)]),
+      theme: 'striped',
+      headStyles: {
+        fillColor: BRAND_GREEN,
+        textColor: [255, 255, 255],
+        fontStyle: 'bold',
+      },
+      styles: { fontSize: 9, cellPadding: 2, minCellWidth: 18 },
+      columnStyles: {
+        0: { cellWidth: 'auto' },
+        1: { cellWidth: 28, halign: 'right' },
+      },
+      margin: { left: leftX, right: rightMargin },
+    });
+    nextY = ((doc as jsPDF & { lastAutoTable?: { finalY: number } }).lastAutoTable?.finalY ?? nextY) + 6;
+  }
 
   if (employerContributions.length) {
     autoTable(doc, {

@@ -214,10 +214,13 @@ export function runCertificationSuite(): CertificationReport {
     components: { bonus: { amount: 10000 } },
     ruleSet: rs,
   });
+  // SARS difference method: periodic PAYE plus tax(annual + bonus) − tax(annual), once.
+  const periodicLiability = Math.max(0, sarsAnnualTax2025(300000) - 17235 - 364 * 12);
   const bonusExpected = roundCurrency(
-    (Math.max(0, sarsAnnualTax2025(420000) - 17235 - 364 * 12)) / 12
+    periodicLiability / 12 +
+      (Math.max(0, sarsAnnualTax2025(310000) - 17235 - 364 * 12) - periodicLiability)
   );
-  cases.push(cert('paye_bonus_aggregate', 'bonus_tax', 'Bonus R10,000 increases PAYE',
+  cases.push(cert('paye_bonus_aggregate', 'bonus_tax', 'Bonus R10,000 taxed once by the SARS difference method',
     bonusExpected, withBonus.engineResults.find((e) => e.engineId === 'paye')?.employeeAmount ?? -1, TOLERANCE));
 
   // ─── UIF ──────────────────────────────────────────────────────────────────

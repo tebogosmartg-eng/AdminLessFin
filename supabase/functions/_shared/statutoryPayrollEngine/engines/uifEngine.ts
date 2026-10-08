@@ -24,15 +24,15 @@ function runUifContribution(
   const config = ctx.engineConfig[engineId] ?? ctx.engineConfig.uif ?? {};
   const rate = Number(config.rate ?? ctx.ruleSet.uifRate);
   const ceiling = Number(config.ceiling ?? ctx.ruleSet.uifCeilingMonthly);
-  const remuneration = ctx.grossEarnings;
+  const remuneration = ctx.uifRemuneration ?? ctx.grossEarnings;
   const cappedRemuneration = Math.min(remuneration, ceiling);
   const amount = roundCurrency(cappedRemuneration * rate);
 
   const auditTrail = [
     createAuditStep(
       'uif_base',
-      'min(gross_remuneration, monthly_ceiling)',
-      { grossEarnings: remuneration, ceiling },
+      'min(uif_remuneration, monthly_ceiling)',
+      { uifRemuneration: remuneration, grossEarnings: ctx.grossEarnings, ceiling },
       cappedRemuneration
     ),
     createAuditStep(

@@ -34,6 +34,7 @@ import {
 import { showError, showSuccess } from '../utils/toast';
 import { Employee } from '../pages/Employees';
 import { useDialogFormReset } from '../hooks/useDialogFormReset';
+import { PayComponentEditor } from './payroll/PayComponentEditor';
 
 const employeeSchema = z.object({
   first_name: z.string().min(1, 'First name is required.'),
@@ -239,6 +240,16 @@ const EmployeeForm = ({ isOpen, setIsOpen, employee }: EmployeeFormProps) => {
                   </FormItem>
               )} />
             </fieldset>
+
+            {employee && activeCompany && (
+              <fieldset className="border p-4 rounded-md space-y-3">
+                <legend className="text-sm font-medium px-1">Pay package</legend>
+                <p className="text-sm text-muted-foreground">
+                  Standing travel, subsistence, bonus, other allowances, and taxable benefits. They are included the next time payslips are generated.
+                </p>
+                <PayComponentEditor companyId={activeCompany.id} mode="package" employeeId={employee.id} />
+              </fieldset>
+            )}
 
             <fieldset className="grid grid-cols-1 md:grid-cols-2 gap-4 border p-4 rounded-md">
               <legend className="text-sm font-medium px-1">Bank Details</legend>

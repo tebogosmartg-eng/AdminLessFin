@@ -31,6 +31,7 @@ async function logPayrollAudit(supabaseAdmin, event) {
 
 function buildPayslipHtml(payslip, companyName) {
   const earnings = payslip.payslip_items.filter(i => i.type === 'earning');
+  const taxableBenefits = payslip.payslip_items.filter(i => i.type === 'taxable_benefit');
   const deductions = payslip.payslip_items.filter(i => i.type === 'deduction');
 
   return `
@@ -70,6 +71,17 @@ function buildPayslipHtml(payslip, companyName) {
                 <td style="padding: 8px; font-weight: bold; border-top: 1px solid #eee;">Total Earnings</td>
                 <td style="text-align: right; padding: 8px; font-weight: bold; border-top: 1px solid #eee;">${formatCurrency(payslip.total_earnings)}</td>
               </tr>
+
+              ${taxableBenefits.length ? `
+              <tr><td colspan="2" style="padding: 8px; font-weight: bold; padding-top: 20px;">Taxable Benefits</td></tr>
+              <tr><td colspan="2" style="padding: 4px 8px; color: #666; font-size: 12px;">Included in PAYE. Not added to gross pay or net pay.</td></tr>
+              ${taxableBenefits.map(item => `
+                <tr>
+                  <td style="padding: 8px;">${item.description}</td>
+                  <td style="text-align: right; padding: 8px;">${formatCurrency(item.amount)}</td>
+                </tr>
+              `).join('')}
+              ` : ''}
 
               <tr><td colspan="2" style="padding: 8px; font-weight: bold; padding-top: 20px;">Deductions</td></tr>
               ${deductions.length > 0 ? deductions.map(item => `

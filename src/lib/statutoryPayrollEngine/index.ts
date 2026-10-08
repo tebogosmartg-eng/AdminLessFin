@@ -15,6 +15,7 @@ export { runCertificationProgramme, formatProgrammeSummary, certificationGatePas
 export { runHistoricalCertification } from './historicalRecertification';
 export { calculateFringeBenefitLine } from './registry/seventhSchedule';
 export { calculateTravelAllowance } from './registry/travelAllowance';
+export { calculateSubsistence } from './registry/subsistence';
 export { calculateTerminationBenefit } from './registry/terminationBenefits';
 
 export { runPayeEngine, calculatePayeAmount } from './engines/payeEngine';
@@ -25,6 +26,7 @@ export { runMedicalTaxCreditEngine, resolveMonthlyMedicalCredits } from './engin
 export { runRetirementDeductionEngine } from './engines/retirementDeductionEngine';
 export { runFringeBenefitEngine } from './engines/fringeBenefitEngine';
 export { runTravelAllowanceEngine } from './engines/travelAllowanceEngine';
+export { runSubsistenceEngine } from './engines/subsistenceEngine';
 export { runBonusTaxEngine } from './engines/bonusTaxEngine';
 export { runLeaveEncashmentEngine } from './engines/leaveEncashmentEngine';
 export { runTerminationTaxEngine } from './engines/terminationTaxEngine';

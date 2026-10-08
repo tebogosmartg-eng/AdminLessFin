@@ -15,6 +15,7 @@ import { runMedicalTaxCreditEngine } from './engines/medicalTaxCreditEngine.ts';
 import { runPayeEngine } from './engines/payeEngine.ts';
 import { runRetirementDeductionEngine } from './engines/retirementDeductionEngine.ts';
 import { runSdlEngine } from './engines/sdlEngine.ts';
+import { runSubsistenceEngine } from './engines/subsistenceEngine.ts';
 import { runTerminationTaxEngine } from './engines/terminationTaxEngine.ts';
 import { runTravelAllowanceEngine } from './engines/travelAllowanceEngine.ts';
 import { runUifEmployeeEngine, runUifEmployerEngine } from './engines/uifEngine.ts';
@@ -53,6 +54,7 @@ export function executeStatutoryPipeline(input: PipelineInput): StatutoryPipelin
     resolveRuleSetForPayroll(input.period.payDate, input.dbTaxYearRows);
 
   let taxableEarnings = input.taxableEarnings ?? input.grossEarnings;
+  let nonPeriodicTaxable = Math.max(0, input.nonPeriodicTaxable ?? 0);
   const engineResults: StatutoryEngineResult[] = [];
   let payeMode: PayeCalculationMode = 'standard';
 
@@ -67,6 +69,7 @@ export function executeStatutoryPipeline(input: PipelineInput): StatutoryPipelin
     runRetirementDeductionEngine,
     runFringeBenefitEngine,
     runTravelAllowanceEngine,
+    runSubsistenceEngine,
     runLeaveEncashmentEngine,
     runBonusTaxEngine,
     runTerminationTaxEngine,
@@ -77,6 +80,10 @@ export function executeStatutoryPipeline(input: PipelineInput): StatutoryPipelin
     engineResults.push(result);
     if (!result.skipped && result.taxableAdjustment !== 0) {
       taxableEarnings = roundCurrency(taxableEarnings + result.taxableAdjustment);
+      // A bonus is an annual payment: SARS taxes it once, not annualised.
+      if (result.engineId === 'bonus_tax') {
+        nonPeriodicTaxable = roundCurrency(nonPeriodicTaxable + result.taxableAdjustment);
+      }
     }
   }
 
@@ -90,6 +97,9 @@ export function executeStatutoryPipeline(input: PipelineInput): StatutoryPipelin
 
   ctx.taxableEarnings = taxableEarnings;
   ctx.payeMode = payeMode;
+  ctx.nonPeriodicTaxable = payeMode === 'director_annual_fee'
+    ? 0
+    : Math.min(nonPeriodicTaxable, Math.max(0, taxableEarnings));
 
   const medicalResult = runMedicalTaxCreditEngine(ctx);
   engineResults.push(medicalResult);
