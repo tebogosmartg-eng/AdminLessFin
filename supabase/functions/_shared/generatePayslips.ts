@@ -24,6 +24,7 @@ import {
 } from './payrollRulesEngine/payComponents.ts';
 import { irp5CodeForEngineLine, irp5CodeForRuleLine } from './payrollRulesEngine/irp5Codes.ts';
 import { payrollRunWarnings } from './payrollRulesEngine/runWarnings.ts';
+import { normaliseEmployerProfile, validateEmployerProfile } from './sars/employerProfile.ts';
 import {
   aggregateCompanyRemunerationYtd,
   aggregateEmployeeYtd,
@@ -252,19 +253,36 @@ export async function loadPayrollRulesContext(supabaseAdmin, companyId, run) {
  * with a payslip on the run.
  */
 export async function loadRunWarnings(supabaseAdmin, companyId, run, paidEmployeeIds: Set<string>) {
-  const [employeesResult, inputsResult] = await Promise.all([
+  const [employeesResult, inputsResult, profileResult] = await Promise.all([
     supabaseAdmin.from('employees').select('*').eq('company_id', companyId),
     supabaseAdmin
       .from('payroll_period_inputs')
       .select('employee_id, component_code')
       .eq('company_id', companyId)
       .eq('payroll_run_id', run.id),
+    supabaseAdmin.from('company_payroll_employer_profile').select('*').eq('company_id', companyId).maybeSingle(),
   ]);
   if (employeesResult.error) throw employeesResult.error;
   if (inputsResult.error) throw inputsResult.error;
+  if (profileResult.error) throw profileResult.error;
   const payFrequency = run.pay_frequency ?? 'monthly';
   const allEmployees = employeesResult.data ?? [];
-  return payrollRunWarnings({
+  // SARS returns need the employer's details as well as the employees'.
+  const profileErrors = profileResult.data
+    ? validateEmployerProfile(normaliseEmployerProfile(profileResult.data))
+    : [{ message: 'not captured yet' }];
+  const employerWarnings = profileErrors.length
+    ? [{
+      code: 'EMPLOYER_PROFILE_INCOMPLETE' as const,
+      category: 'sars' as const,
+      employee_id: '',
+      employee_name: 'Employer',
+      message: profileResult.data
+        ? `Employer details for SARS need attention: ${profileErrors[0].message}`
+        : 'Employer details for SARS (PAYE, SDL and UIF references, contact, address, SIC7 code) are not captured yet. Add them under Settings → Payroll.',
+    }]
+    : [];
+  return [...employerWarnings, ...payrollRunWarnings({
     candidates: allEmployees.filter((e) =>
       (e.salary_period ?? 'monthly') === payFrequency &&
       isEmployeeActiveInPeriod(e, run.pay_period_start, run.pay_period_end)
@@ -273,7 +291,7 @@ export async function loadRunWarnings(supabaseAdmin, companyId, run, paidEmploye
     allEmployees,
     periodInputs: inputsResult.data ?? [],
     payFrequency,
-  });
+  })];
 }
 
 export async function generatePayslipsWithRulesEngine(supabaseAdmin, {

@@ -10,6 +10,10 @@ import {
 import { buildEffectiveCompanyRules } from '../_shared/payrollRulesEngine/index.ts'
 import { payslipEditError } from '../_shared/payrollRulesEngine/payComponents.ts'
 import {
+  normaliseEmployerProfile,
+  validateEmployerProfile,
+} from '../_shared/sars/employerProfile.ts'
+import {
   ENTERPRISE_CORS_HEADERS,
   withEnterprisePlatform,
   edgeFailure,
@@ -46,14 +50,16 @@ class PayrollDomainError extends Error {
   code: string;
   recovery: string;
   status: number;
+  details: unknown;
 
-  constructor({ stage, code, message, recovery, status = 400 }) {
+  constructor({ stage, code, message, recovery, status = 400, details = undefined }) {
     super(message);
     this.name = 'PayrollDomainError';
     this.stage = stage;
     this.code = code;
     this.recovery = recovery;
     this.status = status;
+    this.details = details;
   }
 }
 
@@ -71,6 +77,7 @@ function payrollErrorResponse(error, ctx) {
       stage: error.stage,
       code: error.code,
       recovery: error.recovery,
+      details: error.details,
       correlationId: ctx?.correlationId,
     }), {
       headers,
@@ -723,6 +730,69 @@ serve(withEnterprisePlatform('payroll', 'tenant', async (req, _ctx) => {
           },
           created_by: user.id,
         });
+        break;
+      }
+
+      case 'GET_EMPLOYER_PROFILE': {
+        const [{ data: profile, error: profileError }, { data: engagement }, { data: companyRow }] = await Promise.all([
+          supabaseAdmin.from('company_payroll_employer_profile').select('*').eq('company_id', company_id).maybeSingle(),
+          supabaseAdmin
+            .from('efs_engagement_general_information')
+            .select('trading_name, registered_name, paye_number, sdl_number, uif_number')
+            .eq('company_id', company_id)
+            .order('updated_at', { ascending: false })
+            .limit(1)
+            .maybeSingle(),
+          supabaseAdmin.from('companies').select('name').eq('id', company_id).single(),
+        ]);
+        if (profileError) throw profileError;
+        data = {
+          profile: profile ?? null,
+          // A saved profile is re-checked: a rule may have tightened since it was saved.
+          errors: profile ? validateEmployerProfile(normaliseEmployerProfile(profile)) : [],
+          // Starting values for a first-time profile, from details captured elsewhere.
+          suggested: {
+            trading_name: engagement?.trading_name || engagement?.registered_name || companyRow?.name || '',
+            paye_reference: engagement?.paye_number ?? '',
+            sdl_reference: engagement?.sdl_number ?? '',
+            uif_reference: engagement?.uif_number ?? '',
+          },
+        };
+        error = null;
+        break;
+      }
+
+      case 'UPDATE_EMPLOYER_PROFILE': {
+        const profile = normaliseEmployerProfile(body.profile ?? {});
+        const profileErrors = validateEmployerProfile(profile);
+        if (profileErrors.length) {
+          throw new PayrollDomainError({
+            stage: 'validation',
+            code: 'EMPLOYER_PROFILE_INVALID',
+            message: `Employer details are not valid for SARS: ${profileErrors[0].message}${profileErrors.length > 1 ? ` (and ${profileErrors.length - 1} more)` : ''}`,
+            recovery: 'Correct the highlighted fields and save again.',
+            status: 422,
+            details: profileErrors,
+          });
+        }
+        const { data: before } = await supabaseAdmin
+          .from('company_payroll_employer_profile').select('*').eq('company_id', company_id).maybeSingle();
+        const { data: saved, error: saveError } = await supabaseAdmin
+          .from('company_payroll_employer_profile')
+          .upsert({ ...profile, company_id, updated_by: user.id, updated_at: new Date().toISOString() }, { onConflict: 'company_id' })
+          .select()
+          .single();
+        if (saveError) throw saveError;
+        await logPayrollAudit(supabaseAdmin, {
+          company_id, event_type: 'employer_profile_updated',
+          event_data: {
+            created: !before,
+            changed: before ? Object.keys(profile).filter((k) => before[k] !== saved[k]) : Object.keys(profile),
+          },
+          created_by: user.id,
+        });
+        data = { profile: saved, errors: [] };
+        error = null;
         break;
       }
 

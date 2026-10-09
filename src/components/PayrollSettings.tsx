@@ -13,6 +13,7 @@ import { payrollSettingsQuery } from '../lib/queries';
 import { invokePayroll } from '../lib/payrollOperations';
 import { PAYROLL_RULE_CATALOG } from '../lib/payrollRulesEngine/catalogue';
 import PayrollApprovalControls from './payroll/PayrollApprovalControls';
+import EmployerProfileCard from './payroll/EmployerProfileCard';
 
 type CatalogRule = {
   id: string;
@@ -123,6 +124,7 @@ const PayrollSettings = () => {
 
   return (
     <div className="space-y-6">
+    <EmployerProfileCard />
     <PayrollApprovalControls />
     <Card>
       <CardHeader>

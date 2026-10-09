@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { generateIrp5, type FinalizedPayrollRunSource, type FinalizedPayslipSource } from '@/lib/statutoryReturns';
 import { irp5CodeForEngineLine, irp5CodeForRuleLine } from '@/lib/payrollRulesEngine/irp5Codes';
-import { isInvalidSaIdNumber, isPlausibleTaxNumber, isValidSaIdNumber, payrollRunWarnings } from '@/lib/payrollRulesEngine/runWarnings';
+import { isInvalidSaIdNumber, isValidIncomeTaxNumber, isValidSaIdNumber, payrollRunWarnings } from '@/lib/payrollRulesEngine/runWarnings';
 import { birthDateFromSaId } from '@/lib/payrollRulesEngine/periodEmployment';
 import { RULE_SET_2026_2027 } from '@/lib/statutoryPayrollEngine/registry';
 import { executeStatutoryPipeline } from '@/lib/statutoryPayrollEngine/pipeline';
@@ -20,7 +20,7 @@ function slip(id: string, items: FinalizedPayslipSource['payslipItems'], paye: n
     employeeId: 'emp-1',
     employeeNumber: 'E001',
     employeeName: 'Thandi Mokoena',
-    taxReference: '0123456789',
+    taxReference: '0001339050',
     idNumber: null,
     grossPay: 0,
     totalDeductions: 0,
@@ -112,7 +112,7 @@ describe('IRP5 is built from the code on each payslip line', () => {
   it('carries the stamped codes from the finalised payslip through the payroll facts', () => {
     const fact = mapRawPayslipToPayrollFact({
       companyId: 'co-1', payrollRunId: 'run-1', payDate: '2026-04-25', runStatus: 'finalized', payslipId: 'ps-1',
-      employeeId: 'emp-1', employees: { first_name: 'Thandi', last_name: 'Mokoena', tax_number: '0123456789' },
+      employeeId: 'emp-1', employees: { first_name: 'Thandi', last_name: 'Mokoena', tax_number: '0001339050' },
       total_earnings: 30_000, total_deductions: 5_000, net_pay: 25_000,
       calculation_snapshot: { tax_year: '2026-2027', engine_results: [{ engine_id: 'paye', employee_amount: 5_000 }] },
       payslip_items: [
@@ -145,7 +145,9 @@ describe('IRP5 codes stamped at generation', () => {
   it('keeps the client and server copies identical', () => {
     for (const file of ['irp5Codes.ts', 'runWarnings.ts']) {
       const client = readFileSync(`src/lib/payrollRulesEngine/${file}`, 'utf8').replace(/\r\n/g, '\n');
-      const server = readFileSync(`supabase/functions/_shared/payrollRulesEngine/${file}`, 'utf8').replace(/\r\n/g, '\n');
+      // The server copy differs only in the '.ts' extension Deno needs on relative imports.
+      const server = readFileSync(`supabase/functions/_shared/payrollRulesEngine/${file}`, 'utf8').replace(/\r\n/g, '\n')
+        .replace(/(from '\.{1,2}\/[^']+)\.ts'/g, "$1'");
       expect(server, file).toBe(client);
     }
   });
@@ -176,7 +178,7 @@ describe('pension and provident fund contributions', () => {
 
 describe('run warnings', () => {
   const complete = {
-    tax_number: '0123456789', id_number: '8601015800086', bank_account_number: '62000000004', bank_account_type: 'current',
+    tax_number: '0001339050', id_number: '8601015800086', bank_account_number: '62000000004', bank_account_type: 'current',
     residential_street_name: 'Main Road', residential_city: 'Cape Town', residential_postal_code: '8001',
   };
   const employees = [
@@ -246,10 +248,12 @@ describe('run warnings', () => {
     expect(warnings.map((w) => w.code)).toEqual(['INVALID_ID_NUMBER']);
   });
 
-  it('checks the shape of a SARS income tax number', () => {
-    expect(isPlausibleTaxNumber('0123456789')).toBe(true);
-    expect(isPlausibleTaxNumber('9123456789')).toBe(true);
-    expect(isPlausibleTaxNumber('4123456789')).toBe(false);
-    expect(isPlausibleTaxNumber('012345678')).toBe(false);
+  it('checks an income tax number with the SARS modulus 10 rule (BRS 8.1)', () => {
+    expect(isValidIncomeTaxNumber('0001339050')).toBe(true); // BRS example 1
+    expect(isValidIncomeTaxNumber('0667056642')).toBe(true); // BRS example 2
+    expect(isValidIncomeTaxNumber('0667056643')).toBe(false); // wrong check digit
+    expect(isValidIncomeTaxNumber('0123456789')).toBe(false);
+    expect(isValidIncomeTaxNumber('4001339050')).toBe(false); // must start with 0, 1, 2, 3 or 9
+    expect(isValidIncomeTaxNumber('000133905')).toBe(false);
   });
 });

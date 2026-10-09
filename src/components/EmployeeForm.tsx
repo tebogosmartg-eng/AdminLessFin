@@ -37,7 +37,7 @@ import { Employee } from '../pages/Employees';
 import { useDialogFormReset } from '../hooks/useDialogFormReset';
 import { PayComponentEditor } from './payroll/PayComponentEditor';
 import { birthDateFromSaId } from '../lib/payrollRulesEngine/periodEmployment';
-import { isPlausibleTaxNumber } from '../lib/payrollRulesEngine/runWarnings';
+import { isValidIncomeTaxNumber } from '../lib/sars/sarsNumbers';
 import { Checkbox } from './ui/checkbox';
 
 const SA_POSTAL_CODE = /^\d{4}$/;
@@ -74,7 +74,7 @@ const employeeSchema = z.object({
   tax_number: z
     .string()
     .optional()
-    .refine((value) => !value?.trim() || isPlausibleTaxNumber(value), 'A SARS income tax number is 10 digits starting with 0, 1, 2, 3 or 9.'),
+    .refine((value) => !value?.trim() || isValidIncomeTaxNumber(value), 'Not a valid SARS income tax number (10 digits starting with 0, 1, 2, 3 or 9, and the check digit must match).'),
   bank_name: z.string().optional(),
   bank_branch_code: z.string().optional(),
   bank_account_number: z.string().optional(),

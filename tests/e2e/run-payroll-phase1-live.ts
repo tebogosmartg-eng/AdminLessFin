@@ -103,7 +103,7 @@ async function main() {
     },
   });
   const sarsComplete = {
-    tax_number: '0123456789', id_number: '8601015800086', bank_name: 'FNB', bank_account_number: '62000000004',
+    tax_number: '0001339050', id_number: '8601015800086', bank_name: 'FNB', bank_account_number: '62000000004',
     bank_branch_code: '250655', bank_account_type: 'current', residential_street_number: '12',
     residential_street_name: 'Main Road', residential_suburb: 'Gardens', residential_city: 'Cape Town', residential_postal_code: '8001',
   };
@@ -118,11 +118,11 @@ async function main() {
 
   const badId = await expectRefused(employee('BadId', { ...sarsComplete, salary_amount: 1, id_number: '8601015800083' }));
   check('API refuses an SA ID with a wrong check digit (same rule as the form)', /VALIDATION_FAILED/.test(badId) && /not a valid South African ID/.test(badId), badId.slice(0, 160));
-  const badTax = await expectRefused(employee('BadTax', { ...sarsComplete, salary_amount: 1, tax_number: '4123456789' }));
-  check('API refuses an implausible income tax number', /VALIDATION_FAILED/.test(badTax) && /10 digits/.test(badTax), badTax.slice(0, 160));
+  const badTax = await expectRefused(employee('BadTax', { ...sarsComplete, salary_amount: 1, tax_number: '0123456789' }));
+  check('API refuses an income tax number that fails the SARS check digit', /VALIDATION_FAILED/.test(badTax) && /10 digits/.test(badTax), badTax.slice(0, 160));
 
   const complete = await employee('Complete', { ...sarsComplete, salary_amount: 30_000, nature_of_person: 'A' });
-  const sparse = await employee('Sparse', { salary_amount: 20_000, tax_number: '0123456789', bank_account_number: '62000000005' });
+  const sparse = await employee('Sparse', { salary_amount: 20_000, tax_number: '0001339050', bank_account_number: '62000000005' });
   const noSalary = await employee('NoSalary', { ...sarsComplete });
   const weekly = await employee('Weekly', { ...sarsComplete, salary_amount: 5_000, salary_period: 'weekly' });
 

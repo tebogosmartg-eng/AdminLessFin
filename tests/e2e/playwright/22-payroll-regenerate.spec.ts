@@ -221,7 +221,7 @@ test('fixing an employee\'s SARS details clears the run warning without regenera
     method: 'POST', company_id: companyId, command_id: crypto.randomUUID(), correlation_id: crypto.randomUUID(),
     employeeData: {
       first_name: 'Warn', last_name: last, employment_type: 'permanent', start_date: iso(start), end_date: iso(end),
-      salary_amount: 18_000, salary_period: 'monthly', tax_number: '0123456789', id_number: '8601015800086',
+      salary_amount: 18_000, salary_period: 'monthly', tax_number: '0001339050', id_number: '8601015800086',
     },
   } });
   expect(createError).toBeNull();
@@ -265,4 +265,29 @@ test('fixing an employee\'s SARS details clears the run warning without regenera
     await call(sb, { method: 'DISCARD_RUN', company_id: companyId, runId: run.id }).catch(() => undefined);
     await sb.functions.invoke('employees', { body: { method: 'DELETE', company_id: companyId, employeeId, command_id: crypto.randomUUID(), correlation_id: crypto.randomUUID() } });
   }
+});
+
+test('employer details for SARS are checked with the SARS rules as you type', async ({ page }) => {
+  await page.goto('/');
+  await waitForRouteSettled(page);
+  await ensureReadyCompany(page);
+  await page.goto('/settings');
+  await waitForRouteSettled(page);
+  await page.getByRole('tab', { name: /payroll/i }).click();
+  const card = page.getByTestId('employer-profile');
+  await expect(card).toBeVisible({ timeout: 30_000 });
+  const paye = card.getByLabel('PAYE Reference Number');
+  const original = await paye.inputValue();
+  await paye.fill('7230767892');
+  await expect(card.getByText(/Not a valid PAYE reference/)).toBeVisible();
+  await paye.fill('7230767891');
+  await expect(card.getByText(/Not a valid PAYE reference/)).toHaveCount(0);
+  await card.getByLabel('Postal Code').fill('0000');
+  await expect(card.getByText('Postal code must be 4 digits and not 0000.')).toBeVisible();
+  await shot(page, '08-employer-profile-validation');
+  // Nothing is saved: reload discards the edits.
+  await page.reload();
+  await waitForRouteSettled(page);
+  await page.getByRole('tab', { name: /payroll/i }).click();
+  await expect(page.getByTestId('employer-profile').getByLabel('PAYE Reference Number')).toHaveValue(original, { timeout: 30_000 });
 });

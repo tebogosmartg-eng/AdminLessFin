@@ -12,7 +12,7 @@ import {
   withEnterprisePlatform,
   edgeFailure,
 } from '../_shared/enterpriseEdgePlatform.ts'
-import { isInvalidSaIdNumber, isPlausibleTaxNumber } from '../_shared/payrollRulesEngine/runWarnings.ts'
+import { isInvalidSaIdNumber, isValidIncomeTaxNumber } from '../_shared/sars/sarsNumbers.ts'
 
 
 const corsHeaders = ENTERPRISE_CORS_HEADERS
@@ -26,8 +26,8 @@ function employeeIdentityError(employeeData) {
   if (typeof employeeData.id_number === 'string' && isInvalidSaIdNumber(employeeData.id_number)) {
     return 'Invalid ID number: not a valid South African ID (check digit or birth date is wrong).';
   }
-  if (typeof employeeData.tax_number === 'string' && employeeData.tax_number.trim() && !isPlausibleTaxNumber(employeeData.tax_number)) {
-    return 'Invalid income tax number: it must be 10 digits starting with 0, 1, 2, 3 or 9.';
+  if (typeof employeeData.tax_number === 'string' && employeeData.tax_number.trim() && !isValidIncomeTaxNumber(employeeData.tax_number)) {
+    return 'Invalid income tax number: SARS needs 10 digits starting with 0, 1, 2, 3 or 9, with a valid check digit.';
   }
   return null;
 }

@@ -8,6 +8,8 @@
  * The copies in src/lib and supabase/functions/_shared must stay identical (a unit test compares them).
  */
 
+import { isInvalidSaIdNumber, isValidIncomeTaxNumber, isValidSaIdNumber } from '../sars/sarsNumbers';
+
 export type RunWarningCode =
   | 'NO_SALARY'
   | 'NOT_ON_RUN'
@@ -17,12 +19,14 @@ export type RunWarningCode =
   | 'MISSING_IDENTITY'
   | 'INVALID_ID_NUMBER'
   | 'MISSING_RESIDENTIAL_ADDRESS'
-  | 'MISSING_BANK_ACCOUNT_TYPE';
+  | 'MISSING_BANK_ACCOUNT_TYPE'
+  | 'EMPLOYER_PROFILE_INCOMPLETE';
 
 export type RunWarning = {
   code: RunWarningCode;
-  /** 'pay' warnings mean someone was not paid as expected; 'sars' warnings are missing employee details. */
+  /** 'pay' warnings mean someone was not paid as expected; 'sars' warnings are missing employee or employer details. */
   category: 'pay' | 'sars';
+  /** Empty for an employer-level warning. */
   employee_id: string;
   employee_name: string;
   message: string;
@@ -46,41 +50,7 @@ export type RunWarningEmployee = {
   residential_postal_code?: string | null;
 };
 
-/** SARS income tax reference: 10 digits starting with 0, 1, 2, 3 or 9. */
-export function isPlausibleTaxNumber(value: string | null | undefined): boolean {
-  const digits = (value ?? '').replace(/\s/g, '');
-  return /^[01239]\d{9}$/.test(digits);
-}
-
-/**
- * A 13-digit South African ID number with a real birth date (YYMMDD) and a valid
- * check digit. The same rule as the employee form; non-13-digit values are treated
- * as passport or foreign numbers and not checked here.
- */
-export function isValidSaIdNumber(value: string | null | undefined): boolean {
-  const digits = (value ?? '').replace(/\s/g, '');
-  if (!/^\d{13}$/.test(digits)) return false;
-  let sum = 0;
-  for (let i = 0; i < 13; i++) {
-    let d = Number(digits[12 - i]);
-    if (i % 2 === 1) {
-      d *= 2;
-      if (d > 9) d -= 9;
-    }
-    sum += d;
-  }
-  if (sum % 10 !== 0) return false;
-  const mm = Number(digits.slice(2, 4));
-  const dd = Number(digits.slice(4, 6));
-  const date = new Date(Date.UTC(2000 + Number(digits.slice(0, 2)), mm - 1, dd));
-  return date.getUTCMonth() === mm - 1 && date.getUTCDate() === dd;
-}
-
-/** True for a 13-digit value that is not a valid SA ID (other values are passports). */
-export function isInvalidSaIdNumber(value: string | null | undefined): boolean {
-  const digits = (value ?? '').replace(/\s/g, '');
-  return /^\d{13}$/.test(digits) && !isValidSaIdNumber(digits);
-}
+export { isInvalidSaIdNumber, isValidIncomeTaxNumber, isValidSaIdNumber };
 
 function hasText(value: string | null | undefined): boolean {
   return typeof value === 'string' && value.trim().length > 0;
@@ -151,8 +121,8 @@ export function payrollRunWarnings(input: {
       warnings.push({ code, category: 'sars', employee_id: employee.id, employee_name: name, message });
     if (!hasText(employee.tax_number)) {
       add('MISSING_TAX_NUMBER', `${name} has no income tax number. SARS needs it on the IRP5.`);
-    } else if (!isPlausibleTaxNumber(employee.tax_number)) {
-      add('INVALID_TAX_NUMBER', `${name}'s income tax number is not 10 digits starting with 0, 1, 2, 3 or 9.`);
+    } else if (!isValidIncomeTaxNumber(employee.tax_number)) {
+      add('INVALID_TAX_NUMBER', `${name}'s income tax number is not valid (SARS check digit), so SARS will reject the IRP5.`);
     }
     if (!hasText(employee.id_number) && !hasText(employee.passport_number)) {
       add('MISSING_IDENTITY', `${name} has no ID or passport number.`);
