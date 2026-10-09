@@ -291,3 +291,29 @@ test('employer details for SARS are checked with the SARS rules as you type', as
   await page.getByRole('tab', { name: /payroll/i }).click();
   await expect(page.getByTestId('employer-profile').getByLabel('PAYE Reference Number')).toHaveValue(original, { timeout: 30_000 });
 });
+
+test('EMP201: prepare a month and download the filed return', async ({ page }) => {
+  // Relies on tests/e2e/run-payroll-emp201-live.ts having filed January 2027 for CERT TX.
+  await page.goto('/');
+  await waitForRouteSettled(page);
+  await ensureReadyCompany(page);
+  await page.goto('/statutory-returns');
+  await waitForRouteSettled(page);
+  await expectNoErrorBoundary(page);
+  const panel = page.getByTestId('emp201-panel');
+  await expect(panel).toBeVisible({ timeout: 30_000 });
+  await panel.getByLabel('Month').fill('2027-01');
+  await panel.getByRole('button', { name: 'Prepare EMP201' }).click();
+  await expect(panel.getByTestId('emp201-totals')).toContainText('Total payable', { timeout: 60_000 });
+  await expect(panel.getByText(/Already filed/)).toBeVisible();
+  const history = panel.getByTestId('emp201-history');
+  await expect(history).toContainText('202701');
+  const row = history.getByRole('row').filter({ hasText: 'Submitted to SARS' }).first();
+  const download = page.waitForEvent('download');
+  await row.getByRole('button', { name: /CSV/ }).click();
+  expect((await download).suggestedFilename()).toMatch(/^EMP201_202701_v\d+\.csv$/);
+  const pdf = page.waitForEvent('download');
+  await row.getByRole('button', { name: /PDF/ }).click();
+  expect((await pdf).suggestedFilename()).toMatch(/^EMP201_202701_v\d+\.pdf$/);
+  await shot(page, '09-emp201');
+});

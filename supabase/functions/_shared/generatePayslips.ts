@@ -25,6 +25,7 @@ import {
 import { irp5CodeForEngineLine, irp5CodeForRuleLine } from './payrollRulesEngine/irp5Codes.ts';
 import { payrollRunWarnings } from './payrollRulesEngine/runWarnings.ts';
 import { normaliseEmployerProfile, validateEmployerProfile } from './sars/employerProfile.ts';
+import { payslipOrdinaryHours } from './sars/eti.ts';
 import {
   aggregateCompanyRemunerationYtd,
   aggregateEmployeeYtd,
@@ -472,6 +473,9 @@ export async function generatePayslipsWithRulesEngine(supabaseAdmin, {
       pro_rata_method: ctx.proRataMethod,
       uif_remuneration_month_to_date: uifMonthToDate,
       pro_rata_factor: proRataFactor,
+      // Ordinary hours paid on this payslip, as they were when it was generated (ETI).
+      ordinary_hours_per_week: employee.ordinary_hours_per_week ?? null,
+      ordinary_hours: payslipOrdinaryHours(employee.ordinary_hours_per_week, ctx.periodsPerYear, proRataFactor),
       ytd_taxable_income: ytd.taxableIncome,
       ytd_paye_paid: ytd.payePaid,
       ytd_periods_processed: ytd.periodsProcessed,

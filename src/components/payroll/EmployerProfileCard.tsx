@@ -40,7 +40,7 @@ function toForm(profile: Partial<EmployerProfile> | null | undefined): FormState
   const form = {} as FormState;
   for (const key of Object.keys(EMPTY_EMPLOYER_PROFILE) as Array<keyof EmployerProfile>) {
     const value = profile?.[key];
-    form[key] = key === 'diplomatic_indemnity' ? value === true : (value as string | null | undefined) ?? '';
+    form[key] = key === 'diplomatic_indemnity' || key === 'claim_eti' ? value === true : (value as string | null | undefined) ?? '';
   }
   if (!form.address_country) form.address_country = 'ZA';
   return form;
@@ -169,6 +169,19 @@ const EmployerProfileCard = () => {
               onCheckedChange={(checked) => set('diplomatic_indemnity', checked)}
             />
             <Label htmlFor="employer-diplomatic" className="font-normal">The employer enjoys diplomatic indemnity</Label>
+          </div>
+          <div className="flex items-start gap-3 md:col-span-2">
+            <Switch
+              id="employer-claim-eti"
+              checked={form.claim_eti === true}
+              onCheckedChange={(checked) => set('claim_eti', checked)}
+            />
+            <div>
+              <Label htmlFor="employer-claim-eti" className="font-normal">Claim the Employment Tax Incentive (ETI)</Label>
+              <p className="text-xs text-muted-foreground">
+                ETI reduces the PAYE paid to SARS for qualifying employees (18–29, earning under R7 500). Only for employers registered for PAYE and tax compliant.
+              </p>
+            </div>
           </div>
         </div>
         <div className="space-y-2">

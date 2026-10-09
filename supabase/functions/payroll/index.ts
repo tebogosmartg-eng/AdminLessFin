@@ -14,6 +14,11 @@ import {
   validateEmployerProfile,
 } from '../_shared/sars/employerProfile.ts'
 import {
+  monthBounds,
+  prepareEmp201,
+  sha256Hex,
+} from '../_shared/statutoryFiling.ts'
+import {
   ENTERPRISE_CORS_HEADERS,
   withEnterprisePlatform,
   edgeFailure,
@@ -793,6 +798,200 @@ serve(withEnterprisePlatform('payroll', 'tenant', async (req, _ctx) => {
         });
         data = { profile: saved, errors: [] };
         error = null;
+        break;
+      }
+
+      case 'PREPARE_EMP201': {
+        const month = String(body.month ?? '');
+        monthBounds(month);
+        const prepared = await prepareEmp201(supabaseAdmin, company_id, month);
+        const { data: existing } = await supabaseAdmin
+          .from('statutory_returns')
+          .select('id, status, version, filed_at, submission_reference')
+          .eq('company_id', company_id).eq('return_type', 'EMP201').eq('period', month.replace('-', ''))
+          .neq('status', 'superseded').maybeSingle();
+        data = { ...prepared, filed: existing ?? null };
+        error = null;
+        break;
+      }
+
+      case 'FILE_EMP201': {
+        const month = String(body.month ?? '');
+        monthBounds(month);
+        const period = month.replace('-', '');
+        const prepared = await prepareEmp201(supabaseAdmin, company_id, month);
+        const blocking = prepared.issues.filter((i) => i.severity === 'error');
+        if (blocking.length) {
+          throw new PayrollDomainError({
+            stage: 'validation', code: 'EMP201_NOT_READY',
+            message: blocking.map((i) => i.message).join(' '),
+            recovery: 'Resolve the listed issues and file again.',
+            status: 422, details: blocking,
+          });
+        }
+        const { data: existing, error: existingError } = await supabaseAdmin
+          .from('statutory_returns')
+          .select('id, version, posting_idempotency_key, journal_entry_id')
+          .eq('company_id', company_id).eq('return_type', 'EMP201').eq('period', period)
+          .neq('status', 'superseded').maybeSingle();
+        if (existingError) throw existingError;
+        const replaceReason = typeof body.replaceReason === 'string' ? body.replaceReason.trim() : '';
+        if (existing && replaceReason.length < 10) {
+          throw new PayrollDomainError({
+            stage: 'validation', code: 'EMP201_ALREADY_FILED',
+            message: `The EMP201 for ${month} is already filed (version ${existing.version}).`,
+            recovery: 'To file a corrected EMP201, give a reason of at least 10 characters; the filed one is kept as superseded.',
+            status: 409,
+          });
+        }
+
+        const declaration = prepared.declaration;
+        const returnId = crypto.randomUUID();
+        const { end: monthEnd } = monthBounds(month);
+
+        // ETI used against PAYE reduces the PAYE owed to SARS: Dr PAYE liability, Cr ETI income.
+        let journalEntryId = null;
+        let postingKey = null;
+        const post = body.postEti ?? null;
+        if (declaration.eti.utilised > 0 && post?.liabilityAccountId && post?.incomeAccountId) {
+          const { data: accounts, error: accountsError } = await supabaseAdmin
+            .from('chart_of_accounts').select('id, type')
+            .eq('company_id', company_id).in('id', [post.liabilityAccountId, post.incomeAccountId]);
+          if (accountsError) throw accountsError;
+          const typeOf = (id) => accounts?.find((a) => a.id === id)?.type;
+          if (typeOf(post.liabilityAccountId) !== 'Liability' || !['Income', 'Revenue'].includes(typeOf(post.incomeAccountId))) {
+            throw new PayrollDomainError({
+              stage: 'validation', code: 'ETI_ACCOUNTS_INVALID',
+              message: 'Choose a liability account for PAYE and an income account for the ETI.',
+              recovery: 'Pick the accounts again.',
+            });
+          }
+          postingKey = `payroll:eti_claim:${returnId}`;
+          const { data: posted, error: postError } = await supabaseAdmin.rpc('posting_engine_submit', {
+            p_request: {
+              company_id,
+              posting_date: monthEnd,
+              module: 'payroll',
+              document_type: 'eti_claim',
+              document_id: returnId,
+              reference: `EMP201-${period}`,
+              description: `Employment Tax Incentive used against PAYE — EMP201 ${period}`,
+              currency: 'ZAR',
+              source: 'payroll_emp201',
+              created_by: user.id,
+              idempotency_key: postingKey,
+              lines: [
+                { account_id: post.liabilityAccountId, debit: declaration.eti.utilised, credit: 0 },
+                { account_id: post.incomeAccountId, debit: 0, credit: declaration.eti.utilised },
+              ],
+            },
+            p_mode: 'commit',
+          });
+          if (postError) throw postError;
+          journalEntryId = posted?.journal_id ?? null;
+        }
+
+        const declarationJson = JSON.stringify(declaration);
+        const row = {
+          id: returnId,
+          company_id,
+          country: 'ZA',
+          return_type: 'EMP201',
+          tax_year: prepared.taxYear,
+          period,
+          status: 'ready',
+          immutable: true,
+          version: (existing?.version ?? 0) + 1,
+          generated_by: user.id,
+          filed_by: user.id,
+          filed_at: new Date().toISOString(),
+          source_payroll_runs: declaration.sourcePayrollRunIds,
+          validation_result: { ok: true, issues: prepared.issues, validatedAt: new Date().toISOString() },
+          declaration_data: declaration,
+          content_hash: await sha256Hex(declarationJson),
+          journal_entry_id: journalEntryId,
+          posting_idempotency_key: postingKey,
+        };
+
+        if (existing) {
+          const { error: supersedeError } = await supabaseAdmin
+            .from('statutory_returns')
+            .update({ status: 'superseded', superseded_at: new Date().toISOString(), superseded_reason: replaceReason })
+            .eq('id', existing.id);
+          if (supersedeError) throw supersedeError;
+        }
+        const { data: filed, error: fileError } = await supabaseAdmin.from('statutory_returns').insert(row).select().single();
+        if (fileError) {
+          // Undo what this call did so nothing half-filed remains.
+          if (postingKey) {
+            await supabaseAdmin.rpc('posting_engine_rollback', {
+              p_idempotency_key: postingKey, p_company_id: company_id, p_reason: 'EMP201 filing failed', p_actor_user_id: user.id,
+            });
+          }
+          if (existing) {
+            await supabaseAdmin.from('statutory_returns')
+              .update({ status: 'ready', superseded_at: null, superseded_reason: null }).eq('id', existing.id);
+          }
+          throw fileError;
+        }
+        // The replaced return's ETI journal is reversed once its replacement is filed.
+        if (existing?.posting_idempotency_key) {
+          const { error: rollbackError } = await supabaseAdmin.rpc('posting_engine_rollback', {
+            p_idempotency_key: existing.posting_idempotency_key, p_company_id: company_id,
+            p_reason: `EMP201 ${period} replaced: ${replaceReason}`, p_actor_user_id: user.id,
+          });
+          if (rollbackError) throw rollbackError;
+        }
+        await logPayrollAudit(supabaseAdmin, {
+          company_id, event_type: existing ? 'emp201_refiled' : 'emp201_filed',
+          event_data: {
+            return_id: returnId, period, version: row.version, replaced: existing?.id ?? null, reason: replaceReason || null,
+            paye: declaration.paye, sdl: declaration.sdl, uif: declaration.uif, eti_utilised: declaration.eti.utilised,
+            total_payable: declaration.totalPayable, journal_entry_id: journalEntryId,
+          },
+          created_by: user.id,
+        });
+        data = { return: filed, issues: prepared.issues };
+        error = null;
+        break;
+      }
+
+      case 'RECORD_RETURN_SUBMISSION': {
+        const reference = typeof body.reference === 'string' ? body.reference.trim() : '';
+        if (!/^[A-Za-z0-9-]{4,40}$/.test(reference)) {
+          throw new PayrollDomainError({
+            stage: 'validation', code: 'REFERENCE_INVALID',
+            message: 'Enter the SARS payment reference number (PRN) or submission reference, letters and digits only.',
+            recovery: 'Copy the reference from eFiling.',
+          });
+        }
+        const { data: ret, error: retError } = await supabaseAdmin
+          .from('statutory_returns').select('id, status')
+          .eq('id', body.returnId).eq('company_id', company_id).single();
+        if (retError) throw retError;
+        if (ret.status === 'superseded') throw new Error('A superseded return cannot be marked as submitted.');
+        ({ data, error } = await supabaseAdmin
+          .from('statutory_returns')
+          .update({ status: 'submitted', submission_reference: reference, submitted_at: new Date().toISOString() })
+          .eq('id', ret.id).select().single());
+        if (!error) {
+          await logPayrollAudit(supabaseAdmin, {
+            company_id, event_type: 'statutory_return_submitted',
+            event_data: { return_id: ret.id, reference }, created_by: user.id,
+          });
+        }
+        break;
+      }
+
+      case 'LIST_STATUTORY_RETURNS': {
+        let query = supabaseAdmin
+          .from('statutory_returns')
+          .select('id, return_type, tax_year, period, status, version, filed_at, filed_by, submitted_at, submission_reference, superseded_at, superseded_reason, content_hash, journal_entry_id, declaration_data')
+          .eq('company_id', company_id)
+          .order('period', { ascending: false })
+          .order('version', { ascending: false });
+        if (body.returnType) query = query.eq('return_type', body.returnType);
+        ({ data, error } = await query);
         break;
       }
 
@@ -1617,7 +1816,14 @@ serve(withEnterprisePlatform('payroll', 'tenant', async (req, _ctx) => {
       }
 
       default:
-        throw new Error(`Unsupported method: ${method}`);
+        // A caller error, not a server failure (e.g. a newer screen talking to an older deployment).
+        throw new PayrollDomainError({
+          stage: 'validation',
+          code: 'UNSUPPORTED_METHOD',
+          message: `Unsupported method: ${method}`,
+          recovery: 'This feature is not available on the server yet. Refresh the page; if it persists, the payroll service needs updating.',
+          status: 400,
+        });
     }
 
     if (error) throw error;

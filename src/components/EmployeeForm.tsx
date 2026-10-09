@@ -39,6 +39,13 @@ import { PayComponentEditor } from './payroll/PayComponentEditor';
 import { birthDateFromSaId } from '../lib/payrollRulesEngine/periodEmployment';
 import { isValidIncomeTaxNumber } from '../lib/sars/sarsNumbers';
 import { Checkbox } from './ui/checkbox';
+import { ETI_SPECIAL_ECONOMIC_ZONES } from '../lib/sars/sic7Codes';
+
+/** Optional number input: blank → null; otherwise a number in range. */
+const optionalNumber = (min: number, max: number, message: string) => z
+  .string()
+  .optional()
+  .refine((value) => !value?.trim() || (Number.isFinite(Number(value)) && Number(value) >= min && Number(value) <= max), message);
 
 const SA_POSTAL_CODE = /^\d{4}$/;
 const optionalPostalCode = z
@@ -100,6 +107,13 @@ const employeeSchema = z.object({
   bank_account_type: z.enum(['', 'current', 'savings', 'transmission', 'bond', 'credit_card', 'subscription_share', 'foreign']).optional(),
   nature_of_person: z.enum(['auto', 'A', 'B', 'C']).default('auto'),
   passport_number: z.string().optional(),
+  ordinary_hours_per_week: optionalNumber(0.01, 168, 'Ordinary hours per week must be between 0 and 168.'),
+  eti_employment_date: z.string().optional(),
+  eti_sez_code: z.enum(['none', 'COE', 'DTP', 'EAL', 'MAP', 'SLB', 'RIB']).default('none'),
+  eti_domestic_worker: z.boolean().default(false),
+  eti_connected_person: z.boolean().default(false),
+  eti_prior_qualifying_months: optionalNumber(0, 24, 'Between 0 and 24 months.'),
+  wage_regulating_minimum_hourly: optionalNumber(0, 10_000, 'Enter an hourly rate.'),
   passport_country: z
     .string()
     .optional()
@@ -145,6 +159,13 @@ const EmployeeForm = ({ isOpen, setIsOpen, employee }: EmployeeFormProps) => {
         postal_same_as_residential: employee.postal_same_as_residential !== false,
         bank_account_type: (employee.bank_account_type ?? '') as EmployeeFormValues['bank_account_type'],
         nature_of_person: employee.nature_of_person ?? 'auto',
+        ordinary_hours_per_week: employee.ordinary_hours_per_week != null ? String(employee.ordinary_hours_per_week) : '',
+        eti_employment_date: employee.eti_employment_date || '',
+        eti_sez_code: (employee.eti_sez_code ?? 'none') as EmployeeFormValues['eti_sez_code'],
+        eti_domestic_worker: employee.eti_domestic_worker === true,
+        eti_connected_person: employee.eti_connected_person === true,
+        eti_prior_qualifying_months: employee.eti_prior_qualifying_months ? String(employee.eti_prior_qualifying_months) : '',
+        wage_regulating_minimum_hourly: employee.wage_regulating_minimum_hourly != null ? String(employee.wage_regulating_minimum_hourly) : '',
       });
     } else {
       form.reset({
@@ -169,6 +190,13 @@ const EmployeeForm = ({ isOpen, setIsOpen, employee }: EmployeeFormProps) => {
         postal_same_as_residential: true,
         bank_account_type: '',
         nature_of_person: 'auto',
+        ordinary_hours_per_week: '',
+        eti_employment_date: '',
+        eti_sez_code: 'none',
+        eti_domestic_worker: false,
+        eti_connected_person: false,
+        eti_prior_qualifying_months: '',
+        wage_regulating_minimum_hourly: '',
       });
     }
   });
@@ -189,6 +217,13 @@ const EmployeeForm = ({ isOpen, setIsOpen, employee }: EmployeeFormProps) => {
         passport_country: values.passport_country?.trim().toUpperCase() || null,
         bank_account_type: values.bank_account_type || null,
         nature_of_person: values.nature_of_person === 'auto' ? null : values.nature_of_person,
+        ordinary_hours_per_week: values.ordinary_hours_per_week?.trim() ? Number(values.ordinary_hours_per_week) : null,
+        eti_employment_date: values.eti_employment_date || null,
+        eti_sez_code: values.eti_sez_code === 'none' ? null : values.eti_sez_code,
+        eti_domestic_worker: values.eti_domestic_worker,
+        eti_connected_person: values.eti_connected_person,
+        eti_prior_qualifying_months: values.eti_prior_qualifying_months?.trim() ? Number(values.eti_prior_qualifying_months) : 0,
+        wage_regulating_minimum_hourly: values.wage_regulating_minimum_hourly?.trim() ? Number(values.wage_regulating_minimum_hourly) : null,
       };
 
       const method = employee ? 'PUT' : 'POST';
@@ -375,6 +410,56 @@ const EmployeeForm = ({ isOpen, setIsOpen, employee }: EmployeeFormProps) => {
               <FormField control={form.control} name="end_date" render={({ field }) => (
                 <FormItem><FormLabel>End Date (Optional)</FormLabel><FormControl><Input type="date" {...field} /></FormControl><FormMessage /></FormItem>
               )} />
+            </fieldset>
+
+            <fieldset className="grid grid-cols-1 md:grid-cols-2 gap-4 border p-4 rounded-md" data-testid="employee-eti-details">
+              <legend className="text-sm font-medium px-1">Hours and Employment Tax Incentive</legend>
+              <FormField control={form.control} name="ordinary_hours_per_week" render={({ field }) => (
+                <FormItem><FormLabel>Ordinary Hours per Week</FormLabel>
+                  <FormControl><Input {...field} type="number" step="0.5" min="0" placeholder="e.g. 40" /></FormControl>
+                  <FormDescription>Used for ETI hours and the minimum-wage check.</FormDescription><FormMessage /></FormItem>
+              )} />
+              <FormField control={form.control} name="eti_employment_date" render={({ field }) => (
+                <FormItem><FormLabel>First Employed On</FormLabel>
+                  <FormControl><Input {...field} type="date" /></FormControl>
+                  <FormDescription>Only if different from the start date (e.g. re-employed).</FormDescription><FormMessage /></FormItem>
+              )} />
+              <FormField control={form.control} name="eti_sez_code" render={({ field }) => (
+                <FormItem><FormLabel>Special Economic Zone</FormLabel>
+                  <Select onValueChange={field.onChange} value={field.value}>
+                    <FormControl><SelectTrigger aria-label="Special economic zone"><SelectValue /></SelectTrigger></FormControl>
+                    <SelectContent>
+                      <SelectItem value="none">Not in a special economic zone</SelectItem>
+                      {ETI_SPECIAL_ECONOMIC_ZONES.map(([code, name]) => <SelectItem key={code} value={code}>{name}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                  <FormDescription>Mainly works in an SEZ where the employer trades: no ETI age limit.</FormDescription><FormMessage />
+                </FormItem>
+              )} />
+              <FormField control={form.control} name="eti_prior_qualifying_months" render={({ field }) => (
+                <FormItem><FormLabel>ETI Months Already Claimed</FormLabel>
+                  <FormControl><Input {...field} type="number" min="0" max="24" placeholder="0" /></FormControl>
+                  <FormDescription>Months claimed before this system (e.g. a previous payroll).</FormDescription><FormMessage /></FormItem>
+              )} />
+              <FormField control={form.control} name="wage_regulating_minimum_hourly" render={({ field }) => (
+                <FormItem><FormLabel>Sectoral Minimum Wage per Hour</FormLabel>
+                  <FormControl><Input {...field} type="number" step="0.01" min="0" placeholder="Only if above the national minimum" /></FormControl>
+                  <FormMessage /></FormItem>
+              )} />
+              <div className="space-y-2">
+                <FormField control={form.control} name="eti_domestic_worker" render={({ field }) => (
+                  <FormItem className="flex items-center gap-2 space-y-0">
+                    <FormControl><Checkbox checked={field.value} onCheckedChange={(checked) => field.onChange(checked === true)} /></FormControl>
+                    <FormLabel className="font-normal">Domestic worker (no ETI)</FormLabel>
+                  </FormItem>
+                )} />
+                <FormField control={form.control} name="eti_connected_person" render={({ field }) => (
+                  <FormItem className="flex items-center gap-2 space-y-0">
+                    <FormControl><Checkbox checked={field.value} onCheckedChange={(checked) => field.onChange(checked === true)} /></FormControl>
+                    <FormLabel className="font-normal">Connected person to the employer (no ETI)</FormLabel>
+                  </FormItem>
+                )} />
+              </div>
             </fieldset>
 
             <fieldset className="grid grid-cols-1 md:grid-cols-2 gap-4 border p-4 rounded-md">

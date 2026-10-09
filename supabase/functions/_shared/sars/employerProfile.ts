@@ -29,6 +29,8 @@ export type EmployerProfile = {
   contact_fax: string | null;
   contact_email: string | null;
   diplomatic_indemnity: boolean;
+  /** Claim the Employment Tax Incentive on the EMP201 (off unless switched on). */
+  claim_eti: boolean;
   sic7_code: string;
   address_unit_number: string | null;
   address_complex: string | null;
@@ -55,6 +57,7 @@ export const EMPTY_EMPLOYER_PROFILE: EmployerProfile = {
   contact_fax: null,
   contact_email: null,
   diplomatic_indemnity: false,
+  claim_eti: false,
   sic7_code: '',
   address_unit_number: null,
   address_complex: null,
@@ -88,8 +91,8 @@ export function normaliseEmployerProfile(input: Partial<Record<keyof EmployerPro
   const out = { ...EMPTY_EMPLOYER_PROFILE };
   for (const key of Object.keys(EMPTY_EMPLOYER_PROFILE) as Array<keyof EmployerProfile>) {
     const value = input[key];
-    if (key === 'diplomatic_indemnity') {
-      out.diplomatic_indemnity = value === true;
+    if (key === 'diplomatic_indemnity' || key === 'claim_eti') {
+      out[key] = value === true;
       continue;
     }
     const trimmed = typeof value === 'string' ? value.trim() : '';

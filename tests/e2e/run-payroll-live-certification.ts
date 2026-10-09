@@ -144,7 +144,10 @@ async function main() {
 
   const supabase = createClient(url!, anonKey!);
 
-  const { error: healthError } = await supabase.from('payroll_tax_year_config').select('tax_year_label').limit(1);
+  // Payroll config tables are closed to API roles (20260728180000), so probe the auth service instead.
+  const healthError = await fetch(`${url}/auth/v1/health`, { headers: { apikey: anonKey! } })
+    .then((res) => (res.ok ? null : { message: `auth health HTTP ${res.status}` }))
+    .catch((err: Error) => ({ message: err.message }));
   record('1', 'Supabase reachable', healthError ? 'FAIL' : 'PASS', {
     evidence: healthError ? { message: healthError.message } : { reachable: true },
     error: healthError?.message,
@@ -177,11 +180,14 @@ async function main() {
     },
   });
 
+  // Pin to the CERT TX demo company: an unordered "first membership" landed on other companies.
+  const certCompanyName = process.env.CERT_COMPANY_NAME ?? 'CERT TX 1785230675937';
+  const { data: certCompany } = await supabase.from('companies').select('id').eq('name', certCompanyName).maybeSingle();
   const { data: membership, error: memberError } = await supabase
     .from('company_users')
     .select('company_id, role')
     .eq('user_id', authData.user.id)
-    .limit(1)
+    .eq('company_id', certCompany?.id ?? '00000000-0000-0000-0000-000000000000')
     .maybeSingle();
 
   if (memberError || !membership?.company_id) {
@@ -496,10 +502,30 @@ async function main() {
   });
 
   // ── PHASE 5: Approval ──
+  // The E2E user prepared the run, so separation of duties must refuse its own approval.
+  // It then approves under the owner's recorded self-approval exception, restored afterwards.
   const approveReq = { method: 'APPROVE_RUN', company_id: companyId, runId };
+  const controlsRes = await invokeFn<{ allow_self_approval: boolean; self_approval_reason: string | null }>(
+    supabase, 'payroll', { method: 'GET_PAYROLL_CONTROLS', company_id: companyId },
+  );
+  const originalControls = controlsRes.data;
+  if (!originalControls?.allow_self_approval) {
+    const blockedRes = await invokeFn(supabase, 'payroll', approveReq);
+    record('5', 'Self-approval refused', String(blockedRes.error ?? '').includes('SELF_APPROVAL_BLOCKED') ? 'PASS' : 'FAIL', {
+      request: approveReq,
+      response: blockedRes.raw,
+    });
+    await invokeFn(supabase, 'payroll', {
+      method: 'UPDATE_PAYROLL_CONTROLS', company_id: companyId,
+      allow_self_approval: true, reason: 'Certification harness: single test user runs payroll',
+    });
+  }
   const approveStart = Date.now();
   const approveRes = await invokeFn<{ approved_at?: string; id?: string }>(supabase, 'payroll', approveReq);
   timings.approveRunMs = Date.now() - approveStart;
+  if (originalControls && !originalControls.allow_self_approval) {
+    await invokeFn(supabase, 'payroll', { method: 'UPDATE_PAYROLL_CONTROLS', company_id: companyId, allow_self_approval: false });
+  }
 
   record('5', 'Approve Payroll', approveRes.error ? 'FAIL' : 'PASS', {
     request: approveReq,

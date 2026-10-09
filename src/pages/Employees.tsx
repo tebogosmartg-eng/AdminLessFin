@@ -70,6 +70,13 @@ export type Employee = {
   nature_of_person?: 'A' | 'B' | 'C' | null;
   passport_number?: string | null;
   passport_country?: string | null;
+  ordinary_hours_per_week?: number | null;
+  eti_employment_date?: string | null;
+  eti_sez_code?: string | null;
+  eti_domestic_worker?: boolean | null;
+  eti_connected_person?: boolean | null;
+  eti_prior_qualifying_months?: number | null;
+  wage_regulating_minimum_hourly?: number | null;
 };
 
 const Employees = () => {

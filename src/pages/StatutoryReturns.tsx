@@ -5,7 +5,6 @@ import { Button } from '../components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../components/ui/table';
 import { Badge } from '../components/ui/badge';
-import { Skeleton } from '../components/ui/skeleton';
 import { Alert, AlertDescription, AlertTitle } from '../components/ui/alert';
 import { FileCheck2, ShieldAlert } from 'lucide-react';
 import { formatCurrency } from '../lib/utils';
@@ -20,6 +19,7 @@ import {
   type StatutoryReturn,
 } from '../lib/statutoryReturns';
 import { loadFinalizedPayrollSources } from '../lib/statutoryReturns/loadFinalizedSources';
+import Emp201Panel from '../components/payroll/Emp201Panel';
 
 type CatalogueTab = (typeof STATUTORY_RETURNS_CATALOGUE)[number]['id'];
 
@@ -122,7 +122,7 @@ const StatutoryReturns = () => {
       )}
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        {packages.map((pkg) => (
+        {packages.filter((pkg) => pkg.returnType !== 'EMP201').map((pkg) => (
           <Card key={pkg.returnType}>
             <CardHeader className="p-4">
               <CardTitle className="text-base">{pkg.label}</CardTitle>
@@ -148,10 +148,8 @@ const StatutoryReturns = () => {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          {isLoading ? (
-            <Skeleton className="h-40 w-full" />
-          ) : (
-            <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as CatalogueTab)}>
+          {/* Always mounted: a sources reload must not unmount the EMP201 panel and lose its state. */}
+          <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as CatalogueTab)}>
               <TabsList className="flex flex-wrap h-auto gap-1">
                 {STATUTORY_RETURNS_CATALOGUE.map((item) => (
                   <TabsTrigger key={item.id} value={item.id} className="text-xs sm:text-sm">
@@ -161,46 +159,7 @@ const StatutoryReturns = () => {
               </TabsList>
 
               <TabsContent value="EMP201" className="mt-4 space-y-3">
-                {generated?.returnType === 'EMP201' && totals ? (
-                  <>
-                    <div className="flex items-center gap-2">
-                      <Badge variant={generated.validationResult.ok ? 'default' : 'destructive'}>
-                        {generated.status}
-                      </Badge>
-                      <span className="text-sm text-muted-foreground">{generated.id}</span>
-                    </div>
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Field</TableHead>
-                          <TableHead className="text-right">Amount</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        <TableRow>
-                          <TableCell>PAYE</TableCell>
-                          <TableCell className="text-right font-mono">{formatCurrency(totals.paye ?? 0)}</TableCell>
-                        </TableRow>
-                        <TableRow>
-                          <TableCell>UIF Total</TableCell>
-                          <TableCell className="text-right font-mono">{formatCurrency(totals.uifTotal ?? 0)}</TableCell>
-                        </TableRow>
-                        <TableRow>
-                          <TableCell>SDL</TableCell>
-                          <TableCell className="text-right font-mono">{formatCurrency(totals.sdl ?? 0)}</TableCell>
-                        </TableRow>
-                        <TableRow>
-                          <TableCell>Gross remuneration</TableCell>
-                          <TableCell className="text-right font-mono">
-                            {formatCurrency(totals.grossRemuneration ?? 0)}
-                          </TableCell>
-                        </TableRow>
-                      </TableBody>
-                    </Table>
-                  </>
-                ) : (
-                  <p className="text-sm text-muted-foreground">Generate EMP201 for the selected period.</p>
-                )}
+                <Emp201Panel />
               </TabsContent>
 
               <TabsContent value="EMP501" className="mt-4 space-y-3">
@@ -327,7 +286,6 @@ const StatutoryReturns = () => {
                 )}
               </TabsContent>
             </Tabs>
-          )}
         </CardContent>
       </Card>
     </div>
