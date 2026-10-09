@@ -63,7 +63,8 @@ test('an approved run can take a late allowance: regenerate withdraws approval',
   const iso = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
   const run = await call<{ id: string }>(sb, {
     method: 'CREATE_RUN', company_id: companyId,
-    runData: { pay_period_start: iso(start), pay_period_end: iso(end), pay_date: iso(end), status: 'draft' },
+    runData: { pay_period_start: iso(start), pay_period_end: iso(end), pay_date: iso(end) },
+    additional_run: true,
   });
   await call(sb, { method: 'GENERATE_PAYSLIPS', company_id: companyId, runId: run.id });
   await call(sb, { method: 'APPROVE_RUN', company_id: companyId, runId: run.id });
@@ -107,4 +108,12 @@ test('an approved run can take a late allowance: regenerate withdraws approval',
 
   const after = await call<{ run: { approved_at: string | null } }>(sb, { method: 'GET_RUN_DETAIL', company_id: companyId, runId: run.id });
   expect(after.run.approved_at).toBeNull();
+
+  // The test run was never processed: discard it through the UI so nothing is left behind.
+  await page.getByTestId('discard-run').click();
+  await expect(page.getByRole('alertdialog')).toContainText('Nothing has been posted');
+  await page.getByTestId('confirm-discard').click();
+  await expect(page).toHaveURL(/\/payroll-runs$/, { timeout: 30_000 });
+  const { data: left } = await sb.from('payroll_runs').select('id').eq('id', run.id);
+  expect(left ?? []).toHaveLength(0);
 });

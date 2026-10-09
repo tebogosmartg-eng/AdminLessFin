@@ -141,6 +141,8 @@ async function main() {
 
   const createRes = await invoke(supabase, 'payroll', {
     method: 'CREATE_RUN',
+    // Certification reruns reuse their months; overlap is intended.
+    additional_run: true,
     company_id: companyId,
     runData: {
       pay_period_start: payPeriodStart,

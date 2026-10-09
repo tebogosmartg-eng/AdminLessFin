@@ -40,6 +40,7 @@ export type Employee = {
   email: string | null;
   phone: string | null;
   id_number: string | null;
+  date_of_birth?: string | null;
   tax_number: string | null;
   bank_name: string | null;
   bank_branch_code?: string | null;

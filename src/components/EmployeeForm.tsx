@@ -22,6 +22,7 @@ import {
   FormItem,
   FormLabel,
   FormMessage,
+  FormDescription,
 } from './ui/form';
 import { Input } from './ui/input';
 import {
@@ -35,13 +36,25 @@ import { showError, showSuccess } from '../utils/toast';
 import { Employee } from '../pages/Employees';
 import { useDialogFormReset } from '../hooks/useDialogFormReset';
 import { PayComponentEditor } from './payroll/PayComponentEditor';
+import { birthDateFromSaId } from '../lib/payrollRulesEngine/periodEmployment';
 
 const employeeSchema = z.object({
   first_name: z.string().min(1, 'First name is required.'),
   last_name: z.string().min(1, 'Last name is required.'),
   email: z.string().email('Invalid email address.').optional().or(z.literal('')),
   phone: z.string().optional(),
-  id_number: z.string().optional(),
+  id_number: z
+    .string()
+    .optional()
+    .refine(
+      (value) => {
+        const digits = (value ?? '').replace(/\s/g, '');
+        // 13 digits means an SA ID, which must pass its check digit; other values (passports) are kept as entered.
+        return !/^\d{13}$/.test(digits) || !!birthDateFromSaId(digits, new Date().toISOString().slice(0, 10));
+      },
+      'This is not a valid South African ID number (check digit or birth date is wrong).'
+    ),
+  date_of_birth: z.string().optional(),
   tax_number: z.string().optional(),
   bank_name: z.string().optional(),
   bank_branch_code: z.string().optional(),
@@ -77,6 +90,7 @@ const EmployeeForm = ({ isOpen, setIsOpen, employee }: EmployeeFormProps) => {
         email: employee.email || '',
         phone: employee.phone || '',
         id_number: employee.id_number || '',
+        date_of_birth: employee.date_of_birth || '',
         tax_number: employee.tax_number || '',
         bank_name: employee.bank_name || '',
         bank_branch_code: employee.bank_branch_code || '',
@@ -94,6 +108,7 @@ const EmployeeForm = ({ isOpen, setIsOpen, employee }: EmployeeFormProps) => {
         email: '',
         phone: '',
         id_number: '',
+        date_of_birth: '',
         tax_number: '',
         bank_name: '',
         bank_branch_code: '',
@@ -116,6 +131,7 @@ const EmployeeForm = ({ isOpen, setIsOpen, employee }: EmployeeFormProps) => {
       const employeeData = {
         ...values,
         end_date: values.end_date || null,
+        date_of_birth: values.date_of_birth || null,
         salary_amount: values.salary_amount || null,
         salary_period: values.salary_period || null,
       };
@@ -189,6 +205,14 @@ const EmployeeForm = ({ isOpen, setIsOpen, employee }: EmployeeFormProps) => {
               )} />
               <FormField control={form.control} name="tax_number" render={({ field }) => (
                 <FormItem><FormLabel>Tax Number</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
+              )} />
+              <FormField control={form.control} name="date_of_birth" render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Date of Birth</FormLabel>
+                  <FormControl><Input type="date" {...field} /></FormControl>
+                  <FormDescription>Needed when there is no SA ID number (e.g. a passport). Used for the age 65 and 75 tax rebates.</FormDescription>
+                  <FormMessage />
+                </FormItem>
               )} />
             </fieldset>
 

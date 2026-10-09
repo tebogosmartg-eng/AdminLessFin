@@ -821,12 +821,21 @@ test.describe('Payroll (Employees) — full UI CRUD workflow', () => {
 
     await expect(page.getByRole('heading', { name: /edit employee/i })).toBeVisible();
     await page.getByLabel('Last Name').fill(editedLast);
+    // An invalid SA ID (wrong check digit) is refused; a date of birth covers employees without one.
+    await page.getByLabel('ID Number').fill('6201155800081');
+    await page.getByRole('button', { name: /save employee/i }).click();
+    await expect(page.getByText('This is not a valid South African ID number')).toBeVisible();
+    await page.getByLabel('ID Number').fill('');
+    await page.getByLabel('Date of Birth').fill('1961-05-20');
     await page.getByRole('button', { name: /save employee/i }).click();
 
     await expect(page.getByRole('dialog')).toBeHidden({ timeout: 20_000 });
     await page.reload();
     await waitForRouteSettled(page);
     await expect(page.getByRole('row').filter({ hasText: editedLast })).toBeVisible({ timeout: 20_000 });
+    await selectRowAction(page, editedLast, /^edit$/i);
+    await expect(page.getByLabel('Date of Birth')).toHaveValue('1961-05-20');
+    await page.keyboard.press('Escape');
 
     expect(diagnostics.failedRequests, diagnostics.failedRequests.join('\n')).toEqual([]);
   });

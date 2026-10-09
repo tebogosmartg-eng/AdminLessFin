@@ -23,6 +23,7 @@ import {
   FormMessage,
 } from './ui/form';
 import { Input } from './ui/input';
+import { Checkbox } from './ui/checkbox';
 import { showError, showSuccess } from '../utils/toast';
 import { endOfMonth, format, startOfMonth } from 'date-fns';
 
@@ -30,6 +31,10 @@ const payrollRunSchema = z.object({
   pay_period_start: z.string().min(1, 'Start date is required.'),
   pay_period_end: z.string().min(1, 'End date is required.'),
   pay_date: z.string().min(1, 'Pay date is required.'),
+  additional_run: z.boolean().default(false),
+}).refine((v) => v.pay_period_end >= v.pay_period_start, {
+  message: 'The period ends before it starts.',
+  path: ['pay_period_end'],
 });
 
 type PayrollRunFormValues = z.infer<typeof payrollRunSchema>;
@@ -48,6 +53,7 @@ const NewPayrollRunDialog = ({ isOpen, setIsOpen }: NewPayrollRunDialogProps) =>
       pay_period_start: format(startOfMonth(new Date()), 'yyyy-MM-dd'),
       pay_period_end: format(endOfMonth(new Date()), 'yyyy-MM-dd'),
       pay_date: format(endOfMonth(new Date()), 'yyyy-MM-dd'),
+      additional_run: false,
     },
   });
 
@@ -55,10 +61,12 @@ const NewPayrollRunDialog = ({ isOpen, setIsOpen }: NewPayrollRunDialogProps) =>
     mutationFn: async (values: PayrollRunFormValues) => {
       if (!activeCompany) throw new Error('No active company selected');
 
+      const { additional_run, ...runData } = values;
       await invokePayroll({
         method: 'CREATE_RUN',
         company_id: activeCompany.id,
-        runData: values,
+        runData,
+        additional_run,
       });
     },
     onSuccess: () => {
@@ -114,6 +122,23 @@ const NewPayrollRunDialog = ({ isOpen, setIsOpen }: NewPayrollRunDialogProps) =>
                   <FormLabel>Pay Date</FormLabel>
                   <FormControl><Input type="date" {...field} /></FormControl>
                   <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="additional_run"
+              render={({ field }) => (
+                <FormItem className="flex flex-row items-start gap-3 space-y-0 rounded-md border p-3">
+                  <FormControl>
+                    <Checkbox checked={field.value} onCheckedChange={(checked) => field.onChange(checked === true)} />
+                  </FormControl>
+                  <div className="space-y-1 leading-none">
+                    <FormLabel>Additional run for a period that already has one</FormLabel>
+                    <p className="text-xs text-muted-foreground">
+                      Only for a bonus or correction run. Without this, a second run over the same dates is refused so nobody is paid twice.
+                    </p>
+                  </div>
                 </FormItem>
               )}
             />

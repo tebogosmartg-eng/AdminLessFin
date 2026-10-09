@@ -175,6 +175,8 @@ async function runPayrollCert(supabase: SupabaseClient, companyId: string, fySta
 
   const createRun = await invoke<{ id: string }>(supabase, 'payroll', {
     method: 'CREATE_RUN',
+    // Certification reruns reuse their months; overlap is intended.
+    additional_run: true,
     company_id: companyId,
     runData,
   });

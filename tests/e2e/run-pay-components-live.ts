@@ -91,20 +91,19 @@ async function main() {
     .select('id');
   check('Pay package saved through RLS (owner/admin)', !pkg.error && pkg.data?.length === 2, pkg.error?.message);
 
-  // 3. A draft run in a future month that has no run yet.
-  let runId: string | null = null;
-  let payDate = '';
-  for (let offset = 1; offset <= 24 && !runId; offset += 1) {
-    const month = addMonths(new Date(), offset);
-    payDate = format(endOfMonth(month), 'yyyy-MM-dd');
-    const run = await invoke<{ id: string }>(supabase, 'payroll', {
-      method: 'CREATE_RUN', company_id: companyId,
-      runData: { pay_period_start: format(startOfMonth(month), 'yyyy-MM-dd'), pay_period_end: payDate, pay_date: payDate, status: 'draft' },
-    });
-    runId = run.data?.id ?? null;
-  }
-  check('Draft payroll run created', !!runId, payDate);
+  // 3. A draft run next month. Reruns reuse the month, so this is an explicit additional run;
+  //    without the flag an overlapping run is refused, and a forged status is ignored.
+  const month = addMonths(new Date(), 1);
+  const payDate = format(endOfMonth(month), 'yyyy-MM-dd');
+  const runData = { pay_period_start: format(startOfMonth(month), 'yyyy-MM-dd'), pay_period_end: payDate, pay_date: payDate };
+  const first = await invoke<{ id: string; status: string }>(supabase, 'payroll', {
+    method: 'CREATE_RUN', company_id: companyId, runData: { ...runData, status: 'finalized' }, additional_run: true,
+  });
+  const runId = first.data?.id ?? null;
+  check('Draft payroll run created (client-sent status ignored)', !!runId && first.data?.status === 'draft', first.error ?? first.data?.status);
   if (!runId) return;
+  const overlap = await invoke(supabase, 'payroll', { method: 'CREATE_RUN', company_id: companyId, runData });
+  check('Second run over the same period refused without "additional run"', !!overlap.error && /already covers these dates/.test(overlap.error), overlap.error);
 
   // 4. An invalid run input must stop generation with the employee's name, not be dropped.
   const bad = await supabase.from('payroll_period_inputs').insert({

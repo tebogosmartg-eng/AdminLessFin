@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../integrations/supabase/client';
 import { Button } from '../components/ui/button';
@@ -28,6 +28,7 @@ import {
   MoreHorizontal,
   ShieldCheck,
   ClipboardList,
+  Trash2,
 } from 'lucide-react';
 import { showError, showPlatformError, showSuccess } from '../utils/toast';
 import { Account } from './ChartOfAccounts';
@@ -227,6 +228,23 @@ const PayrollRunDetail = () => {
   });
 
   const [confirmRegenerate, setConfirmRegenerate] = useState(false);
+  const [confirmDiscard, setConfirmDiscard] = useState(false);
+  const navigate = useNavigate();
+  const discardRunMutation = useMutation({
+    mutationFn: async () =>
+      invokePayroll({ method: 'DISCARD_RUN', company_id: activeCompany!.id, runId: id }),
+    onSuccess: () => {
+      if (id) sessionStorage.removeItem(payrollApprovalStorageKey(id));
+      setConfirmDiscard(false);
+      if (activeCompany?.id) invalidatePayrollQueries(queryClient, activeCompany.id);
+      showSuccess('Draft payroll run discarded.');
+      navigate('/payroll-runs');
+    },
+    onError: (error: Error) => {
+      setConfirmDiscard(false);
+      showError(error.message);
+    },
+  });
   const regenerate = () => {
     if (isRunApproved(workflowRun ?? run!)) setConfirmRegenerate(true);
     else generatePayslipsMutation.mutate();
@@ -523,7 +541,21 @@ const PayrollRunDetail = () => {
                   {' · '}Pay date {format(new Date(run.pay_date), 'PPP')}
                 </CardDescription>
               </div>
-              <Badge variant="outline" className="capitalize text-lg">{run.status}</Badge>
+              <div className="flex items-center gap-2">
+                {run.status === 'draft' && !run.journal_entry_id && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="text-destructive"
+                    onClick={() => setConfirmDiscard(true)}
+                    disabled={discardRunMutation.isPending}
+                    data-testid="discard-run"
+                  >
+                    <Trash2 className="mr-1 h-4 w-4" aria-hidden /> Discard draft
+                  </Button>
+                )}
+                <Badge variant="outline" className="capitalize text-lg">{run.status}</Badge>
+              </div>
             </div>
           </CardHeader>
           <CardContent>
@@ -794,6 +826,23 @@ const PayrollRunDetail = () => {
         )}
       </div>
 
+      <AlertDialog open={confirmDiscard} onOpenChange={setConfirmDiscard}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Discard this draft payroll run?</AlertDialogTitle>
+            <AlertDialogDescription>
+              The run, its payslips and its period inputs are removed. Nothing has been posted, so the books are not affected.
+              Employees' standing pay packages are kept.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Keep run</AlertDialogCancel>
+            <AlertDialogAction onClick={() => discardRunMutation.mutate()} data-testid="confirm-discard">
+              Discard run
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
       <AlertDialog open={confirmRegenerate} onOpenChange={setConfirmRegenerate}>
         <AlertDialogContent>
           <AlertDialogHeader>

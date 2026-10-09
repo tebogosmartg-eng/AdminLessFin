@@ -334,7 +334,9 @@ async function main() {
     status: 'draft',
   };
 
-  const createRunReq = { method: 'CREATE_RUN', company_id: companyId, runData };
+  const createRunReq = { method: 'CREATE_RUN',
+    // Certification reruns reuse their months; overlap is intended.
+    additional_run: true, company_id: companyId, runData };
   const createRunRes = await invokeFn<{ id: string; status: string }>(supabase, 'payroll', createRunReq);
 
   if (createRunRes.error || !createRunRes.data?.id) {

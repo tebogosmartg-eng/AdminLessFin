@@ -22,6 +22,17 @@ import {
   isComponentEffective,
   mergePayComponents,
 } from './payrollRulesEngine/payComponents.ts';
+import {
+  aggregateCompanyRemunerationYtd,
+  aggregateEmployeeYtd,
+  applyProRata,
+  coveredDays,
+  employmentProRataFactor,
+  estimateCompanyAnnualRemuneration,
+  isEmployeeActiveInPeriod,
+  proRatePackageConfig,
+  resolveEmployeeAgeDetail,
+} from './payrollRulesEngine/periodEmployment.ts';
 
 const STATUTORY_RULE_IDS = new Set([
   'paye',
@@ -33,6 +44,64 @@ const STATUTORY_RULE_IDS = new Set([
   'medical_tax_credit',
   'directors_paye',
 ]);
+
+const FINALIZED_RUN_STATUSES = ['finalized', 'paid'];
+/** PostgREST returns at most this many rows per request; prior payslips are read in pages. */
+const PAGE_SIZE = 1000;
+
+/**
+ * Prior finalised runs that count towards this run's year to date: same tax year,
+ * paid on or before this run's pay date, not this run, and not reversed without
+ * being reopened (reverse_payroll_run_atomic leaves those 'finalized' with
+ * output_metadata.cancelled = true).
+ */
+async function loadPriorRunPayslips(supabaseAdmin, companyId, run, taxYearConfig) {
+  const { data: runs, error } = await supabaseAdmin
+    .from('payroll_runs')
+    .select('id, status, pay_date, pay_period_start, pay_period_end, output_metadata')
+    .eq('company_id', companyId)
+    .in('status', FINALIZED_RUN_STATUSES)
+    .neq('id', run.id)
+    .gte('pay_date', taxYearConfig.effectiveFrom)
+    .lte('pay_date', run.pay_date);
+  if (error) throw error;
+  const priorRuns = (runs ?? []).filter((r) => r.output_metadata?.cancelled !== true);
+  if (!priorRuns.length) return { priorRuns, payslips: [] };
+
+  const payDateByRun = new Map(priorRuns.map((r) => [r.id, r.pay_date]));
+  const payslips = [];
+  for (let from = 0; ; from += PAGE_SIZE) {
+    const { data, error: pageError } = await supabaseAdmin
+      .from('payslips')
+      .select(
+        'id, employee_id, payroll_run_id, ' +
+          'taxable_earnings:calculation_snapshot->taxable_earnings, ' +
+          'gross_earnings:calculation_snapshot->gross_earnings, ' +
+          'engine_results:calculation_snapshot->engine_results, ' +
+          'period_employment:calculation_snapshot->period_employment'
+      )
+      .eq('company_id', companyId)
+      .in('payroll_run_id', priorRuns.map((r) => r.id))
+      .order('id')
+      .range(from, from + PAGE_SIZE - 1);
+    if (pageError) throw pageError;
+    for (const row of data ?? []) {
+      payslips.push({
+        employee_id: row.employee_id,
+        payroll_run_id: row.payroll_run_id,
+        pay_date: payDateByRun.get(row.payroll_run_id) ?? null,
+        calculation_snapshot: {
+          taxable_earnings: row.taxable_earnings,
+          gross_earnings: row.gross_earnings,
+          engine_results: row.engine_results,
+          period_employment: row.period_employment,
+        },
+      });
+    }
+    if ((data ?? []).length < PAGE_SIZE) break;
+  }
+  return { priorRuns, payslips };
+}
 
 function roundCurrency(value: number): number {
   return Math.round((value + Number.EPSILON) * 100) / 100;
@@ -102,12 +171,13 @@ export async function loadPayrollRulesContext(supabaseAdmin, companyId, run) {
     };
   }
 
-  const today = new Date().toISOString().split('T')[0];
-  const activeEmployees = (employeesResult.data ?? []).filter(
-    (e) => !e.end_date || e.end_date >= today
+  const periodStart = run.pay_period_start;
+  const periodEnd = run.pay_period_end;
+  const activeEmployees = (employeesResult.data ?? []).filter((e) =>
+    isEmployeeActiveInPeriod(e, periodStart, periodEnd)
   );
 
-  const [recurringResult, periodResult] = await Promise.all([
+  const [recurringResult, periodResult, prior] = await Promise.all([
     supabaseAdmin
       .from('employee_pay_components')
       .select('employee_id, component_code, config, effective_from, effective_to, active')
@@ -118,9 +188,33 @@ export async function loadPayrollRulesContext(supabaseAdmin, companyId, run) {
       .select('employee_id, component_code, config')
       .eq('company_id', companyId)
       .eq('payroll_run_id', run.id),
+    // Prior finalised payslips in the tax year: year-to-date PAYE and the SDL estimate.
+    loadPriorRunPayslips(supabaseAdmin, companyId, run, taxYearConfig),
   ]);
   if (recurringResult.error) throw recurringResult.error;
   if (periodResult.error) throw periodResult.error;
+
+  const ytdPayslips = prior.payslips;
+  const currentPeriodEstimatedGross = activeEmployees.reduce((sum, employee) => {
+    if (!employee.salary_amount) return sum;
+    const factor = employmentProRataFactor(employee, periodStart, periodEnd);
+    return (
+      sum +
+      applyProRata(
+        normalizeSalaryToMonthly(employee.salary_amount, employee.salary_period ?? 'monthly'),
+        factor
+      )
+    );
+  }, 0);
+
+  const companyAnnualRemuneration = estimateCompanyAnnualRemuneration({
+    priorRemuneration: aggregateCompanyRemunerationYtd(ytdPayslips),
+    currentRemuneration: currentPeriodEstimatedGross,
+    coveredDays: coveredDays([
+      ...prior.priorRuns,
+      { pay_period_start: periodStart, pay_period_end: periodEnd },
+    ]),
+  });
 
   return {
     companyRules,
@@ -132,6 +226,8 @@ export async function loadPayrollRulesContext(supabaseAdmin, companyId, run) {
     catalogRows,
     recurringComponents: recurringResult.data ?? [],
     periodInputs: periodResult.data ?? [],
+    ytdPayslips,
+    companyAnnualRemuneration,
   };
 }
 
@@ -161,17 +257,30 @@ export async function generatePayslipsWithRulesEngine(supabaseAdmin, {
   for (const employee of ctx.activeEmployees) {
     if (!employee.salary_amount) continue;
 
+    const proRataFactor = employmentProRataFactor(
+      employee,
+      run.pay_period_start,
+      run.pay_period_end
+    );
+    if (proRataFactor <= 0) continue;
+
+    const ageDetail = resolveEmployeeAgeDetail(employee, run.pay_date);
+    const employeeAge = ageDetail.age;
+    const ytd = aggregateEmployeeYtd(ctx.ytdPayslips ?? [], employee.id);
+    const proRatedSalaryAmount = applyProRata(Number(employee.salary_amount), proRataFactor);
+
     const calculation = executePayrollRules({
       employee: {
         id: employee.id,
         firstName: employee.first_name,
         lastName: employee.last_name,
-        salaryAmount: employee.salary_amount,
+        salaryAmount: proRatedSalaryAmount,
         salaryPeriod: employee.salary_period ?? 'monthly',
         employmentType: employee.employment_type ?? 'permanent',
         taxNumber: employee.tax_number,
         startDate: employee.start_date,
         endDate: employee.end_date,
+        age: employeeAge,
       },
       period: {
         payPeriodStart: run.pay_period_start,
@@ -182,6 +291,8 @@ export async function generatePayslipsWithRulesEngine(supabaseAdmin, {
       companyRuleSettings: ctx.companyRules,
       employeeRuleSettings: ctx.employeeSettingsMap[employee.id] ?? {},
       runRuleOverrides: ctx.runOverrides,
+      ytdTaxableIncome: ytd.taxableIncome,
+      ytdPayePaid: ytd.payePaid,
     });
 
     const ruleSet = taxYearConfigToRuleSet(ctx.taxYearConfig);
@@ -193,9 +304,15 @@ export async function generatePayslipsWithRulesEngine(supabaseAdmin, {
     const periodInputs = (ctx.periodInputs ?? []).filter((row) => row.employee_id === employee.id);
     let assembly;
     try {
+      // Standing package amounts that accrue with time follow the employment fraction
+      // of a partial period; once-off run inputs stay as entered.
+      const packageComponents = recurring.map((row) => ({
+        componentCode: row.component_code,
+        config: proRatePackageConfig(row.component_code, row.config ?? {}, proRataFactor),
+      }));
       assembly = assemblePayComponents(
         mergePayComponents(
-          recurring.map((row) => ({ componentCode: row.component_code, config: row.config ?? {} })),
+          packageComponents,
           periodInputs.map((row) => ({ componentCode: row.component_code, config: row.config ?? {} }))
         ),
         ruleSet
@@ -214,7 +331,7 @@ export async function generatePayslipsWithRulesEngine(supabaseAdmin, {
         employeeNumber: employee.employee_number ?? employee.id,
         firstName: employee.first_name,
         lastName: employee.last_name,
-        age: employee.age,
+        age: employeeAge,
         employmentType: employee.employment_type,
         isDirector: employee.employment_type === 'director',
       },
@@ -239,7 +356,12 @@ export async function generatePayslipsWithRulesEngine(supabaseAdmin, {
       ),
       components: assembly.components,
       ruleSet,
-      companyAnnualRemuneration: ctx.companyAnnualRemuneration ?? 600000,
+      ytd: {
+        taxableIncome: ytd.taxableIncome,
+        payePaid: ytd.payePaid,
+        periodsProcessed: ytd.periodsProcessed,
+      },
+      companyAnnualRemuneration: ctx.companyAnnualRemuneration,
       audit: {
         employeeNumber: employee.employee_number ?? employee.id,
         employeeName: `${employee.first_name ?? ''} ${employee.last_name ?? ''}`.trim(),
@@ -258,6 +380,18 @@ export async function generatePayslipsWithRulesEngine(supabaseAdmin, {
     });
     snapshot.rules_engine_result = calculation;
     snapshot.engine_version = '3.0.2';
+    snapshot.period_employment = {
+      age: employeeAge ?? null,
+      age_as_at: ageDetail.asAt,
+      age_source: ageDetail.source,
+      age_warning: ageDetail.warning ?? null,
+      sdl_remuneration: remuneration,
+      pro_rata_factor: proRataFactor,
+      ytd_taxable_income: ytd.taxableIncome,
+      ytd_paye_paid: ytd.payePaid,
+      ytd_periods_processed: ytd.periodsProcessed,
+      company_annual_remuneration: ctx.companyAnnualRemuneration,
+    };
     snapshot.pay_components = {
       cashGross: assembly.cashGross,
       taxableBaseAddition: assembly.taxableBaseAddition,

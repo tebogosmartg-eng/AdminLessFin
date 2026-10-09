@@ -355,16 +355,114 @@ serve(withEnterprisePlatform('payroll', 'tenant', async (req, _ctx) => {
         break;
       }
 
-      case 'CREATE_RUN':
-        ({ data, error } = await supabaseAdmin.from('payroll_runs').insert({ ...body.runData, company_id }).select().single());
+      case 'CREATE_RUN': {
+        // Only the period and pay date come from the caller: a run always starts as an
+        // unapproved draft (status, approval and posting fields are never client-set).
+        const runInput = body.runData ?? {};
+        const isoDate = /^\d{4}-\d{2}-\d{2}$/;
+        const start = String(runInput.pay_period_start ?? '');
+        const end = String(runInput.pay_period_end ?? '');
+        const payDate = String(runInput.pay_date ?? '');
+        if (!isoDate.test(start) || !isoDate.test(end) || !isoDate.test(payDate)) {
+          throw new PayrollDomainError({
+            stage: 'validation', code: 'INVALID_PERIOD',
+            message: 'Enter the period start, period end and pay date.',
+            recovery: 'Choose all three dates and try again.',
+          });
+        }
+        if (end < start) {
+          throw new PayrollDomainError({
+            stage: 'validation', code: 'INVALID_PERIOD',
+            message: 'The period ends before it starts.',
+            recovery: 'Check the period start and end dates.',
+          });
+        }
+        if (payDate < start) {
+          throw new PayrollDomainError({
+            stage: 'validation', code: 'INVALID_PERIOD',
+            message: 'The pay date is before the period starts.',
+            recovery: 'Choose a pay date on or after the period start.',
+          });
+        }
+
+        // A second run over the same days pays those days twice unless it is meant to
+        // (a bonus or correction run), so an overlap must be asked for explicitly.
+        const { data: overlapping, error: overlapError } = await supabaseAdmin
+          .from('payroll_runs')
+          .select('id, pay_period_start, pay_period_end, status, output_metadata')
+          .eq('company_id', company_id)
+          .lte('pay_period_start', end)
+          .gte('pay_period_end', start);
+        if (overlapError) throw overlapError;
+        const live = (overlapping ?? []).filter((r) => r.output_metadata?.cancelled !== true);
+        const additionalRun = body.additional_run === true;
+        if (live.length && !additionalRun) {
+          const list = live.map((r) => `${r.pay_period_start} to ${r.pay_period_end} (${r.status})`).join('; ');
+          throw new PayrollDomainError({
+            stage: 'validation', code: 'PERIOD_OVERLAP',
+            message: `A payroll run already covers these dates: ${list}.`,
+            recovery: 'Open the existing run, or tick "Additional run" for a bonus or correction run over the same period.',
+            status: 409,
+          });
+        }
+
+        ({ data, error } = await supabaseAdmin
+          .from('payroll_runs')
+          .insert({ company_id, pay_period_start: start, pay_period_end: end, pay_date: payDate, status: 'draft' })
+          .select()
+          .single());
         if (!error && data) {
           await logPayrollAudit(supabaseAdmin, {
             company_id, payroll_run_id: data.id, event_type: 'run_created',
-            event_data: { pay_period_start: data.pay_period_start, pay_period_end: data.pay_period_end },
+            event_data: {
+              pay_period_start: data.pay_period_start,
+              pay_period_end: data.pay_period_end,
+              additional_run: additionalRun,
+              overlaps: live.map((r) => r.id),
+            },
             created_by: user.id,
           });
         }
         break;
+      }
+
+      case 'DISCARD_RUN': {
+        // Removes a draft run created in error, with its payslips and run inputs.
+        // A run that was ever posted (even if reversed and reopened) is kept for the record.
+        const runId = body.runId;
+        const { data: runToDiscard, error: discardLookupError } = await supabaseAdmin
+          .from('payroll_runs')
+          .select('id, status, journal_entry_id, posting_request_id, output_metadata, pay_period_start, pay_period_end')
+          .eq('id', runId)
+          .eq('company_id', company_id)
+          .single();
+        if (discardLookupError) throw discardLookupError;
+        if (runToDiscard.status !== 'draft' || runToDiscard.journal_entry_id || runToDiscard.posting_request_id) {
+          throw new PayrollDomainError({
+            stage: 'state_transition', code: 'NOT_DISCARDABLE',
+            message: 'Only a draft run that has never been processed can be discarded.',
+            recovery: 'Reverse a processed run instead.',
+            status: 409,
+          });
+        }
+        if (runToDiscard.output_metadata?.reversed_at) {
+          throw new PayrollDomainError({
+            stage: 'state_transition', code: 'NOT_DISCARDABLE',
+            message: 'This run was processed and reversed before; it is kept for the audit trail.',
+            recovery: 'Correct and process it again, or leave it as a draft.',
+            status: 409,
+          });
+        }
+        // payroll_runs is audited (audit_payroll_runs), so the deleted run is kept in audit_logs.
+        ({ error } = await supabaseAdmin
+          .from('payroll_runs')
+          .delete()
+          .eq('id', runId)
+          .eq('company_id', company_id)
+          .eq('status', 'draft'));
+        data = error ? null : { discarded: true, run_id: runId };
+        break;
+      }
 
       case 'GENERATE_PAYSLIPS': {
         const genRun = await fetchPayrollRun(supabaseAdmin, body.runId, company_id);
