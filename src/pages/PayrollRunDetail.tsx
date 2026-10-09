@@ -112,6 +112,8 @@ const payrollApprovalStorageKey = (runId: string) => `payroll-approved-${runId}`
 
 type PayrollRunDetailData = {
   run?: PayrollRun;
+  /** Worked out from the current employee records each time the run is loaded. */
+  warnings?: RunWarning[];
   payslips?: Payslip[];
   audit_events?: unknown[];
 };
@@ -167,9 +169,8 @@ const PayrollRunDetail = () => {
   const { data: payrollControls } = usePayrollControls(activeCompany?.id);
   const preparedByMe = !!user && (run?.prepared_by ?? []).includes(user.id);
   const selfApprovalBlocked = preparedByMe && !!payrollControls && !payrollControls.allow_self_approval;
-  const generationWarnings = (Array.isArray(run?.output_metadata?.generation_warnings)
-    ? run!.output_metadata!.generation_warnings
-    : []) as RunWarning[];
+  const generationWarnings = (data?.warnings
+    ?? (Array.isArray(run?.output_metadata?.generation_warnings) ? run!.output_metadata!.generation_warnings : [])) as RunWarning[];
   const payWarnings = generationWarnings.filter((w) => w.category === 'pay');
   const sarsWarnings = generationWarnings.filter((w) => w.category === 'sars');
 

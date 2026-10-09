@@ -12,9 +12,25 @@ import {
   withEnterprisePlatform,
   edgeFailure,
 } from '../_shared/enterpriseEdgePlatform.ts'
+import { isInvalidSaIdNumber, isPlausibleTaxNumber } from '../_shared/payrollRulesEngine/runWarnings.ts'
 
 
 const corsHeaders = ENTERPRISE_CORS_HEADERS
+
+/**
+ * The same identity rules as the employee form, so the API and imports cannot store
+ * what the form would refuse (and payroll would then warn about).
+ * Only fields present in the payload are checked.
+ */
+function employeeIdentityError(employeeData) {
+  if (typeof employeeData.id_number === 'string' && isInvalidSaIdNumber(employeeData.id_number)) {
+    return 'Invalid ID number: not a valid South African ID (check digit or birth date is wrong).';
+  }
+  if (typeof employeeData.tax_number === 'string' && employeeData.tax_number.trim() && !isPlausibleTaxNumber(employeeData.tax_number)) {
+    return 'Invalid income tax number: it must be 10 digits starting with 0, 1, 2, 3 or 9.';
+  }
+  return null;
+}
 
 const PUBLIC_EMPLOYEE_FIELDS = 'id, employee_number, first_name, last_name, department, branch, position, employment_status';
 
@@ -112,6 +128,8 @@ serve(withEnterprisePlatform('employees', 'tenant', async (req, _ctx) => {
         if (!isAdmin) throw new Error("Access Denied: Only Admins can create employees.");
 
         const employeeData = stripEmployeeNumber(body.employeeData ?? {});
+        const createError = employeeIdentityError(employeeData);
+        if (createError) throw new Error(createError);
         const employeeNumber = await generateNumber(supabaseAdmin, company_id);
 
         ({ data, error } = await supabaseAdmin
@@ -141,6 +159,8 @@ serve(withEnterprisePlatform('employees', 'tenant', async (req, _ctx) => {
         if (!isAdmin) throw new Error("Access Denied: Only Admins can update employees.");
         const employeeData = stripEmployeeNumber(body.employeeData ?? {});
         delete employeeData.id;
+        const updateError = employeeIdentityError(employeeData);
+        if (updateError) throw new Error(updateError);
 
         const { data: before } = await supabaseAdmin
           .from('employees')
@@ -188,6 +208,8 @@ serve(withEnterprisePlatform('employees', 'tenant', async (req, _ctx) => {
               : null;
             const employeeData = stripEmployeeNumber(raw);
             delete employeeData.employee_number;
+            const importError = employeeIdentityError(employeeData);
+            if (importError) throw new Error(importError);
 
             let employeeNumber = suppliedNumber;
             if (!employeeNumber) {

@@ -4,6 +4,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0'
 import {
   generatePayslipsWithRulesEngine,
   loadPayrollRulesContext,
+  loadRunWarnings,
   fetchPayrollRun,
 } from '../_shared/generatePayslips.ts'
 import { buildEffectiveCompanyRules } from '../_shared/payrollRulesEngine/index.ts'
@@ -367,7 +368,13 @@ serve(withEnterprisePlatform('payroll', 'tenant', async (req, _ctx) => {
           .limit(50);
         if (!auditError) auditEvents = auditData ?? [];
 
-        data = { run: runData, payslips: payslipsData, journal_entry: journalEntry, audit_events: auditEvents };
+        // Warnings reflect the employee records as they are now, not as they were when
+        // the payslips were generated. A finalised run keeps its generation snapshot.
+        const warnings = isFinalizedRun(runData.status)
+          ? (runData.output_metadata?.generation_warnings ?? [])
+          : await loadRunWarnings(supabaseAdmin, company_id, runData, new Set((payslipsData ?? []).map((p) => p.employee_id)));
+
+        data = { run: runData, payslips: payslipsData, journal_entry: journalEntry, audit_events: auditEvents, warnings };
         break;
       }
 

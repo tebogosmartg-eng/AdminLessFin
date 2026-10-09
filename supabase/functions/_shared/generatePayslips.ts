@@ -246,6 +246,36 @@ export async function loadPayrollRulesContext(supabaseAdmin, companyId, run) {
   };
 }
 
+/**
+ * Warnings for a run worked out from the current employee records and run inputs, so a
+ * corrected employee no longer shows as a warning. `paidEmployeeIds` are the employees
+ * with a payslip on the run.
+ */
+export async function loadRunWarnings(supabaseAdmin, companyId, run, paidEmployeeIds: Set<string>) {
+  const [employeesResult, inputsResult] = await Promise.all([
+    supabaseAdmin.from('employees').select('*').eq('company_id', companyId),
+    supabaseAdmin
+      .from('payroll_period_inputs')
+      .select('employee_id, component_code')
+      .eq('company_id', companyId)
+      .eq('payroll_run_id', run.id),
+  ]);
+  if (employeesResult.error) throw employeesResult.error;
+  if (inputsResult.error) throw inputsResult.error;
+  const payFrequency = run.pay_frequency ?? 'monthly';
+  const allEmployees = employeesResult.data ?? [];
+  return payrollRunWarnings({
+    candidates: allEmployees.filter((e) =>
+      (e.salary_period ?? 'monthly') === payFrequency &&
+      isEmployeeActiveInPeriod(e, run.pay_period_start, run.pay_period_end)
+    ),
+    paidEmployeeIds,
+    allEmployees,
+    periodInputs: inputsResult.data ?? [],
+    payFrequency,
+  });
+}
+
 export async function generatePayslipsWithRulesEngine(supabaseAdmin, {
   companyId,
   runId,

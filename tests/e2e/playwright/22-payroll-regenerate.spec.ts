@@ -70,7 +70,13 @@ test('an approved run can take a late allowance: regenerate withdraws approval',
   await call(sb, { method: 'APPROVE_RUN', company_id: companyId, runId: run.id });
   const detail = await call<{ payslips: Array<{ employee_id: string; total_earnings: number; employees: { first_name: string; last_name: string } }> }>(
     sb, { method: 'GET_RUN_DETAIL', company_id: companyId, runId: run.id });
-  const target = detail.payslips[0];
+  // A run input replaces a standing package amount for the same component, so pick an
+  // employee without a standing travel allowance: then the R3 000 adds to gross.
+  const { data: withTravel } = await sb.from('employee_pay_components')
+    .select('employee_id').eq('company_id', companyId).eq('component_code', 'travel_allowance').eq('active', true);
+  const packaged = new Set((withTravel ?? []).map((r) => r.employee_id as string));
+  const target = detail.payslips.find((p) => !packaged.has(p.employee_id))!;
+  expect(target).toBeTruthy();
   const name = `${target.employees.first_name} ${target.employees.last_name}`;
   const grossBefore = detail.payslips.reduce((s, p) => s + Number(p.total_earnings), 0);
 
@@ -193,5 +199,70 @@ test('the person who prepared a run cannot approve it unless the owner allows se
       method: 'UPDATE_PAYROLL_CONTROLS', company_id: companyId,
       allow_self_approval: original.allow_self_approval, reason: original.self_approval_reason ?? undefined,
     });
+  }
+});
+
+test('fixing an employee\'s SARS details clears the run warning without regenerating', async ({ page }) => {
+  const env = loadE2EEnv();
+  const sb = createClient(env.supabaseUrl, env.supabaseAnonKey, { auth: { persistSession: false } });
+  const auth = await sb.auth.signInWithPassword({ email: env.email, password: env.password });
+  expect(auth.error).toBeNull();
+  const { data: company } = await sb.from('companies').select('id').eq('name', READY_COMPANY).single();
+  const companyId = company!.id as string;
+
+  const stamp = Date.now().toString().slice(-6);
+  const month = new Date();
+  month.setMonth(month.getMonth() + 4);
+  const start = new Date(month.getFullYear(), month.getMonth(), 1);
+  const end = new Date(month.getFullYear(), month.getMonth() + 1, 0);
+  const iso = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  const last = `SarsFix${stamp}`;
+  const { data: created, error: createError } = await sb.functions.invoke('employees', { body: {
+    method: 'POST', company_id: companyId, command_id: crypto.randomUUID(), correlation_id: crypto.randomUUID(),
+    employeeData: {
+      first_name: 'Warn', last_name: last, employment_type: 'permanent', start_date: iso(start), end_date: iso(end),
+      salary_amount: 18_000, salary_period: 'monthly', tax_number: '0123456789', id_number: '8601015800086',
+    },
+  } });
+  expect(createError).toBeNull();
+  const employeeId = (created as { id: string }).id;
+  const run = await call<{ id: string }>(sb, {
+    method: 'CREATE_RUN', company_id: companyId, additional_run: true,
+    runData: { pay_period_start: iso(start), pay_period_end: iso(end), pay_date: iso(end) },
+  });
+  try {
+    await call(sb, { method: 'GENERATE_PAYSLIPS', company_id: companyId, runId: run.id });
+
+    await page.goto('/');
+    await waitForRouteSettled(page);
+    await ensureReadyCompany(page);
+    await page.goto(`/payroll-runs/${run.id}`);
+    await waitForRouteSettled(page);
+    const warnings = page.getByTestId('run-generation-warnings');
+    await warnings.locator('summary').click();
+    await expect(warnings).toContainText(`Warn ${last}'s residential address is incomplete`, { timeout: 30_000 });
+
+    // Fix the employee in the app (in-app navigation, so the run page's cached data is reused).
+    await page.getByRole('link', { name: 'Employees' }).first().click();
+    await waitForRouteSettled(page);
+    const row = page.getByRole('row').filter({ hasText: last });
+    await expect(row).toBeVisible({ timeout: 30_000 });
+    await row.getByRole('button').last().click();
+    await page.getByRole('menuitem', { name: /^edit$/i }).click();
+    await page.getByLabel('Street Number').fill('5');
+    await page.getByLabel('Street or Farm Name').fill('Long Street');
+    await page.getByLabel('City or Town').fill('Cape Town');
+    await page.getByLabel('Postal Code', { exact: true }).fill('8001');
+    await page.getByRole('button', { name: /save employee/i }).click();
+    await expect(page.getByRole('dialog')).toBeHidden({ timeout: 20_000 });
+
+    await page.goBack();
+    await waitForRouteSettled(page);
+    await expect(page.getByText('Step 3: Approve Payroll')).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByText(`Warn ${last}'s residential address is incomplete`)).toHaveCount(0, { timeout: 30_000 });
+    await shot(page, '07-warning-cleared-after-fix');
+  } finally {
+    await call(sb, { method: 'DISCARD_RUN', company_id: companyId, runId: run.id }).catch(() => undefined);
+    await sb.functions.invoke('employees', { body: { method: 'DELETE', company_id: companyId, employeeId, command_id: crypto.randomUUID(), correlation_id: crypto.randomUUID() } });
   }
 });

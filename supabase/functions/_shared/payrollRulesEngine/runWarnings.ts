@@ -1,17 +1,21 @@
 /**
- * Warnings raised when payslips are generated, so nobody is left out silently and
- * missing SARS details surface while they can still be fixed, not at IRP5 time.
- * Warnings never stop a run; they are stored on the run and shown on its page.
+ * Warnings for a payroll run, so nobody is left out silently and missing SARS details
+ * surface while they can still be fixed, not at IRP5 time. Warnings never stop a run.
+ * They are worked out from the current employee records each time the run is shown,
+ * so fixing an employee clears the warning; a snapshot is also kept on the run when
+ * payslips are generated.
  *
  * The copies in src/lib and supabase/functions/_shared must stay identical (a unit test compares them).
  */
 
 export type RunWarningCode =
   | 'NO_SALARY'
+  | 'NOT_ON_RUN'
   | 'INPUTS_NOT_APPLIED'
   | 'MISSING_TAX_NUMBER'
   | 'INVALID_TAX_NUMBER'
   | 'MISSING_IDENTITY'
+  | 'INVALID_ID_NUMBER'
   | 'MISSING_RESIDENTIAL_ADDRESS'
   | 'MISSING_BANK_ACCOUNT_TYPE';
 
@@ -48,6 +52,36 @@ export function isPlausibleTaxNumber(value: string | null | undefined): boolean 
   return /^[01239]\d{9}$/.test(digits);
 }
 
+/**
+ * A 13-digit South African ID number with a real birth date (YYMMDD) and a valid
+ * check digit. The same rule as the employee form; non-13-digit values are treated
+ * as passport or foreign numbers and not checked here.
+ */
+export function isValidSaIdNumber(value: string | null | undefined): boolean {
+  const digits = (value ?? '').replace(/\s/g, '');
+  if (!/^\d{13}$/.test(digits)) return false;
+  let sum = 0;
+  for (let i = 0; i < 13; i++) {
+    let d = Number(digits[12 - i]);
+    if (i % 2 === 1) {
+      d *= 2;
+      if (d > 9) d -= 9;
+    }
+    sum += d;
+  }
+  if (sum % 10 !== 0) return false;
+  const mm = Number(digits.slice(2, 4));
+  const dd = Number(digits.slice(4, 6));
+  const date = new Date(Date.UTC(2000 + Number(digits.slice(0, 2)), mm - 1, dd));
+  return date.getUTCMonth() === mm - 1 && date.getUTCDate() === dd;
+}
+
+/** True for a 13-digit value that is not a valid SA ID (other values are passports). */
+export function isInvalidSaIdNumber(value: string | null | undefined): boolean {
+  const digits = (value ?? '').replace(/\s/g, '');
+  return /^\d{13}$/.test(digits) && !isValidSaIdNumber(digits);
+}
+
 function hasText(value: string | null | undefined): boolean {
   return typeof value === 'string' && value.trim().length > 0;
 }
@@ -71,10 +105,17 @@ export function payrollRunWarnings(input: {
   const candidateIds = new Set(input.candidates.map((e) => e.id));
 
   for (const employee of input.candidates) {
-    if (!input.paidEmployeeIds.has(employee.id) && !Number(employee.salary_amount)) {
+    if (input.paidEmployeeIds.has(employee.id)) continue;
+    if (!Number(employee.salary_amount)) {
       warnings.push({
         code: 'NO_SALARY', category: 'pay', employee_id: employee.id, employee_name: nameOf(employee),
         message: `${nameOf(employee)} was not paid: no salary amount is set on the employee.`,
+      });
+    } else {
+      // The employee was changed after payslips were generated (salary set, dates or frequency changed).
+      warnings.push({
+        code: 'NOT_ON_RUN', category: 'pay', employee_id: employee.id, employee_name: nameOf(employee),
+        message: `${nameOf(employee)} has no payslip on this run yet. Regenerate payslips to include them.`,
       });
     }
   }
@@ -94,7 +135,9 @@ export function payrollRunWarnings(input: {
       ? `the employee is paid ${frequency}, and this is a ${input.payFrequency} run`
       : !candidateIds.has(employeeId)
         ? 'the employee was not employed during this pay period'
-        : 'the employee has no salary amount';
+        : !Number(employee.salary_amount)
+          ? 'the employee has no salary amount'
+          : 'the employee has no payslip on this run yet; regenerate payslips';
     warnings.push({
       code: 'INPUTS_NOT_APPLIED', category: 'pay', employee_id: employeeId, employee_name: nameOf(employee),
       message: `Run inputs for ${nameOf(employee)} (${codes.join(', ')}) were not applied: ${reason}.`,
@@ -113,6 +156,8 @@ export function payrollRunWarnings(input: {
     }
     if (!hasText(employee.id_number) && !hasText(employee.passport_number)) {
       add('MISSING_IDENTITY', `${name} has no ID or passport number.`);
+    } else if (isInvalidSaIdNumber(employee.id_number)) {
+      add('INVALID_ID_NUMBER', `${name}'s ID number is not a valid South African ID (check digit or birth date is wrong).`);
     }
     const street = hasText(employee.residential_street_name) || hasText(employee.residential_complex);
     const place = hasText(employee.residential_city) || hasText(employee.residential_suburb);

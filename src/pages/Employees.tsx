@@ -127,6 +127,7 @@ const Employees = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['employees', activeCompany?.id] });
+      queryClient.invalidateQueries({ queryKey: ['payroll_run_detail'] });
       showSuccess('Employee deleted successfully.');
     },
     onError: (error) => {

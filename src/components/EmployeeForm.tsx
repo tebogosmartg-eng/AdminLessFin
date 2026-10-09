@@ -205,6 +205,8 @@ const EmployeeForm = ({ isOpen, setIsOpen, employee }: EmployeeFormProps) => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['employees', activeCompany?.id] });
+      // Payroll run warnings are worked out from employee records: refresh open runs.
+      queryClient.invalidateQueries({ queryKey: ['payroll_run_detail'] });
       showSuccess(`Employee ${employee ? 'updated' : 'added'} successfully.`);
       setIsOpen(false);
     },

@@ -2,7 +2,8 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { generateIrp5, type FinalizedPayrollRunSource, type FinalizedPayslipSource } from '@/lib/statutoryReturns';
 import { irp5CodeForEngineLine, irp5CodeForRuleLine } from '@/lib/payrollRulesEngine/irp5Codes';
-import { isPlausibleTaxNumber, payrollRunWarnings } from '@/lib/payrollRulesEngine/runWarnings';
+import { isInvalidSaIdNumber, isPlausibleTaxNumber, isValidSaIdNumber, payrollRunWarnings } from '@/lib/payrollRulesEngine/runWarnings';
+import { birthDateFromSaId } from '@/lib/payrollRulesEngine/periodEmployment';
 import { RULE_SET_2026_2027 } from '@/lib/statutoryPayrollEngine/registry';
 import { executeStatutoryPipeline } from '@/lib/statutoryPayrollEngine/pipeline';
 import { executeStatutoryPipeline as serverPipeline } from '../../supabase/functions/_shared/statutoryPayrollEngine/pipeline';
@@ -175,7 +176,7 @@ describe('pension and provident fund contributions', () => {
 
 describe('run warnings', () => {
   const complete = {
-    tax_number: '0123456789', id_number: '9001015800080', bank_account_number: '62000000004', bank_account_type: 'current',
+    tax_number: '0123456789', id_number: '8601015800086', bank_account_number: '62000000004', bank_account_type: 'current',
     residential_street_name: 'Main Road', residential_city: 'Cape Town', residential_postal_code: '8001',
   };
   const employees = [
@@ -209,6 +210,40 @@ describe('run warnings', () => {
     ]));
     expect(codes.filter((c) => c.startsWith('paid:'))).toEqual([]);
     expect(warnings.find((w) => w.employee_id === 'weekly')!.message).toContain('paid weekly');
+  });
+
+  it('clears a SARS warning once the employee record is fixed, and asks for a regenerate when needed', () => {
+    const sparse = employees.find((e) => e.id === 'sparse')!;
+    const fixed = { ...sparse, ...complete };
+    const run = (list: typeof employees) => payrollRunWarnings({
+      candidates: list.filter((e) => e.salary_period === 'monthly'),
+      paidEmployeeIds: new Set(['paid', 'sparse']),
+      allEmployees: list,
+      periodInputs: [],
+      payFrequency: 'monthly',
+    });
+    expect(run(employees).some((w) => w.employee_id === 'sparse')).toBe(true);
+    const after = run(employees.map((e) => (e.id === 'sparse' ? fixed : e)));
+    expect(after.some((w) => w.employee_id === 'sparse')).toBe(false);
+    // A salary added after generation: no longer "no salary", but not on the run until regenerated.
+    const salaried = run(employees.map((e) => (e.id === 'nosalary' ? { ...e, salary_amount: 15_000 } : e)));
+    expect(salaried.find((w) => w.employee_id === 'nosalary')?.code).toBe('NOT_ON_RUN');
+  });
+
+  it('flags an SA ID number with a wrong check digit, as the employee form does', () => {
+    expect(isValidSaIdNumber('8601015800086')).toBe(true);
+    expect(isInvalidSaIdNumber('8601015800083')).toBe(true); // wrong check digit
+    expect(isInvalidSaIdNumber('8613015800085')).toBe(true); // month 13
+    expect(isInvalidSaIdNumber('FN1234567')).toBe(false); // passport: not checked
+    // Same verdict as the form's validator for a spread of numbers.
+    for (const id of ['8601015800086', '8601015800083', '9001015800080', '6201155800081', '7502290000084', '0002290000087']) {
+      expect(isValidSaIdNumber(id), id).toBe(!!birthDateFromSaId(id, '2026-10-09'));
+    }
+    const warnings = payrollRunWarnings({
+      candidates: [{ ...employees[0], id: 'badid', id_number: '8601015800083' }],
+      paidEmployeeIds: new Set(['badid']), allEmployees: [], periodInputs: [], payFrequency: 'monthly',
+    });
+    expect(warnings.map((w) => w.code)).toEqual(['INVALID_ID_NUMBER']);
   });
 
   it('checks the shape of a SARS income tax number', () => {

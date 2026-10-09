@@ -103,7 +103,7 @@ async function main() {
     },
   });
   const sarsComplete = {
-    tax_number: '0123456789', id_number: '8601015800083', bank_name: 'FNB', bank_account_number: '62000000004',
+    tax_number: '0123456789', id_number: '8601015800086', bank_name: 'FNB', bank_account_number: '62000000004',
     bank_branch_code: '250655', bank_account_type: 'current', residential_street_number: '12',
     residential_street_name: 'Main Road', residential_suburb: 'Gardens', residential_city: 'Cape Town', residential_postal_code: '8001',
   };
@@ -115,6 +115,11 @@ async function main() {
   check('Database refuses a postal code that is not 4 digits', /postal_code/.test(badPostal), badPostal.slice(0, 160));
   const badPassport = await expectRefused(employee('BadPassport', { ...sarsComplete, salary_amount: 1, passport_number: 'FN123456' }));
   check('Database refuses a passport without its country', /passport/.test(badPassport), badPassport.slice(0, 160));
+
+  const badId = await expectRefused(employee('BadId', { ...sarsComplete, salary_amount: 1, id_number: '8601015800083' }));
+  check('API refuses an SA ID with a wrong check digit (same rule as the form)', /VALIDATION_FAILED/.test(badId) && /not a valid South African ID/.test(badId), badId.slice(0, 160));
+  const badTax = await expectRefused(employee('BadTax', { ...sarsComplete, salary_amount: 1, tax_number: '4123456789' }));
+  check('API refuses an implausible income tax number', /VALIDATION_FAILED/.test(badTax) && /10 digits/.test(badTax), badTax.slice(0, 160));
 
   const complete = await employee('Complete', { ...sarsComplete, salary_amount: 30_000, nature_of_person: 'A' });
   const sparse = await employee('Sparse', { salary_amount: 20_000, tax_number: '0123456789', bank_account_number: '62000000005' });
@@ -197,6 +202,26 @@ async function main() {
     check('Warning: missing residential address, ID and account type for the sparse record',
       has(sparse.id, 'MISSING_RESIDENTIAL_ADDRESS') && has(sparse.id, 'MISSING_IDENTITY') && has(sparse.id, 'MISSING_BANK_ACCOUNT_TYPE'));
     check('No warnings for the complete record', !warnings.some((w) => w.employee_id === complete.id), warnings.filter((w) => w.employee_id === complete.id));
+
+    // Fixing the employee clears their SARS warnings on the next load, without regenerating.
+    check('Run page warnings are served live with the run', Array.isArray((detail as { warnings?: unknown }).warnings));
+    await invoke(sb, 'employees', {
+      method: 'PUT', company_id: companyId, employeeId: sparse.id, command_id: crypto.randomUUID(), correlation_id: crypto.randomUUID(),
+      employeeData: { ...sarsComplete, bank_account_number: '62000000005' },
+    });
+    await invoke(sb, 'employees', {
+      method: 'PUT', company_id: companyId, employeeId: noSalary.id, command_id: crypto.randomUUID(), correlation_id: crypto.randomUUID(),
+      employeeData: { salary_amount: 12_000 },
+    });
+    const refreshed = (await payroll<RunDetail & { warnings: Warning[] }>({ method: 'GET_RUN_DETAIL', runId: run.id })).warnings;
+    check('Fixed SARS details clear the warnings without regenerating', !refreshed.some((w) => w.employee_id === sparse.id),
+      refreshed.filter((w) => w.employee_id === sparse.id));
+    check('A salary added after generation asks for a regenerate', refreshed.some((w) => w.employee_id === noSalary.id && w.code === 'NOT_ON_RUN'),
+      refreshed.filter((w) => w.employee_id === noSalary.id));
+    await invoke(sb, 'employees', {
+      method: 'PUT', company_id: companyId, employeeId: noSalary.id, command_id: crypto.randomUUID(), correlation_id: crypto.randomUUID(),
+      employeeData: { salary_amount: null },
+    });
 
     // ── Separation of duties. ──
     check('Run records who prepared it', (detail.run.prepared_by ?? []).includes(me), detail.run.prepared_by);
