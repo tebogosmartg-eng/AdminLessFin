@@ -162,6 +162,10 @@ async function main() {
     }
 
     const latest = (await payroll<Filed[]>({ method: 'LIST_STATUTORY_RETURNS', returnType: 'EMP201' })).find((r) => r.period === '202701' && r.status !== 'superseded')!;
+    const unapproved = await refused(payroll({ method: 'RECORD_RETURN_SUBMISSION', returnId: latest.id, reference: `LIVECHECK${stamp}` }));
+    check('Submission is refused until the return is approved', /RETURN_NOT_APPROVED/.test(unapproved), unapproved.slice(0, 120));
+    // CERT TX allows self-approval (single test user).
+    await payroll({ method: 'APPROVE_RETURN', returnId: latest.id });
     const submitted = await payroll<Filed>({ method: 'RECORD_RETURN_SUBMISSION', returnId: latest.id, reference: `LIVECHECK${stamp}` });
     check('Submission (PRN) recorded', submitted.status === 'submitted' && submitted.submission_reference === `LIVECHECK${stamp}`);
     const badRef = await refused(payroll({ method: 'RECORD_RETURN_SUBMISSION', returnId: latest.id, reference: 'x' }));

@@ -251,8 +251,9 @@ async function obligationDetail(admin, companyId, today, ws, obligationId) {
 
 const SOURCE_READS = {
   statutory_returns: {
-    select: 'id, company_id, return_type, tax_year, status, submitted_at, created_at',
-    label: (r) => `${r.return_type} ${r.tax_year ?? ''} (${r.status})`.trim(),
+    select: 'id, company_id, return_type, tax_year, period, version, status, submitted_at, created_at',
+    // A filed EMP201/EMP501 is identified by its SARS period and version, not only the tax year.
+    label: (r) => `${r.return_type} ${r.period ?? r.tax_year ?? ''}${r.period && r.version ? ` v${r.version}` : ''} (${r.status})`.trim(),
     route: () => '/statutory-returns',
     file: () => null,
   },

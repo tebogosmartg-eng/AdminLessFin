@@ -19,6 +19,11 @@ import {
   sha256Hex,
 } from '../_shared/statutoryFiling.ts'
 import {
+  STATUTORY_RETURN_METHODS,
+  handleStatutoryReturnMethod,
+  logReturnEvent,
+} from './statutoryReturns.ts'
+import {
   ENTERPRISE_CORS_HEADERS,
   withEnterprisePlatform,
   edgeFailure,
@@ -942,6 +947,10 @@ serve(withEnterprisePlatform('payroll', 'tenant', async (req, _ctx) => {
           });
           if (rollbackError) throw rollbackError;
         }
+        if (existing) {
+          await logReturnEvent(supabaseAdmin, { company_id, return_id: existing.id, event_type: 'superseded', payload: { replaced_by: returnId, reason: replaceReason }, user_id: user.id });
+        }
+        await logReturnEvent(supabaseAdmin, { company_id, return_id: returnId, event_type: 'generated', content_hash: row.content_hash, payload: { version: row.version, total_payable: declaration.totalPayable }, user_id: user.id });
         await logPayrollAudit(supabaseAdmin, {
           company_id, event_type: existing ? 'emp201_refiled' : 'emp201_filed',
           event_data: {
@@ -966,15 +975,25 @@ serve(withEnterprisePlatform('payroll', 'tenant', async (req, _ctx) => {
           });
         }
         const { data: ret, error: retError } = await supabaseAdmin
-          .from('statutory_returns').select('id, status')
+          .from('statutory_returns').select('id, status, approved_at, content_hash')
           .eq('id', body.returnId).eq('company_id', company_id).single();
         if (retError) throw retError;
         if (ret.status === 'superseded') throw new Error('A superseded return cannot be marked as submitted.');
+        // Maker-checker: a filed return is approved before it is recorded as submitted to SARS.
+        if (!ret.approved_at) {
+          throw new PayrollDomainError({
+            stage: 'validation', code: 'RETURN_NOT_APPROVED',
+            message: 'Approve the return before recording its submission to SARS.',
+            recovery: 'Ask another owner or admin to approve it (or approve it yourself if the owner allows self-approval).',
+            status: 409,
+          });
+        }
         ({ data, error } = await supabaseAdmin
           .from('statutory_returns')
           .update({ status: 'submitted', submission_reference: reference, submitted_at: new Date().toISOString() })
           .eq('id', ret.id).select().single());
         if (!error) {
+          await logReturnEvent(supabaseAdmin, { company_id, return_id: ret.id, event_type: 'submitted', content_hash: ret.content_hash, payload: { reference }, user_id: user.id });
           await logPayrollAudit(supabaseAdmin, {
             company_id, event_type: 'statutory_return_submitted',
             event_data: { return_id: ret.id, reference }, created_by: user.id,
@@ -986,7 +1005,7 @@ serve(withEnterprisePlatform('payroll', 'tenant', async (req, _ctx) => {
       case 'LIST_STATUTORY_RETURNS': {
         let query = supabaseAdmin
           .from('statutory_returns')
-          .select('id, return_type, tax_year, period, status, version, filed_at, filed_by, submitted_at, submission_reference, superseded_at, superseded_reason, content_hash, journal_entry_id, declaration_data')
+          .select('id, return_type, tax_year, period, status, version, filed_at, filed_by, approved_at, approved_by, self_approved, submitted_at, submission_reference, superseded_at, superseded_reason, content_hash, journal_entry_id, declaration_data')
           .eq('company_id', company_id)
           .order('period', { ascending: false })
           .order('version', { ascending: false });
@@ -1816,6 +1835,13 @@ serve(withEnterprisePlatform('payroll', 'tenant', async (req, _ctx) => {
       }
 
       default:
+        if (STATUTORY_RETURN_METHODS.has(method)) {
+          data = await handleStatutoryReturnMethod(method, {
+            supabaseAdmin, company_id, user, body, member, PayrollDomainError, logPayrollAudit, loadPayrollControls,
+          });
+          error = null;
+          break;
+        }
         // A caller error, not a server failure (e.g. a newer screen talking to an older deployment).
         throw new PayrollDomainError({
           stage: 'validation',

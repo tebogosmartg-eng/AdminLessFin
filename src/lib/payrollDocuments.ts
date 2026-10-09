@@ -977,6 +977,11 @@ export function mapEmployeeToBankPaymentRow(input: {
   };
 }
 
+/** A quoted CSV field: embedded quotes are doubled (RFC 4180) and line breaks become spaces. */
+function quoteCsv(value: string): string {
+  return `"${value.replace(/[\r\n]+/g, ' ').replace(/"/g, '""')}"`;
+}
+
 export function buildBankPaymentFileContent(
   rows: BankPaymentRow[],
   runLabel: string,
@@ -992,8 +997,9 @@ export function buildBankPaymentFileContent(
       const account = (r.bank_account_number ?? '').replace(/\s/g, '');
       const branch = (r.bank_branch_code ?? '').replace(/\s/g, '');
       const amount = Math.round(r.net_pay * 100).toString().padStart(12, '0');
-      const name = r.employee_name.slice(0, 30).toUpperCase();
-      const ref = (r.reference ?? `PAY-${runLabel}`).slice(0, 20);
+      // The pipe separates fields and each payment is one line: neither may appear inside a field.
+      const name = r.employee_name.replace(/[|\r\n]+/g, ' ').slice(0, 30).toUpperCase();
+      const ref = (r.reference ?? `PAY-${runLabel}`).replace(/[|\r\n]+/g, ' ').slice(0, 20);
       return `D|${String(idx + 1).padStart(4, '0')}|${account}|${branch}|${amount}|${name}|${ref}|${dateStamp}`;
     });
     const trailer = `T|${rows.length}|${integrity.total_cents.toString().padStart(14, '0')}|${integrity.control_hash}`;
@@ -1003,12 +1009,12 @@ export function buildBankPaymentFileContent(
   const header = 'Employee Name,Bank Name,Branch Code,Account Number,Amount,Reference,Payment Date';
   const lines = rows.map((r) =>
     [
-      `"${r.employee_name}"`,
-      `"${r.bank_name ?? ''}"`,
-      `"${r.bank_branch_code ?? ''}"`,
-      `"${r.bank_account_number ?? ''}"`,
+      quoteCsv(r.employee_name),
+      quoteCsv(r.bank_name ?? ''),
+      quoteCsv(r.bank_branch_code ?? ''),
+      quoteCsv(r.bank_account_number ?? ''),
       r.net_pay.toFixed(2),
-      `"${r.reference ?? `PAY-${runLabel}`}"`,
+      quoteCsv(r.reference ?? `PAY-${runLabel}`),
       payDate,
     ].join(',')
   );

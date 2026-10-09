@@ -1,7 +1,7 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { format, subMonths } from 'date-fns';
-import { Download, FileCheck2, FileText, Loader2 } from 'lucide-react';
+import { Banknote, CheckCircle2, Download, FileCheck2, FileText, Loader2 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
@@ -18,6 +18,7 @@ import { accountsQuery } from '../../lib/queries';
 import { showError, showSuccess } from '../../utils/toast';
 import type { Emp201Declaration } from '../../lib/sars/emp201';
 import { downloadEmp201Csv, downloadEmp201Pdf, type FiledEmp201 } from '../../lib/sars/emp201Documents';
+import ReturnPaymentsDialog, { type PaymentTarget } from './ReturnPaymentsDialog';
 
 type Issue = { severity: 'error' | 'warning'; code: string; message: string };
 type Prepared = {
@@ -26,22 +27,31 @@ type Prepared = {
   taxYear: string;
   filed: { id: string; status: string; version: number; filed_at: string } | null;
 };
-type FiledRow = FiledEmp201 & { return_type: string; superseded_reason: string | null; journal_entry_id: string | null };
+type FiledRow = FiledEmp201 & {
+  return_type: string;
+  superseded_reason: string | null;
+  journal_entry_id: string | null;
+  approved_at: string | null;
+  self_approved: boolean | null;
+};
 type Account = { id: string; name: string; type: string };
 
-const STATUS_LABEL: Record<string, string> = {
-  ready: 'Filed — not yet submitted', submitted: 'Submitted to SARS', superseded: 'Replaced',
-};
+function statusLabel(row: Pick<FiledRow, 'status' | 'approved_at'>): string {
+  if (row.status === 'superseded') return 'Replaced';
+  if (row.status === 'submitted' || row.status === 'accepted') return 'Submitted to SARS';
+  return row.approved_at ? 'Approved — not yet submitted' : 'Filed — awaiting approval';
+}
 
 /**
  * EMP201: prepare a month from finalised payroll (with ETI), file it (locked, optional
- * ETI journal), download it, and record the SARS payment reference once submitted.
+ * ETI journal), have a second person approve it, record its submission (PRN) and the
+ * payments made, and download it.
  */
-export default function Emp201Panel() {
+export default function Emp201Panel({ month: monthProp, onMonthChange }: { month?: string; onMonthChange?: (month: string) => void } = {}) {
   const { activeCompany } = useAuth();
   const companyId = activeCompany?.id;
   const queryClient = useQueryClient();
-  const [month, setMonth] = useState(() => format(subMonths(new Date(), 1), 'yyyy-MM'));
+  const [month, setMonthState] = useState(() => monthProp ?? format(subMonths(new Date(), 1), 'yyyy-MM'));
   const [prepared, setPrepared] = useState<Prepared | null>(null);
   const [fileOpen, setFileOpen] = useState(false);
   const [liabilityAccountId, setLiabilityAccountId] = useState('');
@@ -49,8 +59,18 @@ export default function Emp201Panel() {
   const [replaceReason, setReplaceReason] = useState('');
   const [submitFor, setSubmitFor] = useState<FiledRow | null>(null);
   const [reference, setReference] = useState('');
+  const [paymentsFor, setPaymentsFor] = useState<PaymentTarget | null>(null);
+  const setMonth = (value: string) => { setMonthState(value); setPrepared(null); onMonthChange?.(value); };
+  useEffect(() => {
+    if (monthProp && monthProp !== month) { setMonthState(monthProp); setPrepared(null); }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [monthProp]);
 
   const historyKey = ['statutory-returns', companyId, 'EMP201'];
+  const refreshReturns = () => {
+    queryClient.invalidateQueries({ queryKey: historyKey });
+    queryClient.invalidateQueries({ queryKey: ['statutory-workspace', companyId] });
+  };
   const { data: history, error: historyError } = useQuery({
     queryKey: historyKey,
     queryFn: () => invokePayroll<FiledRow[]>({ method: 'LIST_STATUTORY_RETURNS', company_id: companyId, returnType: 'EMP201' }),
@@ -85,7 +105,7 @@ export default function Emp201Panel() {
       showSuccess(`EMP201 for ${month} filed.`);
       setFileOpen(false);
       setReplaceReason('');
-      queryClient.invalidateQueries({ queryKey: historyKey });
+      refreshReturns();
       prepare.mutate();
     },
     onError: (error: Error) => showError(error.message),
@@ -97,8 +117,14 @@ export default function Emp201Panel() {
       showSuccess('Submission recorded.');
       setSubmitFor(null);
       setReference('');
-      queryClient.invalidateQueries({ queryKey: historyKey });
+      refreshReturns();
     },
+    onError: (error: Error) => showError(error.message),
+  });
+
+  const approve = useMutation({
+    mutationFn: (returnId: string) => invokePayroll({ method: 'APPROVE_RETURN', company_id: companyId, returnId }),
+    onSuccess: () => { showSuccess('EMP201 approved.'); refreshReturns(); },
     onError: (error: Error) => showError(error.message),
   });
 
@@ -115,7 +141,7 @@ export default function Emp201Panel() {
       <div className="flex flex-wrap items-end gap-3">
         <div className="space-y-1">
           <Label htmlFor="emp201-month">Month</Label>
-          <Input id="emp201-month" type="month" value={month} onChange={(e) => { setMonth(e.target.value); setPrepared(null); }} className="w-44" />
+          <Input id="emp201-month" type="month" value={month} onChange={(e) => setMonth(e.target.value)} className="w-44" />
         </div>
         <Button onClick={() => prepare.mutate()} disabled={!month || prepare.isPending}>
           {prepare.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileText className="mr-2 h-4 w-4" />}
@@ -128,7 +154,7 @@ export default function Emp201Panel() {
         )}
       </div>
       <p className="text-xs text-muted-foreground">
-        Built from finalised payroll paid in the month. Filing locks it here; capture the amounts on SARS eFiling, then record the payment reference (PRN).
+        Built from finalised payroll paid in the month. Filing locks it here; a second owner or admin approves it, you capture it on SARS eFiling, then record the payment reference (PRN) and the payment.
       </p>
 
       {errors.length > 0 && (
@@ -211,7 +237,7 @@ export default function Emp201Panel() {
                 <TableHead>Status</TableHead>
                 <TableHead className="text-right">Total payable</TableHead>
                 <TableHead>PRN</TableHead>
-                <TableHead className="text-right">Files</TableHead>
+                <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -219,16 +245,31 @@ export default function Emp201Panel() {
                 <TableRow key={h.id} className={h.status === 'superseded' ? 'opacity-60' : undefined}>
                   <TableCell className="font-mono">{h.period} <span className="text-xs text-muted-foreground">v{h.version}</span></TableCell>
                   <TableCell>
-                    <Badge variant={h.status === 'submitted' ? 'default' : 'secondary'}>{STATUS_LABEL[h.status] ?? h.status}</Badge>
+                    <Badge variant={h.status === 'submitted' ? 'default' : 'secondary'}>{statusLabel(h)}</Badge>
+                    {h.self_approved && <div className="text-xs text-muted-foreground mt-1">Self-approved (owner exception)</div>}
                     {h.superseded_reason && <div className="text-xs text-muted-foreground mt-1">{h.superseded_reason}</div>}
                   </TableCell>
                   <TableCell className="text-right font-mono">{formatCurrency(h.declaration_data.totalPayable)}</TableCell>
                   <TableCell className="font-mono text-xs">
                     {h.submission_reference ?? (h.status === 'ready' ? (
-                      <Button size="sm" variant="outline" onClick={() => setSubmitFor(h)}>Record PRN</Button>
+                      h.approved_at ? (
+                        <Button size="sm" variant="outline" onClick={() => setSubmitFor(h)}>Record PRN</Button>
+                      ) : (
+                        <Button size="sm" variant="outline" onClick={() => approve.mutate(h.id)} disabled={approve.isPending} aria-label={`Approve EMP201 ${h.period}`}>
+                          <CheckCircle2 className="mr-1 h-3 w-3" />Approve
+                        </Button>
+                      )
                     ) : '—')}
                   </TableCell>
                   <TableCell className="text-right space-x-1 whitespace-nowrap">
+                    {h.status !== 'superseded' && (
+                      <Button
+                        size="sm" variant="ghost" aria-label={`Payments for EMP201 ${h.period}`}
+                        onClick={() => setPaymentsFor({ returnId: h.id, period: h.period, totalPayable: h.declaration_data.totalPayable, submissionReference: h.submission_reference })}
+                      >
+                        <Banknote className="mr-1 h-3 w-3" />Payments
+                      </Button>
+                    )}
                     <Button size="sm" variant="ghost" onClick={() => downloadEmp201Pdf(h, employer)} aria-label={`Download EMP201 ${h.period} PDF`}>
                       <Download className="mr-1 h-3 w-3" />PDF
                     </Button>
@@ -284,6 +325,8 @@ export default function Emp201Panel() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <ReturnPaymentsDialog target={paymentsFor} onClose={() => setPaymentsFor(null)} />
 
       <Dialog open={!!submitFor} onOpenChange={(open) => !open && setSubmitFor(null)}>
         <DialogContent>

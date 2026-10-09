@@ -130,7 +130,8 @@ describe('IRP5 is built from the code on each payslip line', () => {
 describe('IRP5 codes stamped at generation', () => {
   it('codes the rule and statutory lines', () => {
     expect(irp5CodeForRuleLine('basic_salary')).toBe('3601');
-    expect(irp5CodeForRuleLine('basic_salary', { isDirector: true })).toBe('3615');
+    // 3615 was retired after 2018: directors' pay is reported under 3601 (BRS V25.3.0).
+    expect(irp5CodeForRuleLine('basic_salary', { isDirector: true })).toBe('3601');
     expect(irp5CodeForRuleLine('pension')).toBe('4001');
     expect(irp5CodeForRuleLine('provident_fund')).toBe('4003');
     expect(irp5CodeForRuleLine('medical_aid')).toBe('4005');

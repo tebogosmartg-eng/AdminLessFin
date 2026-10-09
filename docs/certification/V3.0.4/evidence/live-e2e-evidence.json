@@ -1,13 +1,13 @@
 {
-  "runAt": "2026-10-09T15:31:54.568Z",
+  "runAt": "2026-10-09T17:06:34.750Z",
   "version": "3.5",
   "decision": "CERTIFIED FOR PRODUCTION",
   "timings": {
-    "generatePayslipsMs": 3510,
-    "approveRunMs": 914,
-    "finalizeRunMs": 1263,
-    "generateBankBatchMs": 1022,
-    "workspaceSummaryMs": 686
+    "generatePayslipsMs": 4676,
+    "approveRunMs": 729,
+    "finalizeRunMs": 1386,
+    "generateBankBatchMs": 839,
+    "workspaceSummaryMs": 820
   },
   "steps": [
     {
@@ -62,12 +62,12 @@
         "userId": "908ad90e-ee0e-4957-943d-ed1ec2fb843a",
         "email": "efs.certification.v6102@adminless.local",
         "accessTokenPrefix": "eyJhbGciOiJIUzI1NiIs…",
-        "expiresAt": 1791563490,
+        "expiresAt": 1791569161,
         "expiresIn": 3600
       },
       "evidence": {
         "userId": "908ad90e-ee0e-4957-943d-ed1ec2fb843a",
-        "jwtExpiry": "2026-10-09T16:31:30.000Z"
+        "jwtExpiry": "2026-10-09T18:06:01.000Z"
       }
     },
     {
@@ -115,13 +115,13 @@
         }
       },
       "response": {
-        "id": "375d29e4-78a6-41af-9804-9b8c2aedf927",
+        "id": "31a1f2f3-35c8-4bb2-8150-70915bbb32b2",
         "company_id": "be3855e9-d11c-48a8-8c39-10e12a0ff2df",
         "pay_period_start": "2026-11-01",
         "pay_period_end": "2026-11-30",
         "pay_date": "2026-11-30",
         "status": "draft",
-        "created_at": "2026-10-09T15:31:32.951572+00:00",
+        "created_at": "2026-10-09T17:06:08.741527+00:00",
         "journal_entry_id": null,
         "approved_by": null,
         "approved_at": null,
@@ -134,7 +134,7 @@
         "prepared_by": []
       },
       "evidence": {
-        "runId": "375d29e4-78a6-41af-9804-9b8c2aedf927"
+        "runId": "31a1f2f3-35c8-4bb2-8150-70915bbb32b2"
       }
     },
     {
@@ -144,7 +144,7 @@
       "request": {
         "method": "GET_RUN_RULE_CONFIG",
         "company_id": "be3855e9-d11c-48a8-8c39-10e12a0ff2df",
-        "runId": "375d29e4-78a6-41af-9804-9b8c2aedf927"
+        "runId": "31a1f2f3-35c8-4bb2-8150-70915bbb32b2"
       },
       "response": {
         "effectiveRulesCount": 12,
@@ -158,10 +158,10 @@
       "request": {
         "method": "GENERATE_PAYSLIPS",
         "company_id": "be3855e9-d11c-48a8-8c39-10e12a0ff2df",
-        "runId": "375d29e4-78a6-41af-9804-9b8c2aedf927"
+        "runId": "31a1f2f3-35c8-4bb2-8150-70915bbb32b2"
       },
       "response": {
-        "generated": 24,
+        "generated": 30,
         "engine": "statutory_payroll_engine_v3",
         "rules_applied": [
           "basic_salary",
@@ -172,8 +172,8 @@
         ]
       },
       "evidence": {
-        "runId": "375d29e4-78a6-41af-9804-9b8c2aedf927",
-        "generated": 24
+        "runId": "31a1f2f3-35c8-4bb2-8150-70915bbb32b2",
+        "generated": 30
       }
     },
     {
@@ -703,7 +703,7 @@
           "total_employee_deductions",
           "total_employer_contributions"
         ],
-        "payslipId": "89baabbd-701e-4f12-af67-22b1a356277e"
+        "payslipId": "d4d526b9-b41d-4367-bc2f-db3761ef944b"
       }
     },
     {
@@ -721,19 +721,19 @@
       "request": {
         "method": "APPROVE_RUN",
         "company_id": "be3855e9-d11c-48a8-8c39-10e12a0ff2df",
-        "runId": "375d29e4-78a6-41af-9804-9b8c2aedf927"
+        "runId": "31a1f2f3-35c8-4bb2-8150-70915bbb32b2"
       },
       "response": {
-        "id": "375d29e4-78a6-41af-9804-9b8c2aedf927",
+        "id": "31a1f2f3-35c8-4bb2-8150-70915bbb32b2",
         "company_id": "be3855e9-d11c-48a8-8c39-10e12a0ff2df",
         "pay_period_start": "2026-11-01",
         "pay_period_end": "2026-11-30",
         "pay_date": "2026-11-30",
         "status": "draft",
-        "created_at": "2026-10-09T15:31:32.951572+00:00",
+        "created_at": "2026-10-09T17:06:08.741527+00:00",
         "journal_entry_id": null,
         "approved_by": "908ad90e-ee0e-4957-943d-ed1ec2fb843a",
-        "approved_at": "2026-10-09T15:31:39.91+00:00",
+        "approved_at": "2026-10-09T17:06:17.998+00:00",
         "processed_by": null,
         "processed_at": null,
         "output_metadata": {
@@ -963,6 +963,55 @@
               "employee_name": "Leaver Period-921958"
             },
             {
+              "code": "MISSING_RESIDENTIAL_ADDRESS",
+              "message": "Senior ETI-311903's residential address is incomplete (street, suburb or city, and postal code).",
+              "category": "sars",
+              "employee_id": "67d3a866-4bd8-4903-85b1-878450cd4b59",
+              "employee_name": "Senior ETI-311903"
+            },
+            {
+              "code": "MISSING_IDENTITY",
+              "message": "Leaver Period-434634 has no ID or passport number.",
+              "category": "sars",
+              "employee_id": "68658422-ceb8-463f-9195-fb67dd35b975",
+              "employee_name": "Leaver Period-434634"
+            },
+            {
+              "code": "MISSING_RESIDENTIAL_ADDRESS",
+              "message": "Leaver Period-434634's residential address is incomplete (street, suburb or city, and postal code).",
+              "category": "sars",
+              "employee_id": "68658422-ceb8-463f-9195-fb67dd35b975",
+              "employee_name": "Leaver Period-434634"
+            },
+            {
+              "code": "MISSING_BANK_ACCOUNT_TYPE",
+              "message": "Leaver Period-434634's bank account type (current, savings, …) is not set.",
+              "category": "sars",
+              "employee_id": "68658422-ceb8-463f-9195-fb67dd35b975",
+              "employee_name": "Leaver Period-434634"
+            },
+            {
+              "code": "MISSING_IDENTITY",
+              "message": "LeavePay Freq-496536 has no ID or passport number.",
+              "category": "sars",
+              "employee_id": "5e892117-b99b-41b7-bb00-2d32e0fb3d90",
+              "employee_name": "LeavePay Freq-496536"
+            },
+            {
+              "code": "MISSING_RESIDENTIAL_ADDRESS",
+              "message": "LeavePay Freq-496536's residential address is incomplete (street, suburb or city, and postal code).",
+              "category": "sars",
+              "employee_id": "5e892117-b99b-41b7-bb00-2d32e0fb3d90",
+              "employee_name": "LeavePay Freq-496536"
+            },
+            {
+              "code": "MISSING_BANK_ACCOUNT_TYPE",
+              "message": "LeavePay Freq-496536's bank account type (current, savings, …) is not set.",
+              "category": "sars",
+              "employee_id": "5e892117-b99b-41b7-bb00-2d32e0fb3d90",
+              "employee_name": "LeavePay Freq-496536"
+            },
+            {
               "code": "MISSING_IDENTITY",
               "message": "LeavePay Freq-202366 has no ID or passport number.",
               "category": "sars",
@@ -1038,6 +1087,27 @@
               "category": "sars",
               "employee_id": "82aeb1e6-ae6e-4f5a-b5ac-86f38e2497a7",
               "employee_name": "Leaver Period-291703"
+            },
+            {
+              "code": "MISSING_RESIDENTIAL_ADDRESS",
+              "message": "Low ETI-311903's residential address is incomplete (street, suburb or city, and postal code).",
+              "category": "sars",
+              "employee_id": "4e7788d8-4e5e-4d87-82a2-3650fa1030cf",
+              "employee_name": "Low ETI-311903"
+            },
+            {
+              "code": "MISSING_RESIDENTIAL_ADDRESS",
+              "message": "Pensioner Period-434634's residential address is incomplete (street, suburb or city, and postal code).",
+              "category": "sars",
+              "employee_id": "06d3aafa-3c81-4968-bc98-fe37564cbea1",
+              "employee_name": "Pensioner Period-434634"
+            },
+            {
+              "code": "MISSING_BANK_ACCOUNT_TYPE",
+              "message": "Pensioner Period-434634's bank account type (current, savings, …) is not set.",
+              "category": "sars",
+              "employee_id": "06d3aafa-3c81-4968-bc98-fe37564cbea1",
+              "employee_name": "Pensioner Period-434634"
             },
             {
               "code": "MISSING_IDENTITY",
@@ -1117,6 +1187,13 @@
               "employee_name": "LeavePay Freq-055707"
             },
             {
+              "code": "MISSING_RESIDENTIAL_ADDRESS",
+              "message": "Youth ETI-311903's residential address is incomplete (street, suburb or city, and postal code).",
+              "category": "sars",
+              "employee_id": "16b4533b-9e1c-49af-9e6a-d3efe24d8cf4",
+              "employee_name": "Youth ETI-311903"
+            },
+            {
               "code": "MISSING_IDENTITY",
               "message": "LeavePay Freq-497531 has no ID or passport number.",
               "category": "sars",
@@ -1194,7 +1271,7 @@
               "employee_name": "Leaver Period-448093"
             }
           ],
-          "generation_warnings_at": "2026-10-09T15:31:37.297Z"
+          "generation_warnings_at": "2026-10-09T17:06:15.020Z"
         },
         "rule_config": {},
         "posting_request_id": null,
@@ -1204,7 +1281,7 @@
         ]
       },
       "evidence": {
-        "approved_at": "2026-10-09T15:31:39.91+00:00"
+        "approved_at": "2026-10-09T17:06:17.998+00:00"
       }
     },
     {
@@ -1214,7 +1291,7 @@
       "evidence": [
         {
           "event_type": "run_approved",
-          "created_at": "2026-10-09T15:31:39.971352+00:00"
+          "created_at": "2026-10-09T17:06:18.082013+00:00"
         }
       ]
     },
@@ -1223,18 +1300,18 @@
       "step": "Payslip data retrieved",
       "status": "PASS",
       "evidence": {
-        "payslipId": "89baabbd-701e-4f12-af67-22b1a356277e",
+        "payslipId": "d4d526b9-b41d-4367-bc2f-db3761ef944b",
         "employeeNumber": "EMP-000009",
         "employeeName": "PayComp Live-20261008-202953",
         "companyId": "be3855e9-d11c-48a8-8c39-10e12a0ff2df",
         "payPeriod": "2026-11-01 to 2026-11-30",
         "grossEarnings": 30000,
-        "totalDeductions": 6846.24,
-        "netPay": 23153.76,
+        "totalDeductions": 7205.67,
+        "netPay": 22794.33,
         "taxYear": "2026/2027",
         "ruleVersion": "2026.2.0",
         "calculationSnapshot": true,
-        "auditReference": "PAYSLIP:13e8261b-c2a0-4940-92b4-c4cc12e1ff77:375d29e4-78a6-41af-9804-9b8c2aedf927",
+        "auditReference": "PAYSLIP:13e8261b-c2a0-4940-92b4-c4cc12e1ff77:31a1f2f3-35c8-4bb2-8150-70915bbb32b2",
         "ytd": null,
         "itemCount": 3,
         "hasPaye": true,
@@ -1262,45 +1339,45 @@
       "request": {
         "method": "FINALIZE_RUN",
         "company_id": "be3855e9-d11c-48a8-8c39-10e12a0ff2df",
-        "runId": "375d29e4-78a6-41af-9804-9b8c2aedf927",
+        "runId": "31a1f2f3-35c8-4bb2-8150-70915bbb32b2",
         "wageAccountId": "4a93b5ce-972f-4940-b66f-4f7090196313",
         "bankAccountId": "7bcb0bac-76c8-40f2-bf07-217cefed6d28",
         "liabilityAccountId": "e0eb3208-9259-41e1-b9d8-16b3f384fbcc"
       },
       "response": {
         "run": {
-          "id": "375d29e4-78a6-41af-9804-9b8c2aedf927",
+          "id": "31a1f2f3-35c8-4bb2-8150-70915bbb32b2",
           "company_id": "be3855e9-d11c-48a8-8c39-10e12a0ff2df",
           "pay_period_start": "2026-11-01",
           "pay_period_end": "2026-11-30",
           "pay_date": "2026-11-30",
           "status": "finalized",
-          "created_at": "2026-10-09T15:31:32.951572+00:00",
-          "journal_entry_id": "fcad3fa5-83c8-48d7-bcf7-087804a9351c",
+          "created_at": "2026-10-09T17:06:08.741527+00:00",
+          "journal_entry_id": "31020719-d9c5-4ffa-af7b-5ed3d2056d05",
           "approved_by": "908ad90e-ee0e-4957-943d-ed1ec2fb843a",
-          "approved_at": "2026-10-09T15:31:39.91+00:00",
+          "approved_at": "2026-10-09T17:06:17.998+00:00",
           "processed_by": "908ad90e-ee0e-4957-943d-ed1ec2fb843a",
-          "processed_at": "2026-10-09T15:31:44.341408+00:00",
+          "processed_at": "2026-10-09T17:06:21.686339+00:00",
           "output_metadata": {
             "summary": {
-              "total_net": 499427.72,
+              "total_net": 595380.75,
               "pay_period": "2026-11-01 to 2026-11-30",
-              "total_gross": 615500,
-              "payroll_cost": 623443.84,
-              "employees_paid": 24,
-              "total_deductions": 116072.28,
-              "employer_contributions": 7943.84
+              "total_gross": 731000,
+              "payroll_cost": 739672.48,
+              "employees_paid": 30,
+              "total_deductions": 135619.25,
+              "employer_contributions": 8672.48
             },
             "recovered": false,
             "emails_sent": 0,
-            "processed_at": "2026-10-09T15:31:44.341408+00:00",
+            "processed_at": "2026-10-09T17:06:21.686339+00:00",
             "email_failures": [],
             "journal_posted": true,
             "posting_engine": true,
             "reports_generated": true,
             "summary_generated": true,
-            "payslips_generated": 24,
-            "posting_request_id": "20432430-20a6-4130-994f-d717c92e0d37",
+            "payslips_generated": 30,
+            "posting_request_id": "823aa2cf-0803-427b-918f-f554d2b87baf",
             "register_generated": true,
             "generation_warnings": [
               {
@@ -1528,6 +1605,55 @@
                 "employee_name": "Leaver Period-921958"
               },
               {
+                "code": "MISSING_RESIDENTIAL_ADDRESS",
+                "message": "Senior ETI-311903's residential address is incomplete (street, suburb or city, and postal code).",
+                "category": "sars",
+                "employee_id": "67d3a866-4bd8-4903-85b1-878450cd4b59",
+                "employee_name": "Senior ETI-311903"
+              },
+              {
+                "code": "MISSING_IDENTITY",
+                "message": "Leaver Period-434634 has no ID or passport number.",
+                "category": "sars",
+                "employee_id": "68658422-ceb8-463f-9195-fb67dd35b975",
+                "employee_name": "Leaver Period-434634"
+              },
+              {
+                "code": "MISSING_RESIDENTIAL_ADDRESS",
+                "message": "Leaver Period-434634's residential address is incomplete (street, suburb or city, and postal code).",
+                "category": "sars",
+                "employee_id": "68658422-ceb8-463f-9195-fb67dd35b975",
+                "employee_name": "Leaver Period-434634"
+              },
+              {
+                "code": "MISSING_BANK_ACCOUNT_TYPE",
+                "message": "Leaver Period-434634's bank account type (current, savings, …) is not set.",
+                "category": "sars",
+                "employee_id": "68658422-ceb8-463f-9195-fb67dd35b975",
+                "employee_name": "Leaver Period-434634"
+              },
+              {
+                "code": "MISSING_IDENTITY",
+                "message": "LeavePay Freq-496536 has no ID or passport number.",
+                "category": "sars",
+                "employee_id": "5e892117-b99b-41b7-bb00-2d32e0fb3d90",
+                "employee_name": "LeavePay Freq-496536"
+              },
+              {
+                "code": "MISSING_RESIDENTIAL_ADDRESS",
+                "message": "LeavePay Freq-496536's residential address is incomplete (street, suburb or city, and postal code).",
+                "category": "sars",
+                "employee_id": "5e892117-b99b-41b7-bb00-2d32e0fb3d90",
+                "employee_name": "LeavePay Freq-496536"
+              },
+              {
+                "code": "MISSING_BANK_ACCOUNT_TYPE",
+                "message": "LeavePay Freq-496536's bank account type (current, savings, …) is not set.",
+                "category": "sars",
+                "employee_id": "5e892117-b99b-41b7-bb00-2d32e0fb3d90",
+                "employee_name": "LeavePay Freq-496536"
+              },
+              {
                 "code": "MISSING_IDENTITY",
                 "message": "LeavePay Freq-202366 has no ID or passport number.",
                 "category": "sars",
@@ -1603,6 +1729,27 @@
                 "category": "sars",
                 "employee_id": "82aeb1e6-ae6e-4f5a-b5ac-86f38e2497a7",
                 "employee_name": "Leaver Period-291703"
+              },
+              {
+                "code": "MISSING_RESIDENTIAL_ADDRESS",
+                "message": "Low ETI-311903's residential address is incomplete (street, suburb or city, and postal code).",
+                "category": "sars",
+                "employee_id": "4e7788d8-4e5e-4d87-82a2-3650fa1030cf",
+                "employee_name": "Low ETI-311903"
+              },
+              {
+                "code": "MISSING_RESIDENTIAL_ADDRESS",
+                "message": "Pensioner Period-434634's residential address is incomplete (street, suburb or city, and postal code).",
+                "category": "sars",
+                "employee_id": "06d3aafa-3c81-4968-bc98-fe37564cbea1",
+                "employee_name": "Pensioner Period-434634"
+              },
+              {
+                "code": "MISSING_BANK_ACCOUNT_TYPE",
+                "message": "Pensioner Period-434634's bank account type (current, savings, …) is not set.",
+                "category": "sars",
+                "employee_id": "06d3aafa-3c81-4968-bc98-fe37564cbea1",
+                "employee_name": "Pensioner Period-434634"
               },
               {
                 "code": "MISSING_IDENTITY",
@@ -1682,6 +1829,13 @@
                 "employee_name": "LeavePay Freq-055707"
               },
               {
+                "code": "MISSING_RESIDENTIAL_ADDRESS",
+                "message": "Youth ETI-311903's residential address is incomplete (street, suburb or city, and postal code).",
+                "category": "sars",
+                "employee_id": "16b4533b-9e1c-49af-9e6a-d3efe24d8cf4",
+                "employee_name": "Youth ETI-311903"
+              },
+              {
                 "code": "MISSING_IDENTITY",
                 "message": "LeavePay Freq-497531 has no ID or passport number.",
                 "category": "sars",
@@ -1759,65 +1913,65 @@
                 "employee_name": "Leaver Period-448093"
               }
             ],
-            "generation_warnings_at": "2026-10-09T15:31:37.297Z"
+            "generation_warnings_at": "2026-10-09T17:06:15.020Z"
           },
           "rule_config": {},
-          "posting_request_id": "20432430-20a6-4130-994f-d717c92e0d37",
+          "posting_request_id": "823aa2cf-0803-427b-918f-f554d2b87baf",
           "pay_frequency": "monthly",
           "prepared_by": [
             "908ad90e-ee0e-4957-943d-ed1ec2fb843a"
           ]
         },
-        "journal_entry_id": "fcad3fa5-83c8-48d7-bcf7-087804a9351c",
-        "posting_request_id": "20432430-20a6-4130-994f-d717c92e0d37",
+        "journal_entry_id": "31020719-d9c5-4ffa-af7b-5ed3d2056d05",
+        "posting_request_id": "823aa2cf-0803-427b-918f-f554d2b87baf",
         "posting_status": "committed",
         "summary": {
-          "employees_paid": 24,
-          "total_gross": 615500,
-          "total_net": 499427.72000000003,
+          "employees_paid": 30,
+          "total_gross": 731000,
+          "total_net": 595380.75,
           "total_paye": 0,
           "total_uif": 0,
           "total_sdl": 0,
           "total_pension": 0,
-          "employer_contributions": 7943.839999999999,
-          "payroll_cost": 623443.84,
+          "employer_contributions": 8672.48,
+          "payroll_cost": 739672.48,
           "variance_previous": null,
           "variance_budget": null,
           "pay_period": "2026-11-01 to 2026-11-30",
-          "total_deductions": 116072.27999999997
+          "total_deductions": 135619.25
         },
         "outputs": {
-          "payslips_generated": 24,
+          "payslips_generated": 30,
           "reports_generated": true,
           "register_generated": true,
           "summary_generated": true,
           "journal_posted": true,
           "posting_engine": true,
-          "posting_request_id": "20432430-20a6-4130-994f-d717c92e0d37",
+          "posting_request_id": "823aa2cf-0803-427b-918f-f554d2b87baf",
           "emails_sent": 0,
           "email_failures": [],
-          "processed_at": "2026-10-09T15:31:44.341408+00:00",
+          "processed_at": "2026-10-09T17:06:21.686339+00:00",
           "summary": {
-            "employees_paid": 24,
-            "total_gross": 615500,
-            "total_net": 499427.72000000003,
+            "employees_paid": 30,
+            "total_gross": 731000,
+            "total_net": 595380.75,
             "total_paye": 0,
             "total_uif": 0,
             "total_sdl": 0,
             "total_pension": 0,
-            "employer_contributions": 7943.839999999999,
-            "payroll_cost": 623443.84,
+            "employer_contributions": 8672.48,
+            "payroll_cost": 739672.48,
             "variance_previous": null,
             "variance_budget": null,
             "pay_period": "2026-11-01 to 2026-11-30",
-            "total_deductions": 116072.27999999997
+            "total_deductions": 135619.25
           },
           "recovered": false
         },
         "recovered": false
       },
       "evidence": {
-        "journalId": "fcad3fa5-83c8-48d7-bcf7-087804a9351c",
+        "journalId": "31020719-d9c5-4ffa-af7b-5ed3d2056d05",
         "status": "finalized"
       }
     },
@@ -1826,41 +1980,41 @@
       "step": "Journal balanced",
       "status": "PASS",
       "evidence": {
-        "journalId": "fcad3fa5-83c8-48d7-bcf7-087804a9351c",
-        "debits": 623443.84,
-        "credits": 623443.84,
+        "journalId": "31020719-d9c5-4ffa-af7b-5ed3d2056d05",
+        "debits": 739672.48,
+        "credits": 739672.48,
         "lines": [
           {
             "type": "debit",
-            "amount": 615500,
+            "amount": 731000,
             "chart_of_accounts": {
               "name": "CERT Salaries & Wages"
             }
           },
           {
             "type": "credit",
-            "amount": 499427.72,
+            "amount": 595380.75,
             "chart_of_accounts": {
               "name": "CERT Bank Account"
             }
           },
           {
             "type": "credit",
-            "amount": 116072.28,
+            "amount": 135619.25,
             "chart_of_accounts": {
               "name": "CERT Payroll Liabilities"
             }
           },
           {
             "type": "debit",
-            "amount": 7943.84,
+            "amount": 8672.48,
             "chart_of_accounts": {
               "name": "CERT Salaries & Wages"
             }
           },
           {
             "type": "credit",
-            "amount": 7943.84,
+            "amount": 8672.48,
             "chart_of_accounts": {
               "name": "CERT Payroll Liabilities"
             }
@@ -1875,51 +2029,51 @@
       "request": {
         "method": "GENERATE_BANK_BATCH",
         "company_id": "be3855e9-d11c-48a8-8c39-10e12a0ff2df",
-        "runId": "375d29e4-78a6-41af-9804-9b8c2aedf927",
+        "runId": "31a1f2f3-35c8-4bb2-8150-70915bbb32b2",
         "format": "csv"
       },
       "response": {
         "run": {
-          "id": "375d29e4-78a6-41af-9804-9b8c2aedf927",
+          "id": "31a1f2f3-35c8-4bb2-8150-70915bbb32b2",
           "company_id": "be3855e9-d11c-48a8-8c39-10e12a0ff2df",
           "pay_period_start": "2026-11-01",
           "pay_period_end": "2026-11-30",
           "pay_date": "2026-11-30",
           "status": "finalized",
-          "created_at": "2026-10-09T15:31:32.951572+00:00",
-          "journal_entry_id": "fcad3fa5-83c8-48d7-bcf7-087804a9351c",
+          "created_at": "2026-10-09T17:06:08.741527+00:00",
+          "journal_entry_id": "31020719-d9c5-4ffa-af7b-5ed3d2056d05",
           "approved_by": "908ad90e-ee0e-4957-943d-ed1ec2fb843a",
-          "approved_at": "2026-10-09T15:31:39.91+00:00",
+          "approved_at": "2026-10-09T17:06:17.998+00:00",
           "processed_by": "908ad90e-ee0e-4957-943d-ed1ec2fb843a",
-          "processed_at": "2026-10-09T15:31:44.341408+00:00",
+          "processed_at": "2026-10-09T17:06:21.686339+00:00",
           "output_metadata": {
             "summary": {
-              "total_net": 499427.72,
+              "total_net": 595380.75,
               "pay_period": "2026-11-01 to 2026-11-30",
-              "total_gross": 615500,
-              "payroll_cost": 623443.84,
-              "employees_paid": 24,
-              "total_deductions": 116072.28,
-              "employer_contributions": 7943.84
+              "total_gross": 731000,
+              "payroll_cost": 739672.48,
+              "employees_paid": 30,
+              "total_deductions": 135619.25,
+              "employer_contributions": 8672.48
             },
             "recovered": false,
             "bank_batch": {
               "format": "csv",
               "status": "generated",
               "reference": "PAY-2026-11-30",
-              "generated_at": "2026-10-09T15:31:46.339Z",
-              "total_amount": 499427.7200000001,
-              "employee_count": 24
+              "generated_at": "2026-10-09T17:06:24.219Z",
+              "total_amount": 595380.75,
+              "employee_count": 30
             },
             "emails_sent": 0,
-            "processed_at": "2026-10-09T15:31:44.341408+00:00",
+            "processed_at": "2026-10-09T17:06:21.686339+00:00",
             "email_failures": [],
             "journal_posted": true,
             "posting_engine": true,
             "reports_generated": true,
             "summary_generated": true,
-            "payslips_generated": 24,
-            "posting_request_id": "20432430-20a6-4130-994f-d717c92e0d37",
+            "payslips_generated": 30,
+            "posting_request_id": "823aa2cf-0803-427b-918f-f554d2b87baf",
             "register_generated": true,
             "bank_file_generated": true,
             "generation_warnings": [
@@ -2148,6 +2302,55 @@
                 "employee_name": "Leaver Period-921958"
               },
               {
+                "code": "MISSING_RESIDENTIAL_ADDRESS",
+                "message": "Senior ETI-311903's residential address is incomplete (street, suburb or city, and postal code).",
+                "category": "sars",
+                "employee_id": "67d3a866-4bd8-4903-85b1-878450cd4b59",
+                "employee_name": "Senior ETI-311903"
+              },
+              {
+                "code": "MISSING_IDENTITY",
+                "message": "Leaver Period-434634 has no ID or passport number.",
+                "category": "sars",
+                "employee_id": "68658422-ceb8-463f-9195-fb67dd35b975",
+                "employee_name": "Leaver Period-434634"
+              },
+              {
+                "code": "MISSING_RESIDENTIAL_ADDRESS",
+                "message": "Leaver Period-434634's residential address is incomplete (street, suburb or city, and postal code).",
+                "category": "sars",
+                "employee_id": "68658422-ceb8-463f-9195-fb67dd35b975",
+                "employee_name": "Leaver Period-434634"
+              },
+              {
+                "code": "MISSING_BANK_ACCOUNT_TYPE",
+                "message": "Leaver Period-434634's bank account type (current, savings, …) is not set.",
+                "category": "sars",
+                "employee_id": "68658422-ceb8-463f-9195-fb67dd35b975",
+                "employee_name": "Leaver Period-434634"
+              },
+              {
+                "code": "MISSING_IDENTITY",
+                "message": "LeavePay Freq-496536 has no ID or passport number.",
+                "category": "sars",
+                "employee_id": "5e892117-b99b-41b7-bb00-2d32e0fb3d90",
+                "employee_name": "LeavePay Freq-496536"
+              },
+              {
+                "code": "MISSING_RESIDENTIAL_ADDRESS",
+                "message": "LeavePay Freq-496536's residential address is incomplete (street, suburb or city, and postal code).",
+                "category": "sars",
+                "employee_id": "5e892117-b99b-41b7-bb00-2d32e0fb3d90",
+                "employee_name": "LeavePay Freq-496536"
+              },
+              {
+                "code": "MISSING_BANK_ACCOUNT_TYPE",
+                "message": "LeavePay Freq-496536's bank account type (current, savings, …) is not set.",
+                "category": "sars",
+                "employee_id": "5e892117-b99b-41b7-bb00-2d32e0fb3d90",
+                "employee_name": "LeavePay Freq-496536"
+              },
+              {
                 "code": "MISSING_IDENTITY",
                 "message": "LeavePay Freq-202366 has no ID or passport number.",
                 "category": "sars",
@@ -2223,6 +2426,27 @@
                 "category": "sars",
                 "employee_id": "82aeb1e6-ae6e-4f5a-b5ac-86f38e2497a7",
                 "employee_name": "Leaver Period-291703"
+              },
+              {
+                "code": "MISSING_RESIDENTIAL_ADDRESS",
+                "message": "Low ETI-311903's residential address is incomplete (street, suburb or city, and postal code).",
+                "category": "sars",
+                "employee_id": "4e7788d8-4e5e-4d87-82a2-3650fa1030cf",
+                "employee_name": "Low ETI-311903"
+              },
+              {
+                "code": "MISSING_RESIDENTIAL_ADDRESS",
+                "message": "Pensioner Period-434634's residential address is incomplete (street, suburb or city, and postal code).",
+                "category": "sars",
+                "employee_id": "06d3aafa-3c81-4968-bc98-fe37564cbea1",
+                "employee_name": "Pensioner Period-434634"
+              },
+              {
+                "code": "MISSING_BANK_ACCOUNT_TYPE",
+                "message": "Pensioner Period-434634's bank account type (current, savings, …) is not set.",
+                "category": "sars",
+                "employee_id": "06d3aafa-3c81-4968-bc98-fe37564cbea1",
+                "employee_name": "Pensioner Period-434634"
               },
               {
                 "code": "MISSING_IDENTITY",
@@ -2302,6 +2526,13 @@
                 "employee_name": "LeavePay Freq-055707"
               },
               {
+                "code": "MISSING_RESIDENTIAL_ADDRESS",
+                "message": "Youth ETI-311903's residential address is incomplete (street, suburb or city, and postal code).",
+                "category": "sars",
+                "employee_id": "16b4533b-9e1c-49af-9e6a-d3efe24d8cf4",
+                "employee_name": "Youth ETI-311903"
+              },
+              {
                 "code": "MISSING_IDENTITY",
                 "message": "LeavePay Freq-497531 has no ID or passport number.",
                 "category": "sars",
@@ -2379,10 +2610,10 @@
                 "employee_name": "Leaver Period-448093"
               }
             ],
-            "generation_warnings_at": "2026-10-09T15:31:37.297Z"
+            "generation_warnings_at": "2026-10-09T17:06:15.020Z"
           },
           "rule_config": {},
-          "posting_request_id": "20432430-20a6-4130-994f-d717c92e0d37",
+          "posting_request_id": "823aa2cf-0803-427b-918f-f554d2b87baf",
           "pay_frequency": "monthly",
           "prepared_by": [
             "908ad90e-ee0e-4957-943d-ed1ec2fb843a"
@@ -2391,44 +2622,34 @@
         "bank_batch": {
           "status": "generated",
           "format": "csv",
-          "generated_at": "2026-10-09T15:31:46.339Z",
-          "employee_count": 24,
-          "total_amount": 499427.7200000001,
+          "generated_at": "2026-10-09T17:06:24.219Z",
+          "employee_count": 30,
+          "total_amount": 595380.75,
           "reference": "PAY-2026-11-30"
         },
         "bank_rows": [
-          {
-            "employee_name": "PayComp Live-20261008-202953",
-            "bank_name": "FNB",
-            "bank_branch_code": "250655",
-            "bank_account_number": "62000000002",
-            "net_pay": 23153.76,
-            "payment_amount": 23153.76,
-            "reference": "PAY-2026-11-30",
-            "payment_reference": "PAY-2026-11-30"
-          },
-          {
-            "employee_name": "PayComp Live-20261008-204016",
-            "bank_name": "FNB",
-            "bank_branch_code": "250655",
-            "bank_account_number": "62000000002",
-            "net_pay": 23864.88,
-            "payment_amount": 23864.88,
-            "reference": "PAY-2026-11-30",
-            "payment_reference": "PAY-2026-11-30"
-          },
           {
             "employee_name": "CERT Employee",
             "bank_name": null,
             "bank_branch_code": null,
             "bank_account_number": null,
-            "net_pay": 15804.39,
-            "payment_amount": 15804.39,
+            "net_pay": 15581.68,
+            "payment_amount": 15581.68,
             "reference": "PAY-2026-11-30",
             "payment_reference": "PAY-2026-11-30"
           },
           {
-            "employee_name": "PayComp Live-20261009-092821",
+            "employee_name": "Leaver Period-921958",
+            "bank_name": "FNB",
+            "bank_branch_code": "250655",
+            "bank_account_number": "62000000003",
+            "net_pay": 17383.31,
+            "payment_amount": 17383.31,
+            "reference": "PAY-2026-11-30",
+            "payment_reference": "PAY-2026-11-30"
+          },
+          {
+            "employee_name": "PayComp Live-20261009-104104",
             "bank_name": "FNB",
             "bank_branch_code": "250655",
             "bank_account_number": "62000000002",
@@ -2438,22 +2659,82 @@
             "payment_reference": "PAY-2026-11-30"
           },
           {
-            "employee_name": "Leaver Period-291703",
+            "employee_name": "PayComp Live-20261009-092821",
             "bank_name": "FNB",
             "bank_branch_code": "250655",
-            "bank_account_number": "62000000003",
-            "net_pay": 17885,
-            "payment_amount": 17885,
+            "bank_account_number": "62000000002",
+            "net_pay": 24879.5,
+            "payment_amount": 24879.5,
             "reference": "PAY-2026-11-30",
             "payment_reference": "PAY-2026-11-30"
           },
           {
-            "employee_name": "Leaver Period-018823",
+            "employee_name": "LeavePay Freq-496536",
+            "bank_name": "FNB",
+            "bank_branch_code": "250655",
+            "bank_account_number": "62000000004",
+            "net_pay": 25141.88,
+            "payment_amount": 25141.88,
+            "reference": "PAY-2026-11-30",
+            "payment_reference": "PAY-2026-11-30"
+          },
+          {
+            "employee_name": "Low ETI-311903",
+            "bank_name": null,
+            "bank_branch_code": null,
+            "bank_account_number": null,
+            "net_pay": 3960,
+            "payment_amount": 3960,
+            "reference": "PAY-2026-11-30",
+            "payment_reference": "PAY-2026-11-30"
+          },
+          {
+            "employee_name": "LeavePay Freq-055707",
+            "bank_name": "FNB",
+            "bank_branch_code": "250655",
+            "bank_account_number": "62000000004",
+            "net_pay": 25319,
+            "payment_amount": 25319,
+            "reference": "PAY-2026-11-30",
+            "payment_reference": "PAY-2026-11-30"
+          },
+          {
+            "employee_name": "Low ETI-338136",
+            "bank_name": null,
+            "bank_branch_code": null,
+            "bank_account_number": null,
+            "net_pay": 3960,
+            "payment_amount": 3960,
+            "reference": "PAY-2026-11-30",
+            "payment_reference": "PAY-2026-11-30"
+          },
+          {
+            "employee_name": "Senior ETI-311903",
+            "bank_name": null,
+            "bank_branch_code": null,
+            "bank_account_number": null,
+            "net_pay": 25141.88,
+            "payment_amount": 25141.88,
+            "reference": "PAY-2026-11-30",
+            "payment_reference": "PAY-2026-11-30"
+          },
+          {
+            "employee_name": "Pensioner Period-291703",
             "bank_name": "FNB",
             "bank_branch_code": "250655",
             "bank_account_number": "62000000003",
-            "net_pay": 17707.88,
-            "payment_amount": 17707.88,
+            "net_pay": 22075.23,
+            "payment_amount": 22075.23,
+            "reference": "PAY-2026-11-30",
+            "payment_reference": "PAY-2026-11-30"
+          },
+          {
+            "employee_name": "Pensioner Period-018823",
+            "bank_name": "FNB",
+            "bank_branch_code": "250655",
+            "bank_account_number": "62000000003",
+            "net_pay": 22432.75,
+            "payment_amount": 22432.75,
             "reference": "PAY-2026-11-30",
             "payment_reference": "PAY-2026-11-30"
           },
@@ -2468,7 +2749,37 @@
             "payment_reference": "PAY-2026-11-30"
           },
           {
-            "employee_name": "Pensioner Period-448093",
+            "employee_name": "PayComp Live-20261008-202953",
+            "bank_name": "FNB",
+            "bank_branch_code": "250655",
+            "bank_account_number": "62000000002",
+            "net_pay": 22794.33,
+            "payment_amount": 22794.33,
+            "reference": "PAY-2026-11-30",
+            "payment_reference": "PAY-2026-11-30"
+          },
+          {
+            "employee_name": "Leaver Period-641743",
+            "bank_name": "FNB",
+            "bank_branch_code": "250655",
+            "bank_account_number": "62000000003",
+            "net_pay": 16934.96,
+            "payment_amount": 16934.96,
+            "reference": "PAY-2026-11-30",
+            "payment_reference": "PAY-2026-11-30"
+          },
+          {
+            "employee_name": "PayComp Live-20261008-204016",
+            "bank_name": "FNB",
+            "bank_branch_code": "250655",
+            "bank_account_number": "62000000002",
+            "net_pay": 23373.89,
+            "payment_amount": 23373.89,
+            "reference": "PAY-2026-11-30",
+            "payment_reference": "PAY-2026-11-30"
+          },
+          {
+            "employee_name": "Pensioner Period-434634",
             "bank_name": "FNB",
             "bank_branch_code": "250655",
             "bank_account_number": "62000000003",
@@ -2478,127 +2789,17 @@
             "payment_reference": "PAY-2026-11-30"
           },
           {
-            "employee_name": "PayComp Live-20261009-114317",
-            "bank_name": "FNB",
-            "bank_branch_code": "250655",
-            "bank_account_number": "62000000002",
-            "net_pay": 26582,
-            "payment_amount": 26582,
-            "reference": "PAY-2026-11-30",
-            "payment_reference": "PAY-2026-11-30"
-          },
-          {
-            "employee_name": "LeavePay Freq-055707",
-            "bank_name": "FNB",
-            "bank_branch_code": "250655",
-            "bank_account_number": "62000000004",
-            "net_pay": 25141.88,
-            "payment_amount": 25141.88,
-            "reference": "PAY-2026-11-30",
-            "payment_reference": "PAY-2026-11-30"
-          },
-          {
-            "employee_name": "Senior ETI-338136",
+            "employee_name": "Youth ETI-311903",
             "bank_name": null,
             "bank_branch_code": null,
             "bank_account_number": null,
-            "net_pay": 25141.88,
-            "payment_amount": 25141.88,
+            "net_pay": 6435,
+            "payment_amount": 6435,
             "reference": "PAY-2026-11-30",
             "payment_reference": "PAY-2026-11-30"
           },
           {
-            "employee_name": "Leaver Period-448093",
-            "bank_name": "FNB",
-            "bank_branch_code": "250655",
-            "bank_account_number": "62000000003",
-            "net_pay": 17707.88,
-            "payment_amount": 17707.88,
-            "reference": "PAY-2026-11-30",
-            "payment_reference": "PAY-2026-11-30"
-          },
-          {
-            "employee_name": "LeavePay Freq-202366",
-            "bank_name": "FNB",
-            "bank_branch_code": "250655",
-            "bank_account_number": "62000000004",
-            "net_pay": 25004.09,
-            "payment_amount": 25004.09,
-            "reference": "PAY-2026-11-30",
-            "payment_reference": "PAY-2026-11-30"
-          },
-          {
-            "employee_name": "PayComp Live-20261008-205301",
-            "bank_name": "FNB",
-            "bank_branch_code": "250655",
-            "bank_account_number": "62000000002",
-            "net_pay": 24400.14,
-            "payment_amount": 24400.14,
-            "reference": "PAY-2026-11-30",
-            "payment_reference": "PAY-2026-11-30"
-          },
-          {
-            "employee_name": "Pensioner Period-641743",
-            "bank_name": "FNB",
-            "bank_branch_code": "250655",
-            "bank_account_number": "62000000003",
-            "net_pay": 21454.73,
-            "payment_amount": 21454.73,
-            "reference": "PAY-2026-11-30",
-            "payment_reference": "PAY-2026-11-30"
-          },
-          {
-            "employee_name": "PayComp Live-20261009-092443",
-            "bank_name": "FNB",
-            "bank_branch_code": "250655",
-            "bank_account_number": "62000000002",
-            "net_pay": 24879.5,
-            "payment_amount": 24879.5,
-            "reference": "PAY-2026-11-30",
-            "payment_reference": "PAY-2026-11-30"
-          },
-          {
-            "employee_name": "Leaver Period-921958",
-            "bank_name": "FNB",
-            "bank_branch_code": "250655",
-            "bank_account_number": "62000000003",
-            "net_pay": 17641.64,
-            "payment_amount": 17641.64,
-            "reference": "PAY-2026-11-30",
-            "payment_reference": "PAY-2026-11-30"
-          },
-          {
-            "employee_name": "Leaver Period-641743",
-            "bank_name": "FNB",
-            "bank_branch_code": "250655",
-            "bank_account_number": "62000000003",
-            "net_pay": 17148.46,
-            "payment_amount": 17148.46,
-            "reference": "PAY-2026-11-30",
-            "payment_reference": "PAY-2026-11-30"
-          },
-          {
-            "employee_name": "Pensioner Period-921958",
-            "bank_name": "FNB",
-            "bank_branch_code": "250655",
-            "bank_account_number": "62000000003",
-            "net_pay": 22075.23,
-            "payment_amount": 22075.23,
-            "reference": "PAY-2026-11-30",
-            "payment_reference": "PAY-2026-11-30"
-          },
-          {
-            "employee_name": "PayComp Live-20261009-104104",
-            "bank_name": "FNB",
-            "bank_branch_code": "250655",
-            "bank_account_number": "62000000002",
-            "net_pay": 25959.64,
-            "payment_amount": 25959.64,
-            "reference": "PAY-2026-11-30",
-            "payment_reference": "PAY-2026-11-30"
-          },
-          {
-            "employee_name": "Pensioner Period-291703",
+            "employee_name": "Pensioner Period-448093",
             "bank_name": "FNB",
             "bank_branch_code": "250655",
             "bank_account_number": "62000000003",
@@ -2608,12 +2809,62 @@
             "payment_reference": "PAY-2026-11-30"
           },
           {
-            "employee_name": "Pensioner Period-018823",
+            "employee_name": "PayComp Live-20261009-092443",
+            "bank_name": "FNB",
+            "bank_branch_code": "250655",
+            "bank_account_number": "62000000002",
+            "net_pay": 24400.14,
+            "payment_amount": 24400.14,
+            "reference": "PAY-2026-11-30",
+            "payment_reference": "PAY-2026-11-30"
+          },
+          {
+            "employee_name": "PayComp Live-20261008-205301",
+            "bank_name": "FNB",
+            "bank_branch_code": "250655",
+            "bank_account_number": "62000000002",
+            "net_pay": 23860.49,
+            "payment_amount": 23860.49,
+            "reference": "PAY-2026-11-30",
+            "payment_reference": "PAY-2026-11-30"
+          },
+          {
+            "employee_name": "Pensioner Period-641743",
             "bank_name": "FNB",
             "bank_branch_code": "250655",
             "bank_account_number": "62000000003",
-            "net_pay": 22255.63,
-            "payment_amount": 22255.63,
+            "net_pay": 21109.3,
+            "payment_amount": 21109.3,
+            "reference": "PAY-2026-11-30",
+            "payment_reference": "PAY-2026-11-30"
+          },
+          {
+            "employee_name": "Pensioner Period-921958",
+            "bank_name": "FNB",
+            "bank_branch_code": "250655",
+            "bank_account_number": "62000000003",
+            "net_pay": 21750.21,
+            "payment_amount": 21750.21,
+            "reference": "PAY-2026-11-30",
+            "payment_reference": "PAY-2026-11-30"
+          },
+          {
+            "employee_name": "LeavePay Freq-202366",
+            "bank_name": "FNB",
+            "bank_branch_code": "250655",
+            "bank_account_number": "62000000004",
+            "net_pay": 24612.81,
+            "payment_amount": 24612.81,
+            "reference": "PAY-2026-11-30",
+            "payment_reference": "PAY-2026-11-30"
+          },
+          {
+            "employee_name": "PayComp Live-20261009-114317",
+            "bank_name": "FNB",
+            "bank_branch_code": "250655",
+            "bank_account_number": "62000000002",
+            "net_pay": 25959.64,
+            "payment_amount": 25959.64,
             "reference": "PAY-2026-11-30",
             "payment_reference": "PAY-2026-11-30"
           },
@@ -2622,18 +2873,58 @@
             "bank_name": "FNB",
             "bank_branch_code": "250655",
             "bank_account_number": "62000000004",
-            "net_pay": 25141.88,
-            "payment_amount": 25141.88,
+            "net_pay": 25319,
+            "payment_amount": 25319,
             "reference": "PAY-2026-11-30",
             "payment_reference": "PAY-2026-11-30"
           },
           {
-            "employee_name": "Low ETI-338136",
+            "employee_name": "Leaver Period-448093",
+            "bank_name": "FNB",
+            "bank_branch_code": "250655",
+            "bank_account_number": "62000000003",
+            "net_pay": 17885,
+            "payment_amount": 17885,
+            "reference": "PAY-2026-11-30",
+            "payment_reference": "PAY-2026-11-30"
+          },
+          {
+            "employee_name": "Leaver Period-434634",
+            "bank_name": "FNB",
+            "bank_branch_code": "250655",
+            "bank_account_number": "62000000003",
+            "net_pay": 17707.88,
+            "payment_amount": 17707.88,
+            "reference": "PAY-2026-11-30",
+            "payment_reference": "PAY-2026-11-30"
+          },
+          {
+            "employee_name": "Leaver Period-291703",
+            "bank_name": "FNB",
+            "bank_branch_code": "250655",
+            "bank_account_number": "62000000003",
+            "net_pay": 17641.64,
+            "payment_amount": 17641.64,
+            "reference": "PAY-2026-11-30",
+            "payment_reference": "PAY-2026-11-30"
+          },
+          {
+            "employee_name": "Leaver Period-018823",
+            "bank_name": "FNB",
+            "bank_branch_code": "250655",
+            "bank_account_number": "62000000003",
+            "net_pay": 17885,
+            "payment_amount": 17885,
+            "reference": "PAY-2026-11-30",
+            "payment_reference": "PAY-2026-11-30"
+          },
+          {
+            "employee_name": "Senior ETI-338136",
             "bank_name": null,
             "bank_branch_code": null,
             "bank_account_number": null,
-            "net_pay": 3960,
-            "payment_amount": 3960,
+            "net_pay": 25319,
+            "payment_amount": 25319,
             "reference": "PAY-2026-11-30",
             "payment_reference": "PAY-2026-11-30"
           }
@@ -2643,9 +2934,9 @@
       "evidence": {
         "status": "generated",
         "format": "csv",
-        "generated_at": "2026-10-09T15:31:46.339Z",
-        "employee_count": 24,
-        "total_amount": 499427.7200000001,
+        "generated_at": "2026-10-09T17:06:24.219Z",
+        "employee_count": 30,
+        "total_amount": 595380.75,
         "reference": "PAY-2026-11-30"
       }
     },
@@ -2654,7 +2945,7 @@
       "step": "Payroll Register",
       "status": "PASS",
       "response": {
-        "rowCount": 24
+        "rowCount": 30
       }
     },
     {
@@ -2662,19 +2953,19 @@
       "step": "Payroll Summary",
       "status": "PASS",
       "response": {
-        "employees_paid": 24,
-        "total_gross": 615500,
-        "total_net": 499427.7200000001,
-        "total_paye": 114727.44,
-        "total_uif": 2689.6799999999994,
-        "total_sdl": 6599,
+        "employees_paid": 30,
+        "total_gross": 731000,
+        "total_net": 595380.75,
+        "total_paye": 134700.77,
+        "total_uif": 1836.9599999999996,
+        "total_sdl": 7754,
         "total_pension": 0,
-        "employer_contributions": 7943.839999999999,
-        "payroll_cost": 623443.84,
-        "variance_previous": 495035.07000000007,
+        "employer_contributions": 8672.48,
+        "payroll_cost": 739672.48,
+        "variance_previous": 590988.1,
         "variance_budget": null,
         "pay_period": "2026-11-01 to 2026-11-30",
-        "total_deductions": 116072.28000000001
+        "total_deductions": 135619.24999999997
       }
     },
     {
@@ -2682,8 +2973,8 @@
       "step": "Period Reports",
       "status": "PASS",
       "response": {
-        "runCount": 20,
-        "payslipCount": 99
+        "runCount": 25,
+        "payslipCount": 145
       }
     },
     {
@@ -2706,28 +2997,28 @@
       "step": "Dashboard workspace summary",
       "status": "PASS",
       "response": {
-        "employeeCount": 39,
-        "estimatedMonthlyPayroll": 868500,
+        "employeeCount": 48,
+        "estimatedMonthlyPayroll": 1057666.6666666665,
         "draftPayrollRuns": 0,
         "pendingClaims": 0,
         "approvedClaimsAwaitingReimbursement": 0,
-        "employeesNeedingAction": 8,
+        "employeesNeedingAction": 11,
         "upcomingPayDate": null,
         "draftRunEstimatedCost": 0,
-        "lastProcessedNetPay": 307923.06999999995,
+        "lastProcessedNetPay": 464972.66000000003,
         "payrollVariance": 0,
         "payrollReady": false,
-        "lastProcessedGross": 387483.87,
-        "lastProcessedPaye": 78757.48,
-        "lastProcessedUif": 1606.6399999999999,
-        "lastProcessedSdl": 4244.84,
+        "lastProcessedGross": 584467.74,
+        "lastProcessedPaye": 118586.76000000001,
+        "lastProcessedUif": 1816.6399999999999,
+        "lastProcessedSdl": 6288.68,
         "bankBatchStatus": "not_generated",
-        "payslipGenerationStatus": "15 generated",
+        "payslipGenerationStatus": "25 generated",
         "upcomingPayrollRunStatus": null,
         "draftPayrollRunCount": 0
       },
       "evidence": {
-        "durationMs": 686
+        "durationMs": 820
       }
     },
     {
@@ -2735,8 +3026,8 @@
       "step": "Historical values unchanged",
       "status": "PASS",
       "evidence": {
-        "firstNetPay": 23153.76,
-        "secondNetPay": 23153.76
+        "firstNetPay": 15581.68,
+        "secondNetPay": 15581.68
       }
     },
     {

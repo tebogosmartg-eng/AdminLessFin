@@ -317,3 +317,37 @@ test('EMP201: prepare a month and download the filed return', async ({ page }) =
   expect((await pdf).suggestedFilename()).toMatch(/^EMP201_202701_v\d+\.pdf$/);
   await shot(page, '09-emp201');
 });
+
+test('statutory returns: filing calendar, EMP501 certificates and the e@syFile file', async ({ page }) => {
+  // Relies on tests/e2e/run-payroll-statutory-workspace-live.ts having filed the 2026 interim EMP501 for CERT TX.
+  await page.goto('/');
+  await waitForRouteSettled(page);
+  await ensureReadyCompany(page);
+  await page.goto('/statutory-returns');
+  await waitForRouteSettled(page);
+  await expectNoErrorBoundary(page);
+  await page.getByRole('combobox', { name: 'Tax year' }).click();
+  await page.getByRole('option', { name: 'March 2025 – February 2026' }).click();
+  const june = page.getByTestId('statutory-month-2025-06');
+  await expect(june).toContainText('Paid', { timeout: 30_000 });
+  await expect(june).toContainText('7 Jul 2025');
+  await expect(page.getByTestId('statutory-emp501-interim')).toContainText(/To submit|Awaiting approval|Submitted/);
+
+  await page.getByRole('tab', { name: /EMP501/ }).click();
+  const panel = page.getByTestId('emp501-panel');
+  await panel.getByRole('combobox', { name: 'Reconciliation' }).click();
+  await page.getByRole('option', { name: /Interim/ }).click();
+  await expect(panel.getByTestId('emp501-history')).toContainText('202508', { timeout: 30_000 });
+  await expect(panel.getByTestId('tax-certificates')).toContainText('IT3(a)', { timeout: 30_000 });
+  const row = panel.getByTestId('emp501-history').getByRole('row').filter({ hasNotText: 'Replaced' }).filter({ hasText: '202508' }).first();
+  const easyFile = page.waitForEvent('download');
+  await row.getByRole('button', { name: /e@syFile \(test\)/ }).click();
+  expect((await easyFile).suggestedFilename()).toMatch(/^EMP501_\d{10}_202508_Interim_TEST\.csv$/);
+  const pdf = page.waitForEvent('download');
+  await panel.getByRole('button', { name: /All certificates/ }).click();
+  expect((await pdf).suggestedFilename()).toMatch(/^Certificates_202508_v\d+\.pdf$/);
+
+  await panel.getByRole('button', { name: 'Reconcile' }).click();
+  await expect(panel.getByTestId('emp501-reconciliation')).toContainText('2025-06', { timeout: 60_000 });
+  await shot(page, '10-emp501');
+});

@@ -11,6 +11,7 @@
  */
 
 export const IRP5_INCOME = '3601';
+/** Retired by SARS after the 2018 year of assessment; directors' pay is reported under 3601. */
 export const IRP5_DIRECTORS_REMUNERATION = '3615';
 
 /** Rule engine lines (basic salary and fund contributions). */
@@ -31,9 +32,13 @@ const ENGINE_IRP5_CODES: Record<string, string> = {
   sdl: '4142',
 };
 
-/** IRP5 code for a rule engine line; basic salary is director's remuneration for a director. */
-export function irp5CodeForRuleLine(ruleId: string, options: { isDirector?: boolean } = {}): string | null {
-  if (ruleId === 'basic_salary') return options.isDirector ? IRP5_DIRECTORS_REMUNERATION : IRP5_INCOME;
+/**
+ * IRP5 code for a rule engine line. Basic salary is 3601 for directors too: SARS accepts
+ * 3615 only up to the 2018 year of assessment (BRS V25.3.0). Directors are still taxed
+ * as directors by the PAYE engine.
+ */
+export function irp5CodeForRuleLine(ruleId: string, _options: { isDirector?: boolean } = {}): string | null {
+  if (ruleId === 'basic_salary') return IRP5_INCOME;
   return RULE_IRP5_CODES[ruleId] ?? null;
 }
 
@@ -46,7 +51,7 @@ export function irp5CodeForEngineLine(engineId: string): string | null {
 export const IRP5_CODE_LABELS: Record<string, string> = {
   '3601': 'Income (taxable)',
   '3605': 'Annual payment (bonus, leave pay)',
-  '3615': "Director's remuneration",
+  '3615': "Director's remuneration (before 2019; reported under 3601)",
   '3701': 'Travel allowance',
   '3704': 'Subsistence allowance (taxable excess)',
   '3713': 'Other allowances (taxable)',

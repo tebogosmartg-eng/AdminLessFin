@@ -283,6 +283,19 @@ describe('Bank File Generator', () => {
     expect(lines[2]).toContain('"Absa"');
   });
 
+  it('CSV doubles embedded quotes and keeps each payment on one line; EFT strips the pipe', () => {
+    const tricky = [{ ...rows[0], employee_name: 'Anne "Annie"\nSmith', reference: 'PAY|X' }];
+    const csv = buildBankPaymentFileContent(tricky, '2026-04', '2026-04-25', 'csv');
+    const line = csv.split('\n')[1];
+    expect(line.startsWith('"Anne ""Annie"" Smith",')).toBe(true);
+    expect(line).toContain('"PAY|X"');
+    const eft = buildBankPaymentFileContent(tricky, '2026-04', '2026-04-25', 'eft');
+    const detail = eft.split('\n')[1].split('|');
+    expect(detail).toHaveLength(8);
+    expect(detail[5]).toBe('ANNE "ANNIE" SMITH');
+    expect(detail[6]).toBe('PAY X');
+  });
+
   it('server bank rows take precedence over blank client cache', () => {
     // Simulates the scenario where server returns authoritative bank_rows
     // and client-side cache has empty bank fields.

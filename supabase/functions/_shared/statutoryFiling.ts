@@ -8,13 +8,33 @@ import { ageOn, birthDateFromSaId } from './payrollRulesEngine/periodEmployment.
 import { payslipOrdinaryHours } from './sars/eti.ts';
 import { buildEmp201, type Emp201Declaration, type Emp201Employee, type Emp201Payslip } from './sars/emp201.ts';
 import { isValidSaIdNumber } from './sars/sarsNumbers.ts';
-import { normaliseEmployerProfile, validateEmployerProfile } from './sars/employerProfile.ts';
+import { normaliseEmployerProfile, validateEmployerProfile, type EmployerProfile } from './sars/employerProfile.ts';
+import {
+  buildTaxCertificate,
+  reconcileEmp501,
+  type CertificateEmployee,
+  type CertificateEtiMonth,
+  type CertificatePayslip,
+  type Emp501Reconciliation,
+  type ReconciliationEmp201,
+  type TaxCertificate,
+} from './sars/emp501.ts';
+import {
+  emp201DueDate,
+  emp501Window,
+  isOverdue,
+  monthFilingState,
+  monthsOfReconciliation,
+  monthsOfYear,
+  reconciliationPeriod,
+  type Emp501Kind,
+} from './sars/statutoryCalendar.ts';
 
 const FINALIZED_RUN_STATUSES = ['finalized', 'paid'];
 const PAGE_SIZE = 1000;
 const PAYE_ENGINES = new Set(['paye', 'directors_paye', 'bonus_tax', 'termination_tax']);
 
-export type FilingIssue = { severity: 'error' | 'warning'; code: string; message: string };
+export type FilingIssue = { severity: 'error' | 'warning'; code: string; message: string; employeeId?: string };
 
 const round2 = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100;
 
@@ -72,17 +92,18 @@ export function emp201AmountsFromPayslip(row: {
   };
 }
 
-async function loadMonthPayslips(admin, companyId: string, month: string) {
-  const { start, end } = monthBounds(month);
+/** Finalised payslips paid between two dates, with the run each came from. */
+async function loadFinalisedPayslips(admin, companyId: string, start: string, end: string) {
   const { data: runs, error } = await admin
     .from('payroll_runs')
-    .select('id, status, pay_date, output_metadata')
+    .select('id, status, pay_date, pay_period_start, output_metadata')
     .eq('company_id', companyId)
     .gte('pay_date', start)
     .lte('pay_date', end);
   if (error) throw error;
   const finalised = (runs ?? []).filter((r) => FINALIZED_RUN_STATUSES.includes(r.status) && r.output_metadata?.cancelled !== true);
   const notFinalised = (runs ?? []).filter((r) => !FINALIZED_RUN_STATUSES.includes(r.status));
+  const runById = new Map(finalised.map((r) => [r.id, r]));
   const payDateByRun = new Map(finalised.map((r) => [r.id, r.pay_date]));
   const rows = [];
   if (finalised.length) {
@@ -99,7 +120,12 @@ async function loadMonthPayslips(admin, companyId: string, month: string) {
       if ((data ?? []).length < PAGE_SIZE) break;
     }
   }
-  return { rows, payDateByRun, notFinalised };
+  return { rows, payDateByRun, runById, notFinalised, finalisedRuns: finalised };
+}
+
+async function loadMonthPayslips(admin, companyId: string, month: string) {
+  const { start, end } = monthBounds(month);
+  return loadFinalisedPayslips(admin, companyId, start, end);
 }
 
 /** Active (not superseded) filed returns of a type, oldest first. */
@@ -218,4 +244,321 @@ export async function prepareEmp201(admin, companyId: string, month: string): Pr
 export async function sha256Hex(text: string): Promise<string> {
   const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text));
   return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, '0')).join('');
+}
+
+// ── EMP501 ────────────────────────────────────────────────────────────────
+
+/**
+ * Medical scheme fees tax credit allowed on a payslip: the period's share of the annual
+ * credit, never more than the tax it reduced (PAYE breakdown before credits and rebates).
+ */
+export function medicalCreditOnPayslip(snapshot: Record<string, any> | null): number {
+  const engines = Array.isArray(snapshot?.engine_results) ? snapshot!.engine_results : [];
+  const medical = engines.find((e) => e.engine_id === 'medical_tax_credit');
+  if (!medical || medical.skip_reason || medical.skipReason) return 0;
+  const annualCredit = Number(medical.breakdown?.annualCredit) || 0;
+  if (annualCredit <= 0) return 0;
+  const paye = engines.find((e) => e.engine_id === 'paye' || e.engine_id === 'directors_paye');
+  const before = Number(paye?.breakdown?.annualTaxBeforeCredits);
+  const rebate = Number(paye?.breakdown?.annualRebate) || 0;
+  const usable = Number.isFinite(before) ? Math.min(annualCredit, Math.max(0, before - rebate)) : annualCredit;
+  const period = snapshot?.period_employment ?? {};
+  const periods = Number(period.periods_per_year) || 12;
+  const fraction = Number(period.pro_rata_factor ?? 1);
+  return round2((usable / periods) * (Number.isFinite(fraction) ? fraction : 1));
+}
+
+function certificatePayslip(row, run): CertificatePayslip {
+  const snapshot = row.calculation_snapshot ?? {};
+  const period = snapshot.period_employment ?? {};
+  return {
+    payslipId: row.id,
+    employeeId: row.employee_id,
+    month: String(run.pay_date).slice(0, 7),
+    periodKey: `${run.pay_period_start ?? run.pay_date}`,
+    periodsPerYear: Number(period.periods_per_year) || 12,
+    periodFraction: Number(period.pro_rata_factor ?? 1),
+    items: (row.payslip_items ?? []).map((i) => ({ code: i.irp5_code ?? null, amount: Number(i.amount) || 0 })),
+    medicalCredit: medicalCreditOnPayslip(snapshot),
+  };
+}
+
+export function certificateEmployee(e: Record<string, any>, asAt: string): CertificateEmployee {
+  const dob = e.date_of_birth || birthDateFromSaId(e.id_number, asAt) || null;
+  return {
+    id: e.id,
+    employeeNumber: e.employee_number ?? null,
+    firstName: (e.first_name ?? '').trim(),
+    lastName: (e.last_name ?? '').trim(),
+    idNumber: e.id_number ?? null,
+    passportNumber: e.passport_number ?? null,
+    passportCountry: e.passport_country ?? null,
+    dateOfBirth: dob,
+    taxNumber: e.tax_number ?? null,
+    natureOfPerson: e.nature_of_person ?? null,
+    email: e.email ?? null,
+    phone: e.phone ?? null,
+    startDate: e.start_date ?? null,
+    endDate: e.end_date ?? null,
+    residential: {
+      unitNumber: e.residential_unit_number ?? null,
+      complex: e.residential_complex ?? null,
+      streetNumber: e.residential_street_number ?? null,
+      streetName: e.residential_street_name ?? null,
+      suburb: e.residential_suburb ?? null,
+      city: e.residential_city ?? null,
+      postalCode: e.residential_postal_code ?? null,
+    },
+    postalSameAsResidential: e.postal_same_as_residential !== false,
+    postalLines: [e.postal_address_line1, e.postal_address_line2, e.postal_address_line3].filter((l) => !!l && String(l).trim()),
+    postalCode: e.postal_code ?? null,
+    bankAccountType: e.bank_account_type ?? null,
+    bankAccountNumber: e.bank_account_number ?? null,
+    bankBranchCode: e.bank_branch_code ?? null,
+    bankName: e.bank_name ?? null,
+    etiEmploymentDate: e.eti_employment_date ?? null,
+    etiSezCode: e.eti_sez_code ?? null,
+  };
+}
+
+export async function loadPaymentsByReturn(admin, companyId: string, returnIds: string[]) {
+  const totals = new Map<string, number>();
+  if (!returnIds.length) return totals;
+  const { data, error } = await admin
+    .from('statutory_return_payments')
+    .select('statutory_return_id, amount')
+    .eq('company_id', companyId)
+    .in('statutory_return_id', returnIds)
+    .is('voided_at', null);
+  if (error) throw error;
+  for (const p of data ?? []) totals.set(p.statutory_return_id, round2((totals.get(p.statutory_return_id) ?? 0) + Number(p.amount)));
+  return totals;
+}
+
+const monthOfPeriod = (period: string) => `${period.slice(0, 4)}-${period.slice(4, 6)}`;
+
+function emp201Summary(ret): ReconciliationEmp201 {
+  const d = ret.declaration_data ?? {};
+  return {
+    returnId: ret.id,
+    month: monthOfPeriod(ret.period),
+    version: ret.version,
+    status: ret.status,
+    paye: Number(d.paye) || 0,
+    uif: Number(d.uif) || 0,
+    sdl: Number(d.sdl) || 0,
+    etiUtilised: Number(d.eti?.utilised) || 0,
+    totalPayable: Number(d.totalPayable) || 0,
+  };
+}
+
+export async function loadEmployerProfile(admin, companyId: string): Promise<{ profile: EmployerProfile | null; errors: string[] }> {
+  const { data, error } = await admin.from('company_payroll_employer_profile').select('*').eq('company_id', companyId).maybeSingle();
+  if (error) throw error;
+  if (!data) return { profile: null, errors: ['Capture the employer details for SARS under Settings → Payroll first.'] };
+  const profile = normaliseEmployerProfile(data);
+  return { profile, errors: validateEmployerProfile(profile).map((e) => `Employer details for SARS: ${e.message}`) };
+}
+
+export async function prepareEmp501(admin, companyId: string, yearOfAssessment: number, kind: Emp501Kind): Promise<{
+  certificates: TaxCertificate[];
+  reconciliation: Emp501Reconciliation;
+  issues: FilingIssue[];
+  profile: EmployerProfile | null;
+  sourceRunIds: string[];
+}> {
+  if (!Number.isInteger(yearOfAssessment) || yearOfAssessment < 2014 || yearOfAssessment > 2100) {
+    throw new Error('Year of assessment must be a year such as 2027.');
+  }
+  const months = monthsOfReconciliation(yearOfAssessment, kind);
+  const start = `${months[0]}-01`;
+  const end = monthBounds(months[months.length - 1]).end;
+  const periods = new Set(months.map((m) => m.replace('-', '')));
+
+  const [{ rows, runById, notFinalised, finalisedRuns }, { profile, errors: profileErrors }, employeesResult, emp201s] = await Promise.all([
+    loadFinalisedPayslips(admin, companyId, start, end),
+    loadEmployerProfile(admin, companyId),
+    admin.from('employees').select('*').eq('company_id', companyId),
+    loadActiveReturns(admin, companyId, 'EMP201'),
+  ]);
+  if (employeesResult.error) throw employeesResult.error;
+  const issues: FilingIssue[] = profileErrors.map((message) => ({ severity: 'error', code: 'EMPLOYER_PROFILE', message }));
+  for (const run of notFinalised) {
+    issues.push({ severity: 'warning', code: 'RUN_NOT_FINALISED', message: `A payroll run paid on ${run.pay_date} is still ${run.status} and is not included.` });
+  }
+
+  const yearEmp201s = emp201s.filter((r) => r.period && periods.has(r.period));
+  const payments = await loadPaymentsByReturn(admin, companyId, yearEmp201s.map((r) => r.id));
+
+  // ETI per employee per month, as filed on each month's EMP201.
+  const etiByEmployee = new Map<string, CertificateEtiMonth[]>();
+  for (const ret of yearEmp201s) {
+    const month = monthOfPeriod(ret.period);
+    for (const line of ret.declaration_data?.employees ?? []) {
+      if (!line?.eti) continue;
+      const list = etiByEmployee.get(line.employeeId) ?? [];
+      list.push({
+        month,
+        cycle: line.eti.cycle === 1 || line.eti.cycle === 2 ? line.eti.cycle : 0,
+        remunerationPaid: Number(line.eti.remunerationPaid) || 0,
+        hoursReported: Number(line.eti.hoursReported) || 0,
+        minimumWageHourly: Number(line.eti.minimumWageHourly) || 0,
+        wagePaidHourly: Number(line.eti.wagePaidHourly) || 0,
+        eti: Number(line.eti.eti) || 0,
+      });
+      etiByEmployee.set(line.employeeId, list);
+    }
+  }
+
+  const payslipsByEmployee = new Map<string, CertificatePayslip[]>();
+  for (const row of rows) {
+    const list = payslipsByEmployee.get(row.employee_id) ?? [];
+    list.push(certificatePayslip(row, runById.get(row.payroll_run_id)));
+    payslipsByEmployee.set(row.employee_id, list);
+  }
+  const employeeById = new Map((employeesResult.data ?? []).map((e) => [e.id, e]));
+  const certificates: TaxCertificate[] = [];
+  if (profile) {
+    for (const [employeeId, payslips] of payslipsByEmployee) {
+      const employee = employeeById.get(employeeId);
+      if (!employee) continue;
+      certificates.push(buildTaxCertificate({
+        yearOfAssessment,
+        kind,
+        employer: {
+          payeReference: profile.paye_reference,
+          sdlReference: profile.sdl_reference,
+          uifReference: profile.uif_reference,
+          sic7Code: profile.sic7_code,
+          businessPhone: profile.contact_business_phone ?? profile.contact_cell_phone,
+          workAddress: {
+            unitNumber: profile.address_unit_number, complex: profile.address_complex,
+            streetNumber: profile.address_street_number, streetName: profile.address_street_name,
+            suburb: profile.address_suburb, city: profile.address_city, postalCode: profile.address_postal_code,
+          },
+        },
+        employee: certificateEmployee(employee, end),
+        payslips,
+        etiMonths: (etiByEmployee.get(employeeId) ?? []).filter((m) => months.includes(m.month)),
+      }));
+    }
+    certificates.sort((a, b) => a.employeeName.localeCompare(b.employeeName));
+  }
+
+  const reconciliation = reconcileEmp501({
+    yearOfAssessment,
+    kind,
+    certificates,
+    emp201s: yearEmp201s.map(emp201Summary),
+    paymentsByMonth: Object.fromEntries(yearEmp201s.map((r) => [monthOfPeriod(r.period), payments.get(r.id) ?? 0])),
+    monthsWithPayroll: [...new Set(finalisedRuns.map((r) => String(r.pay_date).slice(0, 7)))],
+  });
+  if (!rows.length) issues.push({ severity: 'error', code: 'NO_FINALISED_PAYROLL', message: 'No finalised payroll was paid in this period.' });
+  return {
+    certificates,
+    reconciliation,
+    issues: [...issues, ...reconciliation.issues],
+    profile,
+    sourceRunIds: finalisedRuns.map((r) => r.id),
+  };
+}
+
+// ── Workspace ─────────────────────────────────────────────────────────────
+
+/** Today in South Africa (UTC+2, no daylight saving), YYYY-MM-DD. */
+export function todayInSouthAfrica(now = new Date()): string {
+  return new Date(now.getTime() + 2 * 3600_000).toISOString().slice(0, 10);
+}
+
+export async function loadStatutoryWorkspace(admin, companyId: string, yearOfAssessment: number) {
+  const months = monthsOfYear(yearOfAssessment);
+  const start = `${months[0]}-01`;
+  const end = monthBounds(months[11]).end;
+  const [runsResult, returnsResult, holidaysResult] = await Promise.all([
+    admin.from('payroll_runs').select('id, status, pay_date, output_metadata').eq('company_id', companyId).gte('pay_date', start).lte('pay_date', end),
+    admin.from('statutory_returns')
+      .select('id, return_type, period, status, version, filed_at, filed_by, approved_at, approved_by, self_approved, submitted_at, submission_reference, declaration_data, journal_entry_id')
+      .eq('company_id', companyId).in('return_type', ['EMP201', 'EMP501']).neq('status', 'superseded'),
+    admin.from('compliance_public_holidays').select('holiday_date').eq('country_code', 'ZA')
+      .gte('holiday_date', start).lte('holiday_date', `${yearOfAssessment}-06-30`),
+  ]);
+  if (runsResult.error) throw runsResult.error;
+  if (returnsResult.error) throw returnsResult.error;
+  if (holidaysResult.error) throw holidaysResult.error;
+  const holidays = new Set((holidaysResult.data ?? []).map((h) => String(h.holiday_date)));
+  const today = todayInSouthAfrica();
+  const runs = runsResult.data ?? [];
+  const returns = returnsResult.data ?? [];
+  const payments = await loadPaymentsByReturn(admin, companyId, returns.map((r) => r.id));
+
+  const monthRows = months.map((month) => {
+    const period = month.replace('-', '');
+    const monthRuns = runs.filter((r) => String(r.pay_date).startsWith(month) && r.output_metadata?.cancelled !== true);
+    const finalised = monthRuns.filter((r) => FINALIZED_RUN_STATUSES.includes(r.status));
+    const ret = returns.find((r) => r.return_type === 'EMP201' && r.period === period) ?? null;
+    const paid = ret ? payments.get(ret.id) ?? 0 : 0;
+    const totalPayable = Number(ret?.declaration_data?.totalPayable ?? 0);
+    const state = monthFilingState({
+      hasFinalisedPayroll: finalised.length > 0,
+      filed: ret ? { approved: !!ret.approved_at, submitted: ['submitted', 'accepted'].includes(ret.status), totalPayable } : null,
+      paid,
+    });
+    const dueDate = emp201DueDate(month, holidays);
+    return {
+      month,
+      period,
+      dueDate,
+      state,
+      overdue: isOverdue(state, dueDate, today),
+      finalisedRuns: finalised.length,
+      pendingRuns: monthRuns.length - finalised.length,
+      paid,
+      return: ret ? {
+        id: ret.id,
+        version: ret.version,
+        status: ret.status,
+        filedAt: ret.filed_at,
+        filedBy: ret.filed_by,
+        approvedAt: ret.approved_at,
+        approvedBy: ret.approved_by,
+        selfApproved: ret.self_approved,
+        submittedAt: ret.submitted_at,
+        submissionReference: ret.submission_reference,
+        paye: Number(ret.declaration_data?.paye ?? 0),
+        uif: Number(ret.declaration_data?.uif ?? 0),
+        sdl: Number(ret.declaration_data?.sdl ?? 0),
+        etiUtilised: Number(ret.declaration_data?.eti?.utilised ?? 0),
+        totalPayable,
+        journalEntryId: ret.journal_entry_id,
+      } : null,
+    };
+  });
+
+  const reconciliations = (['interim', 'annual'] as Emp501Kind[]).map((kind) => {
+    const period = reconciliationPeriod(yearOfAssessment, kind);
+    const ret = returns.find((r) => r.return_type === 'EMP501' && r.period === period) ?? null;
+    const window = emp501Window(yearOfAssessment, kind);
+    const done = !!ret && ['submitted', 'accepted'].includes(ret.status);
+    return {
+      kind,
+      period,
+      opens: window.opens,
+      due: window.due,
+      overdue: !done && today > window.due,
+      return: ret ? {
+        id: ret.id,
+        version: ret.version,
+        status: ret.status,
+        filedAt: ret.filed_at,
+        filedBy: ret.filed_by,
+        approvedAt: ret.approved_at,
+        approvedBy: ret.approved_by,
+        submittedAt: ret.submitted_at,
+        submissionReference: ret.submission_reference,
+        certificateCount: Number(ret.declaration_data?.certificateCount ?? 0),
+      } : null,
+    };
+  });
+
+  return { yearOfAssessment, today, months: monthRows, reconciliations };
 }
