@@ -20,7 +20,8 @@ export type RunWarningCode =
   | 'INVALID_ID_NUMBER'
   | 'MISSING_RESIDENTIAL_ADDRESS'
   | 'MISSING_BANK_ACCOUNT_TYPE'
-  | 'EMPLOYER_PROFILE_INCOMPLETE';
+  | 'EMPLOYER_PROFILE_INCOMPLETE'
+  | 'LEAVE_PAYOUT_DUE';
 
 export type RunWarning = {
   code: RunWarningCode;

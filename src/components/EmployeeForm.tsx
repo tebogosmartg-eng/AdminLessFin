@@ -108,6 +108,8 @@ const employeeSchema = z.object({
   nature_of_person: z.enum(['auto', 'A', 'B', 'C']).default('auto'),
   passport_number: z.string().optional(),
   ordinary_hours_per_week: optionalNumber(0.01, 168, 'Ordinary hours per week must be between 0 and 168.'),
+  work_days_per_week: optionalNumber(1, 7, 'Between 1 and 7 days.'),
+  annual_leave_days_per_cycle: optionalNumber(0.5, 60, 'Between 0.5 and 60 days.'),
   eti_employment_date: z.string().optional(),
   eti_sez_code: z.enum(['none', 'COE', 'DTP', 'EAL', 'MAP', 'SLB', 'RIB']).default('none'),
   eti_domestic_worker: z.boolean().default(false),
@@ -160,6 +162,8 @@ const EmployeeForm = ({ isOpen, setIsOpen, employee }: EmployeeFormProps) => {
         bank_account_type: (employee.bank_account_type ?? '') as EmployeeFormValues['bank_account_type'],
         nature_of_person: employee.nature_of_person ?? 'auto',
         ordinary_hours_per_week: employee.ordinary_hours_per_week != null ? String(employee.ordinary_hours_per_week) : '',
+        work_days_per_week: employee.work_days_per_week != null ? String(employee.work_days_per_week) : '',
+        annual_leave_days_per_cycle: employee.annual_leave_days_per_cycle != null ? String(employee.annual_leave_days_per_cycle) : '',
         eti_employment_date: employee.eti_employment_date || '',
         eti_sez_code: (employee.eti_sez_code ?? 'none') as EmployeeFormValues['eti_sez_code'],
         eti_domestic_worker: employee.eti_domestic_worker === true,
@@ -191,6 +195,8 @@ const EmployeeForm = ({ isOpen, setIsOpen, employee }: EmployeeFormProps) => {
         bank_account_type: '',
         nature_of_person: 'auto',
         ordinary_hours_per_week: '',
+        work_days_per_week: '',
+        annual_leave_days_per_cycle: '',
         eti_employment_date: '',
         eti_sez_code: 'none',
         eti_domestic_worker: false,
@@ -218,6 +224,8 @@ const EmployeeForm = ({ isOpen, setIsOpen, employee }: EmployeeFormProps) => {
         bank_account_type: values.bank_account_type || null,
         nature_of_person: values.nature_of_person === 'auto' ? null : values.nature_of_person,
         ordinary_hours_per_week: values.ordinary_hours_per_week?.trim() ? Number(values.ordinary_hours_per_week) : null,
+        work_days_per_week: values.work_days_per_week?.trim() ? Number(values.work_days_per_week) : null,
+        annual_leave_days_per_cycle: values.annual_leave_days_per_cycle?.trim() ? Number(values.annual_leave_days_per_cycle) : null,
         eti_employment_date: values.eti_employment_date || null,
         eti_sez_code: values.eti_sez_code === 'none' ? null : values.eti_sez_code,
         eti_domestic_worker: values.eti_domestic_worker,
@@ -413,7 +421,17 @@ const EmployeeForm = ({ isOpen, setIsOpen, employee }: EmployeeFormProps) => {
             </fieldset>
 
             <fieldset className="grid grid-cols-1 md:grid-cols-2 gap-4 border p-4 rounded-md" data-testid="employee-eti-details">
-              <legend className="text-sm font-medium px-1">Hours and Employment Tax Incentive</legend>
+              <legend className="text-sm font-medium px-1">Hours, Leave and Employment Tax Incentive</legend>
+              <FormField control={form.control} name="work_days_per_week" render={({ field }) => (
+                <FormItem><FormLabel>Working Days per Week</FormLabel>
+                  <FormControl><Input {...field} type="number" step="0.5" min="1" max="7" placeholder="5" /></FormControl>
+                  <FormDescription>Leave accrual (BCEA) and the daily rate. Blank = 5.</FormDescription><FormMessage /></FormItem>
+              )} />
+              <FormField control={form.control} name="annual_leave_days_per_cycle" render={({ field }) => (
+                <FormItem><FormLabel>Annual Leave Days per Year</FormLabel>
+                  <FormControl><Input {...field} type="number" step="0.5" min="0.5" max="60" placeholder="BCEA minimum (15 on a 5-day week)" /></FormControl>
+                  <FormDescription>Only if the contract gives more than the BCEA minimum.</FormDescription><FormMessage /></FormItem>
+              )} />
               <FormField control={form.control} name="ordinary_hours_per_week" render={({ field }) => (
                 <FormItem><FormLabel>Ordinary Hours per Week</FormLabel>
                   <FormControl><Input {...field} type="number" step="0.5" min="0" placeholder="e.g. 40" /></FormControl>

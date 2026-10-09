@@ -19,6 +19,12 @@ import {
   sha256Hex,
 } from '../_shared/statutoryFiling.ts'
 import {
+  LEAVE_METHODS,
+  handleLeaveMethod,
+  recordLeavePayouts,
+  releaseLeavePayouts,
+} from './leave.ts'
+import {
   STATUTORY_RETURN_METHODS,
   handleStatutoryReturnMethod,
   logReturnEvent,
@@ -1341,6 +1347,8 @@ serve(withEnterprisePlatform('payroll', 'tenant', async (req, _ctx) => {
           .eq('company_id', company_id)
           .single();
         if (fetchRunError) throw fetchRunError;
+        // Leave paid out on this run draws down the annual leave balance (once per employee).
+        const leavePayouts = await recordLeavePayouts(supabaseAdmin, company_id, updatedRun ?? runToFinalize, user.id);
 
         data = {
           run: updatedRun ?? { ...runToFinalize, status: 'finalized', journal_entry_id: entryId, output_metadata: outputMetadata },
@@ -1350,6 +1358,7 @@ serve(withEnterprisePlatform('payroll', 'tenant', async (req, _ctx) => {
           summary,
           outputs: outputMetadata,
           recovered,
+          leave_payouts_recorded: leavePayouts,
         };
         error = null;
         break;
@@ -1376,6 +1385,7 @@ serve(withEnterprisePlatform('payroll', 'tenant', async (req, _ctx) => {
           }
         );
         if (reverseError) throw mapPayrollRpcError(reverseError);
+        await releaseLeavePayouts(supabaseAdmin, company_id, runId, user.id, body.reason ?? 'Payroll reversal');
         data = reverseResult;
         error = null;
         break;
@@ -1402,6 +1412,7 @@ serve(withEnterprisePlatform('payroll', 'tenant', async (req, _ctx) => {
           }
         );
         if (reopenError) throw mapPayrollRpcError(reopenError);
+        await releaseLeavePayouts(supabaseAdmin, company_id, runId, user.id, body.reason ?? 'Payroll reopen for correction');
         data = reopenResult;
         error = null;
         break;
@@ -1835,6 +1846,13 @@ serve(withEnterprisePlatform('payroll', 'tenant', async (req, _ctx) => {
       }
 
       default:
+        if (LEAVE_METHODS.has(method)) {
+          data = await handleLeaveMethod(method, {
+            supabaseAdmin, company_id, user, body, PayrollDomainError, logPayrollAudit, addRunPreparer,
+          });
+          error = null;
+          break;
+        }
         if (STATUTORY_RETURN_METHODS.has(method)) {
           data = await handleStatutoryReturnMethod(method, {
             supabaseAdmin, company_id, user, body, member, PayrollDomainError, logPayrollAudit, loadPayrollControls,

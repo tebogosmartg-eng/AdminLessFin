@@ -133,6 +133,7 @@ const PayrollRuns = lazy(() => import("./pages/PayrollRuns"));
 const PayrollRunDetail = lazy(() => import("./pages/PayrollRunDetail"));
 const PayrollReports = lazy(() => import("./pages/PayrollReports"));
 const StatutoryReturns = lazy(() => import("./pages/StatutoryReturns"));
+const Leave = lazy(() => import("./pages/Leave"));
 const AuditComplianceReports = lazy(() => import("./pages/AuditComplianceReports"));
 const Loans = lazy(() => import("./pages/Loans"));
 const LoanDetail = lazy(() => import("./pages/LoanDetail"));
@@ -320,6 +321,7 @@ export const AppRouter = () => {
           <Route path="/payroll-runs/:id" element={<AccountingReadyGate module="payroll"><PayrollRunDetail /></AccountingReadyGate>} />
           <Route path="/payroll-reports" element={<AccountingReadyGate module="payroll"><PayrollReports /></AccountingReadyGate>} />
           <Route path="/statutory-returns" element={<StatutoryReturns />} />
+          <Route path="/leave" element={<Leave />} />
           <Route path="/audit-compliance-reports" element={<AuditComplianceReports />} />
           <Route path="/loans" element={<Loans />} />
           <Route path="/loans/:id" element={<LoanDetail />} />

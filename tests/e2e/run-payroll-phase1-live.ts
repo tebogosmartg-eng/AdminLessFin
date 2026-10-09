@@ -214,7 +214,8 @@ async function main() {
       employeeData: { salary_amount: 12_000 },
     });
     const refreshed = (await payroll<RunDetail & { warnings: Warning[] }>({ method: 'GET_RUN_DETAIL', runId: run.id })).warnings;
-    check('Fixed SARS details clear the warnings without regenerating', !refreshed.some((w) => w.employee_id === sparse.id),
+    // The employee leaves in the test month, so leave owing (Phase 3) is still flagged; only SARS details are fixed here.
+    check('Fixed SARS details clear the warnings without regenerating', !refreshed.some((w) => w.employee_id === sparse.id && w.code !== 'LEAVE_PAYOUT_DUE'),
       refreshed.filter((w) => w.employee_id === sparse.id));
     check('A salary added after generation asks for a regenerate', refreshed.some((w) => w.employee_id === noSalary.id && w.code === 'NOT_ON_RUN'),
       refreshed.filter((w) => w.employee_id === noSalary.id));

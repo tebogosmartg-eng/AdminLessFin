@@ -26,11 +26,26 @@ export type PayslipItem = {
   irp5_code?: string | null;
 };
 
+/** Leave balances in days as at the period end, and unpaid leave taken in the period. */
 export type LeaveBalances = {
   annual?: number;
   sick?: number;
   family?: number;
+  unpaid_this_period?: number;
 };
+
+const days = (n: number) => `${Number(n).toLocaleString('en-ZA', { maximumFractionDigits: 2 })} day${Number(n) === 1 ? '' : 's'}`;
+
+/** One line for the payslip, e.g. "Annual 12.5 days · Sick 30 days · Family 3 days". */
+export function formatLeaveBalances(balances: LeaveBalances | undefined): string | null {
+  if (!balances) return null;
+  const parts: string[] = [];
+  if (balances.annual != null) parts.push(`Annual ${days(balances.annual)}`);
+  if (balances.sick != null) parts.push(`Sick ${days(balances.sick)}`);
+  if (balances.family != null) parts.push(`Family responsibility ${days(balances.family)}`);
+  if (balances.unpaid_this_period) parts.push(`Unpaid leave this period ${days(balances.unpaid_this_period)}`);
+  return parts.length ? parts.join(' · ') : null;
+}
 
 export type PayslipDocumentData = {
   companyName: string;
@@ -316,7 +331,7 @@ export function computeBankFileIntegrity(rows: BankPaymentRow[]): BankFileIntegr
 
 export function extractPayslipCertificationFromSnapshot(
   snapshot: Record<string, unknown> | null | undefined
-): Pick<PayslipDocumentData, 'tax_year' | 'rule_version' | 'calculation_version' | 'ytd'> {
+): Pick<PayslipDocumentData, 'tax_year' | 'rule_version' | 'calculation_version' | 'ytd' | 'leave_balances'> {
   if (!snapshot) {
     return { tax_year: null, rule_version: null, calculation_version: null, ytd: null };
   }
@@ -341,12 +356,19 @@ export function extractPayslipCertificationFromSnapshot(
         net_pay: typeof snapshot.net_pay === 'number' ? (snapshot.net_pay as number) : undefined,
       };
 
+  const leave = snapshot.leave_balances as LeaveBalances | undefined;
+  const unpaid = Number((snapshot.period_employment as Record<string, unknown> | undefined)?.unpaid_leave_days ?? 0);
+  const leave_balances = leave && Object.keys(leave).length
+    ? { ...leave, ...(unpaid > 0 ? { unpaid_this_period: unpaid } : {}) }
+    : unpaid > 0 ? { unpaid_this_period: unpaid } : undefined;
+
   return {
     tax_year: (snapshot.tax_year as string) ?? null,
     rule_version: (snapshot.rule_version as string) ?? null,
     calculation_version:
       (snapshot.calculation_version as string) ?? (snapshot.engine_version as string) ?? null,
     ytd,
+    leave_balances,
   };
 }
 
@@ -428,12 +450,15 @@ export function buildPayslipHtml(data: PayslipDocumentData, qrDataUrl?: string):
   const row = (label: string, amount: number) =>
     `<tr><td style="padding:6px 8px;">${label}</td><td style="padding:6px 8px;text-align:right;font-family:monospace;">${currency(amount)}</td></tr>`;
 
+  const dayRow = (label: string, value: number) =>
+    `<tr><td style="padding:6px 8px;">${label}</td><td style="padding:6px 8px;text-align:right;">${days(value)}</td></tr>`;
   const leaveSection = data.leave_balances
     ? `<h3>Leave Balances</h3>
        <table>
-         ${data.leave_balances.annual != null ? row('Annual Leave', data.leave_balances.annual) : ''}
-         ${data.leave_balances.sick != null ? row('Sick Leave', data.leave_balances.sick) : ''}
-         ${data.leave_balances.family != null ? row('Family Responsibility', data.leave_balances.family) : ''}
+         ${data.leave_balances.annual != null ? dayRow('Annual Leave', data.leave_balances.annual) : ''}
+         ${data.leave_balances.sick != null ? dayRow('Sick Leave', data.leave_balances.sick) : ''}
+         ${data.leave_balances.family != null ? dayRow('Family Responsibility', data.leave_balances.family) : ''}
+         ${data.leave_balances.unpaid_this_period ? dayRow('Unpaid Leave This Period', data.leave_balances.unpaid_this_period) : ''}
        </table>`
     : '';
 
@@ -787,6 +812,14 @@ export async function generatePayslipPdf(data: PayslipDocumentData): Promise<jsP
   doc.text(`Gross Earnings: ${currency(data.total_earnings)}`, leftX, nextY);
   doc.text(`Total Deductions: ${currency(data.total_deductions)}`, leftX, nextY + 6);
   doc.text(`Employer Cost: ${currency(employerCost)}`, leftX, nextY + 12);
+  const leaveLine = formatLeaveBalances(data.leave_balances);
+  if (leaveLine) {
+    doc.setFontSize(8);
+    doc.setTextColor(80);
+    doc.text(`Leave balances: ${leaveLine}`, leftX, nextY + 18, { maxWidth: pageWidth - 100 });
+    doc.setFontSize(10);
+    doc.setTextColor(0);
+  }
 
   doc.setFillColor(...BRAND_GREEN_LIGHT);
   doc.roundedRect(pageWidth - 80, nextY - 4, 66, 18, 2, 2, 'F');
@@ -798,7 +831,7 @@ export async function generatePayslipPdf(data: PayslipDocumentData): Promise<jsP
 
   if (hasPayslipPaymentDetails(data)) {
     const payment = getPayslipPaymentDetails(data);
-    const paymentY = nextY + 22;
+    const paymentY = nextY + (leaveLine ? 28 : 22);
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(9);
     doc.setTextColor(80);

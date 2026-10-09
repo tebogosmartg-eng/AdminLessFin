@@ -351,3 +351,40 @@ test('statutory returns: filing calendar, EMP501 certificates and the e@syFile f
   await expect(panel.getByTestId('emp501-reconciliation')).toContainText('2025-06', { timeout: 60_000 });
   await shot(page, '10-emp501');
 });
+
+test('leave: BCEA balances, an employee register and recording leave', async ({ page }) => {
+  // Relies on tests/e2e/run-payroll-leave-live.ts having created "Keeper Leave …" for CERT TX.
+  await page.goto('/');
+  await waitForRouteSettled(page);
+  await ensureReadyCompany(page);
+  await page.goto('/leave');
+  await waitForRouteSettled(page);
+  await expectNoErrorBoundary(page);
+  await page.getByLabel('Balances as at').fill('2025-10-31');
+  await page.getByLabel('Search employees').fill('Keeper Leave');
+  const table = page.getByTestId('leave-balances');
+  await expect(table).toContainText('Keeper Leave', { timeout: 30_000 });
+  await table.getByRole('button', { name: /Leave for Keeper Leave/ }).first().click();
+  const sheet = page.getByTestId('employee-leave');
+  await expect(sheet.getByTestId('leave-balance-sick')).toContainText('days', { timeout: 30_000 });
+  await expect(sheet.getByTestId('leave-balance-annual')).toContainText('days');
+  await expect(sheet).toContainText('Leave taken');
+  await expect(sheet).toContainText('Two days granted for long service');
+  await sheet.getByRole('button', { name: 'Record leave' }).click();
+  const dialog = page.getByTestId('record-leave-dialog');
+  await dialog.getByRole('combobox', { name: 'Leave type' }).click();
+  await page.getByRole('option', { name: 'Family responsibility leave' }).click();
+  await dialog.getByLabel('First day').fill('2025-12-13');
+  await dialog.getByLabel('Last day').fill('2025-12-14');
+  await expect(dialog).toContainText('0 working days');
+  await dialog.getByTestId('save-leave').click();
+  await expect(page.getByText(/no working days/)).toBeVisible({ timeout: 20_000 });
+  await shot(page, '11-leave');
+  // Close the dialog, then the employee drawer.
+  await page.keyboard.press('Escape');
+  await expect(dialog).toBeHidden();
+  await page.keyboard.press('Escape');
+  await expect(sheet).toBeHidden();
+  await page.getByRole('tab', { name: 'Leave types' }).click();
+  await expect(page.getByText('BCEA s22: 6 weeks per 36 months')).toBeVisible();
+});

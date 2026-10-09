@@ -56,6 +56,7 @@ import {
   downloadPayrollSummaryReport,
   downloadBankPaymentFile,
   downloadPayslipPdf,
+  extractPayslipCertificationFromSnapshot,
   mapEmployeeToBankPaymentRow,
   openPrintDocument,
   type PayrollRegisterRow,
@@ -296,6 +297,17 @@ const PayrollRunDetail = () => {
     onError: (error: Error) => showError(error.message),
   });
 
+  // Leave owing to a leaver is added as leave pay (days × BCEA daily rate) on the run.
+  const addLeavePayMutation = useMutation({
+    mutationFn: (employeeId: string) =>
+      invokePayroll<{ days: number; amount: number }>({ method: 'ADD_LEAVE_PAYOUT', company_id: activeCompany!.id, runId: id, employeeId }),
+    onSuccess: (result) => {
+      invalidateRun();
+      showSuccess(`Leave pay added: ${result.days} days, ${formatCurrency(result.amount)}. Regenerate payslips to apply it.`);
+    },
+    onError: (error: Error) => showError(error.message),
+  });
+
   const finalizeRunMutation = useMutation({
     mutationFn: async () => {
       if (!id) throw new Error('Payroll run ID is missing.');
@@ -504,6 +516,7 @@ const PayrollRunDetail = () => {
     audit_reference: `PSL-${(detail.id as string)?.slice(0, 8)}`,
     payslip_id: detail.id as string,
     payroll_run_id: id,
+    ...extractPayslipCertificationFromSnapshot(detail.calculation_snapshot as Record<string, unknown> | undefined),
   });
 
   const handleDownloadAllPayslips = async () => {
@@ -748,7 +761,21 @@ const PayrollRunDetail = () => {
             <AlertDescription className="space-y-2">
               {payWarnings.length > 0 && (
                 <ul className="list-disc pl-5 text-sm">
-                  {payWarnings.map((w, i) => <li key={`pay-${i}`}>{w.message}</li>)}
+                  {payWarnings.map((w, i) => (
+                    <li key={`pay-${i}`}>
+                      {w.message}
+                      {w.code === 'LEAVE_PAYOUT_DUE' && run?.status === 'draft' && (
+                        <Button
+                          size="sm" variant="outline" className="ml-2 h-7"
+                          onClick={() => addLeavePayMutation.mutate(w.employee_id)}
+                          disabled={addLeavePayMutation.isPending}
+                          data-testid="add-leave-pay"
+                        >
+                          Add leave pay
+                        </Button>
+                      )}
+                    </li>
+                  ))}
                 </ul>
               )}
               {sarsWarnings.length > 0 && (

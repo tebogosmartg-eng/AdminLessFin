@@ -71,6 +71,8 @@ export type Employee = {
   passport_number?: string | null;
   passport_country?: string | null;
   ordinary_hours_per_week?: number | null;
+  work_days_per_week?: number | null;
+  annual_leave_days_per_cycle?: number | null;
   eti_employment_date?: string | null;
   eti_sez_code?: string | null;
   eti_domestic_worker?: boolean | null;

@@ -26,6 +26,8 @@ import { irp5CodeForEngineLine, irp5CodeForRuleLine } from './payrollRulesEngine
 import { payrollRunWarnings } from './payrollRulesEngine/runWarnings.ts';
 import { normaliseEmployerProfile, validateEmployerProfile } from './sars/employerProfile.ts';
 import { payslipOrdinaryHours } from './sars/eti.ts';
+import { loadLeaveContext, payslipLeaveBalances, unpaidLeaveForPayslip, leaveEmployee, toLeaveEntry } from './leaveRegister.ts';
+import { dailyRate, leaveBalance } from './payrollRulesEngine/leave.ts';
 import {
   aggregateCompanyRemunerationYtd,
   aggregateEmployeeYtd,
@@ -208,6 +210,8 @@ export async function loadPayrollRulesContext(supabaseAdmin, companyId, run) {
   if (periodResult.error) throw periodResult.error;
 
   const ytdPayslips = prior.payslips;
+  // Unpaid leave reduces salary; balances are printed on the payslip.
+  const leaveContext = await loadLeaveContext(supabaseAdmin, companyId, activeEmployees.map((e) => e.id));
   const currentPeriodEstimatedGross = activeEmployees.reduce((sum, employee) => {
     if (!employee.salary_amount) return sum;
     const factor = employmentProRataFactor(employee, periodStart, periodEnd, proRataMethod);
@@ -245,6 +249,7 @@ export async function loadPayrollRulesContext(supabaseAdmin, companyId, run) {
     payFrequency,
     periodsPerYear,
     proRataMethod,
+    leaveContext,
   };
 }
 
@@ -283,11 +288,34 @@ export async function loadRunWarnings(supabaseAdmin, companyId, run, paidEmploye
         : 'Employer details for SARS (PAYE, SDL and UIF references, contact, address, SIC7 code) are not captured yet. Add them under Settings → Payroll.',
     }]
     : [];
-  return [...employerWarnings, ...payrollRunWarnings({
-    candidates: allEmployees.filter((e) =>
-      (e.salary_period ?? 'monthly') === payFrequency &&
-      isEmployeeActiveInPeriod(e, run.pay_period_start, run.pay_period_end)
-    ),
+  const candidates = allEmployees.filter((e) =>
+    (e.salary_period ?? 'monthly') === payFrequency &&
+    isEmployeeActiveInPeriod(e, run.pay_period_start, run.pay_period_end)
+  );
+  // Leavers with annual leave owing and no leave pay on the run (BCEA s40).
+  const leavers = candidates.filter((e) => e.end_date && e.end_date >= run.pay_period_start && e.end_date <= run.pay_period_end);
+  const leaveWarnings = [];
+  if (leavers.length) {
+    const leave = await loadLeaveContext(supabaseAdmin, companyId, leavers.map((e) => e.id));
+    const annual = leave.types.find((t) => t.accrual === 'bcea_annual');
+    for (const e of leavers) {
+      if ((inputsResult.data ?? []).some((i) => i.employee_id === e.id && i.component_code === 'leave_payout')) continue;
+      const entries = annual ? leave.rows.filter((r) => r.employee_id === e.id && r.leave_type_id === annual.id).map(toLeaveEntry) : [];
+      const days = leaveBalance('bcea_annual', leaveEmployee(e), entries, e.end_date).balance;
+      if (days <= 0) continue;
+      const amount = Math.round(days * dailyRate(e.salary_amount, e.salary_period, e.work_days_per_week) * 100) / 100;
+      const name = [e.first_name, e.last_name].filter(Boolean).join(' ') || e.id;
+      leaveWarnings.push({
+        code: 'LEAVE_PAYOUT_DUE' as const,
+        category: 'pay' as const,
+        employee_id: e.id,
+        employee_name: name,
+        message: `${name} leaves on ${e.end_date} with ${days} day${days === 1 ? '' : 's'} of annual leave owing (about R${amount.toFixed(2)}). Add the leave pay to this run.`,
+      });
+    }
+  }
+  return [...employerWarnings, ...leaveWarnings, ...payrollRunWarnings({
+    candidates,
     paidEmployeeIds,
     allEmployees,
     periodInputs: inputsResult.data ?? [],
@@ -334,7 +362,10 @@ export async function generatePayslipsWithRulesEngine(supabaseAdmin, {
     const employeeAge = ageDetail.age;
     const ytd = aggregateEmployeeYtd(ctx.ytdPayslips ?? [], employee.id, ctx.periodsPerYear);
     const uifMonthToDate = uifRemunerationMonthToDate(ctx.ytdPayslips ?? [], employee.id, run.pay_date);
-    const proRatedSalaryAmount = applyProRata(Number(employee.salary_amount), proRataFactor);
+    // Unpaid leave in the period reduces the basic salary (working days, BCEA); the
+    // employment fraction itself (pay periods worked) is unchanged.
+    const unpaidLeave = unpaidLeaveForPayslip(employee, ctx.leaveContext, run.pay_period_start, run.pay_period_end, proRataFactor);
+    const proRatedSalaryAmount = applyProRata(Number(employee.salary_amount), unpaidLeave.paidShare);
 
     const calculation = executePayrollRules({
       employee: {
@@ -462,6 +493,7 @@ export async function generatePayslipsWithRulesEngine(supabaseAdmin, {
     });
     snapshot.rules_engine_result = calculation;
     snapshot.engine_version = '3.0.2';
+    snapshot.leave_balances = payslipLeaveBalances(employee, ctx.leaveContext, run.pay_period_end);
     snapshot.period_employment = {
       age: employeeAge ?? null,
       age_as_at: ageDetail.asAt,
@@ -475,7 +507,9 @@ export async function generatePayslipsWithRulesEngine(supabaseAdmin, {
       pro_rata_factor: proRataFactor,
       // Ordinary hours paid on this payslip, as they were when it was generated (ETI).
       ordinary_hours_per_week: employee.ordinary_hours_per_week ?? null,
-      ordinary_hours: payslipOrdinaryHours(employee.ordinary_hours_per_week, ctx.periodsPerYear, proRataFactor),
+      ordinary_hours: payslipOrdinaryHours(employee.ordinary_hours_per_week, ctx.periodsPerYear, unpaidLeave.paidShare),
+      unpaid_leave_days: unpaidLeave.unpaidDays,
+      salary_paid_share: unpaidLeave.paidShare,
       ytd_taxable_income: ytd.taxableIncome,
       ytd_paye_paid: ytd.payePaid,
       ytd_periods_processed: ytd.periodsProcessed,

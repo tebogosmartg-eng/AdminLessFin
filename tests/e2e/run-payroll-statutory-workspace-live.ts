@@ -121,6 +121,12 @@ async function main() {
     },
   });
 
+  // Earlier test employees are paid again by every re-run, so their income grows until PAYE is
+  // due; an IRP5 then needs an income tax number.
+  const { data: noTax } = await sb.from('employees').select('id').eq('company_id', companyId).like('last_name', 'Recon %').is('tax_number', null);
+  for (const e of noTax ?? []) {
+    await invoke(sb, 'employees', { method: 'PUT', company_id: companyId, employeeId: e.id, command_id: crypto.randomUUID(), correlation_id: crypto.randomUUID(), employeeData: { tax_number: '0667056642' } });
+  }
   // Employees from earlier runs of this check that were saved with digits in the surname.
   const { data: earlier } = await sb.from('employees').select('id, last_name').eq('company_id', companyId).like('last_name', 'Recon-%');
   for (const e of earlier ?? []) {
@@ -133,7 +139,7 @@ async function main() {
     // Ages in 2025: 40, 35 and 23.
     const full = await employee('Full', { salary_amount: 15_000, id_number: saId('850315', '5800'), tax_number: '0001339050' });
     const low = await employee('Low', { salary_amount: 1_500, id_number: saId('900620', '5800'), tax_number: '0667056642' });
-    const youth = await employee('Youth', { salary_amount: 3_000, id_number: saId('020510', '5800') });
+    const youth = await employee('Youth', { salary_amount: 3_000, id_number: saId('020510', '5800'), tax_number: '0667056642' });
 
     for (const r of RUNS) {
       const run = await payroll<{ id: string }>({
