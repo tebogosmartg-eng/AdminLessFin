@@ -105,7 +105,10 @@ export function factsToStatutoryRunSources(facts: PayrollFact[]): FinalizedPayro
           skipped: e.skipped,
         })),
       },
-      payslipItems: itemsFromFact(f),
+      payslipItems: itemsFromFact(f).map((item, index) => ({
+        ...item,
+        irp5Code: f.payrollItems[index]?.irp5Code ?? null,
+      })),
     };
     run.payslips.push(payslip);
   }

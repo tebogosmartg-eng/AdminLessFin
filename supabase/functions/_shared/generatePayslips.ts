@@ -22,6 +22,8 @@ import {
   isComponentEffective,
   mergePayComponents,
 } from './payrollRulesEngine/payComponents.ts';
+import { irp5CodeForEngineLine, irp5CodeForRuleLine } from './payrollRulesEngine/irp5Codes.ts';
+import { payrollRunWarnings } from './payrollRulesEngine/runWarnings.ts';
 import {
   aggregateCompanyRemunerationYtd,
   aggregateEmployeeYtd,
@@ -232,6 +234,7 @@ export async function loadPayrollRulesContext(supabaseAdmin, companyId, run) {
     taxYearConfig,
     employeeSettingsMap,
     activeEmployees,
+    allEmployees: employeesResult.data ?? [],
     catalogRows,
     recurringComponents: recurringResult.data ?? [],
     periodInputs: periodResult.data ?? [],
@@ -265,6 +268,7 @@ export async function generatePayslipsWithRulesEngine(supabaseAdmin, {
 
   const results = [];
   let generated = 0;
+  const paidEmployeeIds = new Set<string>();
 
   for (const employee of ctx.activeEmployees) {
     if (!employee.salary_amount) continue;
@@ -340,6 +344,13 @@ export async function generatePayslipsWithRulesEngine(supabaseAdmin, {
       const name = [employee.first_name, employee.last_name].filter(Boolean).join(' ') || employee.id;
       throw new Error(`${name}: ${err instanceof Error ? err.message : String(err)}`);
     }
+    // Pension and provident fund contributions from the rule lines: the retirement engine
+    // gives the section 11F tax relief on them (it adds no payslip line of its own).
+    const retirementContributions = roundCurrency(
+      calculation.lineItems
+        .filter((item) => item.ruleId === 'pension' || item.ruleId === 'provident_fund')
+        .reduce((sum, item) => sum + item.amount, 0)
+    );
     const cashGross = roundCurrency(calculation.grossPay + assembly.cashGross);
     const taxableEarnings = roundCurrency(calculation.grossPay + assembly.taxableBaseAddition);
     const remuneration = roundCurrency(calculation.grossPay + assembly.remunerationAddition);
@@ -369,13 +380,14 @@ export async function generatePayslipsWithRulesEngine(supabaseAdmin, {
       enabledEngines: {
         ...mapRulesToStatutoryEngines(ctx.effectiveRunRules),
         ...assembly.enabledEngines,
+        retirement_deduction: retirementContributions > 0,
       },
       engineConfig: buildStatutoryEngineConfig(
         ctx.companyRules,
         ctx.employeeSettingsMap[employee.id] ?? {},
         ctx.runOverrides
       ),
-      components: assembly.components,
+      components: { ...assembly.components, retirementContributions },
       ruleSet,
       ytd: {
         taxableIncome: ytd.taxableIncome,
@@ -429,16 +441,17 @@ export async function generatePayslipsWithRulesEngine(supabaseAdmin, {
       calculation.lineItems.find((item) => item.ruleId === 'basic_salary')?.amount ??
       salaryForPayPeriod(employee.salary_amount, employee.salary_period ?? 'monthly', ctx.periodsPerYear);
 
-    const nonStatutoryItems = calculation.lineItems.filter(
-      (item) => !STATUTORY_RULE_IDS.has(item.ruleId)
-    );
+    const isDirector = employee.employment_type === 'director' || employee.nature_of_person === 'C';
+    const nonStatutoryItems = calculation.lineItems
+      .filter((item) => !STATUTORY_RULE_IDS.has(item.ruleId))
+      .map((item) => ({ ...item, irp5Code: irp5CodeForRuleLine(item.ruleId, { isDirector }) }));
     const statutoryItems = statutoryResult.payslipLines.map((line) => ({
       ruleId: line.engineId,
       description: line.description,
       type: line.type,
       amount: line.amount,
       componentCode: null,
-      irp5Code: null,
+      irp5Code: irp5CodeForEngineLine(line.engineId),
     }));
     const componentItems = assembly.lines.map((line) => ({
       ruleId: line.componentCode,
@@ -493,11 +506,21 @@ export async function generatePayslipsWithRulesEngine(supabaseAdmin, {
     }
 
     generated++;
+    paidEmployeeIds.add(employee.id);
     results.push({ employee_id: employee.id, payslip_id: payslip.id, calculation });
   }
 
+  const warnings = payrollRunWarnings({
+    candidates: ctx.activeEmployees,
+    paidEmployeeIds,
+    allEmployees: ctx.allEmployees,
+    periodInputs: ctx.periodInputs ?? [],
+    payFrequency: ctx.payFrequency,
+  });
+
   return {
     generated,
+    warnings,
     results,
     engine: 'statutory_payroll_engine_v3',
     rules_applied: Object.keys(ctx.effectiveRunRules).filter((k) => ctx.effectiveRunRules[k]?.enabled !== false),

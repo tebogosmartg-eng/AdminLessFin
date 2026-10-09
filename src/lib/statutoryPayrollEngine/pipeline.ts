@@ -171,6 +171,8 @@ function buildPayslipLines(results: StatutoryEngineResult[]): PayslipStatutoryLi
   for (const r of results) {
     if (r.skipped) continue;
     if (r.engineId === 'medical_tax_credit' || r.engineId === 'directors_paye') continue;
+    // Tax relief only: the pension / provident fund rule already puts the contribution on the payslip.
+    if (r.engineId === 'retirement_deduction') continue;
     if (r.employeeAmount > 0) {
       lines.push({
         engineId: r.engineId,

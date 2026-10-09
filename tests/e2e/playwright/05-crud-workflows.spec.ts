@@ -827,6 +827,20 @@ test.describe('Payroll (Employees) — full UI CRUD workflow', () => {
     await expect(page.getByText('This is not a valid South African ID number')).toBeVisible();
     await page.getByLabel('ID Number').fill('');
     await page.getByLabel('Date of Birth').fill('1961-05-20');
+    // SARS details: a passport needs its country, and a postal code is 4 digits.
+    await page.getByLabel('Passport Number').fill('FN1234567');
+    await page.getByLabel('Postal Code', { exact: true }).fill('123');
+    await page.getByRole('button', { name: /save employee/i }).click();
+    await expect(page.getByText('Which country issued the passport?')).toBeVisible();
+    await expect(page.getByText('A South African postal code is 4 digits.')).toBeVisible();
+    await page.getByLabel('Passport Country').fill('zw');
+    await page.getByLabel('Street Number').fill('12');
+    await page.getByLabel('Street or Farm Name').fill('Main Road');
+    await page.getByLabel('Suburb or District').fill('Gardens');
+    await page.getByLabel('City or Town').fill('Cape Town');
+    await page.getByLabel('Postal Code', { exact: true }).fill('8001');
+    await page.getByRole('combobox', { name: /account type/i }).click();
+    await page.getByRole('option', { name: /^savings$/i }).click();
     await page.getByRole('button', { name: /save employee/i }).click();
 
     await expect(page.getByRole('dialog')).toBeHidden({ timeout: 20_000 });
@@ -835,6 +849,10 @@ test.describe('Payroll (Employees) — full UI CRUD workflow', () => {
     await expect(page.getByRole('row').filter({ hasText: editedLast })).toBeVisible({ timeout: 20_000 });
     await selectRowAction(page, editedLast, /^edit$/i);
     await expect(page.getByLabel('Date of Birth')).toHaveValue('1961-05-20');
+    await expect(page.getByLabel('Passport Country')).toHaveValue('ZW');
+    await expect(page.getByLabel('Street or Farm Name')).toHaveValue('Main Road');
+    await expect(page.getByLabel('Postal Code', { exact: true })).toHaveValue('8001');
+    await expect(page.getByRole('combobox', { name: /account type/i })).toHaveText(/savings/i);
     await page.keyboard.press('Escape');
 
     expect(diagnostics.failedRequests, diagnostics.failedRequests.join('\n')).toEqual([]);

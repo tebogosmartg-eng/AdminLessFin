@@ -235,6 +235,28 @@ async function clearRunApproval(supabaseAdmin, { companyId, runId, userId, reaso
   return true;
 }
 
+/** Records that a user prepared part of a run (generated or edited payslips, or changed its inputs). */
+async function addRunPreparer(supabaseAdmin, runId, userId) {
+  const { error } = await supabaseAdmin.rpc('payroll_run_add_preparer', { p_run_id: runId, p_user_id: userId });
+  if (error) throw error;
+}
+
+/** Company approval controls. Without a row, separation of duties applies. */
+async function loadPayrollControls(supabaseAdmin, companyId) {
+  const { data, error } = await supabaseAdmin
+    .from('company_payroll_controls')
+    .select('allow_self_approval, self_approval_reason, updated_by, updated_at')
+    .eq('company_id', companyId)
+    .maybeSingle();
+  if (error) throw error;
+  return {
+    allow_self_approval: data?.allow_self_approval === true,
+    self_approval_reason: data?.self_approval_reason ?? null,
+    updated_by: data?.updated_by ?? null,
+    updated_at: data?.updated_at ?? null,
+  };
+}
+
 serve(withEnterprisePlatform('payroll', 'tenant', async (req, _ctx) => {
 
   try {
@@ -297,12 +319,6 @@ serve(withEnterprisePlatform('payroll', 'tenant', async (req, _ctx) => {
     const supabaseAdmin = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-    );
-    
-    const userSupabase = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
-      { auth: { autoRefreshToken: false, persistSession: false }, global: { headers: { Authorization: req.headers.get('Authorization')! } } }
     );
 
     let data, error;
@@ -492,6 +508,28 @@ serve(withEnterprisePlatform('payroll', 'tenant', async (req, _ctx) => {
           createdBy: user.id,
         });
 
+        await addRunPreparer(supabaseAdmin, body.runId, user.id);
+        // Warnings stay on the run so its page shows them after a reload.
+        const { data: metaRow, error: metaError } = await supabaseAdmin
+          .from('payroll_runs')
+          .select('output_metadata')
+          .eq('id', body.runId)
+          .eq('company_id', company_id)
+          .single();
+        if (metaError) throw metaError;
+        const { error: warningsError } = await supabaseAdmin
+          .from('payroll_runs')
+          .update({
+            output_metadata: {
+              ...(metaRow?.output_metadata ?? {}),
+              generation_warnings: generationResult.warnings,
+              generation_warnings_at: new Date().toISOString(),
+            },
+          })
+          .eq('id', body.runId)
+          .eq('company_id', company_id);
+        if (warningsError) throw warningsError;
+
         data = { ...generationResult, approval_cleared: approvalCleared };
         error = null;
 
@@ -501,6 +539,7 @@ serve(withEnterprisePlatform('payroll', 'tenant', async (req, _ctx) => {
             count: generationResult.generated,
             engine: generationResult.engine,
             rules_applied: generationResult.rules_applied,
+            warnings: generationResult.warnings.length,
           },
           created_by: user.id,
         });
@@ -636,6 +675,22 @@ serve(withEnterprisePlatform('payroll', 'tenant', async (req, _ctx) => {
           .eq('payroll_run_id', body.runId);
         if (!payslipCount) throw new Error('Generate payslips before approving.');
 
+        // Separation of duties: whoever prepared the run (generated or edited payslips,
+        // or changed its inputs) cannot approve it, unless the owner has allowed
+        // self-approval for a one-person payroll. The database enforces the same rule.
+        const preparers = runToApprove.prepared_by ?? [];
+        const selfApproval = preparers.includes(user.id);
+        const controls = selfApproval ? await loadPayrollControls(supabaseAdmin, company_id) : null;
+        if (selfApproval && !controls.allow_self_approval) {
+          throw new PayrollDomainError({
+            stage: 'validation',
+            code: 'SELF_APPROVAL_BLOCKED',
+            message: 'You prepared this payroll run, so another owner or admin must approve it.',
+            recovery: 'Ask another owner or admin to approve the run. In a one-person business the company owner can allow self-approval under Payroll Settings.',
+            status: 409,
+          });
+        }
+
         const approvedAt = new Date().toISOString();
 
         // Persist via approved_at columns (requires payroll_output_engine migration).
@@ -653,9 +708,65 @@ serve(withEnterprisePlatform('payroll', 'tenant', async (req, _ctx) => {
 
         await logPayrollAudit(supabaseAdmin, {
           company_id, payroll_run_id: body.runId, event_type: 'run_approved',
-          event_data: { employee_count: payslipCount },
+          event_data: {
+            employee_count: payslipCount,
+            prepared_by: preparers,
+            self_approved: selfApproval,
+            self_approval_reason: selfApproval ? controls.self_approval_reason : null,
+          },
           created_by: user.id,
         });
+        break;
+      }
+
+      case 'GET_PAYROLL_CONTROLS': {
+        data = { ...(await loadPayrollControls(supabaseAdmin, company_id)), can_change: member.role === 'owner' };
+        error = null;
+        break;
+      }
+
+      case 'UPDATE_PAYROLL_CONTROLS': {
+        if (member.role !== 'owner') {
+          throw new PayrollDomainError({
+            stage: 'auth', code: 'OWNER_REQUIRED',
+            message: 'Only the company owner can change payroll approval controls.',
+            recovery: 'Ask the company owner to change this setting.',
+            status: 403,
+          });
+        }
+        if (typeof body.allow_self_approval !== 'boolean') {
+          throw new PayrollDomainError({
+            stage: 'validation', code: 'INVALID_CONTROLS',
+            message: 'allow_self_approval must be true or false.',
+            recovery: 'Reload payroll settings and try again.',
+          });
+        }
+        const reason = typeof body.reason === 'string' ? body.reason.trim() : '';
+        if (body.allow_self_approval && reason.length < 10) {
+          throw new PayrollDomainError({
+            stage: 'validation', code: 'REASON_REQUIRED',
+            message: 'Give a reason (at least 10 characters) for allowing self-approval.',
+            recovery: 'For example: "Sole owner runs payroll; no second administrator."',
+          });
+        }
+        const before = await loadPayrollControls(supabaseAdmin, company_id);
+        const { error: controlsError } = await supabaseAdmin
+          .from('company_payroll_controls')
+          .upsert({
+            company_id,
+            allow_self_approval: body.allow_self_approval,
+            self_approval_reason: body.allow_self_approval ? reason : null,
+            updated_by: user.id,
+            updated_at: new Date().toISOString(),
+          }, { onConflict: 'company_id' });
+        if (controlsError) throw controlsError;
+        await logPayrollAudit(supabaseAdmin, {
+          company_id, event_type: 'payroll_controls_updated',
+          event_data: { before, allow_self_approval: body.allow_self_approval, reason: body.allow_self_approval ? reason : null },
+          created_by: user.id,
+        });
+        data = { ...(await loadPayrollControls(supabaseAdmin, company_id)), can_change: true };
+        error = null;
         break;
       }
 
@@ -781,6 +892,7 @@ serve(withEnterprisePlatform('payroll', 'tenant', async (req, _ctx) => {
         if (existingItemsError) throw existingItemsError;
         const editError = payslipEditError(existingItems ?? [], items ?? []);
         if (editError) throw new Error(editError);
+        await addRunPreparer(supabaseAdmin, payslipRun.payroll_run_id, user.id);
         const earnings = items.filter(i => i.type === 'earning').reduce((sum, i) => sum + i.amount, 0);
         const deductions = items.filter(i => i.type === 'deduction').reduce((sum, i) => sum + i.amount, 0);
         const netPay = earnings - deductions;
@@ -795,8 +907,9 @@ serve(withEnterprisePlatform('payroll', 'tenant', async (req, _ctx) => {
             description: item.description,
             type: item.type,
             amount: item.amount,
-            component_code: item.component_code ?? prior?.component_code ?? null,
-            irp5_code: item.irp5_code ?? prior?.irp5_code ?? null,
+            // IRP5 certificates are built from these codes: keep the generated ones.
+            component_code: prior?.component_code ?? null,
+            irp5_code: prior?.irp5_code ?? null,
           };
         });
         await supabaseAdmin.from('payslip_items').insert(itemsToInsert);
@@ -805,7 +918,14 @@ serve(withEnterprisePlatform('payroll', 'tenant', async (req, _ctx) => {
           total_deductions: deductions,
           net_pay: netPay,
         }).eq('id', payslipId).eq('company_id', company_id));
-        if (!error) data = { approval_cleared: editApprovalCleared };
+        if (!error) {
+          data = { approval_cleared: editApprovalCleared };
+          await logPayrollAudit(supabaseAdmin, {
+            company_id, payroll_run_id: payslipRun.payroll_run_id, payslip_id: payslipId, event_type: 'payslip_updated',
+            event_data: { net_pay: netPay, lines: itemsToInsert.length },
+            created_by: user.id,
+          });
+        }
         break;
       }
 
@@ -1194,13 +1314,6 @@ serve(withEnterprisePlatform('payroll', 'tenant', async (req, _ctx) => {
         };
         break;
       }
-
-      case 'GET_SUMMARY_REPORT':
-        ({ data, error } = await userSupabase.rpc('get_payroll_summary_report', {
-          p_start_date: body.start_date,
-          p_end_date: body.end_date,
-        }));
-        break;
 
       case 'GET_PERIOD_REPORTS': {
         const startDate = body.start_date;

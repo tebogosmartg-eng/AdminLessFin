@@ -14,6 +14,8 @@ export type PayrollFactItemLine = {
   isEarning: boolean;
   isDeduction: boolean;
   isEmployerContribution: boolean;
+  /** IRP5 source code stamped when the payslip was generated (null on lines not reported, or older payslips). */
+  irp5Code?: string | null;
 };
 
 export type PayrollFactTotals = {

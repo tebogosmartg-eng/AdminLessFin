@@ -97,7 +97,7 @@ export async function loadFinalizedPayrollFactSource(
         total_deductions?: number;
         net_pay?: number;
         calculation_snapshot?: Record<string, unknown>;
-        payslip_items?: Array<{ description: string; type: string; amount: number }>;
+        payslip_items?: Array<{ description: string; type: string; amount: number; irp5_code?: string | null }>;
       } | null = null;
 
       try {

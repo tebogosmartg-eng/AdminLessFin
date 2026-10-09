@@ -138,3 +138,60 @@ test('a weekly run is chosen in the new-run dialog with a one-week period', asyn
   await shot(page, '04-weekly-run-dialog');
   await page.getByRole('button', { name: 'Cancel' }).click();
 });
+
+test('the person who prepared a run cannot approve it unless the owner allows self-approval', async ({ page }) => {
+  const env = loadE2EEnv();
+  const sb = createClient(env.supabaseUrl, env.supabaseAnonKey, { auth: { persistSession: false } });
+  const auth = await sb.auth.signInWithPassword({ email: env.email, password: env.password });
+  expect(auth.error).toBeNull();
+  const { data: company } = await sb.from('companies').select('id').eq('name', READY_COMPANY).single();
+  const companyId = company!.id as string;
+  const original = await call<{ allow_self_approval: boolean; self_approval_reason: string | null }>(sb, { method: 'GET_PAYROLL_CONTROLS', company_id: companyId });
+
+  const month = new Date();
+  month.setMonth(month.getMonth() + 3);
+  const start = new Date(month.getFullYear(), month.getMonth(), 1);
+  const end = new Date(month.getFullYear(), month.getMonth() + 1, 0);
+  const iso = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  const run = await call<{ id: string }>(sb, {
+    method: 'CREATE_RUN', company_id: companyId, additional_run: true,
+    runData: { pay_period_start: iso(start), pay_period_end: iso(end), pay_date: iso(end) },
+  });
+  try {
+    await call(sb, { method: 'UPDATE_PAYROLL_CONTROLS', company_id: companyId, allow_self_approval: false });
+    await call(sb, { method: 'GENERATE_PAYSLIPS', company_id: companyId, runId: run.id });
+
+    await page.goto('/');
+    await waitForRouteSettled(page);
+    await ensureReadyCompany(page);
+    await page.goto(`/payroll-runs/${run.id}`);
+    await waitForRouteSettled(page);
+    await expectNoErrorBoundary(page);
+    await expect(page.getByTestId('self-approval-blocked')).toContainText('another owner or admin must approve', { timeout: 30_000 });
+    await expect(page.getByRole('button', { name: 'Approve Payroll Run' })).toBeDisabled();
+    await shot(page, '05-self-approval-blocked');
+
+    // The owner allows self-approval (with a reason) in Settings → Payroll.
+    await page.goto('/settings');
+    await waitForRouteSettled(page);
+    await page.getByRole('tab', { name: /payroll/i }).click();
+    const card = page.getByTestId('payroll-approval-controls');
+    await expect(card).toBeVisible({ timeout: 30_000 });
+    await card.getByRole('switch').click();
+    await card.getByLabel('Reason').fill('CERT TX: single test user runs payroll');
+    await card.getByRole('button', { name: 'Save Approval Setting' }).click();
+    await expect(page.getByText(/Self-approval allowed/)).toBeVisible({ timeout: 30_000 });
+    await shot(page, '06-self-approval-allowed');
+
+    await page.goto(`/payroll-runs/${run.id}`);
+    await waitForRouteSettled(page);
+    await expect(page.getByText('Approving it will be recorded as a self-approval')).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByRole('button', { name: 'Approve Payroll Run' })).toBeEnabled();
+  } finally {
+    await call(sb, { method: 'DISCARD_RUN', company_id: companyId, runId: run.id }).catch(() => undefined);
+    await call(sb, {
+      method: 'UPDATE_PAYROLL_CONTROLS', company_id: companyId,
+      allow_self_approval: original.allow_self_approval, reason: original.self_approval_reason ?? undefined,
+    });
+  }
+});

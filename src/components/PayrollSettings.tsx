@@ -12,6 +12,7 @@ import { showError, showSuccess } from '../utils/toast';
 import { payrollSettingsQuery } from '../lib/queries';
 import { invokePayroll } from '../lib/payrollOperations';
 import { PAYROLL_RULE_CATALOG } from '../lib/payrollRulesEngine/catalogue';
+import PayrollApprovalControls from './payroll/PayrollApprovalControls';
 
 type CatalogRule = {
   id: string;
@@ -121,6 +122,8 @@ const PayrollSettings = () => {
   if (isLoading) return <Skeleton className="h-64 w-full" />;
 
   return (
+    <div className="space-y-6">
+    <PayrollApprovalControls />
     <Card>
       <CardHeader>
         <CardTitle>Payroll Rules</CardTitle>
@@ -177,6 +180,7 @@ const PayrollSettings = () => {
         </Button>
       </CardContent>
     </Card>
+    </div>
   );
 };
 

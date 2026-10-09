@@ -80,6 +80,8 @@ export type FinalizedPayslipSource = {
     description: string;
     type: 'earning' | 'deduction' | 'employer_contribution' | string;
     amount: number;
+    /** IRP5 source code stamped at generation; absent on payslips generated before codes were stamped. */
+    irp5Code?: string | null;
   }>;
 };
 

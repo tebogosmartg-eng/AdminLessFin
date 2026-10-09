@@ -44,6 +44,8 @@ import PayrollWorkflowStepper from '../components/payroll/PayrollWorkflowStepper
 import PayrollRunRulesPanel from '../components/payroll/PayrollRunRulesPanel';
 import { PayComponentEditor } from '../components/payroll/PayComponentEditor';
 import PayrollCommandCentre from '../components/payroll/PayrollCommandCentre';
+import { usePayrollControls } from '../components/payroll/usePayrollControls';
+import type { RunWarning } from '../lib/payrollRulesEngine/runWarnings';
 import LifecycleContextBadge from '../components/boe/LifecycleContextBadge';
 import { buildChatUrl } from '../lib/boe/contextualChat';
 import { Link } from 'react-router-dom';
@@ -102,6 +104,8 @@ type PayrollRun = {
   processed_at?: string | null;
   journal_entry_id?: string | null;
   output_metadata?: Record<string, unknown> | null;
+  /** Users who generated or edited the payslips or changed the inputs; they cannot approve. */
+  prepared_by?: string[] | null;
 };
 
 const payrollApprovalStorageKey = (runId: string) => `payroll-approved-${runId}`;
@@ -158,6 +162,16 @@ const PayrollRunDetail = () => {
   const run = data?.run;
   const payslips = data?.payslips;
   const auditEvents = data?.audit_events ?? [];
+
+  // Separation of duties: whoever prepared the run cannot approve it (the server enforces this too).
+  const { data: payrollControls } = usePayrollControls(activeCompany?.id);
+  const preparedByMe = !!user && (run?.prepared_by ?? []).includes(user.id);
+  const selfApprovalBlocked = preparedByMe && !!payrollControls && !payrollControls.allow_self_approval;
+  const generationWarnings = (Array.isArray(run?.output_metadata?.generation_warnings)
+    ? run!.output_metadata!.generation_warnings
+    : []) as RunWarning[];
+  const payWarnings = generationWarnings.filter((w) => w.category === 'pay');
+  const sarsWarnings = generationWarnings.filter((w) => w.category === 'sars');
 
   const workflowRun = useMemo<PayrollRun | undefined>(() => {
     if (!run) return undefined;
@@ -722,6 +736,34 @@ const PayrollRunDetail = () => {
           </Card>
         )}
 
+        {!isRunFinalized(run?.status) && generationWarnings.length > 0 && (
+          <Alert data-testid="run-generation-warnings">
+            <AlertCircle className="h-4 w-4" />
+            <AlertTitle>
+              {payWarnings.length > 0
+                ? `${payWarnings.length} employee${payWarnings.length === 1 ? '' : 's'} not paid as expected`
+                : 'Payslips generated with missing SARS details'}
+            </AlertTitle>
+            <AlertDescription className="space-y-2">
+              {payWarnings.length > 0 && (
+                <ul className="list-disc pl-5 text-sm">
+                  {payWarnings.map((w, i) => <li key={`pay-${i}`}>{w.message}</li>)}
+                </ul>
+              )}
+              {sarsWarnings.length > 0 && (
+                <details className="text-sm">
+                  <summary className="cursor-pointer">
+                    {sarsWarnings.length} missing SARS detail{sarsWarnings.length === 1 ? '' : 's'} (needed for IRP5 certificates)
+                  </summary>
+                  <ul className="list-disc pl-5 mt-1">
+                    {sarsWarnings.map((w, i) => <li key={`sars-${i}`}>{w.message}</li>)}
+                  </ul>
+                </details>
+              )}
+            </AlertDescription>
+          </Alert>
+        )}
+
         {currentStep === 'review' && payslips && payslips.length > 0 && (
           <Card>
             <CardHeader>
@@ -736,11 +778,22 @@ const PayrollRunDetail = () => {
               <Button
                 size="lg"
                 onClick={() => approveRunMutation.mutate()}
-                disabled={approveRunMutation.isPending || isRunApproved(workflowRun ?? run)}
+                disabled={approveRunMutation.isPending || isRunApproved(workflowRun ?? run) || selfApprovalBlocked}
               >
                 {approveRunMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CheckCircle className="mr-2 h-4 w-4" />}
                 {isRunApproved(workflowRun ?? run) ? 'Approved' : 'Approve Payroll Run'}
               </Button>
+              {!isRunApproved(workflowRun ?? run) && selfApprovalBlocked && (
+                <p className="text-sm text-muted-foreground mt-2" data-testid="self-approval-blocked">
+                  You prepared this run, so another owner or admin must approve it.
+                  {payrollControls?.can_change && ' In a one-person business you can allow self-approval under Settings → Payroll.'}
+                </p>
+              )}
+              {!isRunApproved(workflowRun ?? run) && preparedByMe && !selfApprovalBlocked && payrollControls && (
+                <p className="text-sm text-muted-foreground mt-2">
+                  You prepared this run. Approving it will be recorded as a self-approval.
+                </p>
+              )}
               {isRunApproved(workflowRun ?? run) && (
                 <p className="text-sm text-muted-foreground mt-2">
                   {(workflowRun ?? run)?.approved_at

@@ -37,6 +37,22 @@ import { Employee } from '../pages/Employees';
 import { useDialogFormReset } from '../hooks/useDialogFormReset';
 import { PayComponentEditor } from './payroll/PayComponentEditor';
 import { birthDateFromSaId } from '../lib/payrollRulesEngine/periodEmployment';
+import { isPlausibleTaxNumber } from '../lib/payrollRulesEngine/runWarnings';
+import { Checkbox } from './ui/checkbox';
+
+const SA_POSTAL_CODE = /^\d{4}$/;
+const optionalPostalCode = z
+  .string()
+  .optional()
+  .refine((value) => !value || SA_POSTAL_CODE.test(value.trim()), 'A South African postal code is 4 digits.');
+
+/** SARS fields saved as null when left blank (the database checks their format). */
+const SARS_TEXT_FIELDS = [
+  'residential_unit_number', 'residential_complex', 'residential_street_number', 'residential_street_name',
+  'residential_suburb', 'residential_city', 'residential_postal_code',
+  'postal_address_line1', 'postal_address_line2', 'postal_address_line3', 'postal_code',
+  'passport_number', 'passport_country',
+] as const;
 
 const employeeSchema = z.object({
   first_name: z.string().min(1, 'First name is required.'),
@@ -55,7 +71,10 @@ const employeeSchema = z.object({
       'This is not a valid South African ID number (check digit or birth date is wrong).'
     ),
   date_of_birth: z.string().optional(),
-  tax_number: z.string().optional(),
+  tax_number: z
+    .string()
+    .optional()
+    .refine((value) => !value?.trim() || isPlausibleTaxNumber(value), 'A SARS income tax number is 10 digits starting with 0, 1, 2, 3 or 9.'),
   bank_name: z.string().optional(),
   bank_branch_code: z.string().optional(),
   bank_account_number: z.string().optional(),
@@ -66,7 +85,29 @@ const employeeSchema = z.object({
   end_date: z.string().optional(),
   salary_amount: z.coerce.number().min(0, 'Salary must be a positive number.').optional().nullable(),
   salary_period: z.enum(['monthly', 'weekly', 'fortnightly']).optional().nullable(),
-});
+  residential_unit_number: z.string().optional(),
+  residential_complex: z.string().optional(),
+  residential_street_number: z.string().optional(),
+  residential_street_name: z.string().optional(),
+  residential_suburb: z.string().optional(),
+  residential_city: z.string().optional(),
+  residential_postal_code: optionalPostalCode,
+  postal_same_as_residential: z.boolean().default(true),
+  postal_address_line1: z.string().optional(),
+  postal_address_line2: z.string().optional(),
+  postal_address_line3: z.string().optional(),
+  postal_code: optionalPostalCode,
+  bank_account_type: z.enum(['', 'current', 'savings', 'transmission', 'bond', 'credit_card', 'subscription_share', 'foreign']).optional(),
+  nature_of_person: z.enum(['auto', 'A', 'B', 'C']).default('auto'),
+  passport_number: z.string().optional(),
+  passport_country: z
+    .string()
+    .optional()
+    .refine((value) => !value || /^[A-Za-z]{2}$/.test(value.trim()), 'Use the 2-letter country code, e.g. ZW, MZ, GB.'),
+}).refine(
+  (values) => !values.passport_number?.trim() || !!values.passport_country?.trim(),
+  { path: ['passport_country'], message: 'Which country issued the passport?' }
+);
 
 type EmployeeFormValues = z.infer<typeof employeeSchema>;
 
@@ -100,6 +141,10 @@ const EmployeeForm = ({ isOpen, setIsOpen, employee }: EmployeeFormProps) => {
         end_date: employee.end_date || '',
         salary_amount: employee.salary_amount || undefined,
         salary_period: employee.salary_period || undefined,
+        ...Object.fromEntries(SARS_TEXT_FIELDS.map((key) => [key, employee[key] || ''])),
+        postal_same_as_residential: employee.postal_same_as_residential !== false,
+        bank_account_type: (employee.bank_account_type ?? '') as EmployeeFormValues['bank_account_type'],
+        nature_of_person: employee.nature_of_person ?? 'auto',
       });
     } else {
       form.reset({
@@ -120,9 +165,15 @@ const EmployeeForm = ({ isOpen, setIsOpen, employee }: EmployeeFormProps) => {
         end_date: '',
         salary_amount: undefined,
         salary_period: undefined,
+        ...Object.fromEntries(SARS_TEXT_FIELDS.map((key) => [key, ''])),
+        postal_same_as_residential: true,
+        bank_account_type: '',
+        nature_of_person: 'auto',
       });
     }
   });
+
+  const postalSameAsResidential = form.watch('postal_same_as_residential');
 
   const mutation = useMutation({
     mutationFn: async (values: EmployeeFormValues) => {
@@ -134,6 +185,10 @@ const EmployeeForm = ({ isOpen, setIsOpen, employee }: EmployeeFormProps) => {
         date_of_birth: values.date_of_birth || null,
         salary_amount: values.salary_amount || null,
         salary_period: values.salary_period || null,
+        ...Object.fromEntries(SARS_TEXT_FIELDS.map((key) => [key, values[key]?.trim() || null])),
+        passport_country: values.passport_country?.trim().toUpperCase() || null,
+        bank_account_type: values.bank_account_type || null,
+        nature_of_person: values.nature_of_person === 'auto' ? null : values.nature_of_person,
       };
 
       const method = employee ? 'PUT' : 'POST';
@@ -216,6 +271,80 @@ const EmployeeForm = ({ isOpen, setIsOpen, employee }: EmployeeFormProps) => {
               )} />
             </fieldset>
 
+            <fieldset className="grid grid-cols-1 md:grid-cols-2 gap-4 border p-4 rounded-md" data-testid="employee-sars-details">
+              <legend className="text-sm font-medium px-1">SARS Details (IRP5)</legend>
+              <p className="md:col-span-2 text-xs text-muted-foreground">
+                SARS needs these on the employee's tax certificate. Payroll runs list employees whose details are missing.
+              </p>
+              <FormField control={form.control} name="nature_of_person" render={({ field }) => (
+                <FormItem><FormLabel>Nature of Person</FormLabel>
+                  <Select onValueChange={field.onChange} value={field.value}>
+                    <FormControl><SelectTrigger aria-label="Nature of person"><SelectValue /></SelectTrigger></FormControl>
+                    <SelectContent>
+                      <SelectItem value="auto">Work it out from the ID or passport</SelectItem>
+                      <SelectItem value="A">A – Individual with an ID or passport number</SelectItem>
+                      <SelectItem value="B">B – Individual without an ID or passport number</SelectItem>
+                      <SelectItem value="C">C – Director of a private company / member of a CC</SelectItem>
+                    </SelectContent>
+                  </Select><FormMessage />
+                </FormItem>
+              )} />
+              <div />
+              <FormField control={form.control} name="passport_number" render={({ field }) => (
+                <FormItem><FormLabel>Passport Number</FormLabel><FormControl><Input {...field} /></FormControl>
+                  <FormDescription>For employees without a South African ID.</FormDescription><FormMessage /></FormItem>
+              )} />
+              <FormField control={form.control} name="passport_country" render={({ field }) => (
+                <FormItem><FormLabel>Passport Country</FormLabel>
+                  <FormControl><Input {...field} maxLength={2} placeholder="e.g. ZW" className="uppercase" /></FormControl><FormMessage /></FormItem>
+              )} />
+              <div className="md:col-span-2 text-sm font-medium pt-2">Residential Address</div>
+              <FormField control={form.control} name="residential_unit_number" render={({ field }) => (
+                <FormItem><FormLabel>Unit Number</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
+              )} />
+              <FormField control={form.control} name="residential_complex" render={({ field }) => (
+                <FormItem><FormLabel>Complex</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
+              )} />
+              <FormField control={form.control} name="residential_street_number" render={({ field }) => (
+                <FormItem><FormLabel>Street Number</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
+              )} />
+              <FormField control={form.control} name="residential_street_name" render={({ field }) => (
+                <FormItem><FormLabel>Street or Farm Name</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
+              )} />
+              <FormField control={form.control} name="residential_suburb" render={({ field }) => (
+                <FormItem><FormLabel>Suburb or District</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
+              )} />
+              <FormField control={form.control} name="residential_city" render={({ field }) => (
+                <FormItem><FormLabel>City or Town</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
+              )} />
+              <FormField control={form.control} name="residential_postal_code" render={({ field }) => (
+                <FormItem><FormLabel>Postal Code</FormLabel><FormControl><Input {...field} inputMode="numeric" maxLength={4} /></FormControl><FormMessage /></FormItem>
+              )} />
+              <div />
+              <FormField control={form.control} name="postal_same_as_residential" render={({ field }) => (
+                <FormItem className="md:col-span-2 flex items-center gap-2 space-y-0">
+                  <FormControl><Checkbox checked={field.value} onCheckedChange={(checked) => field.onChange(checked === true)} /></FormControl>
+                  <FormLabel className="font-normal">Postal address is the same as the residential address</FormLabel>
+                </FormItem>
+              )} />
+              {!postalSameAsResidential && (
+                <>
+                  <FormField control={form.control} name="postal_address_line1" render={({ field }) => (
+                    <FormItem><FormLabel>Postal Address Line 1</FormLabel><FormControl><Input {...field} placeholder="e.g. PO Box 123" /></FormControl><FormMessage /></FormItem>
+                  )} />
+                  <FormField control={form.control} name="postal_address_line2" render={({ field }) => (
+                    <FormItem><FormLabel>Postal Address Line 2</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
+                  )} />
+                  <FormField control={form.control} name="postal_address_line3" render={({ field }) => (
+                    <FormItem><FormLabel>Postal Address Line 3</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
+                  )} />
+                  <FormField control={form.control} name="postal_code" render={({ field }) => (
+                    <FormItem><FormLabel>Postal Address Code</FormLabel><FormControl><Input {...field} inputMode="numeric" maxLength={4} /></FormControl><FormMessage /></FormItem>
+                  )} />
+                </>
+              )}
+            </fieldset>
+
             <fieldset className="grid grid-cols-1 md:grid-cols-2 gap-4 border p-4 rounded-md">
               <legend className="text-sm font-medium px-1">Employment Details</legend>
               <FormField control={form.control} name="employment_type" render={({ field }) => (
@@ -285,6 +414,22 @@ const EmployeeForm = ({ isOpen, setIsOpen, employee }: EmployeeFormProps) => {
               )} />
               <FormField control={form.control} name="bank_account_number" render={({ field }) => (
                 <FormItem><FormLabel>Account Number</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
+              )} />
+              <FormField control={form.control} name="bank_account_type" render={({ field }) => (
+                <FormItem><FormLabel>Account Type</FormLabel>
+                  <Select onValueChange={field.onChange} value={field.value || ''}>
+                    <FormControl><SelectTrigger aria-label="Account type"><SelectValue placeholder="Select an account type" /></SelectTrigger></FormControl>
+                    <SelectContent>
+                      <SelectItem value="current">Current / Cheque</SelectItem>
+                      <SelectItem value="savings">Savings</SelectItem>
+                      <SelectItem value="transmission">Transmission</SelectItem>
+                      <SelectItem value="bond">Bond</SelectItem>
+                      <SelectItem value="credit_card">Credit card</SelectItem>
+                      <SelectItem value="subscription_share">Subscription share</SelectItem>
+                      <SelectItem value="foreign">Foreign bank account</SelectItem>
+                    </SelectContent>
+                  </Select><FormMessage />
+                </FormItem>
               )} />
             </fieldset>
           </form>

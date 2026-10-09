@@ -54,6 +54,22 @@ export type Employee = {
   end_date: string | null;
   salary_amount: number | null;
   salary_period: 'monthly' | 'weekly' | 'fortnightly' | null;
+  residential_unit_number?: string | null;
+  residential_complex?: string | null;
+  residential_street_number?: string | null;
+  residential_street_name?: string | null;
+  residential_suburb?: string | null;
+  residential_city?: string | null;
+  residential_postal_code?: string | null;
+  postal_same_as_residential?: boolean | null;
+  postal_address_line1?: string | null;
+  postal_address_line2?: string | null;
+  postal_address_line3?: string | null;
+  postal_code?: string | null;
+  bank_account_type?: string | null;
+  nature_of_person?: 'A' | 'B' | 'C' | null;
+  passport_number?: string | null;
+  passport_country?: string | null;
 };
 
 const Employees = () => {

@@ -43,6 +43,7 @@ export type RawFinalizedPayslipPayload = {
     description: string;
     type: string;
     amount: number;
+    irp5_code?: string | null;
   }>;
 };
 
@@ -95,6 +96,7 @@ export function mapRawPayslipToPayrollFact(raw: RawFinalizedPayslipPayload): Pay
       isEarning: item.type === 'earning' || classified?.isEarning === true,
       isDeduction: item.type === 'deduction' || classified?.isDeduction === true,
       isEmployerContribution: isEmployer,
+      irp5Code: item.irp5_code ?? null,
     };
   });
 
