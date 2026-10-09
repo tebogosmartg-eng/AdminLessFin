@@ -9,6 +9,7 @@ import { executeStatutoryPipeline } from '../statutoryPayrollEngine/pipeline';
 import { resolveRuleSetForDate } from '../statutoryPayrollEngine/registry';
 import { roundCurrency } from '../statutoryPayrollEngine/utils';
 import { assemblePayComponents, mergePayComponents, type StoredPayComponent } from './payComponents';
+import { packageConfigForPayPeriod } from './periodEmployment';
 
 export function previewEmployeePay(input: {
   monthlyBasic: number;
@@ -17,10 +18,19 @@ export function previewEmployeePay(input: {
   packageComponents?: StoredPayComponent[];
   periodInputs?: StoredPayComponent[];
   payDate: string;
+  /** Pay periods in the year for the run (12 monthly, 26 fortnightly, 52 weekly). monthlyBasic is then per period. */
+  periodsPerYear?: number;
 }) {
+  const periodsPerYear = input.periodsPerYear ?? 12;
   const ruleSet = resolveRuleSetForDate(input.payDate);
   const rows = input.components
-    ?? mergePayComponents(input.packageComponents ?? [], input.periodInputs ?? []);
+    ?? mergePayComponents(
+      (input.packageComponents ?? []).map((row) => ({
+        ...row,
+        config: packageConfigForPayPeriod(row.componentCode, row.config, periodsPerYear),
+      })),
+      input.periodInputs ?? []
+    );
   const assembly = assemblePayComponents(rows, ruleSet);
   const cashGross = roundCurrency(input.monthlyBasic + assembly.cashGross);
   const taxableEarnings = roundCurrency(input.monthlyBasic + assembly.taxableBaseAddition);
@@ -50,6 +60,7 @@ export function previewEmployeePay(input: {
     components: assembly.components,
     ruleSet,
     companyAnnualRemuneration: 600_000,
+    periodsPerYear,
   });
 
   return { assembly, result, cashGross };

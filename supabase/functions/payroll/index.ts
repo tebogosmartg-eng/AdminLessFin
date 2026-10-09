@@ -363,6 +363,14 @@ serve(withEnterprisePlatform('payroll', 'tenant', async (req, _ctx) => {
         const start = String(runInput.pay_period_start ?? '');
         const end = String(runInput.pay_period_end ?? '');
         const payDate = String(runInput.pay_date ?? '');
+        const payFrequency = String(runInput.pay_frequency ?? 'monthly');
+        if (!['monthly', 'fortnightly', 'weekly'].includes(payFrequency)) {
+          throw new PayrollDomainError({
+            stage: 'validation', code: 'INVALID_FREQUENCY',
+            message: 'Pay frequency must be monthly, fortnightly or weekly.',
+            recovery: 'Choose the pay frequency for this run.',
+          });
+        }
         if (!isoDate.test(start) || !isoDate.test(end) || !isoDate.test(payDate)) {
           throw new PayrollDomainError({
             stage: 'validation', code: 'INVALID_PERIOD',
@@ -387,17 +395,19 @@ serve(withEnterprisePlatform('payroll', 'tenant', async (req, _ctx) => {
 
         // A second run over the same days pays those days twice unless it is meant to
         // (a bonus or correction run), so an overlap must be asked for explicitly.
+        // Weekly and monthly runs pay different employees, so only the same frequency counts.
         const { data: overlapping, error: overlapError } = await supabaseAdmin
           .from('payroll_runs')
           .select('id, pay_period_start, pay_period_end, status, output_metadata')
           .eq('company_id', company_id)
+          .eq('pay_frequency', payFrequency)
           .lte('pay_period_start', end)
           .gte('pay_period_end', start);
         if (overlapError) throw overlapError;
         const live = (overlapping ?? []).filter((r) => r.output_metadata?.cancelled !== true);
         const additionalRun = body.additional_run === true;
         if (live.length && !additionalRun) {
-          const list = live.map((r) => `${r.pay_period_start} to ${r.pay_period_end} (${r.status})`).join('; ');
+          const list = live.map((r) => `${r.pay_period_start} to ${r.pay_period_end} (${payFrequency}, ${r.status})`).join('; ');
           throw new PayrollDomainError({
             stage: 'validation', code: 'PERIOD_OVERLAP',
             message: `A payroll run already covers these dates: ${list}.`,
@@ -408,7 +418,7 @@ serve(withEnterprisePlatform('payroll', 'tenant', async (req, _ctx) => {
 
         ({ data, error } = await supabaseAdmin
           .from('payroll_runs')
-          .insert({ company_id, pay_period_start: start, pay_period_end: end, pay_date: payDate, status: 'draft' })
+          .insert({ company_id, pay_period_start: start, pay_period_end: end, pay_date: payDate, pay_frequency: payFrequency, status: 'draft' })
           .select()
           .single());
         if (!error && data) {
@@ -417,6 +427,7 @@ serve(withEnterprisePlatform('payroll', 'tenant', async (req, _ctx) => {
             event_data: {
               pay_period_start: data.pay_period_start,
               pay_period_end: data.pay_period_end,
+              pay_frequency: payFrequency,
               additional_run: additionalRun,
               overlaps: live.map((r) => r.id),
             },
@@ -530,14 +541,36 @@ serve(withEnterprisePlatform('payroll', 'tenant', async (req, _ctx) => {
       case 'UPDATE_PAYROLL_SETTINGS': {
         const { settings } = body;
         if (!Array.isArray(settings)) throw new Error('Settings array is required.');
-        const upserts = settings.map((s) => ({
-          company_id,
-          rule_id: s.rule_id,
-          enabled: s.enabled,
-          config: s.config ?? {},
-          updated_by: user.id,
-          updated_at: new Date().toISOString(),
-        }));
+        const { data: catalogRules, error: catalogError } = await supabaseAdmin
+          .from('payroll_rule_catalog')
+          .select('id, company_configurable');
+        if (catalogError) throw catalogError;
+        const catalogById = new Map((catalogRules ?? []).map((r) => [r.id, r]));
+        const unknown = settings.filter((s) => !catalogById.has(s.rule_id)).map((s) => s.rule_id);
+        if (unknown.length) {
+          throw new PayrollDomainError({
+            stage: 'validation', code: 'UNKNOWN_RULE',
+            message: `Unknown payroll rule: ${unknown.join(', ')}.`,
+            recovery: 'Reload payroll settings and try again.',
+          });
+        }
+        const upserts = settings.map((s) => {
+          const configurable = catalogById.get(s.rule_id)?.company_configurable === true;
+          let config = s.config && typeof s.config === 'object' ? s.config : {};
+          if (s.rule_id === 'basic_salary') {
+            // The only company choice on basic salary is how a partial period is measured.
+            config = { pro_rata_method: config.pro_rata_method === 'working_days' ? 'working_days' : 'calendar_days' };
+          }
+          return {
+            company_id,
+            rule_id: s.rule_id,
+            // A required rule (PAYE, UIF, basic salary, …) cannot be switched off.
+            enabled: configurable ? s.enabled !== false : true,
+            config,
+            updated_by: user.id,
+            updated_at: new Date().toISOString(),
+          };
+        });
         const { data: updated, error: upsertError } = await supabaseAdmin
           .from('company_payroll_rule_settings')
           .upsert(upserts, { onConflict: 'company_id,rule_id' })

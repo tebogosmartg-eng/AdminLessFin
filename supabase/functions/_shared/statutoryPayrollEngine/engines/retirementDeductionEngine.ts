@@ -32,12 +32,13 @@ export function runRetirementDeductionEngine(
     return skippedEngineResult(engineId, 'No retirement contribution configured');
   }
 
-  const annualRemuneration = ctx.grossEarnings * 12;
+  const periods = ctx.periodsPerYear ?? 12;
+  const annualRemuneration = ctx.grossEarnings * periods;
   const maxByRate = roundCurrency(annualRemuneration * ctx.ruleSet.retirementDeductionMaxRate);
   const maxAnnual = Math.min(maxByRate, ctx.ruleSet.retirementDeductionCapAnnual);
   const ytdContributions = ctx.ytd?.retirementContributions ?? 0;
   const remainingAnnualCap = Math.max(0, maxAnnual - ytdContributions);
-  const maxMonthly = roundCurrency(remainingAnnualCap / 12);
+  const maxMonthly = roundCurrency(remainingAnnualCap / periods);
   const deductible = Math.min(contribution, maxMonthly);
   const nonDeductible = roundCurrency(contribution - deductible);
 

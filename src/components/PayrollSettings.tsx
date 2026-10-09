@@ -7,6 +7,7 @@ import { Button } from './ui/button';
 import { Switch } from './ui/switch';
 import { Badge } from './ui/badge';
 import { Skeleton } from './ui/skeleton';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { showError, showSuccess } from '../utils/toast';
 import { payrollSettingsQuery } from '../lib/queries';
 import { invokePayroll } from '../lib/payrollOperations';
@@ -65,13 +66,17 @@ const PayrollSettings = () => {
   const saveMutation = useMutation({
     mutationFn: async () => {
       if (!activeCompany) throw new Error('No company selected');
-      const settings = catalog
-        .filter((r) => r.company_configurable)
-        .map((r) => ({
-          rule_id: r.id,
-          enabled: localRules[r.id]?.enabled ?? r.enabled_by_default,
-          config: localRules[r.id]?.config ?? {},
-        }));
+      const settings = [
+        ...catalog
+          .filter((r) => r.company_configurable)
+          .map((r) => ({
+            rule_id: r.id,
+            enabled: localRules[r.id]?.enabled ?? r.enabled_by_default,
+            config: localRules[r.id]?.config ?? {},
+          })),
+        // Basic salary is always on; its one company choice is how partial periods are measured.
+        { rule_id: 'basic_salary', enabled: true, config: { pro_rata_method: proRataMethod } },
+      ];
       return invokePayroll({
         method: 'UPDATE_PAYROLL_SETTINGS',
         company_id: activeCompany.id,
@@ -95,6 +100,17 @@ const PayrollSettings = () => {
     return groups;
   }, [catalog]);
 
+  const proRataMethod =
+    (localRules.basic_salary?.config?.pro_rata_method as string | undefined) === 'working_days'
+      ? 'working_days'
+      : 'calendar_days';
+  const setProRataMethod = (method: string) => {
+    setLocalRules((prev) => ({
+      ...prev,
+      basic_salary: { ...prev.basic_salary, enabled: true, config: { ...(prev.basic_salary?.config ?? {}), pro_rata_method: method } },
+    }));
+  };
+
   const toggleRule = (ruleId: string, enabled: boolean) => {
     setLocalRules((prev) => ({
       ...prev,
@@ -114,6 +130,19 @@ const PayrollSettings = () => {
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
+        <div className="space-y-2 rounded-lg border p-4">
+          <div className="font-medium">Partial-period pay</div>
+          <p className="text-sm text-muted-foreground">
+            How salary is pro-rated when an employee starts or leaves during a pay period.
+          </p>
+          <Select value={proRataMethod} onValueChange={setProRataMethod}>
+            <SelectTrigger className="max-w-sm" aria-label="Partial-period pay"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="calendar_days">Calendar days (every day counts)</SelectItem>
+              <SelectItem value="working_days">Working days (Mon–Fri, excluding public holidays)</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
         {Object.entries(grouped).map(([category, rules]) => (
           <div key={category} className="space-y-3">
             <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">

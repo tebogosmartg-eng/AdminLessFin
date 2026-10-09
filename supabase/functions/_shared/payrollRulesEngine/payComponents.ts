@@ -24,6 +24,7 @@ export const PAY_COMPONENT_CODES = [
   'subsistence',
   'bonus',
   'other_cash',
+  'leave_payout',
   'fringe_company_car',
   'fringe_employer_insurance',
   'fringe_low_interest_loan',
@@ -53,6 +54,9 @@ export const PAY_COMPONENT_CATALOG: PayComponentDefinition[] = [
   { code: 'subsistence', payslipLabel: 'Subsistence Allowance', cash: true, irp5Code: '3704', engineId: 'subsistence', remuneration: 'excess' },
   { code: 'bonus', payslipLabel: 'Bonus', cash: true, irp5Code: '3605', engineId: 'bonus_tax', remuneration: 'full' },
   { code: 'other_cash', payslipLabel: 'Other Allowance', cash: true, irp5Code: '3713', engineId: null, remuneration: 'when_taxable' },
+  // Leave paid out (e.g. on termination) is remuneration for services, reported with
+  // annual payments (3605) and taxed once by the SARS difference method.
+  { code: 'leave_payout', payslipLabel: 'Leave Pay', cash: true, irp5Code: '3605', engineId: null, remuneration: 'full' },
   { code: 'fringe_company_car', payslipLabel: 'Company Car', cash: false, irp5Code: '3802', engineId: 'fringe_benefit', remuneration: 'benefit' },
   { code: 'fringe_employer_insurance', payslipLabel: 'Employer Insurance', cash: false, irp5Code: '3801', engineId: 'fringe_benefit', remuneration: 'benefit' },
   { code: 'fringe_low_interest_loan', payslipLabel: 'Low Interest Loan', cash: false, irp5Code: '3807', engineId: 'fringe_benefit', remuneration: 'benefit' },
@@ -314,6 +318,29 @@ export function assemblePayComponents(
       remunerationAddition += amount;
       lines.push({
         description: definition.payslipLabel,
+        type: 'earning',
+        amount: roundCurrency(amount),
+        componentCode: definition.code,
+        irp5Code: definition.irp5Code,
+      });
+      continue;
+    }
+
+    if (definition.code === 'leave_payout') {
+      if (row.source === 'package') {
+        throw new PayComponentError('Leave paid out is a once-off amount: add it as a period input on the run, not on the pay package.');
+      }
+      const days = amountOf(config, ['days'], 'Leave days');
+      const dailyRate = amountOf(config, ['dailyRate', 'daily_rate'], 'Daily rate');
+      const entered = amountOf(config, ['amount'], 'Leave pay');
+      const amount = entered > 0 ? entered : roundCurrency(days * dailyRate);
+      if (amount <= 0) continue;
+      cashGross += amount;
+      taxableBaseAddition += amount;
+      nonPeriodicTaxable += amount;
+      remunerationAddition += amount;
+      lines.push({
+        description: days > 0 && entered <= 0 ? `${definition.payslipLabel} (${days} days)` : definition.payslipLabel,
         type: 'earning',
         amount: roundCurrency(amount),
         componentCode: definition.code,

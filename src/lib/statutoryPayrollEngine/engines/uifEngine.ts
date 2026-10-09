@@ -25,14 +25,17 @@ function runUifContribution(
   const rate = Number(config.rate ?? ctx.ruleSet.uifRate);
   const ceiling = Number(config.ceiling ?? ctx.ruleSet.uifCeilingMonthly);
   const remuneration = ctx.uifRemuneration ?? ctx.grossEarnings;
-  const cappedRemuneration = Math.min(remuneration, ceiling);
+  // The ceiling is per calendar month: earlier runs in the month use part of it.
+  const monthToDate = Math.max(0, ctx.uifRemunerationMonthToDate ?? 0);
+  const ceilingLeft = Math.max(0, ceiling - monthToDate);
+  const cappedRemuneration = Math.min(remuneration, ceilingLeft);
   const amount = roundCurrency(cappedRemuneration * rate);
 
   const auditTrail = [
     createAuditStep(
       'uif_base',
-      'min(uif_remuneration, monthly_ceiling)',
-      { uifRemuneration: remuneration, grossEarnings: ctx.grossEarnings, ceiling },
+      'min(uif_remuneration, monthly_ceiling − remuneration_already_counted_this_month)',
+      { uifRemuneration: remuneration, grossEarnings: ctx.grossEarnings, ceiling, monthToDate },
       cappedRemuneration
     ),
     createAuditStep(

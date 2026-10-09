@@ -183,18 +183,94 @@ export function isEmployeeActiveInPeriod(employee: PeriodEmployee, periodStart: 
  * Calendar-day fraction of the pay period the employee was employed.
  * Full period → 1. Mid-period join/leave → partial. Outside period → 0.
  */
-export function employmentProRataFactor(employee: PeriodEmployee, periodStart: string, periodEnd: string): number {
+export function employmentProRataFactor(
+  employee: PeriodEmployee,
+  periodStart: string,
+  periodEnd: string,
+  method: ProRataMethod = 'calendar_days'
+): number {
   if (!isEmployeeActiveInPeriod(employee, periodStart, periodEnd)) return 0;
-  const periodDays = inclusiveDayCount(periodStart, periodEnd);
-  if (periodDays <= 0) return 0;
+  const count = method === 'working_days' ? workingDayCount : inclusiveDayCount;
+  const periodDays = count(periodStart, periodEnd);
+  if (periodDays <= 0) {
+    // A period with no working days (e.g. a holiday week) falls back to calendar days.
+    return method === 'working_days' ? employmentProRataFactor(employee, periodStart, periodEnd, 'calendar_days') : 0;
+  }
   const start = startOf(employee);
   const end = endOf(employee);
   const workedFrom = start && start > periodStart ? start : periodStart;
   const workedTo = end && end < periodEnd ? end : periodEnd;
-  const workedDays = inclusiveDayCount(workedFrom, workedTo);
+  const workedDays = count(workedFrom, workedTo);
   if (workedDays <= 0) return 0;
   if (workedDays >= periodDays) return 1;
   return workedDays / periodDays;
+}
+
+/** How a partial period is measured: every calendar day, or Monday–Friday excluding SA public holidays. */
+export type ProRataMethod = 'calendar_days' | 'working_days';
+
+export function proRataMethodOf(value: unknown): ProRataMethod {
+  return value === 'working_days' ? 'working_days' : 'calendar_days';
+}
+
+/** Easter Sunday (Gregorian, anonymous algorithm) as YYYY-MM-DD. */
+function easterSunday(year: number): string {
+  const a = year % 19;
+  const b = Math.floor(year / 100);
+  const c = year % 100;
+  const d = Math.floor(b / 4);
+  const e = b % 4;
+  const f = Math.floor((b + 8) / 25);
+  const g = Math.floor((b - f + 1) / 3);
+  const h = (19 * a + b - d - g + 15) % 30;
+  const i = Math.floor(c / 4);
+  const k = c % 4;
+  const l = (32 + 2 * e + 2 * i - h - k) % 7;
+  const m = Math.floor((a + 11 * h + 22 * l) / 451);
+  const month = Math.floor((h + l - 7 * m + 114) / 31);
+  const day = ((h + l - 7 * m + 114) % 31) + 1;
+  return iso(Date.UTC(year, month - 1, day));
+}
+
+/**
+ * South African public holidays for a year (Public Holidays Act 36 of 1994):
+ * the twelve statutory days, Good Friday and Family Day from Easter, and the
+ * following Monday when a holiday falls on a Sunday. Once-off proclaimed
+ * holidays (e.g. election days) are not included.
+ */
+export function saPublicHolidays(year: number): Set<string> {
+  const fixed = ['01-01', '03-21', '04-27', '05-01', '06-16', '08-09', '09-24', '12-16', '12-25', '12-26'];
+  const days = fixed.map((md) => `${year}-${md}`);
+  const easter = utc(easterSunday(year));
+  days.push(iso(easter - 2 * 86_400_000), iso(easter + 86_400_000));
+  const holidays = new Set(days);
+  for (const day of days) {
+    if (new Date(utc(day)).getUTCDay() === 0) {
+      let monday = utc(day) + 86_400_000;
+      while (holidays.has(iso(monday))) monday += 86_400_000;
+      holidays.add(iso(monday));
+    }
+  }
+  return holidays;
+}
+
+/** Monday–Friday days between two dates (inclusive), excluding SA public holidays. */
+export function workingDayCount(from: string, to: string): number {
+  const a = utc(from);
+  const b = utc(to);
+  if (b < a) return 0;
+  const holidayCache = new Map<number, Set<string>>();
+  let count = 0;
+  for (let t = a; t <= b; t += 86_400_000) {
+    const weekday = new Date(t).getUTCDay();
+    if (weekday === 0 || weekday === 6) continue;
+    const day = iso(t);
+    const year = Number(day.slice(0, 4));
+    if (!holidayCache.has(year)) holidayCache.set(year, saPublicHolidays(year));
+    if (holidayCache.get(year)!.has(day)) continue;
+    count += 1;
+  }
+  return count;
 }
 
 export function applyProRata(amount: number, factor: number): number {
@@ -218,6 +294,35 @@ const TIME_ACCRUING_FIELDS: Record<string, string[]> = {
   fringe_asset: ['monthlyValueOfUse', 'monthly_value_of_use'],
   fringe_other: ['monthlyValue', 'monthly_value', 'amount'],
 };
+
+/**
+ * Monthly package amounts converted to one pay period of a weekly or fortnightly run.
+ * Everything in a standing package is stated per month, including the premium paid.
+ */
+const MONTHLY_PACKAGE_FIELDS: Record<string, string[]> = {
+  ...TIME_ACCRUING_FIELDS,
+  fringe_employer_insurance: ['monthlyPremium', 'monthly_premium'],
+};
+
+export function packageConfigForPayPeriod(
+  componentCode: string,
+  config: Record<string, unknown>,
+  periodsPerYear: number
+): Record<string, unknown> {
+  if (!periodsPerYear || periodsPerYear === 12) return config;
+  const fields = MONTHLY_PACKAGE_FIELDS[componentCode];
+  if (!fields) return config;
+  if (componentCode === 'other_cash' && config.onceOff === true) return config;
+  const next = { ...config };
+  for (const key of fields) {
+    // determinedValue/loanBalance are capital values: scaling them scales the benefit.
+    const raw = next[key];
+    if (raw == null || raw === '') continue;
+    const value = Number(raw);
+    if (Number.isFinite(value)) next[key] = roundCurrency((value * 12) / periodsPerYear);
+  }
+  return next;
+}
 
 /** Pro-rates a standing package component for a partial period. Unknown or once-off fields are left as entered. */
 export function proRatePackageConfig(
@@ -284,7 +389,17 @@ export function snapshotSdlRemuneration(snapshot: Record<string, unknown> | null
 }
 
 /** Year-to-date taxable income, PAYE and gross for one employee from prior finalised payslips. */
-export function aggregateEmployeeYtd(payslips: PayslipYtdSource[], employeeId: string): YtdTotals {
+export function aggregateEmployeeYtd(
+  payslips: PayslipYtdSource[],
+  employeeId: string,
+  periodsPerYear = 12
+): YtdTotals {
+  // Monthly: distinct pay months (a supplementary run in a month is not a new period).
+  // Weekly/fortnightly: each pay date is a period.
+  const periodKey = (slip: PayslipYtdSource) =>
+    slip.pay_date
+      ? periodsPerYear === 12 ? slip.pay_date.slice(0, 7) : slip.pay_date.slice(0, 10)
+      : `run:${slip.payroll_run_id}`;
   const months = new Set<string>();
   let taxableIncome = 0;
   let payePaid = 0;
@@ -295,9 +410,25 @@ export function aggregateEmployeeYtd(payslips: PayslipYtdSource[], employeeId: s
     taxableIncome = roundCurrency(taxableIncome + snapshotNumber(snapshot, 'taxable_earnings'));
     payePaid = roundCurrency(payePaid + snapshotPaye(snapshot));
     grossEarnings = roundCurrency(grossEarnings + snapshotNumber(snapshot, 'gross_earnings'));
-    months.add(slip.pay_date ? slip.pay_date.slice(0, 7) : `run:${slip.payroll_run_id}`);
+    months.add(periodKey(slip));
   }
   return { taxableIncome, payePaid, grossEarnings, periodsProcessed: months.size };
+}
+
+/**
+ * UIF remuneration already counted for an employee in earlier runs paid in the same
+ * calendar month as payDate — the part of the monthly UIF ceiling already used.
+ */
+export function uifRemunerationMonthToDate(payslips: PayslipYtdSource[], employeeId: string, payDate: string): number {
+  const month = payDate.slice(0, 7);
+  let total = 0;
+  for (const slip of payslips) {
+    if (slip.employee_id !== employeeId || !slip.pay_date || slip.pay_date.slice(0, 7) !== month) continue;
+    const uif = engineRows(slip.calculation_snapshot ?? null).find((row) => row.engine_id === 'uif');
+    const counted = Number((uif?.breakdown as Record<string, unknown> | undefined)?.cappedRemuneration);
+    if (Number.isFinite(counted)) total += counted;
+  }
+  return roundCurrency(total);
 }
 
 export type RunPeriod = { pay_period_start: string; pay_period_end: string };

@@ -15,7 +15,7 @@ import {
   type PayComponentCode,
 } from '../../lib/payrollRulesEngine/payComponents';
 import { previewEmployeePay } from '../../lib/payrollRulesEngine/previewPayComponents';
-import { normalizeSalaryToMonthly } from '../../lib/payrollRulesEngine/paye';
+import { periodsPerYearFor, salaryForPayPeriod } from '../../lib/payrollRulesEngine/paye';
 import { resolveRuleSetForDate } from '../../lib/statutoryPayrollEngine/registry';
 
 type ComponentRow = {
@@ -39,6 +39,8 @@ type PayComponentEditorProps = {
   employeeId?: string;
   payrollRunId?: string;
   payDate?: string;
+  /** Frequency of the run (period mode): only its employees are listed, and the preview is per pay period. */
+  payFrequency?: 'monthly' | 'fortnightly' | 'weekly';
 };
 
 const EMPTY = {
@@ -48,6 +50,7 @@ const EMPTY = {
   method: 'deemed_80',
   taxable: 'yes',
   label: '',
+  dailyRate: '',
   onceOff: '',
   incidentalOnly: 'no',
   determinedValue: '',
@@ -70,6 +73,10 @@ function configFromForm(form: typeof EMPTY, mode: 'package' | 'period'): Record<
       return { days: Number(form.days), amountPaid: amount, domestic: true, incidentalOnly: form.incidentalOnly === 'yes' };
     case 'bonus':
       return { amount };
+    case 'leave_payout':
+      return form.amount
+        ? { amount }
+        : { days: Number(form.days), dailyRate: Number(form.dailyRate) };
     case 'other_cash': {
       const onceOff = form.onceOff ? form.onceOff === 'yes' : mode === 'period';
       return { amount, taxable: form.taxable === 'yes', label: form.label, onceOff };
@@ -123,6 +130,7 @@ export function PayComponentEditor({
   employeeId,
   payrollRunId,
   payDate,
+  payFrequency = 'monthly',
 }: PayComponentEditorProps) {
   const queryClient = useQueryClient();
   const [form, setForm] = useState(EMPTY);
@@ -164,6 +172,8 @@ export function PayComponentEditor({
       return (data ?? []) as EmployeeOption[];
     },
     enabled: mode === 'period' && !!companyId,
+    // A run pays only the employees on its frequency.
+    select: (rows: EmployeeOption[]) => rows.filter((e) => (e.salary_period ?? 'monthly') === payFrequency),
   });
 
   const save = useMutation({
@@ -238,7 +248,8 @@ export function PayComponentEditor({
     const mine = rows.filter((row) => row.employee_id === previewEmployee.id);
     try {
       return previewEmployeePay({
-        monthlyBasic: normalizeSalaryToMonthly(previewEmployee.salary_amount, previewEmployee.salary_period ?? 'monthly'),
+        monthlyBasic: salaryForPayPeriod(previewEmployee.salary_amount, previewEmployee.salary_period ?? 'monthly', periodsPerYearFor(payFrequency)),
+        periodsPerYear: periodsPerYearFor(payFrequency),
         packageComponents: packageRows
           .filter((row) => isComponentEffective(row, payDate))
           .map((row) => ({ componentCode: row.component_code, config: (row.config ?? {}) as Record<string, unknown> })),
@@ -248,7 +259,7 @@ export function PayComponentEditor({
     } catch (error) {
       return { error: error instanceof Error ? error.message : 'Preview failed' };
     }
-  }, [mode, previewEmployee, payDate, rows, packageRows]);
+  }, [mode, previewEmployee, payDate, rows, packageRows, payFrequency]);
 
   const set = (patch: Partial<typeof EMPTY>) => setForm((current) => ({ ...current, ...patch }));
 
@@ -276,14 +287,32 @@ export function PayComponentEditor({
           <Select value={form.code} onValueChange={(code) => set({ code: code as PayComponentCode })}>
             <SelectTrigger><SelectValue /></SelectTrigger>
             <SelectContent>
-              {PAY_COMPONENT_CATALOG.map((item) => (
-                <SelectItem key={item.code} value={item.code}>{item.payslipLabel}</SelectItem>
-              ))}
+              {PAY_COMPONENT_CATALOG
+                // Leave paid out is once-off: run inputs only.
+                .filter((item) => mode === 'period' || item.code !== 'leave_payout')
+                .map((item) => (
+                  <SelectItem key={item.code} value={item.code}>{item.payslipLabel}</SelectItem>
+                ))}
             </SelectContent>
           </Select>
         </div>
 
-        {(form.code === 'travel_allowance' || form.code === 'bonus' || form.code === 'other_cash' || form.code === 'subsistence') && (
+        {form.code === 'leave_payout' && (
+          <>
+            <div className="space-y-1">
+              <Label>Leave days paid out</Label>
+              <Input type="number" step="0.5" min="0" value={form.days} onChange={(event) => set({ days: event.target.value })} />
+            </div>
+            <div className="space-y-1">
+              <Label>Daily rate</Label>
+              <Input type="number" step="0.01" min="0" value={form.dailyRate} onChange={(event) => set({ dailyRate: event.target.value })} />
+            </div>
+            <p className="md:col-span-2 text-xs text-muted-foreground">
+              Or enter the total below instead of days × rate. Leave paid out is taxed once as an annual payment (IRP5 3605).
+            </p>
+          </>
+        )}
+        {(form.code === 'travel_allowance' || form.code === 'bonus' || form.code === 'other_cash' || form.code === 'subsistence' || form.code === 'leave_payout') && (
           <div className="space-y-1">
             <Label>{form.code === 'subsistence' ? 'Amount paid' : 'Amount'}</Label>
             <Input type="number" step="0.01" value={form.amount} onChange={(event) => set({ amount: event.target.value })} />

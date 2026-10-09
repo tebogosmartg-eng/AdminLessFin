@@ -117,3 +117,24 @@ test('an approved run can take a late allowance: regenerate withdraws approval',
   const { data: left } = await sb.from('payroll_runs').select('id').eq('id', run.id);
   expect(left ?? []).toHaveLength(0);
 });
+
+test('a weekly run is chosen in the new-run dialog with a one-week period', async ({ page }) => {
+  await page.goto('/');
+  await waitForRouteSettled(page);
+  await ensureReadyCompany(page);
+  await page.goto('/payroll-runs');
+  await waitForRouteSettled(page);
+  await expectNoErrorBoundary(page);
+  await page.getByRole('button', { name: /new payroll run/i }).first().click();
+  await expect(page.getByRole('heading', { name: /start new payroll run/i })).toBeVisible();
+  await page.getByLabel('Period Start Date').fill('2027-02-01');
+  await page.getByRole('combobox', { name: 'Pay frequency' }).click();
+  await page.getByRole('option', { name: 'Weekly' }).click();
+  await expect(page.getByLabel('Period End Date')).toHaveValue('2027-02-07');
+  await expect(page.getByLabel('Pay Date')).toHaveValue('2027-02-07');
+  await page.getByRole('combobox', { name: 'Pay frequency' }).click();
+  await page.getByRole('option', { name: 'Fortnightly' }).click();
+  await expect(page.getByLabel('Period End Date')).toHaveValue('2027-02-14');
+  await shot(page, '04-weekly-run-dialog');
+  await page.getByRole('button', { name: 'Cancel' }).click();
+});

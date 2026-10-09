@@ -3,7 +3,7 @@
  */
 
 import { getRuleById } from './catalogue.ts';
-import { calculatePaye, normalizeSalaryToMonthly, roundCurrency } from './paye.ts';
+import { calculatePaye, monthlyAmountForPayPeriod, roundCurrency, salaryForPayPeriod } from './paye.ts';
 import type {
   CalculationState,
   PayrollRulesContext,
@@ -79,9 +79,11 @@ export const basicSalaryRule: RuleCalculator = {
     if (!isRuleEnabled(ctx, 'basic_salary')) {
       return skippedResult('basic_salary', 'Rule disabled');
     }
-    const monthly = normalizeSalaryToMonthly(
+    // Basic salary for this pay period (a monthly run pays a month, a weekly run a week).
+    const monthly = salaryForPayPeriod(
       ctx.employee.salaryAmount,
-      ctx.employee.salaryPeriod
+      ctx.employee.salaryPeriod,
+      ctx.period.periodsPerYear ?? 12
     );
     const def = getRuleById('basic_salary')!;
     return buildResult(
@@ -106,7 +108,7 @@ export const pensionRule: RuleCalculator = {
   calculate(ctx, state) {
     if (!isRuleEnabled(ctx, 'pension')) return skippedResult('pension', 'Rule disabled');
     const config = mergeConfig(ctx, 'pension');
-    const amount = resolveContributionAmount(state.grossPay, config);
+    const amount = resolveContributionAmount(state.grossPay, config, ctx.period.periodsPerYear);
     if (amount <= 0) return skippedResult('pension', 'No contribution configured');
     const def = getRuleById('pension')!;
     return buildResult('pension', amount, 0, [{
@@ -121,7 +123,7 @@ export const providentFundRule: RuleCalculator = {
   calculate(ctx, state) {
     if (!isRuleEnabled(ctx, 'provident_fund')) return skippedResult('provident_fund', 'Rule disabled');
     const config = mergeConfig(ctx, 'provident_fund');
-    const amount = resolveContributionAmount(state.grossPay, config);
+    const amount = resolveContributionAmount(state.grossPay, config, ctx.period.periodsPerYear);
     if (amount <= 0) return skippedResult('provident_fund', 'No contribution configured');
     const def = getRuleById('provident_fund')!;
     return buildResult('provident_fund', amount, 0, [{
@@ -136,7 +138,7 @@ export const medicalAidRule: RuleCalculator = {
   calculate(ctx, _state) {
     if (!isRuleEnabled(ctx, 'medical_aid')) return skippedResult('medical_aid', 'Rule disabled');
     const config = mergeConfig(ctx, 'medical_aid');
-    const amount = Number(config.monthly_amount ?? config.amount ?? 0);
+    const amount = monthlyAmountForPayPeriod(Number(config.monthly_amount ?? config.amount ?? 0), ctx.period.periodsPerYear);
     if (amount <= 0) return skippedResult('medical_aid', 'No contribution configured');
     const def = getRuleById('medical_aid')!;
     return buildResult('medical_aid', amount, 0, [{
@@ -227,7 +229,7 @@ export const unionFeesRule: RuleCalculator = {
   calculate(ctx, _state) {
     if (!isRuleEnabled(ctx, 'union_fees')) return skippedResult('union_fees', 'Rule disabled');
     const config = mergeConfig(ctx, 'union_fees');
-    const amount = Number(config.monthly_amount ?? config.amount ?? 0);
+    const amount = monthlyAmountForPayPeriod(Number(config.monthly_amount ?? config.amount ?? 0), ctx.period.periodsPerYear);
     if (amount <= 0) return skippedResult('union_fees', 'No amount configured');
     const def = getRuleById('union_fees')!;
     return buildResult('union_fees', amount, 0, [{
@@ -242,7 +244,7 @@ export const garnisheeRule: RuleCalculator = {
   calculate(ctx, _state) {
     if (!isRuleEnabled(ctx, 'garnishee')) return skippedResult('garnishee', 'Rule disabled');
     const config = mergeConfig(ctx, 'garnishee');
-    const amount = Number(config.monthly_amount ?? config.amount ?? 0);
+    const amount = monthlyAmountForPayPeriod(Number(config.monthly_amount ?? config.amount ?? 0), ctx.period.periodsPerYear);
     if (amount <= 0) return skippedResult('garnishee', 'No amount configured');
     const label = String(config.label ?? getRuleById('garnishee')!.payslipLabel);
     const def = getRuleById('garnishee')!;
@@ -258,7 +260,7 @@ export const customDeductionRule: RuleCalculator = {
   calculate(ctx, state) {
     if (!isRuleEnabled(ctx, 'custom_deduction')) return skippedResult('custom_deduction', 'Rule disabled');
     const config = mergeConfig(ctx, 'custom_deduction');
-    const amount = resolveContributionAmount(state.grossPay, config);
+    const amount = resolveContributionAmount(state.grossPay, config, ctx.period.periodsPerYear);
     if (amount <= 0) return skippedResult('custom_deduction', 'No amount configured');
     const label = String(config.label ?? 'Custom Deduction');
     const def = getRuleById('custom_deduction')!;
@@ -276,7 +278,7 @@ export const customEmployerContributionRule: RuleCalculator = {
       return skippedResult('custom_employer_contribution', 'Rule disabled');
     }
     const config = mergeConfig(ctx, 'custom_employer_contribution');
-    const amount = resolveContributionAmount(state.grossPay, config);
+    const amount = resolveContributionAmount(state.grossPay, config, ctx.period.periodsPerYear);
     if (amount <= 0) return skippedResult('custom_employer_contribution', 'No amount configured');
     const label = String(config.label ?? 'Custom Employer Contribution');
     const def = getRuleById('custom_employer_contribution')!;
@@ -287,12 +289,14 @@ export const customEmployerContributionRule: RuleCalculator = {
   },
 };
 
+/** Fixed amounts are configured per month; a percentage applies to this period's gross. */
 function resolveContributionAmount(
   grossPay: number,
-  config: Record<string, unknown>
+  config: Record<string, unknown>,
+  periodsPerYear = 12
 ): number {
-  if (config.amount != null) return roundCurrency(Number(config.amount));
-  if (config.monthly_amount != null) return roundCurrency(Number(config.monthly_amount));
+  if (config.amount != null) return monthlyAmountForPayPeriod(Number(config.amount), periodsPerYear);
+  if (config.monthly_amount != null) return monthlyAmountForPayPeriod(Number(config.monthly_amount), periodsPerYear);
   if (config.percentage != null) {
     return roundCurrency(grossPay * (Number(config.percentage) / 100));
   }

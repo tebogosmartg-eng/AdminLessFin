@@ -233,3 +233,118 @@ describe('engine copies', () => {
     expect(server).toBe(client);
   });
 });
+
+describe('pay frequency', () => {
+  it('pays a salary per pay period of the run', async () => {
+    const { salaryForPayPeriod, periodsPerYearFor, monthlyAmountForPayPeriod } = await import('@/lib/payrollRulesEngine/paye');
+    expect(periodsPerYearFor('weekly')).toBe(52);
+    expect(periodsPerYearFor('fortnightly')).toBe(26);
+    expect(periodsPerYearFor(undefined)).toBe(12);
+    expect(salaryForPayPeriod(5000, 'weekly', 52)).toBe(5000); // weekly salary on a weekly run, as is
+    expect(salaryForPayPeriod(5000, 'weekly', 12)).toBe(21_666.67); // only on a monthly run
+    expect(salaryForPayPeriod(26_000, 'monthly', 26)).toBe(12_000);
+    expect(monthlyAmountForPayPeriod(1300, 52)).toBe(300);
+    expect(monthlyAmountForPayPeriod(1300, 12)).toBe(1300);
+  });
+
+  it('annualises weekly PAYE over 52 weeks (SARS)', () => {
+    const weekly = executeStatutoryPipeline({
+      employee: { id: 'w', age: 30 },
+      period: { payPeriodStart: '2026-11-02', payPeriodEnd: '2026-11-08', payDate: '2026-11-08' },
+      grossEarnings: 5000,
+      taxableEarnings: 5000,
+      enabledEngines: { paye: true },
+      engineConfig: {},
+      ruleSet: rs,
+      periodsPerYear: 52,
+    }).engineResults.find((e) => e.engineId === 'paye')!;
+    const rebate = resolveRebate(rs.rebates, 30, { secondaryAge: rs.rebateSecondaryAge, tertiaryAge: rs.rebateTertiaryAge });
+    const expected = (calculateAnnualTax(5000 * 52, rs.brackets) - rebate) / 52;
+    expect(weekly.employeeAmount).toBeCloseTo(expected, 1);
+  });
+
+  it('shares the monthly UIF ceiling across the weekly runs of a month', () => {
+    const uifFor = (monthToDate: number) => executeStatutoryPipeline({
+      employee: { id: 'w', age: 30 },
+      period: { payPeriodStart: '2026-11-02', payPeriodEnd: '2026-11-08', payDate: '2026-11-08' },
+      grossEarnings: 5000,
+      taxableEarnings: 5000,
+      uifRemunerationMonthToDate: monthToDate,
+      enabledEngines: { uif: true },
+      engineConfig: {},
+      ruleSet: rs,
+      periodsPerYear: 52,
+    }).engineResults.find((e) => e.engineId === 'uif')!.employeeAmount;
+    const weeks = [uifFor(0), uifFor(5000), uifFor(10_000), uifFor(15_000), uifFor(20_000)];
+    expect(weeks).toEqual([50, 50, 50, 27.12, 0]);
+    expect(weeks.reduce((s, v) => s + v, 0)).toBeCloseTo(rs.uifCeilingMonthly * rs.uifRate, 2);
+  });
+
+  it('reads UIF already counted this month from earlier payslips', async () => {
+    const { uifRemunerationMonthToDate } = await import('@/lib/payrollRulesEngine/periodEmployment');
+    const slip = (date: string, counted: number) => ({
+      employee_id: 'w', payroll_run_id: date, pay_date: date,
+      calculation_snapshot: { engine_results: [{ engine_id: 'uif', breakdown: { cappedRemuneration: counted } }] },
+    });
+    expect(uifRemunerationMonthToDate([slip('2026-11-08', 5000), slip('2026-11-15', 5000), slip('2026-10-31', 5000)], 'w', '2026-11-22')).toBe(10_000);
+  });
+
+  it('counts weekly YTD periods by pay date', () => {
+    const slips = ['2026-11-06', '2026-11-13', '2026-11-20'].map((d) => ({
+      employee_id: 'w', payroll_run_id: d, pay_date: d,
+      calculation_snapshot: { taxable_earnings: 5000, gross_earnings: 5000, engine_results: [] },
+    }));
+    expect(aggregateEmployeeYtd(slips, 'w', 52).periodsProcessed).toBe(3);
+    expect(aggregateEmployeeYtd(slips, 'w', 12).periodsProcessed).toBe(1);
+  });
+
+  it('converts monthly package amounts to the pay period', async () => {
+    const { packageConfigForPayPeriod } = await import('@/lib/payrollRulesEngine/periodEmployment');
+    expect(packageConfigForPayPeriod('travel_allowance', { monthlyAllowance: 5200 }, 52)).toEqual({ monthlyAllowance: 1200 });
+    expect(packageConfigForPayPeriod('fringe_employer_insurance', { monthlyPremium: 2600 }, 26)).toEqual({ monthlyPremium: 1200 });
+    expect(packageConfigForPayPeriod('bonus', { amount: 5000 }, 52)).toEqual({ amount: 5000 });
+    expect(packageConfigForPayPeriod('travel_allowance', { monthlyAllowance: 5200 }, 12)).toEqual({ monthlyAllowance: 5200 });
+  });
+});
+
+describe('working-day pro-rata', () => {
+  it('knows the SA public holidays, Easter and the Sunday rule', async () => {
+    const { saPublicHolidays } = await import('@/lib/payrollRulesEngine/periodEmployment');
+    const h2026 = saPublicHolidays(2026);
+    expect(h2026.has('2026-04-03')).toBe(true); // Good Friday (Easter 5 April 2026)
+    expect(h2026.has('2026-04-06')).toBe(true); // Family Day
+    const h2027 = saPublicHolidays(2027);
+    expect(h2027.has('2027-03-26')).toBe(true); // Good Friday (Easter 28 March 2027)
+    expect(h2027.has('2027-03-29')).toBe(true); // Family Day
+    expect(h2027.has('2027-12-27')).toBe(true); // 26 Dec 2027 is a Sunday, so the Monday is off
+  });
+
+  it('counts working days and pro-rates by them when the company chooses to', async () => {
+    const { workingDayCount } = await import('@/lib/payrollRulesEngine/periodEmployment');
+    expect(workingDayCount('2026-11-01', '2026-11-30')).toBe(21);
+    const calendar = employmentProRataFactor({ start_date: '2026-11-16' }, '2026-11-01', '2026-11-30', 'calendar_days');
+    const working = employmentProRataFactor({ start_date: '2026-11-16' }, '2026-11-01', '2026-11-30', 'working_days');
+    expect(calendar).toBeCloseTo(15 / 30, 6);
+    expect(working).toBeCloseTo(11 / 21, 6);
+  });
+});
+
+describe('leave paid out', () => {
+  it('is an earning taxed once as an annual payment, and only as a run input', async () => {
+    const { assemblePayComponents, PayComponentError } = await import('@/lib/payrollRulesEngine/payComponents');
+    const { previewEmployeePay } = await import('@/lib/payrollRulesEngine/previewPayComponents');
+    const byDays = assemblePayComponents([{ componentCode: 'leave_payout', config: { days: 10, dailyRate: 1500 }, source: 'period' }], rs);
+    expect(byDays.lines).toEqual([expect.objectContaining({ description: 'Leave Pay (10 days)', amount: 15_000, irp5Code: '3605', type: 'earning' })]);
+    expect(byDays.nonPeriodicTaxable).toBe(15_000);
+    expect(byDays.remunerationAddition).toBe(15_000);
+    expect(() => assemblePayComponents([{ componentCode: 'leave_payout', config: { amount: 1000 }, source: 'package' }], rs)).toThrow(PayComponentError);
+
+    const plain = previewEmployeePay({ monthlyBasic: 30_000, components: [], payDate: PAY_DATE });
+    const withLeave = previewEmployeePay({ monthlyBasic: 30_000, periodInputs: [{ componentCode: 'leave_payout', config: { amount: 15_000 } }], payDate: PAY_DATE });
+    const rebate = resolveRebate(rs.rebates, undefined, { secondaryAge: rs.rebateSecondaryAge, tertiaryAge: rs.rebateTertiaryAge });
+    const sars = (calculateAnnualTax(360_000 + 15_000, rs.brackets) - rebate) - (calculateAnnualTax(360_000, rs.brackets) - rebate);
+    const leavePaye = withLeave.result.engineResults.find((e) => e.engineId === 'paye')!.employeeAmount
+      - plain.result.engineResults.find((e) => e.engineId === 'paye')!.employeeAmount;
+    expect(leavePaye).toBeCloseTo(sars, 1);
+  });
+});

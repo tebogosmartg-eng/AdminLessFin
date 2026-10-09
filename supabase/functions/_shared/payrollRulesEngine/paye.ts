@@ -89,6 +89,33 @@ export function normalizeSalaryToMonthly(
   }
 }
 
+/** Pay periods in a tax year for a pay frequency. */
+export function periodsPerYearFor(frequency: 'monthly' | 'weekly' | 'fortnightly' | null | undefined): number {
+  if (frequency === 'weekly') return 52;
+  if (frequency === 'fortnightly') return 26;
+  return 12;
+}
+
+/**
+ * A salary expressed per `salaryPeriod`, converted to one pay period of a run that
+ * has `periodsPerYear` periods (weekly salary on a weekly run is paid as is).
+ */
+export function salaryForPayPeriod(
+  amount: number,
+  salaryPeriod: 'monthly' | 'weekly' | 'fortnightly' | null | undefined,
+  periodsPerYear = 12
+): number {
+  const own = periodsPerYearFor(salaryPeriod);
+  if (own === periodsPerYear) return roundCurrency(amount);
+  return roundCurrency((amount * own) / periodsPerYear);
+}
+
+/** A fixed monthly amount (deduction or contribution) for one pay period. */
+export function monthlyAmountForPayPeriod(amount: number, periodsPerYear = 12): number {
+  if (periodsPerYear === 12) return roundCurrency(amount);
+  return roundCurrency((amount * 12) / periodsPerYear);
+}
+
 export function resolveTaxYearForDate(
   payDate: string,
   configs: TaxYearConfig[]

@@ -24,6 +24,8 @@ export type PayeEngineInput = {
   payeMode?: PayeCalculationMode;
   /** Annual payments inside monthlyTaxableIncome (bonus, once-off taxable amounts). */
   annualPayment?: number;
+  /** Pay periods in the tax year (12 monthly, 26 fortnightly, 52 weekly). monthlyTaxableIncome is per period. */
+  periodsPerYear?: number;
 };
 
 export function calculatePayeAmount(
@@ -47,6 +49,7 @@ export function calculatePayeAmount(
   } = input;
 
   const auditTrail = [];
+  const periods = input.periodsPerYear && input.periodsPerYear > 0 ? input.periodsPerYear : 12;
   const isDirectorAnnualFee = payeMode === 'director_annual_fee';
   const annualPayment = isDirectorAnnualFee
     ? 0
@@ -55,16 +58,16 @@ export function calculatePayeAmount(
   const periodicMonthly = roundCurrency(monthlyTaxableIncome - annualPayment);
   const annualTaxableIncome = isDirectorAnnualFee
     ? roundCurrency(monthlyTaxableIncome)
-    : roundCurrency(periodicMonthly * 12);
+    : roundCurrency(periodicMonthly * periods);
   auditTrail.push(
     createAuditStep(
       'annualise',
       isDirectorAnnualFee
         ? 'director_annual_fee — full fee as annual taxable income'
         : annualPayment > 0
-          ? '(monthly_taxable_income − annual_payments) × 12'
-          : 'monthly_taxable_income × 12',
-      { monthlyTaxableIncome, annualPayment, payeMode },
+          ? '(period_taxable_income − annual_payments) × periods_per_year'
+          : 'period_taxable_income × periods_per_year',
+      { monthlyTaxableIncome, annualPayment, payeMode, periodsPerYear: periods },
       annualTaxableIncome
     )
   );
@@ -138,7 +141,7 @@ export function calculatePayeAmount(
       1,
       Math.round(ytdTaxableIncome / Math.max(periodicMonthly, 1))
     );
-    const remainingMonths = Math.max(1, 12 - monthsElapsed);
+    const remainingMonths = Math.max(1, periods - monthsElapsed);
     const projectedAnnual = ytdTaxableIncome + periodicMonthly * remainingMonths;
     const projectedTax = Math.max(
       0,
@@ -166,7 +169,7 @@ export function calculatePayeAmount(
     const paymentTax = annualPaymentTax(annualTaxableIncome);
     monthlyPaye = isDirectorAnnualFee
       ? roundCurrency(annualTaxLiability)
-      : roundCurrency(annualTaxLiability / 12 + paymentTax);
+      : roundCurrency(annualTaxLiability / periods + paymentTax);
     auditTrail.push(
       createAuditStep(
         'monthly_paye',
@@ -218,5 +221,6 @@ export function runPayeEngine(
     periodsProcessed: ctx.ytd?.periodsProcessed,
     payeMode: ctx.payeMode ?? 'standard',
     annualPayment: ctx.nonPeriodicTaxable ?? 0,
+    periodsPerYear: ctx.periodsPerYear ?? 12,
   });
 }

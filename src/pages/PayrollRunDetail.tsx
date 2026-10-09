@@ -91,6 +91,7 @@ export type Payslip = {
 };
 
 type PayrollRun = {
+  pay_frequency?: 'monthly' | 'fortnightly' | 'weekly' | null;
   id: string;
   pay_period_start: string;
   pay_period_end: string;
@@ -539,6 +540,7 @@ const PayrollRunDetail = () => {
                 <CardDescription>
                   Pay period {format(new Date(run.pay_period_start), 'PPP')} – {format(new Date(run.pay_period_end), 'PPP')}
                   {' · '}Pay date {format(new Date(run.pay_date), 'PPP')}
+                  {' · '}<span className="capitalize">{run.pay_frequency ?? 'monthly'}</span> run
                 </CardDescription>
               </div>
               <div className="flex items-center gap-2">
@@ -607,6 +609,7 @@ const PayrollRunDetail = () => {
                 mode="period"
                 payrollRunId={id}
                 payDate={run.pay_date}
+                payFrequency={run.pay_frequency ?? 'monthly'}
               />
             </CardContent>
           </Card>

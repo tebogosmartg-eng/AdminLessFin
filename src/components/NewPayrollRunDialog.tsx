@@ -25,13 +25,25 @@ import {
 import { Input } from './ui/input';
 import { Checkbox } from './ui/checkbox';
 import { showError, showSuccess } from '../utils/toast';
-import { endOfMonth, format, startOfMonth } from 'date-fns';
+import { addDays, endOfMonth, format, parseISO, startOfMonth } from 'date-fns';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
+
+type PayFrequency = 'monthly' | 'fortnightly' | 'weekly';
+
+/** Period end for a frequency starting on `start` (YYYY-MM-DD). */
+function periodEndFor(start: string, frequency: PayFrequency): string {
+  const date = parseISO(start);
+  if (frequency === 'weekly') return format(addDays(date, 6), 'yyyy-MM-dd');
+  if (frequency === 'fortnightly') return format(addDays(date, 13), 'yyyy-MM-dd');
+  return format(endOfMonth(date), 'yyyy-MM-dd');
+}
 
 const payrollRunSchema = z.object({
   pay_period_start: z.string().min(1, 'Start date is required.'),
   pay_period_end: z.string().min(1, 'End date is required.'),
   pay_date: z.string().min(1, 'Pay date is required.'),
   additional_run: z.boolean().default(false),
+  pay_frequency: z.enum(['monthly', 'fortnightly', 'weekly']).default('monthly'),
 }).refine((v) => v.pay_period_end >= v.pay_period_start, {
   message: 'The period ends before it starts.',
   path: ['pay_period_end'],
@@ -54,6 +66,7 @@ const NewPayrollRunDialog = ({ isOpen, setIsOpen }: NewPayrollRunDialogProps) =>
       pay_period_end: format(endOfMonth(new Date()), 'yyyy-MM-dd'),
       pay_date: format(endOfMonth(new Date()), 'yyyy-MM-dd'),
       additional_run: false,
+      pay_frequency: 'monthly',
     },
   });
 
@@ -92,6 +105,39 @@ const NewPayrollRunDialog = ({ isOpen, setIsOpen }: NewPayrollRunDialogProps) =>
         </DialogHeader>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+            <FormField
+              control={form.control}
+              name="pay_frequency"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Pay Frequency</FormLabel>
+                  <Select
+                    value={field.value}
+                    onValueChange={(value) => {
+                      const frequency = value as PayFrequency;
+                      field.onChange(frequency);
+                      const start = form.getValues('pay_period_start');
+                      if (start) {
+                        const end = periodEndFor(start, frequency);
+                        form.setValue('pay_period_end', end, { shouldDirty: true });
+                        form.setValue('pay_date', end, { shouldDirty: true });
+                      }
+                    }}
+                  >
+                    <FormControl>
+                      <SelectTrigger aria-label="Pay frequency"><SelectValue /></SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value="monthly">Monthly</SelectItem>
+                      <SelectItem value="fortnightly">Fortnightly</SelectItem>
+                      <SelectItem value="weekly">Weekly</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground">The run pays employees whose salary is set to this frequency.</p>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
             <FormField
               control={form.control}
               name="pay_period_start"

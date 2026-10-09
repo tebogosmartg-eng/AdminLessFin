@@ -10,7 +10,7 @@ import {
   mapTaxYearFromDb,
   resolveTaxYearForDate,
 } from './payrollRulesEngine/index.ts';
-import { normalizeSalaryToMonthly } from './payrollRulesEngine/paye.ts';
+import { periodsPerYearFor, salaryForPayPeriod } from './payrollRulesEngine/paye.ts';
 import {
   executeStatutoryPipeline,
   mapRulesToStatutoryEngines,
@@ -30,8 +30,11 @@ import {
   employmentProRataFactor,
   estimateCompanyAnnualRemuneration,
   isEmployeeActiveInPeriod,
+  packageConfigForPayPeriod,
+  proRataMethodOf,
   proRatePackageConfig,
   resolveEmployeeAgeDetail,
+  uifRemunerationMonthToDate,
 } from './payrollRulesEngine/periodEmployment.ts';
 
 const STATUTORY_RULE_IDS = new Set([
@@ -110,13 +113,13 @@ function roundCurrency(value: number): number {
 export async function fetchPayrollRun(supabaseAdmin, runId, companyId) {
   const { data, error } = await supabaseAdmin
     .from('payroll_runs')
-    .select('id, status, rule_config, pay_period_start, pay_period_end, pay_date, journal_entry_id')
+    .select('id, status, rule_config, pay_period_start, pay_period_end, pay_date, journal_entry_id, pay_frequency')
     .eq('id', runId)
     .eq('company_id', companyId)
     .single();
 
   if (error) throw error;
-  return { ...data, rule_config: data.rule_config ?? {} };
+  return { ...data, rule_config: data.rule_config ?? {}, pay_frequency: data.pay_frequency ?? 'monthly' };
 }
 
 export async function loadPayrollRulesContext(supabaseAdmin, companyId, run) {
@@ -173,7 +176,13 @@ export async function loadPayrollRulesContext(supabaseAdmin, companyId, run) {
 
   const periodStart = run.pay_period_start;
   const periodEnd = run.pay_period_end;
+  // A run pays the employees on its pay frequency (monthly, fortnightly or weekly).
+  const payFrequency = run.pay_frequency ?? 'monthly';
+  const periodsPerYear = periodsPerYearFor(payFrequency);
+  // Company setting on the basic-salary rule: calendar days (default) or working days.
+  const proRataMethod = proRataMethodOf(companyRules.basic_salary?.config?.pro_rata_method);
   const activeEmployees = (employeesResult.data ?? []).filter((e) =>
+    (e.salary_period ?? 'monthly') === payFrequency &&
     isEmployeeActiveInPeriod(e, periodStart, periodEnd)
   );
 
@@ -197,11 +206,11 @@ export async function loadPayrollRulesContext(supabaseAdmin, companyId, run) {
   const ytdPayslips = prior.payslips;
   const currentPeriodEstimatedGross = activeEmployees.reduce((sum, employee) => {
     if (!employee.salary_amount) return sum;
-    const factor = employmentProRataFactor(employee, periodStart, periodEnd);
+    const factor = employmentProRataFactor(employee, periodStart, periodEnd, proRataMethod);
     return (
       sum +
       applyProRata(
-        normalizeSalaryToMonthly(employee.salary_amount, employee.salary_period ?? 'monthly'),
+        salaryForPayPeriod(employee.salary_amount, employee.salary_period ?? 'monthly', periodsPerYear),
         factor
       )
     );
@@ -228,6 +237,9 @@ export async function loadPayrollRulesContext(supabaseAdmin, companyId, run) {
     periodInputs: periodResult.data ?? [],
     ytdPayslips,
     companyAnnualRemuneration,
+    payFrequency,
+    periodsPerYear,
+    proRataMethod,
   };
 }
 
@@ -260,13 +272,15 @@ export async function generatePayslipsWithRulesEngine(supabaseAdmin, {
     const proRataFactor = employmentProRataFactor(
       employee,
       run.pay_period_start,
-      run.pay_period_end
+      run.pay_period_end,
+      ctx.proRataMethod
     );
     if (proRataFactor <= 0) continue;
 
     const ageDetail = resolveEmployeeAgeDetail(employee, run.pay_date);
     const employeeAge = ageDetail.age;
-    const ytd = aggregateEmployeeYtd(ctx.ytdPayslips ?? [], employee.id);
+    const ytd = aggregateEmployeeYtd(ctx.ytdPayslips ?? [], employee.id, ctx.periodsPerYear);
+    const uifMonthToDate = uifRemunerationMonthToDate(ctx.ytdPayslips ?? [], employee.id, run.pay_date);
     const proRatedSalaryAmount = applyProRata(Number(employee.salary_amount), proRataFactor);
 
     const calculation = executePayrollRules({
@@ -286,6 +300,7 @@ export async function generatePayslipsWithRulesEngine(supabaseAdmin, {
         payPeriodStart: run.pay_period_start,
         payPeriodEnd: run.pay_period_end,
         payDate: run.pay_date,
+        periodsPerYear: ctx.periodsPerYear,
       },
       taxYearConfig: ctx.taxYearConfig,
       companyRuleSettings: ctx.companyRules,
@@ -308,7 +323,11 @@ export async function generatePayslipsWithRulesEngine(supabaseAdmin, {
       // of a partial period; once-off run inputs stay as entered.
       const packageComponents = recurring.map((row) => ({
         componentCode: row.component_code,
-        config: proRatePackageConfig(row.component_code, row.config ?? {}, proRataFactor),
+        config: proRatePackageConfig(
+          row.component_code,
+          packageConfigForPayPeriod(row.component_code, row.config ?? {}, ctx.periodsPerYear),
+          proRataFactor
+        ),
       }));
       assembly = assemblePayComponents(
         mergePayComponents(
@@ -344,6 +363,8 @@ export async function generatePayslipsWithRulesEngine(supabaseAdmin, {
       taxableEarnings,
       nonPeriodicTaxable: assembly.nonPeriodicTaxable,
       uifRemuneration: remuneration,
+      uifRemunerationMonthToDate: uifMonthToDate,
+      periodsPerYear: ctx.periodsPerYear,
       sdlRemuneration: remuneration,
       enabledEngines: {
         ...mapRulesToStatutoryEngines(ctx.effectiveRunRules),
@@ -386,6 +407,10 @@ export async function generatePayslipsWithRulesEngine(supabaseAdmin, {
       age_source: ageDetail.source,
       age_warning: ageDetail.warning ?? null,
       sdl_remuneration: remuneration,
+      pay_frequency: ctx.payFrequency,
+      periods_per_year: ctx.periodsPerYear,
+      pro_rata_method: ctx.proRataMethod,
+      uif_remuneration_month_to_date: uifMonthToDate,
       pro_rata_factor: proRataFactor,
       ytd_taxable_income: ytd.taxableIncome,
       ytd_paye_paid: ytd.payePaid,
@@ -402,7 +427,7 @@ export async function generatePayslipsWithRulesEngine(supabaseAdmin, {
 
     const basicSalary =
       calculation.lineItems.find((item) => item.ruleId === 'basic_salary')?.amount ??
-      normalizeSalaryToMonthly(employee.salary_amount, employee.salary_period ?? 'monthly');
+      salaryForPayPeriod(employee.salary_amount, employee.salary_period ?? 'monthly', ctx.periodsPerYear);
 
     const nonStatutoryItems = calculation.lineItems.filter(
       (item) => !STATUTORY_RULE_IDS.has(item.ruleId)

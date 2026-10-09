@@ -96,6 +96,8 @@ export type PayrollPeriodInput = {
   payPeriodStart: string;
   payPeriodEnd: string;
   payDate: string;
+  /** Pay periods in the tax year for this run (12, 26 or 52). Omitted means monthly. */
+  periodsPerYear?: number;
 };
 
 export type PayslipLineItem = {

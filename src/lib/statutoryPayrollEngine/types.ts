@@ -223,6 +223,17 @@ export type StatutoryCalculationContext = {
   /** SDL remuneration. Falls back to cash gross when omitted. */
   sdlRemuneration?: number;
   /**
+   * Pay periods in the tax year for this run: 12 monthly, 26 fortnightly, 52 weekly.
+   * Omitted means monthly. Taxable earnings and fixed amounts are per pay period.
+   */
+  periodsPerYear?: number;
+  /**
+   * UIF remuneration already counted for this employee in earlier runs paid in the
+   * same calendar month. The UIF ceiling is a monthly limit, so weekly, fortnightly
+   * and supplementary runs share it.
+   */
+  uifRemunerationMonthToDate?: number;
+  /**
    * Annual (non-periodic) payments already inside taxableEarnings, e.g. a once-off
    * taxable allowance. The bonus engine adds the bonus here itself. PAYE taxes these
    * with the SARS difference method instead of annualising them.
