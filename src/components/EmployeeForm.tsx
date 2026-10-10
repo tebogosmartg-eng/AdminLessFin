@@ -92,6 +92,11 @@ const employeeSchema = z.object({
   end_date: z.string().optional(),
   salary_amount: z.coerce.number().min(0, 'Salary must be a positive number.').optional().nullable(),
   salary_period: z.enum(['monthly', 'weekly', 'fortnightly']).optional().nullable(),
+  pay_basis: z.enum(['salaried', 'hourly', 'daily']).default('salaried'),
+  pay_rate: optionalNumber(0.01, 99_999, 'Enter the rate per hour or per day.'),
+  works_sundays: z.boolean().default(false),
+  tax_method: z.enum(['tables', 'non_standard']).default('tables'),
+  deemed_standard_declaration_on: z.string().optional(),
   residential_unit_number: z.string().optional(),
   residential_complex: z.string().optional(),
   residential_street_number: z.string().optional(),
@@ -157,6 +162,11 @@ const EmployeeForm = ({ isOpen, setIsOpen, employee }: EmployeeFormProps) => {
         end_date: employee.end_date || '',
         salary_amount: employee.salary_amount || undefined,
         salary_period: employee.salary_period || undefined,
+        pay_basis: employee.pay_basis ?? 'salaried',
+        pay_rate: employee.pay_rate != null ? String(employee.pay_rate) : '',
+        works_sundays: employee.works_sundays === true,
+        tax_method: employee.tax_method ?? 'tables',
+        deemed_standard_declaration_on: employee.deemed_standard_declaration_on || '',
         ...Object.fromEntries(SARS_TEXT_FIELDS.map((key) => [key, employee[key] || ''])),
         postal_same_as_residential: employee.postal_same_as_residential !== false,
         bank_account_type: (employee.bank_account_type ?? '') as EmployeeFormValues['bank_account_type'],
@@ -190,6 +200,11 @@ const EmployeeForm = ({ isOpen, setIsOpen, employee }: EmployeeFormProps) => {
         end_date: '',
         salary_amount: undefined,
         salary_period: undefined,
+        pay_basis: 'salaried',
+        pay_rate: '',
+        works_sundays: false,
+        tax_method: 'tables',
+        deemed_standard_declaration_on: '',
         ...Object.fromEntries(SARS_TEXT_FIELDS.map((key) => [key, ''])),
         postal_same_as_residential: true,
         bank_account_type: '',
@@ -208,6 +223,8 @@ const EmployeeForm = ({ isOpen, setIsOpen, employee }: EmployeeFormProps) => {
   });
 
   const postalSameAsResidential = form.watch('postal_same_as_residential');
+  const payBasis = form.watch('pay_basis');
+  const employmentType = form.watch('employment_type');
 
   const mutation = useMutation({
     mutationFn: async (values: EmployeeFormValues) => {
@@ -217,8 +234,13 @@ const EmployeeForm = ({ isOpen, setIsOpen, employee }: EmployeeFormProps) => {
         ...values,
         end_date: values.end_date || null,
         date_of_birth: values.date_of_birth || null,
-        salary_amount: values.salary_amount || null,
+        salary_amount: values.pay_basis === 'salaried' ? values.salary_amount || null : null,
         salary_period: values.salary_period || null,
+        pay_basis: values.pay_basis,
+        pay_rate: values.pay_basis !== 'salaried' && values.pay_rate?.trim() ? Number(values.pay_rate) : null,
+        works_sundays: values.works_sundays,
+        tax_method: values.tax_method,
+        deemed_standard_declaration_on: values.deemed_standard_declaration_on || null,
         ...Object.fromEntries(SARS_TEXT_FIELDS.map((key) => [key, values[key]?.trim() || null])),
         passport_country: values.passport_country?.trim().toUpperCase() || null,
         bank_account_type: values.bank_account_type || null,
@@ -481,12 +503,34 @@ const EmployeeForm = ({ isOpen, setIsOpen, employee }: EmployeeFormProps) => {
             </fieldset>
 
             <fieldset className="grid grid-cols-1 md:grid-cols-2 gap-4 border p-4 rounded-md">
-              <legend className="text-sm font-medium px-1">Salary Information</legend>
-              <FormField control={form.control} name="salary_amount" render={({ field }) => (
-                  <FormItem><FormLabel>Salary Amount</FormLabel><FormControl><Input type="number" step="0.01" placeholder="e.g., 50000" {...field} /></FormControl><FormMessage /></FormItem>
+              <legend className="text-sm font-medium px-1">Pay</legend>
+              <FormField control={form.control} name="pay_basis" render={({ field }) => (
+                <FormItem><FormLabel>Paid by</FormLabel>
+                  <Select onValueChange={field.onChange} value={field.value}>
+                    <FormControl><SelectTrigger aria-label="Paid by"><SelectValue /></SelectTrigger></FormControl>
+                    <SelectContent>
+                      <SelectItem value="salaried">Salary</SelectItem>
+                      <SelectItem value="hourly">The hour (hours on the run's timesheet)</SelectItem>
+                      <SelectItem value="daily">The day (days on the run's timesheet)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <FormDescription>Casual and part-time workers are usually paid by the hour or the day on weekly runs.</FormDescription>
+                  <FormMessage />
+                </FormItem>
               )} />
+              {payBasis === 'salaried' ? (
+                <FormField control={form.control} name="salary_amount" render={({ field }) => (
+                    <FormItem><FormLabel>Salary Amount</FormLabel><FormControl><Input type="number" step="0.01" placeholder="e.g., 50000" {...field} /></FormControl><FormMessage /></FormItem>
+                )} />
+              ) : (
+                <FormField control={form.control} name="pay_rate" render={({ field }) => (
+                  <FormItem><FormLabel>{payBasis === 'hourly' ? 'Rate per Hour' : 'Rate per Day'}</FormLabel>
+                    <FormControl><Input {...field} type="number" step="0.01" min="0" placeholder={payBasis === 'hourly' ? 'e.g. 45.00' : 'e.g. 400.00'} /></FormControl>
+                    <FormDescription>Overtime, Sunday and public holiday pay are worked out from this (BCEA).</FormDescription><FormMessage /></FormItem>
+                )} />
+              )}
               <FormField control={form.control} name="salary_period" render={({ field }) => (
-                  <FormItem><FormLabel>Salary Period</FormLabel>
+                  <FormItem><FormLabel>Pay Frequency</FormLabel>
                       <Select onValueChange={field.onChange} value={field.value || ''}>
                           <FormControl><SelectTrigger><SelectValue placeholder="Select a period" /></SelectTrigger></FormControl>
                           <SelectContent>
@@ -497,6 +541,35 @@ const EmployeeForm = ({ isOpen, setIsOpen, employee }: EmployeeFormProps) => {
                       </Select><FormMessage />
                   </FormItem>
               )} />
+              <FormField control={form.control} name="works_sundays" render={({ field }) => (
+                <FormItem className="flex items-center gap-2 space-y-0">
+                  <FormControl><Checkbox checked={field.value} onCheckedChange={(checked) => field.onChange(checked === true)} /></FormControl>
+                  <FormLabel className="font-normal">Ordinarily works on Sundays (Sunday work at 1.5× instead of 2×)</FormLabel>
+                </FormItem>
+              )} />
+              <FormField control={form.control} name="tax_method" render={({ field }) => (
+                <FormItem><FormLabel>Employees' Tax</FormLabel>
+                  <Select onValueChange={field.onChange} value={field.value}>
+                    <FormControl><SelectTrigger aria-label="Employees' tax"><SelectValue /></SelectTrigger></FormControl>
+                    <SelectContent>
+                      <SelectItem value="tables">SARS tax tables (standard employment)</SelectItem>
+                      <SelectItem value="non_standard">Non-standard employment: flat 25%</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <FormDescription>
+                    Flat 25% only for casual or irregular work: under 22 hours a week without a declaration of no other employer,
+                    and not 5+ hours a day at under R394 a day (SARS Guide for Employers).
+                  </FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )} />
+              {employmentType === 'casual' && (
+                <FormField control={form.control} name="deemed_standard_declaration_on" render={({ field }) => (
+                  <FormItem><FormLabel>Declaration of No Other Employer Signed On</FormLabel>
+                    <FormControl><Input {...field} type="date" /></FormControl>
+                    <FormDescription>A casual's written declaration keeps them on the tax tables.</FormDescription><FormMessage /></FormItem>
+                )} />
+              )}
             </fieldset>
 
             {employee && activeCompany && (

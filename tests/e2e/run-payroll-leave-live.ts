@@ -105,8 +105,10 @@ async function main() {
   const items = async (payslipId: string) => (await payroll<{ payslip_items: Item[] }>({ method: 'GET_PAYSLIP_DETAIL', payslipId })).payslip_items ?? [];
 
   // A re-run pays October again: reverse this check's earlier October run so its period is open.
-  const earlierRuns = await payroll<Array<{ id: string; status: string; pay_frequency: string | null; pay_period_start: string }>>({ method: 'GET_RUNS' });
-  for (const r of earlierRuns.filter((x) => x.pay_frequency === 'fortnightly' && x.pay_period_start === '2025-10-13' && ['finalized', 'paid'].includes(x.status))) {
+  const earlierRuns = await payroll<Array<{ id: string; status: string; pay_frequency: string | null; pay_period_start: string; output_metadata?: { reversed_at?: string; processed_at?: string } | null }>>({ method: 'GET_RUNS' });
+  // A reversed run keeps status 'finalized' with reversed_at after its last processed_at.
+  const reversed = (x: (typeof earlierRuns)[number]) => !!x.output_metadata?.reversed_at && (!x.output_metadata.processed_at || x.output_metadata.processed_at <= x.output_metadata.reversed_at);
+  for (const r of earlierRuns.filter((x) => x.pay_frequency === 'fortnightly' && x.pay_period_start === '2025-10-13' && ['finalized', 'paid'].includes(x.status) && !reversed(x))) {
     await payroll({ method: 'REVERSE_RUN', runId: r.id, reason: 'Leave live check re-run: reopen October' });
   }
 

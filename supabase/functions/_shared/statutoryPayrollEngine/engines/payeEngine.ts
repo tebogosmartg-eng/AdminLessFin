@@ -14,6 +14,9 @@ import {
   skippedEngineResult,
 } from '../utils.ts';
 
+/** Employees' tax rate for non-standard employment. */
+export const NON_STANDARD_RATE = 0.25;
+
 export type PayeEngineInput = {
   monthlyTaxableIncome: number;
   annualMedicalCredits: number;
@@ -35,6 +38,26 @@ export function calculatePayeAmount(
   const engineId = 'paye' as const;
   if (!isEngineEnabled(ctx.enabledEngines, engineId)) {
     return skippedEngineResult(engineId, 'PAYE engine disabled');
+  }
+
+  // Non-standard employment (Fourth Schedule; SARS Guide for Employers iro Employees' Tax):
+  // employees' tax at 25% of the remuneration, without rebates or medical credits.
+  if (input.payeMode === 'non_standard') {
+    const base = roundCurrency(Math.max(0, input.monthlyTaxableIncome));
+    const paye = roundCurrency(base * NON_STANDARD_RATE);
+    return {
+      engineId,
+      engineVersion: ENGINE_VERSION,
+      enabled: true,
+      skipped: false,
+      employeeAmount: paye,
+      employerAmount: 0,
+      taxableAdjustment: 0,
+      breakdown: { periodTaxableIncome: base, flatRate: NON_STANDARD_RATE, payePayable: paye },
+      auditTrail: [
+        createAuditStep('non_standard_employment', 'period_remuneration × 25% (no rebates, no medical credits)', { periodTaxableIncome: base }, paye),
+      ],
+    };
   }
 
   const { ruleSet } = ctx;

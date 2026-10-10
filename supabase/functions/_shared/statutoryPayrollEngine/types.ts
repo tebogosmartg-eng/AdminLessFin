@@ -177,7 +177,8 @@ export type YtdContext = {
   periodsProcessed?: number;
 };
 
-export type PayeCalculationMode = 'standard' | 'director_annual_fee' | 'director_variable';
+/** non_standard: SARS non-standard employment (casual, irregular work) — a flat 25%, no rebates. */
+export type PayeCalculationMode = 'standard' | 'director_annual_fee' | 'director_variable' | 'non_standard';
 
 export type StatutoryEmployeeInput = {
   id: string;
@@ -186,6 +187,8 @@ export type StatutoryEmployeeInput = {
   lastName?: string;
   age?: number;
   employmentType?: string;
+  /** tables (default) or non_standard (flat 25%, SARS Guide for Employers). */
+  taxMethod?: 'tables' | 'non_standard';
   isDirector?: boolean;
 };
 

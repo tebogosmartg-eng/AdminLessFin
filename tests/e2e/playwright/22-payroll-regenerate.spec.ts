@@ -388,3 +388,43 @@ test('leave: BCEA balances, an employee register and recording leave', async ({ 
   await page.getByRole('tab', { name: 'Leave types' }).click();
   await expect(page.getByText('BCEA s22: 6 weeks per 36 months')).toBeVisible();
 });
+
+test('hourly and casual workers: employee tabs and the run timesheet', async ({ page }) => {
+  // Relies on tests/e2e/run-payroll-time-live.ts having created weekly "Time …" employees for December 2026.
+  const env = loadE2EEnv();
+  const sb = createClient(env.supabaseUrl, env.supabaseAnonKey, { auth: { persistSession: false } });
+  await sb.auth.signInWithPassword({ email: env.email, password: env.password });
+  const { data: company } = await sb.from('companies').select('id').eq('name', READY_COMPANY).single();
+  const companyId = company!.id as string;
+  const run = await call<{ id: string }>(sb, {
+    method: 'CREATE_RUN', company_id: companyId, additional_run: true,
+    runData: { pay_period_start: '2026-12-21', pay_period_end: '2026-12-27', pay_date: '2026-12-27', pay_frequency: 'weekly' },
+  });
+  try {
+    await page.goto('/');
+    await waitForRouteSettled(page);
+    await ensureReadyCompany(page);
+    await page.goto('/employees');
+    await waitForRouteSettled(page);
+    await page.getByRole('tab', { name: /Hourly & daily/ }).click();
+    await expect(page.getByRole('row').filter({ hasText: 'Hourly Time' }).first()).toContainText('/ hour', { timeout: 30_000 });
+    await page.getByRole('tab', { name: /Casual/ }).click();
+    await expect(page.getByRole('row').filter({ hasText: 'Daily Time' }).first()).toContainText('Tax 25%');
+
+    await page.goto(`/payroll-runs/${run.id}`);
+    await waitForRouteSettled(page);
+    const panel = page.getByTestId('timesheet-panel');
+    await expect(panel).toBeVisible({ timeout: 30_000 });
+    const hoursInput = panel.getByLabel(/^Hours worked by Hourly Time/).first();
+    await expect(hoursInput).toBeVisible({ timeout: 30_000 });
+    await expect(panel).toContainText('2026-12-25'); // Christmas Day on a working day
+    await hoursInput.fill('24');
+    await panel.getByLabel(/^Overtime hours for Hourly Time/).first().fill('2');
+    await panel.getByTestId('save-timesheet').click();
+    await expect(page.getByText(/Timesheet saved/)).toBeVisible({ timeout: 20_000 });
+    await expect(panel.getByText('R 1 350,00').or(panel.getByText('R1,350.00')).first()).toBeVisible({ timeout: 20_000 });
+    await shot(page, '12-timesheet');
+  } finally {
+    await call(sb, { method: 'DISCARD_RUN', company_id: companyId, runId: run.id }).catch(() => undefined);
+  }
+});

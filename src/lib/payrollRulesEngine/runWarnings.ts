@@ -21,7 +21,9 @@ export type RunWarningCode =
   | 'MISSING_RESIDENTIAL_ADDRESS'
   | 'MISSING_BANK_ACCOUNT_TYPE'
   | 'EMPLOYER_PROFILE_INCOMPLETE'
-  | 'LEAVE_PAYOUT_DUE';
+  | 'LEAVE_PAYOUT_DUE'
+  | 'NO_HOURS'
+  | 'TIMESHEET_CHECK';
 
 export type RunWarning = {
   code: RunWarningCode;
@@ -39,6 +41,8 @@ export type RunWarningEmployee = {
   last_name?: string | null;
   salary_amount?: number | null;
   salary_period?: string | null;
+  pay_basis?: string | null;
+  pay_rate?: number | null;
   tax_number?: string | null;
   id_number?: string | null;
   passport_number?: string | null;
@@ -71,13 +75,26 @@ export function payrollRunWarnings(input: {
   /** Run inputs entered for this run. */
   periodInputs: Array<{ employee_id: string; component_code: string }>;
   payFrequency: string;
+  /** Employees with hours or days on the run's timesheet. */
+  timesheetEmployeeIds?: Set<string>;
 }): RunWarning[] {
   const warnings: RunWarning[] = [];
   const candidateIds = new Set(input.candidates.map((e) => e.id));
 
   for (const employee of input.candidates) {
     if (input.paidEmployeeIds.has(employee.id)) continue;
-    if (!Number(employee.salary_amount)) {
+    const timeBased = employee.pay_basis === 'hourly' || employee.pay_basis === 'daily';
+    if (timeBased && !Number(employee.pay_rate)) {
+      warnings.push({
+        code: 'NO_SALARY', category: 'pay', employee_id: employee.id, employee_name: nameOf(employee),
+        message: `${nameOf(employee)} was not paid: no ${employee.pay_basis === 'hourly' ? 'hourly' : 'daily'} rate is set on the employee.`,
+      });
+    } else if (timeBased && !input.timesheetEmployeeIds?.has(employee.id)) {
+      warnings.push({
+        code: 'NO_HOURS', category: 'pay', employee_id: employee.id, employee_name: nameOf(employee),
+        message: `${nameOf(employee)} was not paid: no ${employee.pay_basis === 'hourly' ? 'hours' : 'days'} are captured on the run's timesheet.`,
+      });
+    } else if (!timeBased && !Number(employee.salary_amount)) {
       warnings.push({
         code: 'NO_SALARY', category: 'pay', employee_id: employee.id, employee_name: nameOf(employee),
         message: `${nameOf(employee)} was not paid: no salary amount is set on the employee.`,
@@ -106,7 +123,7 @@ export function payrollRunWarnings(input: {
       ? `the employee is paid ${frequency}, and this is a ${input.payFrequency} run`
       : !candidateIds.has(employeeId)
         ? 'the employee was not employed during this pay period'
-        : !Number(employee.salary_amount)
+        : !(employee.pay_basis === 'hourly' || employee.pay_basis === 'daily') && !Number(employee.salary_amount)
           ? 'the employee has no salary amount'
           : 'the employee has no payslip on this run yet; regenerate payslips';
     warnings.push({

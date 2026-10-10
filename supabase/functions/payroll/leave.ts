@@ -13,7 +13,7 @@ import {
 } from '../_shared/payrollRulesEngine/leave.ts'
 import { leaveEmployee, loadLeaveRows as loadEntries, toLeaveEntry } from '../_shared/leaveRegister.ts'
 
-const FINALIZED = ['finalized', 'paid'];
+import { isRunInEffect, isRunReversed } from '../_shared/payrollRunState.ts'
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 const round2 = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100;
 
@@ -62,7 +62,7 @@ async function finalisedRunsOverlapping(admin, companyId, payFrequency, from, to
     .eq('company_id', companyId)
     .lte('pay_period_start', to).gte('pay_period_end', from);
   if (error) throw error;
-  return (data ?? []).filter((r) => (r.pay_frequency ?? 'monthly') === payFrequency && r.output_metadata?.cancelled !== true);
+  return (data ?? []).filter((r) => (r.pay_frequency ?? 'monthly') === payFrequency && r.output_metadata?.cancelled !== true && !isRunReversed(r));
 }
 
 /**
@@ -228,7 +228,7 @@ export async function handleLeaveMethod(method, ctx) {
         if (overlap?.length) fail('LEAVE_OVERLAP', `Leave is already recorded from ${overlap[0].start_date} to ${overlap[0].end_date}.`, 'Cancel that entry first, or choose other dates.', 409);
 
         const runs = await finalisedRunsOverlapping(admin, company_id, employee.salary_period ?? 'monthly', start, end);
-        if (!type.paid && runs.some((r) => FINALIZED.includes(r.status))) {
+        if (!type.paid && runs.some(isRunInEffect)) {
           fail('PAYROLL_PERIOD_CLOSED', 'Unpaid leave in a finalised pay period cannot be recorded: the employee was already paid for it.', 'Reverse or reopen the run first, or record it in the next period as an adjustment of pay.', 409);
         }
         if (!type.paid) regenerate.push(...runs.filter((r) => r.status === 'draft').map((r) => r.id));
@@ -280,7 +280,7 @@ export async function handleLeaveMethod(method, ctx) {
         const { data: type } = await admin.from('company_leave_types').select('paid').eq('id', entry.leave_type_id).single();
         const employee = await loadEmployee(entry.employee_id);
         const runs = await finalisedRunsOverlapping(admin, company_id, employee.salary_period ?? 'monthly', entry.start_date, entry.end_date);
-        if (type && !type.paid && runs.some((r) => FINALIZED.includes(r.status))) {
+        if (type && !type.paid && runs.some(isRunInEffect)) {
           fail('PAYROLL_PERIOD_CLOSED', 'This unpaid leave reduced pay in a finalised run, so it cannot be cancelled.', 'Reverse or reopen that run first.', 409);
         }
         if (type && !type.paid) regenerate.push(...runs.filter((r) => r.status === 'draft').map((r) => r.id));

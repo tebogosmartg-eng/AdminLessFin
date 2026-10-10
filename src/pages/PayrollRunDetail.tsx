@@ -43,6 +43,7 @@ import PayslipDetailDialog from '../components/PayslipDetailDialog';
 import PayrollWorkflowStepper from '../components/payroll/PayrollWorkflowStepper';
 import PayrollRunRulesPanel from '../components/payroll/PayrollRunRulesPanel';
 import { PayComponentEditor } from '../components/payroll/PayComponentEditor';
+import TimesheetPanel from '../components/payroll/TimesheetPanel';
 import PayrollCommandCentre from '../components/payroll/PayrollCommandCentre';
 import { usePayrollControls } from '../components/payroll/usePayrollControls';
 import type { RunWarning } from '../lib/payrollRulesEngine/runWarnings';
@@ -624,6 +625,10 @@ const PayrollRunDetail = () => {
         )}
 
         {run.status === 'draft' && id && activeCompany && (
+          <TimesheetPanel runId={id} onSaved={invalidateRun} />
+        )}
+
+        {run.status === 'draft' && id && activeCompany && (
           <Card>
             <CardHeader>
               <CardTitle>Period inputs</CardTitle>
@@ -755,7 +760,7 @@ const PayrollRunDetail = () => {
             <AlertCircle className="h-4 w-4" />
             <AlertTitle>
               {payWarnings.length > 0
-                ? `${payWarnings.length} employee${payWarnings.length === 1 ? '' : 's'} not paid as expected`
+                ? `${payWarnings.length} pay warning${payWarnings.length === 1 ? '' : 's'}`
                 : 'Payslips generated with missing SARS details'}
             </AlertTitle>
             <AlertDescription className="space-y-2">

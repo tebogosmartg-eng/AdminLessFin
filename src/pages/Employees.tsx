@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { Tabs, TabsList, TabsTrigger } from '../components/ui/tabs';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '../integrations/supabase/client';
 import { Button } from '../components/ui/button';
@@ -72,6 +73,11 @@ export type Employee = {
   passport_country?: string | null;
   ordinary_hours_per_week?: number | null;
   work_days_per_week?: number | null;
+  pay_basis?: 'salaried' | 'hourly' | 'daily' | null;
+  pay_rate?: number | null;
+  works_sundays?: boolean | null;
+  tax_method?: 'tables' | 'non_standard' | null;
+  deemed_standard_declaration_on?: string | null;
   annual_leave_days_per_cycle?: number | null;
   eti_employment_date?: string | null;
   eti_sez_code?: string | null;
@@ -81,12 +87,23 @@ export type Employee = {
   wage_regulating_minimum_hourly?: number | null;
 };
 
+type EmployeeGroup = 'all' | 'salaried' | 'time' | 'casual';
+
+/** Salaried, paid by the hour or day, or casual (whatever the pay basis). */
+function inGroup(e: Employee, group: EmployeeGroup): boolean {
+  if (group === 'all') return true;
+  if (group === 'casual') return e.employment_type === 'casual';
+  const timeBased = e.pay_basis === 'hourly' || e.pay_basis === 'daily';
+  return group === 'time' ? timeBased : !timeBased;
+}
+
 const Employees = () => {
   useDocumentTitle('Employees');
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [selectedEmployee, setSelectedEmployee] = useState<Employee | undefined>(undefined);
   const [previewEmployee, setPreviewEmployee] = useState<Employee | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [group, setGroup] = useState<EmployeeGroup>('all');
   const queryClient = useQueryClient();
   const { activeCompany } = useAuth();
 
@@ -119,8 +136,11 @@ const Employees = () => {
 
   const filteredEmployees = useMemo(() => {
     if (!employees) return [];
-    return filterAndRankEmployees(employees, searchQuery);
-  }, [employees, searchQuery]);
+    return filterAndRankEmployees(employees, searchQuery).filter((e) => inGroup(e, group));
+  }, [employees, searchQuery, group]);
+  const groupCounts = useMemo(() => Object.fromEntries(
+    (['all', 'salaried', 'time', 'casual'] as EmployeeGroup[]).map((g) => [g, (employees ?? []).filter((e) => inGroup(e, g)).length]),
+  ) as Record<EmployeeGroup, number>, [employees]);
 
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
@@ -180,6 +200,19 @@ const Employees = () => {
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
+          <Tabs value={group} onValueChange={(v) => setGroup(v as EmployeeGroup)}>
+            <TabsList>
+              <TabsTrigger value="all">All ({groupCounts.all})</TabsTrigger>
+              <TabsTrigger value="salaried">Salaried ({groupCounts.salaried})</TabsTrigger>
+              <TabsTrigger value="time">Hourly &amp; daily ({groupCounts.time})</TabsTrigger>
+              <TabsTrigger value="casual">Casual ({groupCounts.casual})</TabsTrigger>
+            </TabsList>
+          </Tabs>
+          {group !== 'all' && group !== 'salaried' && (
+            <p className="text-xs text-muted-foreground">
+              Paid for the hours or days on each run's timesheet (Payroll Runs → run → Timesheet). Casual workers under 24 hours a month pay no UIF; non-standard employment is taxed at a flat 25%.
+            </p>
+          )}
           <Input
             placeholder="Search by employee number, name, ID, email, or mobile…"
             value={searchQuery}
@@ -215,7 +248,10 @@ const Employees = () => {
                     <TableCell>{employee.position}</TableCell>
                     <TableCell><Badge variant="outline" className="capitalize">{employee.employment_type}</Badge></TableCell>
                     <TableCell>
-                      {employee.salary_amount ? `${formatCurrency(employee.salary_amount)} / ${employee.salary_period}` : 'N/A'}
+                      {employee.pay_basis === 'hourly' || employee.pay_basis === 'daily'
+                        ? employee.pay_rate ? `${formatCurrency(employee.pay_rate)} / ${employee.pay_basis === 'hourly' ? 'hour' : 'day'} · ${employee.salary_period ?? 'monthly'}` : 'No rate'
+                        : employee.salary_amount ? `${formatCurrency(employee.salary_amount)} / ${employee.salary_period}` : 'N/A'}
+                      {employee.tax_method === 'non_standard' && <Badge variant="secondary" className="ml-2">Tax 25%</Badge>}
                     </TableCell>
                     <TableCell>
                       <DropdownMenu>

@@ -19,6 +19,12 @@ import {
   sha256Hex,
 } from '../_shared/statutoryFiling.ts'
 import {
+  TIME_METHODS,
+  handleTimeMethod,
+  consumeWorkHours,
+  releaseWorkHours,
+} from './time.ts'
+import {
   LEAVE_METHODS,
   handleLeaveMethod,
   recordLeavePayouts,
@@ -1349,6 +1355,8 @@ serve(withEnterprisePlatform('payroll', 'tenant', async (req, _ctx) => {
         if (fetchRunError) throw fetchRunError;
         // Leave paid out on this run draws down the annual leave balance (once per employee).
         const leavePayouts = await recordLeavePayouts(supabaseAdmin, company_id, updatedRun ?? runToFinalize, user.id);
+        // Approved Work Management hours on the timesheet are paid once.
+        await consumeWorkHours(supabaseAdmin, company_id, runId);
 
         data = {
           run: updatedRun ?? { ...runToFinalize, status: 'finalized', journal_entry_id: entryId, output_metadata: outputMetadata },
@@ -1386,6 +1394,7 @@ serve(withEnterprisePlatform('payroll', 'tenant', async (req, _ctx) => {
         );
         if (reverseError) throw mapPayrollRpcError(reverseError);
         await releaseLeavePayouts(supabaseAdmin, company_id, runId, user.id, body.reason ?? 'Payroll reversal');
+        await releaseWorkHours(supabaseAdmin, company_id, runId);
         data = reverseResult;
         error = null;
         break;
@@ -1413,6 +1422,7 @@ serve(withEnterprisePlatform('payroll', 'tenant', async (req, _ctx) => {
         );
         if (reopenError) throw mapPayrollRpcError(reopenError);
         await releaseLeavePayouts(supabaseAdmin, company_id, runId, user.id, body.reason ?? 'Payroll reopen for correction');
+        await releaseWorkHours(supabaseAdmin, company_id, runId);
         data = reopenResult;
         error = null;
         break;
@@ -1846,6 +1856,13 @@ serve(withEnterprisePlatform('payroll', 'tenant', async (req, _ctx) => {
       }
 
       default:
+        if (TIME_METHODS.has(method)) {
+          data = await handleTimeMethod(method, {
+            supabaseAdmin, company_id, user, body, PayrollDomainError, logPayrollAudit, addRunPreparer,
+          });
+          error = null;
+          break;
+        }
         if (LEAVE_METHODS.has(method)) {
           data = await handleLeaveMethod(method, {
             supabaseAdmin, company_id, user, body, PayrollDomainError, logPayrollAudit, addRunPreparer,

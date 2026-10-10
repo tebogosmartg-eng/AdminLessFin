@@ -30,7 +30,7 @@ import {
   type Emp501Kind,
 } from './sars/statutoryCalendar.ts';
 
-const FINALIZED_RUN_STATUSES = ['finalized', 'paid'];
+import { FINALIZED_RUN_STATUSES, isRunInEffect, isRunReversed } from './payrollRunState.ts';
 const PAGE_SIZE = 1000;
 const PAYE_ENGINES = new Set(['paye', 'directors_paye', 'bonus_tax', 'termination_tax']);
 
@@ -101,7 +101,8 @@ async function loadFinalisedPayslips(admin, companyId: string, start: string, en
     .gte('pay_date', start)
     .lte('pay_date', end);
   if (error) throw error;
-  const finalised = (runs ?? []).filter((r) => FINALIZED_RUN_STATUSES.includes(r.status) && r.output_metadata?.cancelled !== true);
+  // Reversed runs paid nobody: they are left out of returns.
+  const finalised = (runs ?? []).filter(isRunInEffect);
   const notFinalised = (runs ?? []).filter((r) => !FINALIZED_RUN_STATUSES.includes(r.status));
   const runById = new Map(finalised.map((r) => [r.id, r]));
   const payDateByRun = new Map(finalised.map((r) => [r.id, r.pay_date]));
@@ -493,8 +494,8 @@ export async function loadStatutoryWorkspace(admin, companyId: string, yearOfAss
 
   const monthRows = months.map((month) => {
     const period = month.replace('-', '');
-    const monthRuns = runs.filter((r) => String(r.pay_date).startsWith(month) && r.output_metadata?.cancelled !== true);
-    const finalised = monthRuns.filter((r) => FINALIZED_RUN_STATUSES.includes(r.status));
+    const monthRuns = runs.filter((r) => String(r.pay_date).startsWith(month) && r.output_metadata?.cancelled !== true && !isRunReversed(r));
+    const finalised = monthRuns.filter(isRunInEffect);
     const ret = returns.find((r) => r.return_type === 'EMP201' && r.period === period) ?? null;
     const paid = ret ? payments.get(ret.id) ?? 0 : 0;
     const totalPayable = Number(ret?.declaration_data?.totalPayable ?? 0);

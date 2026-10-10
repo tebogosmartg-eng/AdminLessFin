@@ -95,6 +95,8 @@ export function executeStatutoryPipeline(input: PipelineInput): StatutoryPipelin
     taxableEarnings = deemed;
   }
 
+  // A director's mode wins; otherwise a non-standard employee is taxed at the flat rate.
+  if (payeMode === 'standard' && input.employee.taxMethod === 'non_standard') payeMode = 'non_standard';
   ctx.taxableEarnings = taxableEarnings;
   ctx.payeMode = payeMode;
   ctx.nonPeriodicTaxable = payeMode === 'director_annual_fee'
