@@ -546,3 +546,20 @@ test('bank payment files, UIF declaration and COIDA return of earnings', async (
   expect((await report).suggestedFilename()).toMatch(/\.pdf$/i);
   await shot(page, '16-coida');
 });
+
+test('payroll accounts: each journal line has its account, classified for the statements', async ({ page }) => {
+  await page.goto('/');
+  await waitForRouteSettled(page);
+  await ensureReadyCompany(page);
+  await page.goto('/settings');
+  await waitForRouteSettled(page);
+  await page.getByRole('tab', { name: /payroll/i }).click();
+  const card = page.getByTestId('payroll-accounts');
+  await expect(card).toBeVisible({ timeout: 30_000 });
+  for (const role of ['salary_expense', 'paye_control', 'uif_control', 'sdl_control', 'bank']) {
+    await expect(card.getByTestId(`payroll-account-${role}`)).toBeVisible();
+  }
+  await expect(card).toContainText('PAYE payable');
+  await expect(card.getByTestId('save-payroll-accounts')).toBeDisabled();
+  await shot(page, '17-payroll-accounts');
+});

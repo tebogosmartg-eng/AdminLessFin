@@ -46,6 +46,7 @@ export const NOTE_RECONCILIATIONS: NoteReconciliationRule[] = [
   { disclosure: 'DISC.CASHFLOW', table: 'CASHFLOW.CGO', row: 'cash-generated', line: 'cf.operating.cash_generated' },
   { disclosure: 'DISC.BORROWINGS', table: 'BORROWINGS.ANALYSIS', row: 'Total borrowings', line: 'sfp.borrowings' },
   { disclosure: 'DISC.PAYABLES', table: 'PAYABLES.ANALYSIS', row: 'Total trade and other payables', line: 'sfp.payables' },
+  { disclosure: 'DISC.STATUTORYPAYABLES', table: 'STATUTORYPAYABLES.ANALYSIS', row: 'Total statutory payables', line: 'sfp.statutory_payables' },
   { disclosure: 'DISC.PROVISIONS', table: 'PROVISIONS.ANALYSIS', row: 'Total provisions', line: 'sfp.provisions' },
   { disclosure: 'DISC.REVENUE', table: 'REVENUE.DISAGGREGATION', row: 'Total revenue', line: 'perf.revenue' },
   { disclosure: 'DISC.OTHERINCOME', table: 'OTHERINCOME.ANALYSIS', row: 'Total other income', line: 'perf.other_income' },

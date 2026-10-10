@@ -34,7 +34,7 @@ import { companyService } from '@/governance/domains/company/service';
 import type { ManualField } from '../framework/trialBalanceDisclosureMapping';
 import { applyGeneratedDisclosures } from '../disclosures/assemble';
 import type { FinancialFacts } from '../disclosures/accountIndex';
-import type { EntityParticulars } from '../disclosures/definitions';
+import { payrollLedgerDifferences, type EntityParticulars } from '../disclosures/definitions';
 import {
   buildDetailedIncomeStatement,
   type SupplementarySchedule,
@@ -202,6 +202,8 @@ export type DocumentModel = {
   disclosureReasons?: Record<string, string>;
   /** The supplementary Detailed Income Statement, built from the sealed facts. */
   detailedIncomeStatement?: SupplementarySchedule | null;
+  /** Years in which payroll recorded more employee costs than the ledger's employee cost accounts hold. */
+  payrollLedgerDifferences?: Array<{ year: 'current' | 'comparative'; payroll: number; ledger: number }>;
   /** The company's logo (Company Settings) as the cover prints it. */
   logo?: CoverLogo | null;
   /** Where the logo is stored, for the editor to show and replace it. */
@@ -590,6 +592,7 @@ export async function loadDocumentModel(params: {
     generatedDisclosures: generated.generatedCodes,
     disclosureReasons: generated.reasons,
     detailedIncomeStatement: buildDetailedIncomeStatement(factsRes, years),
+    payrollLedgerDifferences: payrollLedgerDifferences(factsRes as FinancialFacts | null),
     ...(await logoPromise),
   };
 }

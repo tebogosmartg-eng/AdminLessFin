@@ -198,6 +198,8 @@ export function adaptFinancialFacts(factRow, snapshotVersionId) {
   if (Array.isArray(ds.gross_movements)) (facts as any).gross_movements = ds.gross_movements;
   if (Array.isArray(ds.prior_gross_movements)) (facts as any).prior_gross_movements = ds.prior_gross_movements;
   if (Array.isArray(ds.fixed_asset_register)) (facts as any).fixed_asset_register = ds.fixed_asset_register;
+  // Payroll by year (ADR-0009), where the seal carries it.
+  if (ds.payroll && typeof ds.payroll === 'object') (facts as any).payroll = ds.payroll;
   Object.freeze(facts);
 
   return facts;

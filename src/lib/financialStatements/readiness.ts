@@ -242,6 +242,18 @@ export function assessReadiness(model: DocumentModel): Readiness {
     });
   }
 
+  // ── Payroll agrees with the ledger's employee costs ───────────────────────
+  for (const d of model.payrollLedgerDifferences ?? []) {
+    const note = model.notes.find((n) => String(n.disclosure_code).toUpperCase() === 'DISC.EMPLOYEE');
+    issues.push({
+      id: `payroll-ledger-${d.year}`,
+      state: 'warning',
+      title: 'Payroll is not all in employee costs',
+      detail: `For ${d.year === 'current' ? 'this year' : 'the comparative year'} payroll recorded ${formatGap(d.payroll)} of employee costs, but the accounts classified as employee costs total ${formatGap(d.ledger)}. Wages are probably posted to an account classified elsewhere: classify it under Employee Costs (Settings → Payroll → Payroll accounts shows which), then update the statements from accounting.`,
+      ...(note ? { location: { kind: 'note' as const, id: note.id } } : {}),
+    });
+  }
+
   // ── Notes the framework asked for that are still blank ────────────────────
   const blank = model.notes.filter(
     (n) =>

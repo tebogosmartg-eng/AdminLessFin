@@ -37,6 +37,22 @@ export type RegisterAsset = {
 
 export type GrossMovement = { id: string; debits: number; credits: number };
 
+/** One year of payroll, sealed with the facts (ADR-0009; absent on older seals). */
+export type PayrollYear = {
+  from: string;
+  to: string;
+  runs: number;
+  payslips: number;
+  employees: { average: number; yearEnd: number; paid: number };
+  earnings: { salaries: number; overtime: number; bonuses: number; leavePay: number; commission: number; allowances: number; other: number };
+  benefits: number;
+  employer: { uif: number; sdl: number; other: number };
+  grossPay: number;
+  employerContributions: number;
+  payrollCost: number;
+  directors: Array<{ employeeId: string; name: string; salary: number; bonuses: number; allowances: number; benefits: number; total: number }>;
+};
+
 export type FinancialFacts = {
   period?: {
     start_date?: string;
@@ -51,6 +67,8 @@ export type FinancialFacts = {
   prior_gross_movements?: GrossMovement[] | null;
   /** The fixed asset register sub-ledger (absent on older seals). */
   fixed_asset_register?: RegisterAsset[] | null;
+  /** Payroll by year: payslips of runs in effect (absent on older seals). */
+  payroll?: { current: PayrollYear | null; prior: PayrollYear | null } | null;
   /** The ledger's cash movements by section and counter-account, each year. */
   cash_flow?: Array<{ section: string; category: string; amount: number }> | null;
   prior_cash_flow?: Array<{ section: string; category: string; amount: number }> | null;
@@ -117,6 +135,8 @@ export class AccountIndex {
   readonly hasPriorGross: boolean;
   /** The fixed asset register, where the seal carries it. */
   readonly register: RegisterAsset[] | null;
+  /** Payroll for this year and last, where the seal carries it. */
+  readonly payroll: { current: PayrollYear | null; prior: PayrollYear | null } | null;
   /** The ledger's cash movements, where the seal carries them. */
   readonly cashFlow: Array<{ section: string; category: string; amount: number }> | null;
   readonly priorCashFlow: Array<{ section: string; category: string; amount: number }> | null;
@@ -124,6 +144,7 @@ export class AccountIndex {
   constructor(facts: FinancialFacts | null | undefined) {
     this.period = facts?.period;
     this.register = Array.isArray(facts?.fixed_asset_register) ? facts!.fixed_asset_register! : null;
+    this.payroll = facts?.payroll && typeof facts.payroll === 'object' ? facts.payroll : null;
     this.cashFlow = Array.isArray(facts?.cash_flow) ? facts!.cash_flow! : null;
     this.priorCashFlow = Array.isArray(facts?.prior_cash_flow) ? facts!.prior_cash_flow! : null;
     this.hasGross = Array.isArray(facts?.gross_movements);

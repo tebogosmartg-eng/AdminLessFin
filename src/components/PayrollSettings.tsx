@@ -15,6 +15,7 @@ import { PAYROLL_RULE_CATALOG } from '../lib/payrollRulesEngine/catalogue';
 import PayrollApprovalControls from './payroll/PayrollApprovalControls';
 import PayRulesCard from './payroll/PayRulesCard';
 import BankProfilesCard from './payroll/BankProfilesCard';
+import PayrollAccountsCard from './payroll/PayrollAccountsCard';
 import EmployerProfileCard from './payroll/EmployerProfileCard';
 
 type CatalogRule = {
@@ -128,6 +129,7 @@ const PayrollSettings = () => {
     <div className="space-y-6">
     <EmployerProfileCard />
     <PayrollApprovalControls />
+    <PayrollAccountsCard />
     <PayRulesCard />
     <BankProfilesCard />
     <Card>

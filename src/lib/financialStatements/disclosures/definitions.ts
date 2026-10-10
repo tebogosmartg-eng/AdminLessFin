@@ -18,11 +18,14 @@ import {
   ALLOWANCE,
   type AccountFilter,
   type AccountRow,
+  type FinancialFacts,
+  type PayrollYear,
 } from './accountIndex';
 import {
   label,
   MONEY,
   type Cell,
+  type CellFormat,
   type CellSource,
   type DisclosureColumn,
   type DisclosureRow,
@@ -797,37 +800,6 @@ const OTHER_INCOME: DisclosureDefinition = {
   },
 };
 
-const EMPLOYEE_COSTS: DisclosureDefinition = {
-  code: 'DISC.EMPLOYEE',
-  title: 'Employee costs',
-  applies: (ctx) => ctx.index.any({ subcategory: 'Employee Costs' }),
-  reason: () => 'The company incurred employee costs.',
-  narrative: () => [
-    'Employee costs comprise salaries, wages and the related statutory and benefit contributions recognised during the period.',
-  ],
-  tables: (ctx) => {
-    const accounts = ctx.index
-      .find({ subcategory: 'Employee Costs' })
-      .filter((a) => a.closing !== 0 || a.prior !== 0)
-      .sort((a, b) => (a.account_number ?? 0) - (b.account_number ?? 0));
-    const rows = accounts.map((a) =>
-      linkedRow(ctx, a.name, { subcategory: 'Employee Costs', nameMatches: new RegExp(`^${escape(a.name)}$`, 'i') }, { indent: 1, key: `emp:${a.name}`, flow: true }),
-    );
-    return [
-      {
-        code: 'EMPLOYEE.ANALYSIS',
-        title: 'Employee costs',
-        columns: columns(ctx),
-        rows: [
-          ...rows,
-          totalRow(ctx, 'Total employee costs', rows, 'Sum of the employee cost accounts', 'subtotal'),
-          manualRow(ctx, 'Average number of employees during the year', 1),
-        ],
-      },
-    ];
-  },
-};
-
 const OPERATING_EXPENSES: DisclosureDefinition = {
   code: 'DISC.OPERATINGEXPENSES',
   title: 'Operating expenses',
@@ -1221,6 +1193,335 @@ function escape(text: string): string {
   return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
+// ── payroll: employee costs, directors, key management, operating profit ───
+
+/**
+ * Payroll figures for a year as the notes use them: present only where the seal
+ * carries that year's payroll and the ledger's employee costs can hold it (a
+ * company whose wages post outside Employee Costs cannot have its note split by
+ * payroll — the analysis would not add up to the statement line).
+ */
+function payrollYears(ctx: BuildContext): { current: PayrollYear | null; prior: PayrollYear | null } {
+  const p = ctx.index.payroll;
+  const ledger = (basis: 'period' | 'priorPeriod') => ctx.index.total({ subcategory: 'Employee Costs' }, basis).amount;
+  const fits = (year: PayrollYear | null | undefined, basis: 'period' | 'priorPeriod') =>
+    year && year.payrollCost > 0 && ledger(basis) + 0.5 >= year.payrollCost ? year : null;
+  return {
+    current: fits(p?.current, 'period'),
+    prior: ctx.withComparatives && ctx.index.hasPriorFlows ? fits(p?.prior, 'priorPeriod') : null,
+  };
+}
+
+/** A figure taken from payroll, traceable to the payslips it summarises. */
+function payrollCell(value: number | null, year: PayrollYear | null, what: string): Cell {
+  if (value == null || !year) return { value: null, origin: 'linked', format: MONEY };
+  return {
+    value: round(value),
+    origin: 'linked',
+    format: MONEY,
+    source: { basis: 'activity', accounts: [{ name: `${what}: ${year.payslips} payslips, ${year.from} to ${year.to}`, amount: round(value) }] },
+  };
+}
+
+const COUNT: CellFormat = { align: 'right', numberFormat: 'number', decimals: 0 };
+
+function countRow(ctx: BuildContext, text: string, now: number | null, then: number | null): DisclosureRow {
+  const cell = (v: number | null): Cell => (v == null ? { value: null, origin: 'manual', format: COUNT } : { value: v, origin: 'linked', format: COUNT });
+  return { key: text, cells: [label(text), cell(now), ...(ctx.withComparatives ? [cell(then)] : [])] };
+}
+
+const EMPLOYEE_COSTS: DisclosureDefinition = {
+  code: 'DISC.EMPLOYEE',
+  title: 'Employee costs',
+  applies: (ctx) => ctx.index.any({ subcategory: 'Employee Costs' }),
+  reason: () => 'The company incurred employee costs.',
+  narrative: () => [
+    'Employee costs comprise salaries, wages and the related statutory and benefit contributions recognised during the period.',
+  ],
+  tables: (ctx) => {
+    const { current, prior } = payrollYears(ctx);
+    const p = ctx.index.payroll;
+    const headcount = [
+      countRow(ctx, 'Average number of employees during the year', p?.current?.employees.average ?? null, p?.prior?.employees.average ?? null),
+      ...(p?.current ? [countRow(ctx, 'Number of employees at year end', p.current.employees.yearEnd, p.prior?.employees.yearEnd ?? null)] : []),
+    ];
+
+    if (!current) {
+      // No payroll the ledger can hold: one row per employee cost account.
+      const accounts = ctx.index
+        .find({ subcategory: 'Employee Costs' })
+        .filter((a) => a.closing !== 0 || a.prior !== 0)
+        .sort((a, b) => (a.account_number ?? 0) - (b.account_number ?? 0));
+      const rows = accounts.map((a) =>
+        linkedRow(ctx, a.name, { subcategory: 'Employee Costs', nameMatches: new RegExp(`^${escape(a.name)}$`, 'i') }, { indent: 1, key: `emp:${a.name}`, flow: true }),
+      );
+      return [{
+        code: 'EMPLOYEE.ANALYSIS',
+        title: 'Employee costs',
+        columns: columns(ctx),
+        rows: [...rows, totalRow(ctx, 'Total employee costs', rows, 'Sum of the employee cost accounts', 'subtotal'), ...headcount],
+      }];
+    }
+
+    // By nature, from payroll; what the ledger holds beyond payroll is other employee costs.
+    const natures: Array<[string, (y: PayrollYear) => number]> = [
+      ['Salaries and wages', (y) => y.earnings.salaries + y.earnings.overtime + y.earnings.commission + y.earnings.other],
+      ['Bonuses', (y) => y.earnings.bonuses],
+      ['Leave pay', (y) => y.earnings.leavePay],
+      ['Allowances', (y) => y.earnings.allowances],
+      ['Unemployment Insurance Fund (employer)', (y) => y.employer.uif],
+      ['Skills development levy', (y) => y.employer.sdl],
+      ['Other employer contributions', (y) => y.employer.other],
+    ];
+    const rows: DisclosureRow[] = [];
+    for (const [text, of] of natures) {
+      const now = of(current);
+      const then = prior ? of(prior) : null;
+      if (Math.abs(now) < 0.005 && Math.abs(then ?? 0) < 0.005) continue;
+      rows.push({
+        key: `emp:${text}`,
+        cells: [label(text, { indent: 1 }), payrollCell(now, current, text), ...(ctx.withComparatives ? [payrollCell(then, prior, text)] : [])],
+      });
+    }
+    const ledgerNow = ctx.index.total({ subcategory: 'Employee Costs' }, 'period');
+    const ledgerThen = ctx.withComparatives && ctx.index.hasPriorFlows ? ctx.index.total({ subcategory: 'Employee Costs' }, 'priorPeriod') : null;
+    const otherNow = round(ledgerNow.amount - current.payrollCost);
+    const otherThen = ledgerThen ? round(ledgerThen.amount - (prior?.payrollCost ?? 0)) : null;
+    if (Math.abs(otherNow) >= 0.005 || Math.abs(otherThen ?? 0) >= 0.005) {
+      const cell = (v: number | null, source?: CellSource): Cell => ({ value: v, origin: 'linked', format: MONEY, ...(source ? { source } : {}) });
+      rows.push({
+        key: 'emp:Other employee costs',
+        cells: [
+          label('Other employee costs', { indent: 1 }),
+          cell(otherNow, ledgerNow.source),
+          ...(ctx.withComparatives ? [cell(otherThen, ledgerThen?.source)] : []),
+        ],
+      });
+    }
+    const comparativeNotAnalysed = ctx.withComparatives && !prior && (ledgerThen?.amount ?? 0) !== 0;
+    return [{
+      code: 'EMPLOYEE.ANALYSIS',
+      title: 'Employee costs',
+      columns: columns(ctx),
+      rows: [...rows, totalRow(ctx, 'Total employee costs', rows, 'Sum of the employee costs above', 'subtotal'), ...headcount],
+      ...(comparativeNotAnalysed ? { footnote: 'Comparative employee costs are not analysed by nature.' } : {}),
+    }];
+  },
+};
+
+/** The directors paid through payroll in either year. */
+function directorsOf(ctx: BuildContext): { current: PayrollYear | null; prior: PayrollYear | null } {
+  const p = ctx.index.payroll;
+  return {
+    current: p?.current?.directors.length ? p.current : null,
+    prior: ctx.withComparatives && p?.prior?.directors.length ? p.prior : null,
+  };
+}
+
+/**
+ * Directors' emoluments (Companies Act 71 of 2008, s30(4)–(6)): each director's
+ * remuneration by kind, from payroll, for each year. Fees paid to non-executive
+ * directors outside payroll are the preparer's row to complete.
+ */
+const DIRECTORS_EMOLUMENTS: DisclosureDefinition = {
+  code: 'DISC.DIRECTORS',
+  title: "Directors' emoluments",
+  applies: (ctx) => {
+    const d = directorsOf(ctx);
+    return !!(d.current || d.prior);
+  },
+  reason: () => 'Directors were remunerated through payroll (Companies Act s30(4)).',
+  narrative: () => [
+    'The emoluments paid to directors for services rendered as directors and in connection with the affairs of the company are set out below.',
+  ],
+  tables: (ctx) => {
+    const d = directorsOf(ctx);
+    const kinds: Array<[string, (x: PayrollYear['directors'][number]) => number]> = [
+      ['Salary', (x) => x.salary],
+      ['Bonuses and performance payments', (x) => x.bonuses],
+      ['Allowances', (x) => x.allowances],
+      ['Benefits', (x) => x.benefits],
+    ];
+    const table = (year: PayrollYear, yearLabel: string, code: string): GeneratedTable => {
+      const used = kinds.filter(([, of]) => year.directors.some((x) => Math.abs(of(x)) >= 0.005));
+      const rows: DisclosureRow[] = year.directors.map((x) => ({
+        key: `${code}:${x.employeeId}`,
+        cells: [label(x.name), ...used.map(([text, of]) => payrollCell(of(x), year, `${x.name}, ${text.toLowerCase()}`)), payrollCell(x.total, year, `${x.name}, total`)],
+      }));
+      const keys = rows.map((r) => r.key!);
+      const totals: Cell[] = [...used.map(([, of]) => year.directors.reduce((s, x) => s + of(x), 0)), year.directors.reduce((s, x) => s + x.total, 0)]
+        .map((v) => ({ value: round(v), origin: 'calculated' as const, formula: 'Sum of the directors above', sums: keys, format: { ...MONEY, bold: true, borderTop: true, doubleBottom: true } }));
+      const blank = (): Cell => ({ value: null, origin: 'manual', format: MONEY });
+      return {
+        code,
+        title: `Directors' emoluments - ${yearLabel}`,
+        columns: [
+          { label: 'Director', align: 'left', width: 180 },
+          ...used.map(([text]) => ({ label: text, align: 'right' as const, width: 90 })),
+          { label: 'Total', align: 'right', width: 90 },
+        ],
+        rows: [
+          ...rows,
+          { key: `${code}:non-executive`, cells: [label("Non-executive directors' fees"), ...used.map(blank), blank()] },
+          { key: `${code}:total`, kind: 'total', cells: [label('Total', { bold: true }), ...totals] },
+        ],
+      };
+    };
+    const tables: GeneratedTable[] = [];
+    if (d.current) tables.push(table(d.current, ctx.currentLabel, 'DIRECTORS.CURRENT'));
+    if (d.prior) tables.push(table(d.prior, ctx.priorLabel, 'DIRECTORS.PRIOR'));
+    return tables;
+  },
+};
+
+/**
+ * Related parties: the framework's relationships table, and key management
+ * personnel compensation (IFRS for SMEs s33.7, IAS 24.17) with the directors'
+ * short-term benefits from payroll. The other categories are the preparer's.
+ */
+const RELATED_PARTIES: DisclosureDefinition = {
+  code: 'DISC.RELATED',
+  title: 'Related parties',
+  applies: (ctx) => {
+    const d = directorsOf(ctx);
+    return !!(d.current || d.prior);
+  },
+  reason: () => 'The directors are key management personnel, remunerated through payroll.',
+  narrative: () => [
+    'Related party relationships exist between the company and its directors, their close family members and entities they control or significantly influence. Transactions with related parties are entered into in the ordinary course of business.',
+    'The directors are the key management personnel of the company. Their compensation is set out below and in the directors’ emoluments note.',
+  ],
+  tables: (ctx) => {
+    const d = directorsOf(ctx);
+    const short = (y: PayrollYear | null) => (y ? y.directors.reduce((s, x) => s + x.total, 0) : null);
+    const blankRow = (text: string): DisclosureRow => manualRow(ctx, text);
+    const benefits: DisclosureRow = {
+      key: 'Short-term employee benefits',
+      cells: [
+        label('Short-term employee benefits'),
+        payrollCell(short(d.current), d.current, "Directors' emoluments"),
+        ...(ctx.withComparatives ? [payrollCell(short(d.prior), d.prior, "Directors' emoluments")] : []),
+      ],
+    };
+    const kmpRows = [benefits, blankRow('Post-employment benefits'), blankRow('Other long-term benefits'), blankRow('Termination benefits'), blankRow('Share-based payment')];
+    const relationship = (text: string): DisclosureRow => ({
+      key: text,
+      cells: [label(text), { value: null, origin: 'manual', format: MONEY }, { value: null, origin: 'manual', format: MONEY }],
+    });
+    return [
+      {
+        code: 'DISC.RELATED.TBL',
+        title: 'Related party transactions and balances',
+        columns: [
+          { label: 'Related party / nature', align: 'left', width: 240 },
+          { label: 'Transactions for the year', align: 'right', width: 120 },
+          { label: 'Outstanding balance', align: 'right', width: 120 },
+        ],
+        rows: ['Parent / holding company', 'Subsidiaries and fellow subsidiaries', 'Associates and joint ventures', 'Key management personnel', 'Other related parties'].map(relationship),
+      },
+      {
+        code: 'DISC.RELATED.TBL.2',
+        title: 'Key management personnel compensation',
+        columns: columns(ctx),
+        rows: [...kmpRows, totalRow(ctx, 'Total', kmpRows, 'Sum of the compensation above')],
+      },
+    ];
+  },
+};
+
+/** Expense accounts whose movement a reader of the income statement is told about. */
+const DEPRECIATION = /depreciation|amorti[sz]ation/i;
+const AUDIT_FEES = /audit/i;
+const LEASES = /\b(rent|rental|lease)\b/i;
+
+/**
+ * "Operating profit for the year is stated after accounting for": the items a
+ * published set calls out — employee costs and the directors' share of them,
+ * depreciation and amortisation, auditor's remuneration, lease charges.
+ */
+const OPERATING_PROFIT: DisclosureDefinition = {
+  code: 'DISC.OPERATINGPROFIT',
+  title: 'Operating profit',
+  applies: (ctx) =>
+    ctx.index.any({ subcategory: 'Employee Costs' }) ||
+    ctx.index.find({ type: 'Expense' }).some((a) => (a.activity !== 0 || a.priorActivity !== 0) && (DEPRECIATION.test(a.name) || String(a.account_role) === 'depreciation_expense')),
+  reason: () => 'A published set states the items operating profit is stated after.',
+  narrative: () => ['Operating profit for the year is stated after accounting for the following:'],
+  tables: (ctx) => {
+    const rows: DisclosureRow[] = [];
+    const expenses = ctx.index.find({ type: 'Expense' }).filter((a) => a.activity !== 0 || a.priorActivity !== 0);
+    const group = (text: string, pick: (a: AccountRow) => boolean, key: string, manualWhenNone = false) => {
+      const accounts = expenses.filter(pick);
+      if (!accounts.length) {
+        if (manualWhenNone) rows.push(manualRow(ctx, text));
+        return;
+      }
+      rows.push(linkedRow(ctx, text, { type: 'Expense', nameMatches: new RegExp(`^(${accounts.map((a) => escape(a.name)).join('|')})$`, 'i') }, { key, flow: true }));
+    };
+    if (ctx.index.any({ subcategory: 'Employee Costs' })) {
+      rows.push(linkedRow(ctx, 'Employee costs', { subcategory: 'Employee Costs' }, { key: 'op:employee', flow: true }));
+      const d = directorsOf(ctx);
+      if (d.current || d.prior) {
+        const total = (y: PayrollYear | null) => (y ? y.directors.reduce((s, x) => s + x.total, 0) : null);
+        rows.push({
+          key: 'op:directors',
+          cells: [
+            label("Directors' emoluments", { indent: 1 }),
+            payrollCell(total(d.current), d.current, "Directors' emoluments"),
+            ...(ctx.withComparatives ? [payrollCell(total(d.prior), d.prior, "Directors' emoluments")] : []),
+          ],
+        });
+      }
+    }
+    group('Depreciation and amortisation', (a) => DEPRECIATION.test(a.name) || String(a.account_role) === 'depreciation_expense', 'op:depreciation');
+    group("Auditor's remuneration", (a) => AUDIT_FEES.test(a.name), 'op:audit', true);
+    group('Lease rentals', (a) => LEASES.test(a.name) && !DEPRECIATION.test(a.name), 'op:leases');
+    return [{ code: 'OPERATINGPROFIT.ITEMS', title: 'Operating profit', columns: columns(ctx), rows }];
+  },
+};
+
+/**
+ * Statutory payables — the statement of financial position's own line for
+ * amounts owed to SARS and the Unemployment Insurance Fund (PAYE, UIF, SDL).
+ */
+const STATUTORY_PAYABLES: DisclosureDefinition = {
+  code: 'DISC.STATUTORYPAYABLES',
+  title: 'Statutory payables',
+  applies: (ctx) => ctx.index.any({ subcategory: 'Statutory Payables' }),
+  reason: () => 'The company owes statutory amounts to SARS or the Unemployment Insurance Fund.',
+  narrative: () => ['Amounts owed to the South African Revenue Service and the Unemployment Insurance Fund at the reporting date.'],
+  tables: (ctx) => {
+    const accounts = ctx.index
+      .find({ subcategory: 'Statutory Payables' })
+      .filter((a) => a.closing !== 0 || a.prior !== 0)
+      .sort((a, b) => (a.account_number ?? 0) - (b.account_number ?? 0));
+    const rows = accounts.map((a) =>
+      linkedRow(ctx, a.name, { subcategory: 'Statutory Payables', nameMatches: new RegExp(`^${escape(a.name)}$`, 'i') }, { indent: 1, key: `stat:${a.name}` }),
+    );
+    return [{
+      code: 'STATUTORYPAYABLES.ANALYSIS',
+      title: 'Statutory payables',
+      columns: columns(ctx),
+      rows: [...rows, totalRow(ctx, 'Total statutory payables', rows, 'Sum of the statutory payable accounts')],
+    }];
+  },
+};
+
+/** Where payroll recorded more employee costs than the ledger's Employee Costs accounts hold. */
+export function payrollLedgerDifferences(facts: FinancialFacts | null | undefined): Array<{ year: 'current' | 'comparative'; payroll: number; ledger: number }> {
+  const index = new AccountIndex(facts);
+  const out: Array<{ year: 'current' | 'comparative'; payroll: number; ledger: number }> = [];
+  const check = (year: PayrollYear | null | undefined, basis: 'period' | 'priorPeriod', which: 'current' | 'comparative') => {
+    if (!year || year.payrollCost <= 0) return;
+    if (basis === 'priorPeriod' && !index.hasPriorFlows) return;
+    const ledger = round(index.total({ subcategory: 'Employee Costs' }, basis).amount);
+    if (ledger + 0.5 < year.payrollCost) out.push({ year: which, payroll: year.payrollCost, ledger });
+  };
+  check(index.payroll?.current, 'period', 'current');
+  check(index.payroll?.prior, 'priorPeriod', 'comparative');
+  return out;
+}
+
 export const DISCLOSURE_DEFINITIONS: DisclosureDefinition[] = [
   GENERAL_INFORMATION,
   PPE,
@@ -1231,15 +1532,19 @@ export const DISCLOSURE_DEFINITIONS: DisclosureDefinition[] = [
   EQUITY,
   BORROWINGS,
   PAYABLES,
+  STATUTORY_PAYABLES,
   PROVISIONS,
   REVENUE,
   OTHER_INCOME,
   COST_OF_SALES,
   EMPLOYEE_COSTS,
+  DIRECTORS_EMOLUMENTS,
   OPERATING_EXPENSES,
+  OPERATING_PROFIT,
   FINANCE_COSTS,
   TAXATION,
   CASH_GENERATED,
+  RELATED_PARTIES,
   EVENTS_AFTER_REPORTING,
 ];
 

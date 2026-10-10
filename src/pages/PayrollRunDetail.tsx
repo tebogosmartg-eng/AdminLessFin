@@ -45,6 +45,7 @@ import PayrollRunRulesPanel from '../components/payroll/PayrollRunRulesPanel';
 import { PayComponentEditor } from '../components/payroll/PayComponentEditor';
 import TimesheetPanel from '../components/payroll/TimesheetPanel';
 import BankPaymentFileCard from '../components/payroll/BankPaymentFileCard';
+import PostingPreview from '../components/payroll/PostingPreview';
 import PayrollCommandCentre from '../components/payroll/PayrollCommandCentre';
 import { usePayrollControls } from '../components/payroll/usePayrollControls';
 import type { RunWarning } from '../lib/payrollRulesEngine/runWarnings';
@@ -135,6 +136,7 @@ const PayrollRunDetail = () => {
   const [wageAccountId, setWageAccountId] = useState('');
   const [bankAccountId, setBankAccountId] = useState('');
   const [liabilityAccountId, setLiabilityAccountId] = useState('');
+  const [postingReady, setPostingReady] = useState(false);
   const [isPayslipDialogOpen, setIsPayslipDialogOpen] = useState(false);
   const [selectedPayslipId, setSelectedPayslipId] = useState<string | null>(null);
   const [isPayslipDetailOpen, setIsPayslipDetailOpen] = useState(false);
@@ -852,37 +854,19 @@ const PayrollRunDetail = () => {
           <Card>
             <CardHeader>
               <CardTitle>Step 4: Process Payroll & Post Journal</CardTitle>
-              <CardDescription>Select GL accounts and finalize this payroll run.</CardDescription>
+              <CardDescription>Check the journal and finalize this payroll run.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="grid md:grid-cols-3 gap-4">
-                <Select value={wageAccountId} onValueChange={setWageAccountId}>
-                  <SelectTrigger><SelectValue placeholder="Wages/Salary Expense Account…" /></SelectTrigger>
-                  <SelectContent>{expenseAccounts?.map((a) => <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>)}</SelectContent>
-                </Select>
-                <Select value={bankAccountId} onValueChange={setBankAccountId}>
-                  <SelectTrigger><SelectValue placeholder="Bank/Cash Account…" /></SelectTrigger>
-                  <SelectContent>{assetAccounts?.map((a) => <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>)}</SelectContent>
-                </Select>
-                <Select value={liabilityAccountId} onValueChange={setLiabilityAccountId} disabled={totalDeductions === 0}>
-                  <SelectTrigger><SelectValue placeholder="Payroll Liability Account…" /></SelectTrigger>
-                  <SelectContent>{liabilityAccounts?.map((a) => <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>)}</SelectContent>
-                </Select>
-              </div>
-              <Alert>
-                <AlertCircle className="h-4 w-4" />
-                <AlertTitle>Journal Entry Preview</AlertTitle>
-                <AlertDescription>
-                  <p>Debit <strong>{accounts?.find((a) => a.id === wageAccountId)?.name || 'Wages Expense'}</strong>: {formatCurrency(totalEarnings)}</p>
-                  <p>Credit <strong>{accounts?.find((a) => a.id === bankAccountId)?.name || 'Bank Account'}</strong>: {formatCurrency(totalNetPay)}</p>
-                  {totalDeductions > 0 && (
-                    <p>Credit <strong>{accounts?.find((a) => a.id === liabilityAccountId)?.name || 'Payroll Liabilities'}</strong>: {formatCurrency(totalDeductions)}</p>
-                  )}
-                </AlertDescription>
-              </Alert>
+              <PostingPreview
+                runId={id!}
+                value={{ wageAccountId, bankAccountId, liabilityAccountId }}
+                onChange={(v) => { setWageAccountId(v.wageAccountId); setBankAccountId(v.bankAccountId); setLiabilityAccountId(v.liabilityAccountId); }}
+                onReady={setPostingReady}
+              />
               <Button
                 onClick={() => finalizeRunMutation.mutate()}
-                disabled={!wageAccountId || !bankAccountId || (totalDeductions > 0 && !liabilityAccountId) || finalizeRunMutation.isPending}
+                disabled={!postingReady || finalizeRunMutation.isPending}
+                data-testid="finalize-run"
               >
                 {finalizeRunMutation.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CheckCircle className="mr-2 h-4 w-4" />}
                 Process Payroll & Generate Outputs

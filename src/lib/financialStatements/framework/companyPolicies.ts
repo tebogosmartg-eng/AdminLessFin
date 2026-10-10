@@ -145,12 +145,21 @@ const COMPOSERS: Record<string, Composer> = {
 
   'POL.PROVISIONS': (index) => (has(index, { subcategory: 'Provisions' }) ? { body: '' } : null),
 
-  'POL.EMPLOYEE': (index) =>
-    has(index, { subcategory: 'Employee Costs' })
-      ? {
-          body: 'The cost of short-term employee benefits (those payable within twelve months after the service is rendered, such as paid vacation leave, sick leave and bonuses) is recognised in the period in which the service is rendered and is not discounted.',
-        }
-      : null,
+  'POL.EMPLOYEE': (index) => {
+    if (!has(index, { subcategory: 'Employee Costs' })) return null;
+    const payroll = index.payroll?.current ?? null;
+    const parts = [
+      'Short-term employee benefits: The cost of short-term employee benefits (those payable within twelve months after the service is rendered, such as salaries, wages, paid vacation leave, sick leave, bonuses and non-monetary benefits) is recognised as an expense in the period in which the service is rendered and is not discounted.',
+      'The expected cost of compensated absences is recognised as the employees render services that increase their entitlement or, in the case of non-accumulating absences, when the absence occurs.',
+    ];
+    if (payroll && payroll.earnings.bonuses > 0) {
+      parts.push('The expected cost of profit-sharing and bonus payments is recognised when there is a legal or constructive obligation to make such payments as a result of past performance.');
+    }
+    if (payroll && (payroll.employer.uif > 0 || payroll.employer.sdl > 0)) {
+      parts.push("Statutory contributions: The employer's contributions to the Unemployment Insurance Fund and the skills development levy are recognised as an expense as the related remuneration is earned.");
+    }
+    return { body: parts.join('\n\n') };
+  },
 
   'POL.TAX': (index) =>
     has(index, { category: 'Taxation' })

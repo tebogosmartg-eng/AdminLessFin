@@ -23,6 +23,11 @@ import {
   handleDeclarationMethod,
 } from './declarations.ts'
 import {
+  ACCOUNT_METHODS,
+  handleAccountMethod,
+  previewRunPosting,
+} from './accounts.ts'
+import {
   TIME_METHODS,
   handleTimeMethod,
   consumeWorkHours,
@@ -1251,14 +1256,6 @@ serve(withEnterprisePlatform('payroll', 'tenant', async (req, _ctx) => {
             recovery: 'Reload the payroll run page and retry.',
           });
         }
-        if (!wageAccountId || !bankAccountId) {
-          throw new PayrollDomainError({
-            stage: 'validation',
-            code: 'MISSING_GL_ACCOUNTS',
-            message: 'Select wage and bank accounts.',
-            recovery: 'Choose all required GL accounts before processing.',
-          });
-        }
 
         const { data: runToFinalize, error: runToFinalizeError } = await supabaseAdmin
           .from('payroll_runs')
@@ -1306,14 +1303,9 @@ serve(withEnterprisePlatform('payroll', 'tenant', async (req, _ctx) => {
         const totalDeductions = payslipsToFinalize.reduce((sum, p) => sum + p.total_deductions, 0);
         const totalEmployerContributions = sumSnapshotEmployerContributions(payslipsToFinalize);
 
-        if ((totalDeductions > 0 || totalEmployerContributions > 0) && !liabilityAccountId) {
-          throw new PayrollDomainError({
-            stage: 'validation',
-            code: 'MISSING_LIABILITY_ACCOUNT',
-            message: 'Select a payroll liability account for deductions.',
-            recovery: 'Choose a liability account or remove deductions.',
-          });
-        }
+        // The accounts chosen here, or the company's payroll accounts (Settings →
+        // Payroll): the preview is the posting, so a missing account is named here.
+        await previewRunPosting(supabaseAdmin, company_id, runId, { wageAccountId, bankAccountId, liabilityAccountId }, PayrollDomainError);
 
         // Phase 3D: posting goes exclusively through finalize_payroll_run_atomic →
         // posting_engine_submit. No direct journal_entries inserts remain here.
@@ -1322,8 +1314,8 @@ serve(withEnterprisePlatform('payroll', 'tenant', async (req, _ctx) => {
           {
             p_company_id: company_id,
             p_run_id: runId,
-            p_wage_account_id: wageAccountId,
-            p_bank_account_id: bankAccountId,
+            p_wage_account_id: wageAccountId || null,
+            p_bank_account_id: bankAccountId || null,
             p_liability_account_id: liabilityAccountId || null,
             p_actor_user_id: user.id,
             p_require_approval: true,
@@ -1860,6 +1852,13 @@ serve(withEnterprisePlatform('payroll', 'tenant', async (req, _ctx) => {
       }
 
       default:
+        if (ACCOUNT_METHODS.has(method)) {
+          data = await handleAccountMethod(method, {
+            supabaseAdmin, company_id, user, body, PayrollDomainError, logPayrollAudit,
+          });
+          error = null;
+          break;
+        }
         if (DECLARATION_METHODS.has(method)) {
           data = await handleDeclarationMethod(method, {
             supabaseAdmin, company_id, user, body, PayrollDomainError, logPayrollAudit,

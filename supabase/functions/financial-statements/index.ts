@@ -33,6 +33,7 @@ import {
   runStatementEngine,
 } from "../_shared/efsStatementEngine/index.ts";
 import { buildCanonicalFinancialAggregation } from "../_shared/canonicalFinancialAggregation.ts";
+import { summarisePayroll } from "../_shared/efsStatementEngine/payrollFacts.ts";
 import {
   resolveStructureAttachmentPoint,
   appendReviewHistory,
@@ -2317,6 +2318,51 @@ serve(withEnterprisePlatform("financial-statements", "tenant", async (req, _ctx)
           }));
         }
 
+        // Payroll for each year (ADR-0009): what the ledger cannot say — employee
+        // costs by nature, the average number of employees, each director's
+        // emoluments. Payslips of runs in effect, by pay date, the date payroll
+        // journals post on.
+        {
+          const from = dataset.period?.prior_start_date || start_date;
+          const { data: runs, error: runErr } = await admin
+            .from("payroll_runs")
+            .select("id, status, pay_date, output_metadata")
+            .eq("company_id", company_id)
+            .in("status", ["finalized", "paid"])
+            .gte("pay_date", from)
+            .lte("pay_date", end_date);
+          if (runErr) throw runErr;
+          const runIds = (runs || []).map((r) => r.id);
+          const payslips = [];
+          const PAGE = 1000;
+          for (let i = 0; i < runIds.length; i += 50) {
+            const chunk = runIds.slice(i, i + 50);
+            for (let offset = 0; ; offset += PAGE) {
+              const { data: slips, error: slipErr } = await admin
+                .from("payslips")
+                .select("id, employee_id, payroll_run_id, total_earnings, payslip_items(type, irp5_code, component_code, description, amount)")
+                .eq("company_id", company_id)
+                .in("payroll_run_id", chunk)
+                .order("id")
+                .range(offset, offset + PAGE - 1);
+              if (slipErr) throw slipErr;
+              for (const p of slips || []) payslips.push({ ...p, items: p.payslip_items || [] });
+              if (!slips || slips.length < PAGE) break;
+            }
+          }
+          const { data: people, error: peopleErr } = await admin
+            .from("employees")
+            .select("id, first_name, last_name, employment_type, nature_of_person, start_date, end_date")
+            .eq("company_id", company_id);
+          if (peopleErr) throw peopleErr;
+          dataset.payroll = summarisePayroll(
+            { ...dataset.period, start_date, end_date, prior_as_of: dataset.period?.prior_as_of || prior_as_of },
+            runs || [],
+            payslips,
+            people || [],
+          );
+        }
+
         // Seal Canonical Financial Aggregation once — Statement Engine must consume, not recalculate.
         {
           const { data: coaMeta } = await admin
@@ -2728,6 +2774,7 @@ serve(withEnterprisePlatform("financial-statements", "tenant", async (req, _ctx)
           gross_movements: facts.gross_movements ?? null,
           prior_gross_movements: facts.prior_gross_movements ?? null,
           fixed_asset_register: facts.fixed_asset_register ?? null,
+          payroll: facts.payroll ?? null,
           source_rpc_refs: facts.source_rpc_refs,
           version_status: requested.status,
           // The version whose seal these facts are, where it is not the one asked for.
