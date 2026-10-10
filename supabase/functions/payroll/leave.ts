@@ -14,6 +14,7 @@ import {
 import { leaveEmployee, loadLeaveRows as loadEntries, toLeaveEntry } from '../_shared/leaveRegister.ts'
 
 import { isRunInEffect, isRunReversed } from '../_shared/payrollRunState.ts'
+import { loadPayrollPolicy } from './time.ts'
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 const round2 = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100;
 
@@ -236,7 +237,9 @@ export async function handleLeaveMethod(method, ctx) {
         if (type.accrual !== 'none') {
           const rows = await loadEntries(admin, company_id, [employee.id]);
           const position = leaveBalance(type.accrual, leaveEmployee(employee), rows.filter((r) => r.leave_type_id === type.id).map(toLeaveEntry), end);
-          if (position.available - days < -0.001) {
+          // A company may allow leave beyond the balance (e.g. granted in advance).
+          const { allowNegativeLeave } = await loadPayrollPolicy(admin, company_id);
+          if (position.available - days < -0.001 && !allowNegativeLeave) {
             fail('LEAVE_BALANCE_EXCEEDED',
               `${type.name}: ${days} day${days === 1 ? '' : 's'} requested, ${Math.max(0, position.available)} available by ${end}.`,
               'Record the extra days as unpaid leave, or record an adjustment with the reason (e.g. leave granted in advance).', 409,

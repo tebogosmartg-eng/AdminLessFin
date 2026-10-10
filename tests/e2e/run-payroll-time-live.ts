@@ -164,6 +164,68 @@ async function main() {
   const { data: released } = await sb.from('ewm_payroll_input_facts').select('status, payroll_run_id').eq('time_entry_id', entry.id).single();
   check('Reversing the run releases the hours', released?.status === 'ready' && released?.payroll_run_id === null, released);
 
+  // ── Attendance register, company pay rules, copy previous period ──
+  type Policies = { overtimeMultiplier: number; sundayMultiplier: number; sundayMultiplierRegular: number; publicHolidayMultiplier: number; minimumShiftHours: number; allowNegativeLeave: boolean; belowBcea: string[] };
+  const policiesBefore = await payroll<Policies>({ method: 'GET_PAYROLL_POLICIES' });
+  try {
+    const custom = await payroll<Policies>({ method: 'UPDATE_PAYROLL_POLICIES', ...policiesBefore, overtimeMultiplier: 2, sundayMultiplier: 1.5, allowNegativeLeave: true });
+    check('Company pay rules: below-BCEA choices are saved and shown as advice', custom.overtimeMultiplier === 2 && custom.belowBcea.some((a) => /Sunday/.test(a)), custom.belowBcea);
+
+    // Leave beyond the balance is allowed while the company allows it.
+    const types = await payroll<Array<{ id: string; code: string }>>({ method: 'GET_LEAVE_TYPES' });
+    const annualId = types.find((t) => t.code === 'annual')!.id;
+    const advance = await refused(payroll({ method: 'RECORD_LEAVE', employeeId: daily.id, leaveTypeId: annualId, entryType: 'taken', startDate: '2026-12-28', endDate: '2026-12-31' }));
+    check('Leave beyond the balance is recorded when the company allows negative balances', advance === '', advance.slice(0, 120));
+
+    await payroll({
+      method: 'SAVE_ATTENDANCE', entries: [
+        { employeeId: hourly.id, date: '2026-12-21', hours: 10 },
+        { employeeId: hourly.id, date: '2026-12-22', hours: 3 },
+        { employeeId: hourly.id, date: '2026-12-24', hours: 8 },
+        { employeeId: hourly.id, date: '2026-12-25', hours: 6 },
+        { employeeId: hourly.id, date: '2026-12-27', hours: 4 },
+      ],
+    });
+    const register = await payroll<{ entries: Array<{ employee_id: string; work_date: string; hours: number }>; publicHolidays: string[] }>({ method: 'GET_ATTENDANCE', from: '2026-12-21', to: '2026-12-27' });
+    check('The register holds the week; Christmas Day is marked a public holiday',
+      register.entries.filter((e) => e.employee_id === hourly.id).length === 5 && register.publicHolidays.includes('2026-12-25'));
+    const outside = await refused(payroll({ method: 'SAVE_ATTENDANCE', entries: [{ employeeId: hourly.id, date: '2027-01-04', hours: 8 }] }));
+    check('Hours after the employee\'s end date are refused', /ATTENDANCE_OUTSIDE_EMPLOYMENT/.test(outside));
+
+    const run2 = await payroll<{ id: string }>({ method: 'CREATE_RUN', additional_run: true, runData: { pay_period_start: '2026-12-21', pay_period_end: '2026-12-27', pay_date: '2026-12-27', pay_frequency: 'weekly' } });
+    await payroll({ method: 'IMPORT_ATTENDANCE', runId: run2.id });
+    const sheet2 = await payroll<{ rows: Array<{ employeeId: string; timesheet: Record<string, number> | null; source: string | null }> }>({ method: 'GET_TIMESHEET', runId: run2.id });
+    const t = sheet2.rows.find((r) => r.employeeId === hourly.id)!;
+    check('Filled from the register: 8+4(min shift)+8 ordinary, 2 overtime, 4 Sunday, 6 public holiday',
+      t.source === 'attendance' && t.timesheet?.ordinaryHours === 20 && t.timesheet?.overtimeHours === 2 && t.timesheet?.sundayHours === 4 && t.timesheet?.publicHolidayHours === 6, t.timesheet);
+    await payroll({ method: 'GENERATE_PAYSLIPS', runId: run2.id });
+    const d2 = await payroll<RunDetail>({ method: 'GET_RUN_DETAIL', runId: run2.id });
+    const p2 = d2.payslips.find((p) => p.employee_id === hourly.id)!;
+    const i2 = (await payroll<{ payslip_items: Item[] }>({ method: 'GET_PAYSLIP_DETAIL', payslipId: p2.id })).payslip_items;
+    check('The company rules apply: overtime 2 h × R50 × 2 = R200, Sunday 4 h × R50 × 1.5 = R300',
+      near(amount(i2, (i) => i.irp5_code === '3607'), 200) && near(amount(i2, (i) => /Sunday/.test(i.description)), 300), i2.map((i) => [i.description, i.amount]));
+    await payroll({ method: 'APPROVE_RUN', runId: run2.id });
+    await payroll({ method: 'FINALIZE_RUN', runId: run2.id, wageAccountId: wage.id, bankAccountId: bank.id, liabilityAccountId: liability.id });
+    const lockedDay = await refused(payroll({ method: 'SAVE_ATTENDANCE', entries: [{ employeeId: hourly.id, date: '2026-12-21', hours: 9 }] }));
+    check('Days paid by a finalised run are locked', /ATTENDANCE_PAID/.test(lockedDay));
+    const directAttendance = await sb.from('payroll_attendance').insert({ company_id: companyId, employee_id: hourly.id, work_date: '2026-12-23', hours: 12 }).select('id');
+    check('Attendance cannot be written through the API', !!directAttendance.error, directAttendance.error?.message);
+
+    // Copy the previous period into the next run.
+    const run3 = await payroll<{ id: string }>({ method: 'CREATE_RUN', additional_run: true, runData: { pay_period_start: '2026-12-28', pay_period_end: '2027-01-03', pay_date: '2027-01-03', pay_frequency: 'weekly' } });
+    const copy = await payroll<{ copied: number; from: { start: string } | null }>({ method: 'COPY_PREVIOUS_TIMESHEET', runId: run3.id });
+    const sheet3 = await payroll<{ rows: Array<{ employeeId: string; timesheet: Record<string, number> | null }> }>({ method: 'GET_TIMESHEET', runId: run3.id });
+    check('Copy previous period fills the next run from the last timesheet',
+      copy.from?.start === '2026-12-21' && copy.copied >= 1 && sheet3.rows.find((r) => r.employeeId === hourly.id)?.timesheet?.ordinaryHours === 20, copy);
+    await payroll({ method: 'DISCARD_RUN', runId: run3.id });
+
+    await payroll({ method: 'REVERSE_RUN', runId: run2.id, reason: 'Time live check: reverse the register run' });
+    const unlocked = await refused(payroll({ method: 'SAVE_ATTENDANCE', entries: [{ employeeId: hourly.id, date: '2026-12-21', hours: 9 }] }));
+    check('Reversing the run unlocks its days', unlocked === '', unlocked.slice(0, 120));
+  } finally {
+    await payroll({ method: 'UPDATE_PAYROLL_POLICIES', ...policiesBefore }).catch((e) => console.error('restore policies failed', e));
+  }
+
   console.log(failures ? `\n${failures} check(s) failed` : '\nAll checks passed');
   process.exit(failures ? 1 : 0);
 }

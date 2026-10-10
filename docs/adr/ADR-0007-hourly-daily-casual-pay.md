@@ -66,3 +66,20 @@ Payroll paid only salaries. Hourly, daily-paid and casual workers, overtime and 
 - **UIF across a month's weekly runs:** earlier weeks are not recalculated when a later week takes the month past 24 hours.
 - **BCEA leave for employees under 24 hours a month** (s6): leave still accrues for them.
 - **Tax directives** (Phase 6) and piecework.
+
+## Amendment (2026-10-10): attendance register, copy previous period, company pay rules
+
+- **Attendance register** (`payroll_attendance`, Payroll → Attendance):
+  - Hours are recorded per employee per day, at any time; a "Normal week" shortcut and a full-day tick for daily-paid staff speed this up.
+  - A run's timesheet is filled from the register:
+    - each day's hours up to the ordinary day are ordinary time, and the rest is overtime;
+    - Sunday and public holiday hours are kept separate;
+    - daily-paid days count as hours ÷ the ordinary day.
+  - Days in the period of everyone on a finalised run's timesheet lock. They unlock when the run is reversed or reopened.
+- **Minimum paid shift (BCEA s9A):** applied per day from the register, 4 hours by default, switchable to 0.
+- **Copy previous period:** fills the timesheet for employees without hours from the latest earlier run of the same frequency.
+- **Company pay rules** (`company_payroll_policies`):
+  - overtime, Sunday (normal and regular-Sunday) and public holiday multipliers, defaulting to the BCEA rates;
+  - the minimum shift;
+  - "allow leave beyond the balance".
+  Rules below the BCEA are saved and shown as advice; they are never refused. The National Minimum Wage and the hour limits remain warnings only.

@@ -19,6 +19,7 @@
  */
 
 import { nationalMinimumWageHourly } from '../sars/eti.ts';
+import { saPublicHolidays } from './periodEmployment.ts';
 
 export type PayBasis = 'salaried' | 'hourly' | 'daily';
 
@@ -53,6 +54,19 @@ export type TimePayLine = {
   irp5Code: string;
 };
 
+/**
+ * The company's pay rules for time. The defaults are the BCEA rates; an employer may set
+ * other multipliers (the BCEA rates are the legal minimum, shown as advice, never enforced).
+ */
+export type TimePolicy = {
+  overtimeMultiplier: number;
+  sundayMultiplier: number;
+  sundayMultiplierRegular: number;
+  publicHolidayMultiplier: number;
+  /** BCEA s9A: a shift shorter than this is paid as this many hours; 0 = off. */
+  minimumShiftHours: number;
+};
+
 export const OVERTIME_MULTIPLIER = 1.5;
 export const SUNDAY_MULTIPLIER = 2;
 export const SUNDAY_MULTIPLIER_ORDINARY_SUNDAY_WORKER = 1.5;
@@ -60,6 +74,37 @@ export const PUBLIC_HOLIDAY_MULTIPLIER = 2;
 export const MAX_ORDINARY_HOURS_PER_WEEK = 45;
 export const MAX_OVERTIME_HOURS_PER_WEEK = 10;
 export const UIF_MINIMUM_HOURS_PER_MONTH = 24;
+
+export const BCEA_TIME_POLICY: TimePolicy = {
+  overtimeMultiplier: OVERTIME_MULTIPLIER,
+  sundayMultiplier: SUNDAY_MULTIPLIER,
+  sundayMultiplierRegular: SUNDAY_MULTIPLIER_ORDINARY_SUNDAY_WORKER,
+  publicHolidayMultiplier: PUBLIC_HOLIDAY_MULTIPLIER,
+  minimumShiftHours: 4,
+};
+
+/** A stored policy row (or none) as the rules use it. */
+export function timePolicyFrom(row: Record<string, unknown> | null | undefined): TimePolicy {
+  const n = (v: unknown, fallback: number) => (v === null || v === undefined || !Number.isFinite(Number(v)) ? fallback : Number(v));
+  return {
+    overtimeMultiplier: n(row?.overtime_multiplier, OVERTIME_MULTIPLIER),
+    sundayMultiplier: n(row?.sunday_multiplier, SUNDAY_MULTIPLIER),
+    sundayMultiplierRegular: n(row?.sunday_multiplier_regular, SUNDAY_MULTIPLIER_ORDINARY_SUNDAY_WORKER),
+    publicHolidayMultiplier: n(row?.public_holiday_multiplier, PUBLIC_HOLIDAY_MULTIPLIER),
+    minimumShiftHours: n(row?.minimum_shift_hours, 4),
+  };
+}
+
+/** Where a company's rules fall below the BCEA (advice for the settings screen). */
+export function policyBelowBcea(policy: TimePolicy): string[] {
+  const out: string[] = [];
+  if (policy.overtimeMultiplier < OVERTIME_MULTIPLIER) out.push(`Overtime below ${OVERTIME_MULTIPLIER}× (BCEA s10)`);
+  if (policy.sundayMultiplier < SUNDAY_MULTIPLIER) out.push(`Sunday work below ${SUNDAY_MULTIPLIER}× (BCEA s16)`);
+  if (policy.sundayMultiplierRegular < SUNDAY_MULTIPLIER_ORDINARY_SUNDAY_WORKER) out.push(`Sunday work for regular Sunday workers below ${SUNDAY_MULTIPLIER_ORDINARY_SUNDAY_WORKER}× (BCEA s16)`);
+  if (policy.publicHolidayMultiplier < PUBLIC_HOLIDAY_MULTIPLIER) out.push(`Public holiday work below ${PUBLIC_HOLIDAY_MULTIPLIER}× (BCEA s18)`);
+  if (policy.minimumShiftHours < 4) out.push('Shifts shorter than 4 hours paid for fewer than 4 hours (BCEA s9A)');
+  return out;
+}
 
 const round2 = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100;
 const round4 = (n: number) => Math.round((n + Number.EPSILON) * 10_000) / 10_000;
@@ -124,7 +169,7 @@ export function totalHoursWorked(employee: TimeEmployee, ts: Timesheet | null | 
  * basic pay; for salaried employees only the premiums are added (the salary already pays
  * ordinary time and public holidays not worked).
  */
-export function timePayLines(employee: TimeEmployee, ts: Timesheet | null | undefined): {
+export function timePayLines(employee: TimeEmployee, ts: Timesheet | null | undefined, policy: TimePolicy = BCEA_TIME_POLICY): {
   ordinaryPay: number;
   lines: TimePayLine[];
 } {
@@ -153,10 +198,10 @@ export function timePayLines(employee: TimeEmployee, ts: Timesheet | null | unde
       });
     }
   }
-  add('time_overtime', `Overtime (${round2(num(ts.overtime_hours))} h × 1.5)`, num(ts.overtime_hours), hourly, OVERTIME_MULTIPLIER, '3607');
-  const sundayMultiplier = employee.works_sundays ? SUNDAY_MULTIPLIER_ORDINARY_SUNDAY_WORKER : SUNDAY_MULTIPLIER;
+  add('time_overtime', `Overtime (${round2(num(ts.overtime_hours))} h × ${policy.overtimeMultiplier})`, num(ts.overtime_hours), hourly, policy.overtimeMultiplier, '3607');
+  const sundayMultiplier = employee.works_sundays ? policy.sundayMultiplierRegular : policy.sundayMultiplier;
   add('time_sunday', `Sunday work (${round2(num(ts.sunday_hours))} h × ${sundayMultiplier})`, num(ts.sunday_hours), hourly, sundayMultiplier, '3601');
-  add('time_public_holiday_worked', `Public holiday work (${round2(num(ts.public_holiday_hours))} h × 2)`, num(ts.public_holiday_hours), hourly, PUBLIC_HOLIDAY_MULTIPLIER, '3601');
+  add('time_public_holiday_worked', `Public holiday work (${round2(num(ts.public_holiday_hours))} h × ${policy.publicHolidayMultiplier})`, num(ts.public_holiday_hours), hourly, policy.publicHolidayMultiplier, '3601');
   return { ordinaryPay, lines };
 }
 
@@ -206,4 +251,47 @@ export function salariedMonthlyHours(employee: TimeEmployee): number | null {
 /** UI Act s3: no UIF when fewer than 24 hours are worked for the employer in the month. */
 export function uifExemptForHours(hoursInMonth: number | null): boolean {
   return hoursInMonth !== null && hoursInMonth < UIF_MINIMUM_HOURS_PER_MONTH;
+}
+
+export type AttendanceDay = { date: string; hours: number };
+
+/**
+ * Period totals from the daily attendance register. Each day: a public holiday's hours are
+ * public holiday work; a Sunday's are Sunday work; otherwise hours up to the employee's
+ * ordinary day are ordinary time and the rest overtime. A shift shorter than the policy's
+ * minimum is paid as the minimum (BCEA s9A). Daily-paid: each day counts as hours ÷ hours
+ * per day (a full day = 1). Salaried employees: only overtime, Sunday and public holiday
+ * hours (their salary pays ordinary time).
+ */
+export function attendanceTotals(employee: TimeEmployee, days: AttendanceDay[], policy: TimePolicy = BCEA_TIME_POLICY): Required<Timesheet> & { shiftTopUpHours: number; daysRecorded: number } {
+  const basis = payBasisOf(employee);
+  const perDay = hoursPerDay(employee);
+  const totals = { ordinary_hours: 0, days_worked: 0, overtime_hours: 0, sunday_hours: 0, public_holiday_hours: 0, public_holiday_days_paid: 0, shiftTopUpHours: 0, daysRecorded: 0 };
+  const holidays = new Map<number, Set<string>>();
+  for (const day of days) {
+    const worked = num(day.hours);
+    if (worked <= 0) continue;
+    totals.daysRecorded += 1;
+    const year = Number(day.date.slice(0, 4));
+    if (!holidays.has(year)) holidays.set(year, saPublicHolidays(year));
+    const topUp = basis !== 'salaried' && policy.minimumShiftHours > 0 && worked < policy.minimumShiftHours ? policy.minimumShiftHours - worked : 0;
+    const paid = worked + topUp;
+    totals.shiftTopUpHours += topUp;
+    if (holidays.get(year)!.has(day.date)) { totals.public_holiday_hours += paid; continue; }
+    if (new Date(`${day.date}T00:00:00Z`).getUTCDay() === 0) { totals.sunday_hours += paid; continue; }
+    const ordinary = Math.min(paid, perDay);
+    totals.overtime_hours += Math.max(0, paid - perDay);
+    if (basis === 'hourly') totals.ordinary_hours += ordinary;
+    if (basis === 'daily') totals.days_worked += ordinary / perDay;
+  }
+  return {
+    ordinary_hours: round2(totals.ordinary_hours),
+    days_worked: round2(totals.days_worked),
+    overtime_hours: round2(totals.overtime_hours),
+    sunday_hours: round2(totals.sunday_hours),
+    public_holiday_hours: round2(totals.public_holiday_hours),
+    public_holiday_days_paid: 0,
+    shiftTopUpHours: round2(totals.shiftTopUpHours),
+    daysRecorded: totals.daysRecorded,
+  };
 }

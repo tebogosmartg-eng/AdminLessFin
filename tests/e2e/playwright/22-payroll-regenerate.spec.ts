@@ -428,3 +428,29 @@ test('hourly and casual workers: employee tabs and the run timesheet', async ({ 
     await call(sb, { method: 'DISCARD_RUN', company_id: companyId, runId: run.id }).catch(() => undefined);
   }
 });
+
+test('attendance register and company pay rules', async ({ page }) => {
+  // Relies on tests/e2e/run-payroll-time-live.ts having recorded the week of 21 December 2026.
+  await page.goto('/');
+  await waitForRouteSettled(page);
+  await ensureReadyCompany(page);
+  await page.goto('/attendance');
+  await waitForRouteSettled(page);
+  await expectNoErrorBoundary(page);
+  await page.getByLabel('Week of').fill('2026-12-21');
+  const grid = page.getByTestId('attendance-grid');
+  await expect(grid).toContainText('Public holiday', { timeout: 30_000 });
+  // Christmas Day: 6 hours recorded for the hourly test worker.
+  await expect(grid.locator('input[aria-label^="Hourly Time"][aria-label$="hours on 2026-12-25"][value="6"]').first()).toBeVisible({ timeout: 30_000 });
+  await shot(page, '13-attendance');
+
+  await page.goto('/settings');
+  await waitForRouteSettled(page);
+  await page.getByRole('tab', { name: /payroll/i }).click();
+  const rules = page.getByTestId('pay-rules');
+  await expect(rules).toBeVisible({ timeout: 30_000 });
+  await rules.getByLabel('Overtime').fill('1.25');
+  await expect(rules.getByText(/Below the BCEA minimum/)).toBeVisible();
+  await rules.getByLabel('Overtime').fill('1.5');
+  await expect(rules.getByText(/Below the BCEA minimum/)).toHaveCount(0);
+});

@@ -35,6 +35,7 @@ import {
   timesheetIssues,
   salariedMonthlyHours,
   timePayLines,
+  timePolicyFrom,
   totalHoursWorked,
   uifExemptForHours,
 } from './payrollRulesEngine/timePay.ts';
@@ -239,9 +240,14 @@ export async function loadPayrollRulesContext(supabaseAdmin, companyId, run) {
     .from('payroll_timesheets').select('*').eq('company_id', companyId).eq('payroll_run_id', run.id);
   if (timesheetError) throw timesheetError;
   const timesheets = new Map((timesheetRows ?? []).map((t) => [t.employee_id, t]));
+  // The company's pay rules for overtime, Sunday and public holiday work (BCEA by default).
+  const { data: policyRow, error: policyError } = await supabaseAdmin
+    .from('company_payroll_policies').select('*').eq('company_id', companyId).maybeSingle();
+  if (policyError) throw policyError;
+  const timePolicy = timePolicyFrom(policyRow);
   const currentPeriodEstimatedGross = activeEmployees.reduce((sum, employee) => {
     if (payBasisOf(employee) !== 'salaried') {
-      const time = timePayLines(employee, timesheets.get(employee.id) ?? null);
+      const time = timePayLines(employee, timesheets.get(employee.id) ?? null, timePolicy);
       return sum + time.ordinaryPay + time.lines.reduce((s, l) => s + l.amount, 0);
     }
     if (!employee.salary_amount) return sum;
@@ -282,6 +288,7 @@ export async function loadPayrollRulesContext(supabaseAdmin, companyId, run) {
     proRataMethod,
     leaveContext,
     timesheets,
+    timePolicy,
   };
 }
 
@@ -399,7 +406,7 @@ export async function generatePayslipsWithRulesEngine(supabaseAdmin, {
     // on the run's timesheet (no timesheet, no pay: the run warns about it).
     const payBasis = payBasisOf(employee);
     const timesheet = ctx.timesheets?.get(employee.id) ?? null;
-    const timePay = timePayLines(employee, timesheet);
+    const timePay = timePayLines(employee, timesheet, ctx.timePolicy);
     if (payBasis === 'salaried') {
       if (!employee.salary_amount) continue;
     } else if (!Number(employee.pay_rate) || timePay.ordinaryPay + timePay.lines.reduce((s, l) => s + l.amount, 0) <= 0) {

@@ -163,3 +163,46 @@ describe('a reversed payroll run paid nobody', () => {
     expect(isRunInEffect({ status: 'paid', output_metadata: { cancelled: true } })).toBe(false);
   });
 });
+
+describe('attendance register totals (per day)', () => {
+  const week = [
+    { date: '2026-12-14', hours: 10 }, // Monday: 8 ordinary + 2 overtime
+    { date: '2026-12-15', hours: 3 },  // Tuesday: under the 4-hour minimum shift
+    { date: '2026-12-16', hours: 8 },  // Wednesday: Day of Reconciliation
+    { date: '2026-12-20', hours: 5 },  // Sunday
+  ];
+  it('hourly: ordinary up to the ordinary day, the rest overtime; Sunday and public holiday hours apart; short shifts topped up', async () => {
+    const { attendanceTotals } = await import('@/lib/payrollRulesEngine/timePay');
+    expect(attendanceTotals(hourly, week)).toMatchObject({
+      ordinary_hours: 12, overtime_hours: 2, sunday_hours: 5, public_holiday_hours: 8, days_worked: 0, shiftTopUpHours: 1, daysRecorded: 4,
+    });
+  });
+  it('the minimum shift can be switched off', async () => {
+    const { attendanceTotals, BCEA_TIME_POLICY } = await import('@/lib/payrollRulesEngine/timePay');
+    expect(attendanceTotals(hourly, week, { ...BCEA_TIME_POLICY, minimumShiftHours: 0 })).toMatchObject({ ordinary_hours: 11, shiftTopUpHours: 0 });
+  });
+  it('daily-paid: a full ordinary day is 1, half a day 0.5, extra hours overtime', async () => {
+    const { attendanceTotals } = await import('@/lib/payrollRulesEngine/timePay');
+    const daily: TimeEmployee = { pay_basis: 'daily', pay_rate: 400, ordinary_hours_per_week: 40, work_days_per_week: 5 };
+    expect(attendanceTotals(daily, [
+      { date: '2026-12-14', hours: 8 }, { date: '2026-12-15', hours: 4 }, { date: '2026-12-17', hours: 10 },
+    ])).toMatchObject({ days_worked: 2.5, overtime_hours: 2, ordinary_hours: 0 });
+  });
+  it('salaried: only overtime, Sunday and public holiday hours', async () => {
+    const { attendanceTotals } = await import('@/lib/payrollRulesEngine/timePay');
+    const salaried: TimeEmployee = { pay_basis: 'salaried', salary_amount: 19_500, salary_period: 'monthly', ordinary_hours_per_week: 40, work_days_per_week: 5 };
+    expect(attendanceTotals(salaried, week)).toMatchObject({ ordinary_hours: 0, days_worked: 0, overtime_hours: 2, sunday_hours: 5, public_holiday_hours: 8, shiftTopUpHours: 0 });
+  });
+});
+
+describe('company pay rules', () => {
+  it('the company multipliers are used; rules below the BCEA are advice, not refused', async () => {
+    const { timePayLines, timePolicyFrom, policyBelowBcea, BCEA_TIME_POLICY } = await import('@/lib/payrollRulesEngine/timePay');
+    const policy = timePolicyFrom({ overtime_multiplier: 2, sunday_multiplier: 1.5, public_holiday_multiplier: 3 });
+    const pay = timePayLines(hourly, { overtime_hours: 2, sunday_hours: 2, public_holiday_hours: 1 }, policy);
+    expect(pay.lines.map((l) => [l.code, l.amount])).toEqual([['time_overtime', 200], ['time_sunday', 150], ['time_public_holiday_worked', 150]]);
+    expect(policyBelowBcea(policy)).toEqual(['Sunday work below 2× (BCEA s16)']);
+    expect(policyBelowBcea(BCEA_TIME_POLICY)).toEqual([]);
+    expect(timePolicyFrom(null)).toEqual(BCEA_TIME_POLICY);
+  });
+});

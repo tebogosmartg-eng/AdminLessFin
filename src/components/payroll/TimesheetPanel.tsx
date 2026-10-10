@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Clock, Download, Plus, Save } from 'lucide-react';
+import { CalendarCheck2, Clock, Copy, Download, Plus, Save } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
 import { Button } from '../ui/button';
@@ -35,9 +35,10 @@ type Row = {
   worksSundays: boolean;
   taxMethod: 'tables' | 'non_standard';
   timesheet: Values | null;
-  source: 'manual' | 'work_module' | null;
+  source: 'manual' | 'work_module' | 'attendance' | null;
   suggestedPublicHolidays: string[];
   workHours: { ordinary: number; overtime: number; sunday: number; publicHoliday: number; daysWorked: number; factIds: string[] } | null;
+  attendance: { ordinary_hours: number; days_worked: number; overtime_hours: number; sunday_hours: number; public_holiday_hours: number; shiftTopUpHours: number; daysRecorded: number } | null;
   estimatedPay: number;
   issues: Array<{ code: string; message: string }>;
 };
@@ -46,6 +47,8 @@ type Timesheet = {
   rows: Row[];
   salaried: Array<{ employeeId: string; name: string }>;
   workHoursWaiting: number;
+  attendanceWaiting: number;
+  policy: { overtimeMultiplier: number; sundayMultiplier: number; sundayMultiplierRegular: number; publicHolidayMultiplier: number; minimumShiftHours: number };
 };
 
 const EMPTY: Values = { ordinaryHours: 0, daysWorked: 0, overtimeHours: 0, sundayHours: 0, publicHolidayHours: 0, publicHolidayDaysPaid: 0 };
@@ -95,6 +98,21 @@ export default function TimesheetPanel({ runId, onSaved }: { runId: string; onSa
     onSuccess: () => { showSuccess('Timesheet saved. Regenerate payslips to apply it.'); refresh(); },
     onError: (e: Error) => showError(e.message),
   });
+  const fillFromRegister = useMutation({
+    mutationFn: () => invokePayroll<{ imported: number }>({ method: 'IMPORT_ATTENDANCE', company_id: companyId, runId }),
+    onSuccess: (r) => { showSuccess(r.imported ? `Filled from the attendance register for ${r.imported} employee${r.imported === 1 ? '' : 's'}.` : 'Nothing recorded in the attendance register for this period.'); refresh(); },
+    onError: (e: Error) => showError(e.message),
+  });
+  const copyPrevious = useMutation({
+    mutationFn: () => invokePayroll<{ copied: number; from: { start: string; end: string } | null }>({ method: 'COPY_PREVIOUS_TIMESHEET', company_id: companyId, runId }),
+    onSuccess: (r) => {
+      showSuccess(r.from
+        ? `Copied ${r.copied} employee${r.copied === 1 ? '' : 's'} from ${r.from.start} – ${r.from.end}${r.copied ? '' : ' (everyone already has hours)'}.`
+        : 'No earlier run of this frequency has a timesheet to copy.');
+      refresh();
+    },
+    onError: (e: Error) => showError(e.message),
+  });
   const importHours = useMutation({
     mutationFn: () => invokePayroll<{ imported: number }>({ method: 'IMPORT_WORK_HOURS', company_id: companyId, runId }),
     onSuccess: (r) => { showSuccess(r.imported ? `Approved hours imported for ${r.imported} employee${r.imported === 1 ? '' : 's'}.` : 'No approved hours waiting in Work Management for this period.'); refresh(); },
@@ -123,8 +141,9 @@ export default function TimesheetPanel({ runId, onSaved }: { runId: string; onSa
       <CardHeader>
         <CardTitle className="flex items-center gap-2"><Clock className="h-5 w-5" /> Timesheet</CardTitle>
         <CardDescription>
-          Hours and days worked this period. Hourly and daily-paid employees are paid only for what is captured here; overtime is 1.5×,
-          Sunday work 2× (1.5× for regular Sunday workers) and public holiday work 2× (BCEA). Add a salaried employee to pay overtime.
+          Hours and days worked this period. Hourly and daily-paid employees are paid only for what is captured here. Fill it from the
+          attendance register, copy last period's hours, import approved Work Management hours, or type it in.
+          {data ? ` Overtime ${data.policy.overtimeMultiplier}×, Sunday ${data.policy.sundayMultiplier}× (${data.policy.sundayMultiplierRegular}× for regular Sunday workers), public holiday ${data.policy.publicHolidayMultiplier}× (Payroll settings → Pay rules).` : ''}
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-3">
@@ -133,6 +152,12 @@ export default function TimesheetPanel({ runId, onSaved }: { runId: string; onSa
         ) : isLoading || !data ? <Skeleton className="h-40 w-full" /> : (
           <>
             <div className="flex flex-wrap items-center gap-2">
+              <Button size="sm" variant="outline" onClick={() => fillFromRegister.mutate()} disabled={fillFromRegister.isPending || data.run.status !== 'draft'} data-testid="fill-from-attendance">
+                <CalendarCheck2 className="mr-1 h-4 w-4" />Fill from attendance register{data.attendanceWaiting ? ` (${data.attendanceWaiting})` : ''}
+              </Button>
+              <Button size="sm" variant="outline" onClick={() => copyPrevious.mutate()} disabled={copyPrevious.isPending || data.run.status !== 'draft'} data-testid="copy-previous-timesheet">
+                <Copy className="mr-1 h-4 w-4" />Copy previous period
+              </Button>
               <Button size="sm" variant="outline" onClick={() => importHours.mutate()} disabled={importHours.isPending || data.run.status !== 'draft'} data-testid="import-work-hours">
                 <Download className="mr-1 h-4 w-4" />Import approved hours{data.workHoursWaiting ? ` (${data.workHoursWaiting} entries)` : ''}
               </Button>
@@ -173,7 +198,15 @@ export default function TimesheetPanel({ runId, onSaved }: { runId: string; onSa
                               {full?.employmentType === 'casual' && <Badge variant="outline" className="ml-1">Casual</Badge>}
                               {full?.taxMethod === 'non_standard' && <Badge variant="secondary" className="ml-1">Tax 25%</Badge>}
                               {full?.source === 'work_module' && <Badge variant="outline" className="ml-1">From Work Management</Badge>}
+                              {full?.source === 'attendance' && <Badge variant="outline" className="ml-1">From attendance</Badge>}
                             </div>
+                            {full?.attendance && full.source !== 'attendance' && (
+                              <div className="text-xs text-muted-foreground">
+                                Attendance register: {full.attendance.daysRecorded} day{full.attendance.daysRecorded === 1 ? '' : 's'}
+                                {full.payBasis === 'daily' ? `, ${full.attendance.days_worked} days` : `, ${full.attendance.ordinary_hours} h`}
+                                {full.attendance.overtime_hours ? ` + ${full.attendance.overtime_hours} h overtime` : ''}
+                              </div>
+                            )}
                             {full?.workHours && full.source !== 'work_module' && (
                               <div className="text-xs text-muted-foreground">Approved in Work Management: {full.workHours.ordinary} h + {full.workHours.overtime} h overtime</div>
                             )}

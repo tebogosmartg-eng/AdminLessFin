@@ -5,7 +5,7 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible"
-import { Book, BookOpen, LayoutDashboard, BookText, Library, Target, Repeat, Building2, Users, TrendingUp, Receipt, Banknote, HandCoins, ChevronRight, Package, Scale, Upload, FileSignature, Briefcase, Landmark, MessageSquare, Clock, ShoppingBag, Calendar, TicketMinus, PieChart, Coins, FileText, HelpCircle, Quote, ReceiptText, CalendarClock, Store, ArrowLeftRight, Percent, Tags, Wallet, FileCheck2, ShieldCheck, Layers, Timer, Wrench, FileBarChart, Gauge, HeartPulse, BarChart3, ClipboardList, Warehouse, Truck, ClipboardCheck, Calculator, PiggyBank, AlertTriangle, Shield, CalendarRange, Activity, ClipboardCheck as CloseCheck, Palmtree } from 'lucide-react';
+import { Book, BookOpen, LayoutDashboard, BookText, Library, Target, Repeat, Building2, Users, TrendingUp, Receipt, Banknote, HandCoins, ChevronRight, Package, Scale, Upload, FileSignature, Briefcase, Landmark, MessageSquare, Clock, ShoppingBag, Calendar, TicketMinus, PieChart, Coins, FileText, HelpCircle, Quote, ReceiptText, CalendarClock, Store, ArrowLeftRight, Percent, Tags, Wallet, FileCheck2, ShieldCheck, Layers, Timer, Wrench, FileBarChart, Gauge, HeartPulse, BarChart3, ClipboardList, Warehouse, Truck, ClipboardCheck, Calculator, PiggyBank, AlertTriangle, Shield, CalendarRange, Activity, ClipboardCheck as CloseCheck, Palmtree, CalendarCheck2 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { Button } from './ui/button';
 import { useAuth } from '../contexts/AuthContext';
@@ -170,6 +170,7 @@ export const SidebarNav = ({ className, onNavigate }: SidebarNavProps) => {
     { to: '/employees', label: 'Employees', icon: Users, prefetch: () => prefetch(queries.employeesQuery, { adminOnly: true }) },
     { to: '/expense-claims', label: 'Expense Claims', icon: Coins, prefetch: () => prefetch(queries.expenseClaimsQuery, { adminOnly: true }) },
     { to: '/payroll-runs', label: 'Payroll Runs', icon: CalendarClock, prefetch: () => prefetch(queries.payrollRunsQuery, { adminOnly: true }) },
+    { to: '/attendance', label: 'Attendance', icon: CalendarCheck2, prefetch: () => {} },
     { to: '/leave', label: 'Leave', icon: Palmtree, prefetch: () => {} },
     { to: '/payroll-reports', label: 'Payroll Reports', icon: FileText, prefetch: () => {} },
     { to: '/statutory-returns', label: 'Statutory Returns', icon: FileCheck2, prefetch: () => {} },
