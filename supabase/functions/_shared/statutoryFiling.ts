@@ -93,7 +93,7 @@ export function emp201AmountsFromPayslip(row: {
 }
 
 /** Finalised payslips paid between two dates, with the run each came from. */
-async function loadFinalisedPayslips(admin, companyId: string, start: string, end: string) {
+export async function loadFinalisedPayslips(admin, companyId: string, start: string, end: string) {
   const { data: runs, error } = await admin
     .from('payroll_runs')
     .select('id, status, pay_date, pay_period_start, output_metadata')

@@ -15,6 +15,7 @@ import {
   isValidSarsPostalCode,
 } from './sarsNumbers.ts';
 import { isValidSic7Code } from './sic7Codes.ts';
+import { isValidUifReference } from '../payrollRulesEngine/uifDeclaration.ts';
 
 export type EmployerProfile = {
   trading_name: string;
@@ -40,6 +41,12 @@ export type EmployerProfile = {
   address_city: string | null;
   address_postal_code: string;
   address_country: string;
+  /** UIF reference number with the Department of Employment and Labour (E03 declarations). */
+  uif_dol_reference: string | null;
+  coida_registration_number: string | null;
+  /** COIDA assessment rate (% of assessable earnings) from the Fund's notice of assessment. */
+  coida_rate_percent: number | null;
+  coida_domestic_employer: boolean;
 };
 
 export type EmployerProfileError = { field: keyof EmployerProfile; message: string };
@@ -67,6 +74,10 @@ export const EMPTY_EMPLOYER_PROFILE: EmployerProfile = {
   address_city: null,
   address_postal_code: '',
   address_country: 'ZA',
+  uif_dol_reference: null,
+  coida_registration_number: null,
+  coida_rate_percent: null,
+  coida_domestic_employer: false,
 };
 
 /** Maximum lengths from the BRS file layout. */
@@ -91,8 +102,13 @@ export function normaliseEmployerProfile(input: Partial<Record<keyof EmployerPro
   const out = { ...EMPTY_EMPLOYER_PROFILE };
   for (const key of Object.keys(EMPTY_EMPLOYER_PROFILE) as Array<keyof EmployerProfile>) {
     const value = input[key];
-    if (key === 'diplomatic_indemnity' || key === 'claim_eti') {
+    if (key === 'diplomatic_indemnity' || key === 'claim_eti' || key === 'coida_domestic_employer') {
       out[key] = value === true;
+      continue;
+    }
+    if (key === 'coida_rate_percent') {
+      const n = value === '' || value === null || value === undefined ? NaN : Number(value);
+      out.coida_rate_percent = Number.isFinite(n) ? n : null;
       continue;
     }
     const trimmed = typeof value === 'string' ? value.trim() : '';
@@ -106,6 +122,7 @@ export function normaliseEmployerProfile(input: Partial<Record<keyof EmployerPro
     if (out[phone]) out[phone] = out[phone]!.replace(/[\s()-]/g, '');
   }
   out.address_country = (out.address_country || 'ZA').toUpperCase();
+  out.uif_dol_reference = out.uif_dol_reference ? out.uif_dol_reference.replace(/\D/g, '') || null : null;
   return out;
 }
 
@@ -161,6 +178,13 @@ export function validateEmployerProfile(profile: EmployerProfile): EmployerProfi
   if (!text(profile.address_suburb) && !text(profile.address_city)) add('address_city', 'Give the suburb / district or the city / town.');
   if (!isValidSarsPostalCode(text(profile.address_postal_code))) add('address_postal_code', 'Postal code must be 4 digits and not 0000.');
   if (!/^[A-Z]{2}$/.test(text(profile.address_country))) add('address_country', 'Use the 2-letter country code (ZA).');
+
+  if (profile.uif_dol_reference && !isValidUifReference(profile.uif_dol_reference)) {
+    add('uif_dol_reference', 'Not a valid UIF reference number (Department of Labour, e.g. 1234567/8): the check digit does not match.');
+  }
+  if (profile.coida_rate_percent !== null && (profile.coida_rate_percent < 0 || profile.coida_rate_percent > 100)) {
+    add('coida_rate_percent', 'The COIDA rate is a percentage between 0 and 100.');
+  }
 
   for (const [field, max] of Object.entries(MAX_LENGTH) as Array<[keyof EmployerProfile, number]>) {
     const value = profile[field];

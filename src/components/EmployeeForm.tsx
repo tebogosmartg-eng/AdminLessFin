@@ -41,6 +41,13 @@ import { isValidIncomeTaxNumber } from '../lib/sars/sarsNumbers';
 import { Checkbox } from './ui/checkbox';
 import { ETI_SPECIAL_ECONOMIC_ZONES } from '../lib/sars/sic7Codes';
 
+/** Why employment ended, as the UIF declaration reports it. */
+const TERMINATION_REASONS: Array<[string, string]> = [
+  ['resigned', 'Resigned'], ['dismissed', 'Dismissed'], ['retrenched', 'Retrenched'], ['contract_expired', 'Contract expired'],
+  ['retired', 'Retired'], ['deceased', 'Deceased'], ['constructive_dismissal', 'Constructively dismissed'], ['absconded', 'Absconded'],
+  ['transferred', 'Transferred to another branch'], ['insolvency', 'Employer insolvent'], ['business_closed', 'Business closed'],
+];
+
 /** Optional number input: blank → null; otherwise a number in range. */
 const optionalNumber = (min: number, max: number, message: string) => z
   .string()
@@ -90,6 +97,7 @@ const employeeSchema = z.object({
   position: z.string().optional(),
   start_date: z.string().min(1, 'Start date is required.'),
   end_date: z.string().optional(),
+  termination_reason: z.string().optional(),
   salary_amount: z.coerce.number().min(0, 'Salary must be a positive number.').optional().nullable(),
   salary_period: z.enum(['monthly', 'weekly', 'fortnightly']).optional().nullable(),
   pay_basis: z.enum(['salaried', 'hourly', 'daily']).default('salaried'),
@@ -160,6 +168,7 @@ const EmployeeForm = ({ isOpen, setIsOpen, employee }: EmployeeFormProps) => {
         department: employee.department || '',
         position: employee.position || '',
         end_date: employee.end_date || '',
+        termination_reason: employee.termination_reason || '',
         salary_amount: employee.salary_amount || undefined,
         salary_period: employee.salary_period || undefined,
         pay_basis: employee.pay_basis ?? 'salaried',
@@ -198,6 +207,7 @@ const EmployeeForm = ({ isOpen, setIsOpen, employee }: EmployeeFormProps) => {
         position: '',
         start_date: new Date().toISOString().split('T')[0],
         end_date: '',
+        termination_reason: '',
         salary_amount: undefined,
         salary_period: undefined,
         pay_basis: 'salaried',
@@ -224,6 +234,7 @@ const EmployeeForm = ({ isOpen, setIsOpen, employee }: EmployeeFormProps) => {
 
   const postalSameAsResidential = form.watch('postal_same_as_residential');
   const payBasis = form.watch('pay_basis');
+  const endDate = form.watch('end_date');
   const employmentType = form.watch('employment_type');
 
   const mutation = useMutation({
@@ -233,6 +244,7 @@ const EmployeeForm = ({ isOpen, setIsOpen, employee }: EmployeeFormProps) => {
       const employeeData = {
         ...values,
         end_date: values.end_date || null,
+        termination_reason: values.end_date && values.termination_reason ? values.termination_reason : null,
         date_of_birth: values.date_of_birth || null,
         salary_amount: values.pay_basis === 'salaried' ? values.salary_amount || null : null,
         salary_period: values.salary_period || null,
@@ -440,6 +452,19 @@ const EmployeeForm = ({ isOpen, setIsOpen, employee }: EmployeeFormProps) => {
               <FormField control={form.control} name="end_date" render={({ field }) => (
                 <FormItem><FormLabel>End Date (Optional)</FormLabel><FormControl><Input type="date" {...field} /></FormControl><FormMessage /></FormItem>
               )} />
+              {endDate && (
+                <FormField control={form.control} name="termination_reason" render={({ field }) => (
+                  <FormItem><FormLabel>Reason Employment Ended</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value || ''}>
+                      <FormControl><SelectTrigger aria-label="Reason employment ended"><SelectValue placeholder="Choose a reason (UIF declaration)" /></SelectTrigger></FormControl>
+                      <SelectContent>
+                        {TERMINATION_REASONS.map(([value, label]) => <SelectItem key={value} value={value}>{label}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                    <FormDescription>Reported to UIF; the employee needs it to claim.</FormDescription><FormMessage />
+                  </FormItem>
+                )} />
+              )}
             </fieldset>
 
             <fieldset className="grid grid-cols-1 md:grid-cols-2 gap-4 border p-4 rounded-md" data-testid="employee-eti-details">

@@ -14,6 +14,7 @@ import { invokePayroll } from '../lib/payrollOperations';
 import { PAYROLL_RULE_CATALOG } from '../lib/payrollRulesEngine/catalogue';
 import PayrollApprovalControls from './payroll/PayrollApprovalControls';
 import PayRulesCard from './payroll/PayRulesCard';
+import BankProfilesCard from './payroll/BankProfilesCard';
 import EmployerProfileCard from './payroll/EmployerProfileCard';
 
 type CatalogRule = {
@@ -128,6 +129,7 @@ const PayrollSettings = () => {
     <EmployerProfileCard />
     <PayrollApprovalControls />
     <PayRulesCard />
+    <BankProfilesCard />
     <Card>
       <CardHeader>
         <CardTitle>Payroll Rules</CardTitle>

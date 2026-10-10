@@ -18,6 +18,8 @@ import { invokePayroll } from '../lib/payrollOperations';
 import { yearOfAssessmentFor, type Emp501Kind, type MonthFilingState } from '../lib/sars/statutoryCalendar';
 import Emp201Panel from '../components/payroll/Emp201Panel';
 import Emp501Panel from '../components/payroll/Emp501Panel';
+import UifDeclarationPanel from '../components/payroll/UifDeclarationPanel';
+import CoidaRoePanel from '../components/payroll/CoidaRoePanel';
 
 type WorkspaceMonth = {
   month: string;
@@ -66,7 +68,7 @@ const StatutoryReturns = () => {
   const companyId = activeCompany?.id;
   const lastMonth = format(subMonths(new Date(), 1), 'yyyy-MM');
   const [yearOfAssessment, setYearOfAssessment] = useState(() => yearOfAssessmentFor(lastMonth));
-  const [tab, setTab] = useState<'EMP201' | 'EMP501'>('EMP201');
+  const [tab, setTab] = useState<'EMP201' | 'EMP501' | 'UIF' | 'COIDA'>('EMP201');
   const [month, setMonth] = useState(lastMonth);
   const years = useMemo(() => {
     const current = yearOfAssessmentFor(format(new Date(), 'yyyy-MM'));
@@ -191,16 +193,24 @@ const StatutoryReturns = () => {
 
       <Card id="statutory-return-detail">
         <CardContent className="pt-6">
-          <Tabs value={tab} onValueChange={(v) => setTab(v as 'EMP201' | 'EMP501')}>
+          <Tabs value={tab} onValueChange={(v) => setTab(v as typeof tab)}>
             <TabsList>
               <TabsTrigger value="EMP201">EMP201 monthly</TabsTrigger>
               <TabsTrigger value="EMP501">EMP501 &amp; certificates</TabsTrigger>
+              <TabsTrigger value="UIF">UIF declaration</TabsTrigger>
+              <TabsTrigger value="COIDA">COIDA return of earnings</TabsTrigger>
             </TabsList>
             <TabsContent value="EMP201" className="mt-4">
               <Emp201Panel month={month} onMonthChange={setMonth} />
             </TabsContent>
             <TabsContent value="EMP501" className="mt-4">
               <Emp501Panel yearOfAssessment={yearOfAssessment} />
+            </TabsContent>
+            <TabsContent value="UIF" className="mt-4">
+              <UifDeclarationPanel />
+            </TabsContent>
+            <TabsContent value="COIDA" className="mt-4">
+              <CoidaRoePanel />
             </TabsContent>
           </Tabs>
         </CardContent>

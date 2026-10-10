@@ -454,3 +454,64 @@ test('attendance register and company pay rules', async ({ page }) => {
   await rules.getByLabel('Overtime').fill('1.5');
   await expect(rules.getByText(/Below the BCEA minimum/)).toHaveCount(0);
 });
+
+test('bank payment files, UIF declaration and COIDA return of earnings', async ({ page }) => {
+  // Relies on tests/e2e/run-payroll-phase5-live.ts (bank profiles) and the finalised June 2025 fortnightly run.
+  const env = loadE2EEnv();
+  const sb = createClient(env.supabaseUrl, env.supabaseAnonKey, { auth: { persistSession: false } });
+  await sb.auth.signInWithPassword({ email: env.email, password: env.password });
+  const { data: company } = await sb.from('companies').select('id').eq('name', READY_COMPANY).single();
+  const runs = await call<Array<{ id: string; status: string; pay_period_start: string; output_metadata: { reversed_at?: string; processed_at?: string } | null }>>(sb, { method: 'GET_RUNS', company_id: company!.id });
+  const run = runs.find((r) => r.pay_period_start === '2025-06-02' && r.status === 'finalized'
+    && !(r.output_metadata?.reversed_at && (!r.output_metadata.processed_at || r.output_metadata.processed_at <= r.output_metadata.reversed_at)));
+  expect(run, 'finalised June 2025 fortnightly run').toBeTruthy();
+
+  await page.goto('/');
+  await waitForRouteSettled(page);
+  await ensureReadyCompany(page);
+  await page.goto('/settings');
+  await waitForRouteSettled(page);
+  await page.getByRole('tab', { name: /payroll/i }).click();
+  await expect(page.getByTestId('bank-profiles')).toContainText('CERT TX ACB', { timeout: 30_000 });
+
+  await page.goto(`/payroll-runs/${run!.id}`);
+  await waitForRouteSettled(page);
+  await expectNoErrorBoundary(page);
+  const card = page.getByTestId('bank-payment-file');
+  await expect(card).toBeVisible({ timeout: 30_000 });
+  await card.getByRole('combobox', { name: 'Bank profile' }).click();
+  await page.getByRole('option', { name: 'CERT TX FNB CSV' }).first().click();
+  await card.getByLabel('Payment date').fill('2025-06-13');
+  const bankFile = page.waitForEvent('download');
+  await card.getByTestId('download-bank-payment-file').click();
+  expect((await bankFile).suggestedFilename()).toMatch(/\.csv$/i);
+  await expect(card.getByTestId('bank-file-result')).toContainText(/payments? ·/, { timeout: 30_000 });
+  await shot(page, '14-bank-file');
+
+  await page.goto('/statutory-returns');
+  await waitForRouteSettled(page);
+  await page.getByRole('tab', { name: 'UIF declaration' }).click();
+  const uif = page.getByTestId('uif-declaration-panel');
+  await uif.getByLabel('Month').fill('2025-06');
+  await uif.getByRole('button', { name: 'Prepare declaration' }).click();
+  await expect(uif.getByTestId('uif-lines')).toBeVisible({ timeout: 60_000 });
+  // CERT TX has no UIF reference with the Department (the harness restores the profile): the file
+  // waits for it, the register does not. The E03 file itself is checked by run-payroll-phase5-live.ts.
+  await expect(uif.getByText(/Add the UIF reference number/)).toBeVisible();
+  await expect(uif.getByRole('button', { name: 'Test file' })).toBeDisabled();
+  const register = page.waitForEvent('download');
+  await uif.getByRole('button', { name: /Register/ }).click();
+  expect((await register).suggestedFilename()).toBe('UIF_register_2025-06.csv');
+  await shot(page, '15-uif-declaration');
+
+  await page.getByRole('tab', { name: 'COIDA return of earnings' }).click();
+  const coida = page.getByTestId('coida-panel');
+  await coida.getByRole('combobox', { name: 'Assessment year' }).click();
+  await page.getByRole('option', { name: 'March 2025 – February 2026' }).click();
+  await coida.getByRole('button', { name: 'Prepare return of earnings' }).click();
+  await expect(coida.getByTestId('coida-summary')).toContainText('633', { timeout: 60_000 });
+  const report = page.waitForEvent('download');
+  await coida.getByRole('button', { name: /Payroll report/ }).click();
+  expect((await report).suggestedFilename()).toMatch(/\.pdf$/i);
+  await shot(page, '16-coida');
+});

@@ -44,6 +44,7 @@ import PayrollWorkflowStepper from '../components/payroll/PayrollWorkflowStepper
 import PayrollRunRulesPanel from '../components/payroll/PayrollRunRulesPanel';
 import { PayComponentEditor } from '../components/payroll/PayComponentEditor';
 import TimesheetPanel from '../components/payroll/TimesheetPanel';
+import BankPaymentFileCard from '../components/payroll/BankPaymentFileCard';
 import PayrollCommandCentre from '../components/payroll/PayrollCommandCentre';
 import { usePayrollControls } from '../components/payroll/usePayrollControls';
 import type { RunWarning } from '../lib/payrollRulesEngine/runWarnings';
@@ -119,6 +120,12 @@ type PayrollRunDetailData = {
   payslips?: Payslip[];
   audit_events?: unknown[];
 };
+
+/** A reversed run keeps status finalized; it is reversed when reversed_at is after its last processing. */
+function runReversed(meta: { reversed_at?: string | null; processed_at?: string | null } | null | undefined): boolean {
+  if (!meta?.reversed_at) return false;
+  return !meta.processed_at || meta.processed_at <= meta.reversed_at;
+}
 
 const PayrollRunDetail = () => {
   const { id } = useParams();
@@ -618,6 +625,9 @@ const PayrollRunDetail = () => {
             isEmailing={emailAllMutation.isPending}
             warnings={missingEmailCount > 0 ? [`${missingEmailCount} employee(s) missing email addresses`] : []}
           />
+        )}
+        {isRunFinalized(run.status) && id && !runReversed(run.output_metadata) && (
+          <BankPaymentFileCard runId={id} payDate={run.pay_date} />
         )}
 
         {run.status === 'draft' && id && (

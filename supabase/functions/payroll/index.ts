@@ -19,6 +19,10 @@ import {
   sha256Hex,
 } from '../_shared/statutoryFiling.ts'
 import {
+  DECLARATION_METHODS,
+  handleDeclarationMethod,
+} from './declarations.ts'
+import {
   TIME_METHODS,
   handleTimeMethod,
   consumeWorkHours,
@@ -1856,6 +1860,13 @@ serve(withEnterprisePlatform('payroll', 'tenant', async (req, _ctx) => {
       }
 
       default:
+        if (DECLARATION_METHODS.has(method)) {
+          data = await handleDeclarationMethod(method, {
+            supabaseAdmin, company_id, user, body, PayrollDomainError, logPayrollAudit,
+          });
+          error = null;
+          break;
+        }
         if (TIME_METHODS.has(method)) {
           data = await handleTimeMethod(method, {
             supabaseAdmin, company_id, user, body, PayrollDomainError, logPayrollAudit, addRunPreparer,

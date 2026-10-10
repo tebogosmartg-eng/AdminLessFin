@@ -392,15 +392,18 @@ export async function handleTimeMethod(method, ctx) {
     requireDraft();
     const { data: earlier, error } = await admin.from('payroll_runs').select('id, pay_period_start, pay_period_end, pay_frequency')
       .eq('company_id', company_id).lt('pay_period_start', run.pay_period_start).neq('id', run.id)
-      .order('pay_period_start', { ascending: false }).limit(20);
+      .order('pay_period_start', { ascending: false }).order('created_at', { ascending: false }).limit(20);
     if (error) throw error;
     const frequency = run.pay_frequency ?? 'monthly';
     let source = null;
     let sourceRows = [];
+    // The latest run for the latest earlier period (a reversed and redone period has several runs)
+    // whose timesheets cover someone on this run.
     for (const r of (earlier ?? []).filter((x) => (x.pay_frequency ?? 'monthly') === frequency)) {
       const { data, error: sheetError } = await admin.from('payroll_timesheets').select('*').eq('payroll_run_id', r.id);
       if (sheetError) throw sheetError;
-      if ((data ?? []).length) { source = r; sourceRows = data; break; }
+      const rows = (data ?? []).filter((row) => employees.some((e) => e.id === row.employee_id));
+      if (rows.length) { source = r; sourceRows = rows; break; }
     }
     if (!source) return { copied: 0, from: null };
     const current = await loadSheets();

@@ -40,7 +40,9 @@ function toForm(profile: Partial<EmployerProfile> | null | undefined): FormState
   const form = {} as FormState;
   for (const key of Object.keys(EMPTY_EMPLOYER_PROFILE) as Array<keyof EmployerProfile>) {
     const value = profile?.[key];
-    form[key] = key === 'diplomatic_indemnity' || key === 'claim_eti' ? value === true : (value as string | null | undefined) ?? '';
+    form[key] = key === 'diplomatic_indemnity' || key === 'claim_eti' || key === 'coida_domestic_employer'
+      ? value === true
+      : value === null || value === undefined ? '' : String(value);
   }
   if (!form.address_country) form.address_country = 'ZA';
   return form;
@@ -58,6 +60,13 @@ const TEXT_FIELDS: Array<{ key: keyof EmployerProfile; label: string; placeholde
   { key: 'contact_business_phone', label: 'Business Telephone', placeholder: '0211234567', inputMode: 'tel' },
   { key: 'contact_cell_phone', label: 'Cell Number', placeholder: '0821234567', inputMode: 'tel' },
   { key: 'contact_fax', label: 'Fax Number', inputMode: 'tel' },
+];
+
+/** Registrations outside SARS: UIF with the Department of Labour, and COIDA. */
+const REGISTRATION_FIELDS: Array<{ key: keyof EmployerProfile; label: string; placeholder?: string; inputMode?: 'numeric' }> = [
+  { key: 'uif_dol_reference', label: 'UIF Reference (Department of Labour)', placeholder: 'e.g. 1234567/8', inputMode: 'numeric' },
+  { key: 'coida_registration_number', label: 'COIDA Registration Number' },
+  { key: 'coida_rate_percent', label: 'COIDA Assessment Rate (%)', placeholder: 'from the notice of assessment, e.g. 0.18', inputMode: 'numeric' },
 ];
 
 const ADDRESS_FIELDS: Array<{ key: keyof EmployerProfile; label: string; inputMode?: 'numeric' }> = [
@@ -182,6 +191,18 @@ const EmployerProfileCard = () => {
                 ETI reduces the PAYE paid to SARS for qualifying employees (18–29, earning under R7 500). Only for employers registered for PAYE and tax compliant.
               </p>
             </div>
+          </div>
+        </div>
+        <div className="space-y-2">
+          <div className="text-sm font-medium">UIF and COIDA</div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">{REGISTRATION_FIELDS.map(field)}</div>
+          <div className="flex items-center gap-3">
+            <Switch
+              id="employer-coida-domestic"
+              checked={form.coida_domestic_employer === true}
+              onCheckedChange={(checked) => set('coida_domestic_employer', checked)}
+            />
+            <Label htmlFor="employer-coida-domestic" className="font-normal">Domestic employer (lower COIDA minimum assessment)</Label>
           </div>
         </div>
         <div className="space-y-2">

@@ -53,6 +53,7 @@ export type Employee = {
   employment_status?: string | null;
   start_date: string;
   end_date: string | null;
+  termination_reason?: string | null;
   salary_amount: number | null;
   salary_period: 'monthly' | 'weekly' | 'fortnightly' | null;
   residential_unit_number?: string | null;
