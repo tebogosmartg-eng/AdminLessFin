@@ -83,3 +83,40 @@ Payroll paid only salaries. Hourly, daily-paid and casual workers, overtime and 
   - the minimum shift;
   - "allow leave beyond the balance".
   Rules below the BCEA are saved and shown as advice; they are never refused. The National Minimum Wage and the hour limits remain warnings only.
+
+## Amendment (2026-10-10): simple time pay — quantity × rate, nothing automatic
+
+**Why:** in use, the automatic BCEA treatment was wrong for the businesses this product serves. A daily-paid casual earning R250 a day who worked a Saturday and a Sunday was paid about R1,555 instead of R500:
+- the 8 hours became 0.89 of a 9-hour "BCEA day";
+- the Sunday became 24 hours at a derived hourly rate × 2.
+
+SimplePay, Sage and Xero all pay time as a quantity × a rate, with any premium entered by the user. The owner decided to remove the premiums entirely.
+
+**Decision (supersedes the premium, minimum-shift and public-holiday parts above):**
+- **Pay:**
+  - daily-paid: days worked × daily rate;
+  - hourly-paid: hours worked × hourly rate.
+
+  The payslip line reads "Days worked (2 × R250.00)" or "Hours worked (24 × R50.00)", under IRP5 code 3601.
+- **No automatic premiums or adjustments:**
+  - no overtime, Sunday or public holiday multipliers;
+  - no splitting of long days into overtime;
+  - no minimum-shift top-ups;
+  - no "public holidays not worked" pay.
+
+  Salaried employees are no longer added to the timesheet for overtime. Anything extra is a once-off earning on the payslip.
+- **Attendance register:**
+  - a daily-paid employee's day is ticked as full (1) or half (0.5), in the new `payroll_attendance.days` column;
+  - an hourly-paid employee's day keeps its hours;
+  - every day counts the same, whatever the weekday.
+  - Days recorded in hours before this change count as full days.
+- **Run timesheet:** one figure per employee (days or hours), showing the total as it is typed.
+  - Saving, filling from attendance, copying the previous period or importing approved hours recalculates the payslips straight away.
+  - This withdraws an approval, as regenerating always has.
+- **Company pay rules:** the multiplier and minimum-shift settings are no longer applied or shown. The columns stay in `company_payroll_policies` for history. "Allow leave beyond the balance" remains.
+- **Statutory rules unchanged:**
+  - UIF is not deducted for anyone working under 24 hours in the month (a day counts as the employee's ordinary hours a day, or 8);
+  - the flat 25% PAYE for non-standard employment;
+  - ETI hours.
+- **Advice only:** the national minimum wage, for a daily rate measured against an 8-hour day (or the employee's own day).
+- **Migration:** `20261018090000_payroll_simple_time_pay.sql`.

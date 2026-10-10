@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { CalendarCheck2, Clock, Copy, Download, Plus, Save } from 'lucide-react';
+import { CalendarCheck2, Clock, Copy, Download, Save } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
 import { Button } from '../ui/button';
@@ -8,58 +8,40 @@ import { Input } from '../ui/input';
 import { Badge } from '../ui/badge';
 import { Alert, AlertDescription } from '../ui/alert';
 import { Skeleton } from '../ui/skeleton';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../ui/table';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
+import { Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, TableRow } from '../ui/table';
 import { formatCurrency } from '../../lib/utils';
 import { invokePayroll } from '../../lib/payrollOperations';
 import { showError, showSuccess } from '../../utils/toast';
 
-type Values = {
-  ordinaryHours: number;
-  daysWorked: number;
-  overtimeHours: number;
-  sundayHours: number;
-  publicHolidayHours: number;
-  publicHolidayDaysPaid: number;
-};
 type Row = {
   employeeId: string;
   name: string;
   employeeNumber: string | null;
   employmentType: string | null;
-  payBasis: 'salaried' | 'hourly' | 'daily';
+  payBasis: 'hourly' | 'daily';
   rate: number | null;
-  hourlyWage: number;
-  dailyWage: number;
-  hoursPerDay: number;
-  worksSundays: boolean;
   taxMethod: 'tables' | 'non_standard';
-  timesheet: Values | null;
+  quantity: number | null;
   source: 'manual' | 'work_module' | 'attendance' | null;
-  suggestedPublicHolidays: string[];
-  workHours: { ordinary: number; overtime: number; sunday: number; publicHoliday: number; daysWorked: number; factIds: string[] } | null;
-  attendance: { ordinary_hours: number; days_worked: number; overtime_hours: number; sunday_hours: number; public_holiday_hours: number; shiftTopUpHours: number; daysRecorded: number } | null;
-  estimatedPay: number;
+  attendance: { quantity: number; daysRecorded: number } | null;
+  workHours: { quantity: number; entries: number } | null;
+  amount: number;
   issues: Array<{ code: string; message: string }>;
 };
 type Timesheet = {
   run: { id: string; status: string; payPeriodStart: string; payPeriodEnd: string; payFrequency: string };
   rows: Row[];
-  salaried: Array<{ employeeId: string; name: string }>;
+  total: number;
   workHoursWaiting: number;
   attendanceWaiting: number;
-  policy: { overtimeMultiplier: number; sundayMultiplier: number; sundayMultiplierRegular: number; publicHolidayMultiplier: number; minimumShiftHours: number };
 };
 
-const EMPTY: Values = { ordinaryHours: 0, daysWorked: 0, overtimeHours: 0, sundayHours: 0, publicHolidayHours: 0, publicHolidayDaysPaid: 0 };
-type Draft = Record<keyof Values, string>;
-const toDraft = (v: Values | null): Draft => Object.fromEntries(Object.entries(v ?? EMPTY).map(([k, n]) => [k, n ? String(n) : ''])) as Draft;
+const unit = (r: Pick<Row, 'payBasis'>, n: number) => (r.payBasis === 'daily' ? `${n} day${n === 1 ? '' : 's'}` : `${n} hour${n === 1 ? '' : 's'}`);
+const round2 = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100;
 
 /**
- * The run's timesheet: hours (hourly pay) or days (daily pay) worked, overtime, Sunday and
- * public holiday hours, typed in or imported from approved Work Management hours. Hourly and
- * daily-paid employees are paid only for what is on it; salaried employees can be added for
- * overtime. Regenerate payslips after saving.
+ * The run's timesheet for daily and hourly-paid employees: days or hours worked × the
+ * employee's rate. Saving (or filling it) recalculates the payslips straight away.
  */
 export default function TimesheetPanel({ runId, onSaved }: { runId: string; onSaved?: () => void }) {
   const { activeCompany } = useAuth();
@@ -72,173 +54,140 @@ export default function TimesheetPanel({ runId, onSaved }: { runId: string; onSa
     enabled: !!companyId,
     retry: (count, err) => !/Unsupported method|not available on the server/i.test(String((err as Error)?.message)) && count < 1,
   });
-  const [drafts, setDrafts] = useState<Record<string, Draft>>({});
-  const [added, setAdded] = useState<Array<{ employeeId: string; name: string }>>([]);
-
+  const [drafts, setDrafts] = useState<Record<string, string>>({});
   useEffect(() => {
-    if (!data) return;
-    setDrafts(Object.fromEntries(data.rows.map((r) => [r.employeeId, toDraft(r.timesheet)])));
-    setAdded([]);
+    if (data) setDrafts(Object.fromEntries(data.rows.map((r) => [r.employeeId, r.quantity ? String(r.quantity) : ''])));
   }, [data]);
 
-  const refresh = () => { queryClient.invalidateQueries({ queryKey: key }); onSaved?.(); };
-  const save = useMutation({
-    mutationFn: () => invokePayroll<{ saved: Array<{ employeeId: string; issues: unknown[] }> }>({
+  /** Every timesheet change recalculates the payslips, so the run shows the pay at once. */
+  const recalculate = async () => {
+    await invokePayroll({ method: 'GENERATE_PAYSLIPS', company_id: companyId, runId });
+    queryClient.invalidateQueries({ queryKey: key });
+    onSaved?.();
+  };
+  const action = <T,>(fn: () => Promise<T>, message: (r: T) => string) => ({
+    mutationFn: async () => { const r = await fn(); await recalculate(); return r; },
+    onSuccess: (r: T) => showSuccess(message(r)),
+    onError: (e: Error) => showError(e.message),
+  });
+
+  const changedRows = (data?.rows ?? []).filter((r) => {
+    const v = (drafts[r.employeeId] ?? '').trim();
+    return (v === '' ? 0 : Number(v)) !== (r.quantity ?? 0);
+  });
+  const save = useMutation(action(
+    () => invokePayroll<{ saved: number }>({
       method: 'SAVE_TIMESHEET', company_id: companyId, runId,
-      rows: [...(data?.rows ?? []).map((r) => r.employeeId), ...added.map((a) => a.employeeId)].map((employeeId) => {
-        const d = drafts[employeeId] ?? toDraft(null);
-        const row = data?.rows.find((r) => r.employeeId === employeeId);
-        return {
-          employeeId,
-          ...Object.fromEntries(Object.entries(d).map(([k, v]) => [k, v.trim() ? Number(v) : 0])),
-          source: row?.source ?? 'manual',
-        };
-      }),
+      rows: changedRows.map((r) => ({ employeeId: r.employeeId, quantity: (drafts[r.employeeId] ?? '').trim() ? Number(drafts[r.employeeId]) : 0 })),
     }),
-    onSuccess: () => { showSuccess('Timesheet saved. Regenerate payslips to apply it.'); refresh(); },
-    onError: (e: Error) => showError(e.message),
-  });
-  const fillFromRegister = useMutation({
-    mutationFn: () => invokePayroll<{ imported: number }>({ method: 'IMPORT_ATTENDANCE', company_id: companyId, runId }),
-    onSuccess: (r) => { showSuccess(r.imported ? `Filled from the attendance register for ${r.imported} employee${r.imported === 1 ? '' : 's'}.` : 'Nothing recorded in the attendance register for this period.'); refresh(); },
-    onError: (e: Error) => showError(e.message),
-  });
-  const copyPrevious = useMutation({
-    mutationFn: () => invokePayroll<{ copied: number; from: { start: string; end: string } | null }>({ method: 'COPY_PREVIOUS_TIMESHEET', company_id: companyId, runId }),
-    onSuccess: (r) => {
-      showSuccess(r.from
-        ? `Copied ${r.copied} employee${r.copied === 1 ? '' : 's'} from ${r.from.start} – ${r.from.end}${r.copied ? '' : ' (everyone already has hours)'}.`
-        : 'No earlier run of this frequency has a timesheet to copy.');
-      refresh();
-    },
-    onError: (e: Error) => showError(e.message),
-  });
-  const importHours = useMutation({
-    mutationFn: () => invokePayroll<{ imported: number }>({ method: 'IMPORT_WORK_HOURS', company_id: companyId, runId }),
-    onSuccess: (r) => { showSuccess(r.imported ? `Approved hours imported for ${r.imported} employee${r.imported === 1 ? '' : 's'}.` : 'No approved hours waiting in Work Management for this period.'); refresh(); },
-    onError: (e: Error) => showError(e.message),
-  });
+    () => 'Timesheet saved and payslips updated.',
+  ));
+  const fillFromRegister = useMutation(action(
+    () => invokePayroll<{ imported: number }>({ method: 'IMPORT_ATTENDANCE', company_id: companyId, runId }),
+    (r) => (r.imported ? `Filled from attendance for ${r.imported} employee${r.imported === 1 ? '' : 's'}; payslips updated.` : 'Nothing recorded on the attendance register for this period.'),
+  ));
+  const copyPrevious = useMutation(action(
+    () => invokePayroll<{ copied: number; from: { start: string; end: string } | null }>({ method: 'COPY_PREVIOUS_TIMESHEET', company_id: companyId, runId }),
+    (r) => (r.from
+      ? `Copied ${r.copied} employee${r.copied === 1 ? '' : 's'} from ${r.from.start} – ${r.from.end}${r.copied ? '; payslips updated' : ' (everyone already has days or hours)'}.`
+      : 'No earlier run of this frequency has a timesheet to copy.'),
+  ));
+  const importHours = useMutation(action(
+    () => invokePayroll<{ imported: number }>({ method: 'IMPORT_WORK_HOURS', company_id: companyId, runId }),
+    (r) => (r.imported ? `Approved hours imported for ${r.imported} employee${r.imported === 1 ? '' : 's'}; payslips updated.` : 'No approved hours waiting in Work Management for this period.'),
+  ));
+  const busy = save.isPending || fillFromRegister.isPending || copyPrevious.isPending || importHours.isPending;
 
-  const set = (employeeId: string, field: keyof Values, value: string) =>
-    setDrafts((prev) => ({ ...prev, [employeeId]: { ...(prev[employeeId] ?? toDraft(null)), [field]: value } }));
-
-  const rows: Array<Row | { employeeId: string; name: string; payBasis: 'salaried'; added: true }> = useMemo(
-    () => [...(data?.rows ?? []), ...added.map((a) => ({ ...a, payBasis: 'salaried' as const, added: true as const }))],
-    [data, added],
-  );
-  const available = (data?.salaried ?? []).filter((s) => !added.some((a) => a.employeeId === s.employeeId));
-
-  const cell = (employeeId: string, field: keyof Values, label: string, disabled = false) => (
-    <Input
-      type="number" step="0.5" min="0" className="w-20 h-8 text-right" disabled={disabled}
-      aria-label={label} value={drafts[employeeId]?.[field] ?? ''}
-      onChange={(e) => set(employeeId, field, e.target.value)}
-    />
-  );
+  const live = (r: Row) => {
+    const v = (drafts[r.employeeId] ?? '').trim();
+    const qty = v === '' ? 0 : Number(v);
+    return Number.isFinite(qty) && qty >= 0 ? round2(qty * (r.rate ?? 0)) : 0;
+  };
+  const total = (data?.rows ?? []).reduce((s, r) => s + live(r), 0);
+  const draft = data?.run.status === 'draft';
 
   return (
     <Card data-testid="timesheet-panel">
       <CardHeader>
-        <CardTitle className="flex items-center gap-2"><Clock className="h-5 w-5" /> Timesheet</CardTitle>
+        <CardTitle className="flex items-center gap-2"><Clock className="h-5 w-5" /> Days and hours worked</CardTitle>
         <CardDescription>
-          Hours and days worked this period. Hourly and daily-paid employees are paid only for what is captured here. Fill it from the
-          attendance register, copy last period's hours, import approved Work Management hours, or type it in.
-          {data ? ` Overtime ${data.policy.overtimeMultiplier}×, Sunday ${data.policy.sundayMultiplier}× (${data.policy.sundayMultiplierRegular}× for regular Sunday workers), public holiday ${data.policy.publicHolidayMultiplier}× (Payroll settings → Pay rules).` : ''}
+          Daily-paid: days × daily rate. Hourly-paid: hours × hourly rate. Fill it from attendance, copy last period, or type it in.
+          Anything extra (overtime, a bonus) goes on the payslip as a once-off earning.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-3">
         {error ? (
           <Alert variant="destructive"><AlertDescription>The timesheet could not be loaded: {(error as Error).message}</AlertDescription></Alert>
-        ) : isLoading || !data ? <Skeleton className="h-40 w-full" /> : (
+        ) : isLoading || !data ? <Skeleton className="h-40 w-full" /> : data.rows.length === 0 ? (
+          <p className="text-sm text-muted-foreground">No daily or hourly-paid employees on this {data.run.payFrequency} run. Set "Paid by" on the employee to the day or the hour.</p>
+        ) : (
           <>
             <div className="flex flex-wrap items-center gap-2">
-              <Button size="sm" variant="outline" onClick={() => fillFromRegister.mutate()} disabled={fillFromRegister.isPending || data.run.status !== 'draft'} data-testid="fill-from-attendance">
-                <CalendarCheck2 className="mr-1 h-4 w-4" />Fill from attendance register{data.attendanceWaiting ? ` (${data.attendanceWaiting})` : ''}
+              <Button size="sm" variant="outline" onClick={() => fillFromRegister.mutate()} disabled={busy || !draft} data-testid="fill-from-attendance">
+                <CalendarCheck2 className="mr-1 h-4 w-4" />Fill from attendance{data.attendanceWaiting ? ` (${data.attendanceWaiting})` : ''}
               </Button>
-              <Button size="sm" variant="outline" onClick={() => copyPrevious.mutate()} disabled={copyPrevious.isPending || data.run.status !== 'draft'} data-testid="copy-previous-timesheet">
+              <Button size="sm" variant="outline" onClick={() => copyPrevious.mutate()} disabled={busy || !draft} data-testid="copy-previous-timesheet">
                 <Copy className="mr-1 h-4 w-4" />Copy previous period
               </Button>
-              <Button size="sm" variant="outline" onClick={() => importHours.mutate()} disabled={importHours.isPending || data.run.status !== 'draft'} data-testid="import-work-hours">
-                <Download className="mr-1 h-4 w-4" />Import approved hours{data.workHoursWaiting ? ` (${data.workHoursWaiting} entries)` : ''}
-              </Button>
-              {available.length > 0 && (
-                <Select value="" onValueChange={(id) => { const s = available.find((x) => x.employeeId === id); if (s) setAdded((p) => [...p, s]); }}>
-                  <SelectTrigger className="h-9 w-64" aria-label="Add a salaried employee for overtime"><Plus className="mr-1 h-4 w-4" /><SelectValue placeholder="Add salaried employee (overtime)" /></SelectTrigger>
-                  <SelectContent>{available.map((s) => <SelectItem key={s.employeeId} value={s.employeeId}>{s.name}</SelectItem>)}</SelectContent>
-                </Select>
+              {data.workHoursWaiting > 0 && (
+                <Button size="sm" variant="outline" onClick={() => importHours.mutate()} disabled={busy || !draft} data-testid="import-work-hours">
+                  <Download className="mr-1 h-4 w-4" />Import approved hours ({data.workHoursWaiting})
+                </Button>
               )}
             </div>
-            {rows.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No hourly or daily-paid employees on this {data.run.payFrequency} run. Set "Paid by" on the employee to the hour or the day.</p>
-            ) : (
-              <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Employee</TableHead>
-                      <TableHead className="text-right">Hours</TableHead>
-                      <TableHead className="text-right">Days</TableHead>
-                      <TableHead className="text-right">Overtime h</TableHead>
-                      <TableHead className="text-right">Sunday h</TableHead>
-                      <TableHead className="text-right">Public holiday h</TableHead>
-                      <TableHead className="text-right">Public holidays paid (days)</TableHead>
-                      <TableHead className="text-right">Estimate</TableHead>
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Employee</TableHead>
+                    <TableHead className="text-right">Rate</TableHead>
+                    <TableHead className="text-right">Days / hours</TableHead>
+                    <TableHead className="text-right">Total</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {data.rows.map((r) => (
+                    <TableRow key={r.employeeId} data-testid={`timesheet-row-${r.employeeId}`}>
+                      <TableCell className="min-w-48">
+                        <div className="font-medium">
+                          {r.name}
+                          {r.employmentType === 'casual' && <Badge variant="outline" className="ml-1">Casual</Badge>}
+                          {r.taxMethod === 'non_standard' && <Badge variant="secondary" className="ml-1">Tax 25%</Badge>}
+                        </div>
+                        {r.attendance && r.source !== 'attendance' && (
+                          <div className="text-xs text-muted-foreground">Attendance shows {unit(r, r.attendance.quantity)}</div>
+                        )}
+                        {r.issues.map((i) => <div key={i.code} className="text-xs text-amber-600 dark:text-amber-400">{i.message}</div>)}
+                      </TableCell>
+                      <TableCell className="text-right whitespace-nowrap">{formatCurrency(r.rate ?? 0)} / {r.payBasis === 'daily' ? 'day' : 'hour'}</TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex items-center justify-end gap-1">
+                          <Input
+                            type="number" step={r.payBasis === 'daily' ? '0.5' : '0.25'} min="0" className="w-24 h-8 text-right" disabled={!draft}
+                            aria-label={`${r.payBasis === 'daily' ? 'Days' : 'Hours'} worked by ${r.name}`}
+                            value={drafts[r.employeeId] ?? ''}
+                            onChange={(e) => setDrafts((p) => ({ ...p, [r.employeeId]: e.target.value }))}
+                          />
+                          <span className="w-10 text-left text-xs text-muted-foreground">{r.payBasis === 'daily' ? 'days' : 'hours'}</span>
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-right font-mono" data-testid={`timesheet-total-${r.employeeId}`}>{formatCurrency(live(r))}</TableCell>
                     </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {rows.map((r) => {
-                      const full = 'rate' in r ? r : null;
-                      const basis = r.payBasis;
-                      return (
-                        <TableRow key={r.employeeId} data-testid={`timesheet-row-${r.employeeId}`}>
-                          <TableCell className="min-w-48">
-                            <div className="font-medium">{r.name}</div>
-                            <div className="text-xs text-muted-foreground">
-                              {basis === 'hourly' ? `${formatCurrency(full?.rate ?? 0)}/hour` : basis === 'daily' ? `${formatCurrency(full?.rate ?? 0)}/day (${full?.hoursPerDay} h)` : 'Salaried: overtime only'}
-                              {full?.employmentType === 'casual' && <Badge variant="outline" className="ml-1">Casual</Badge>}
-                              {full?.taxMethod === 'non_standard' && <Badge variant="secondary" className="ml-1">Tax 25%</Badge>}
-                              {full?.source === 'work_module' && <Badge variant="outline" className="ml-1">From Work Management</Badge>}
-                              {full?.source === 'attendance' && <Badge variant="outline" className="ml-1">From attendance</Badge>}
-                            </div>
-                            {full?.attendance && full.source !== 'attendance' && (
-                              <div className="text-xs text-muted-foreground">
-                                Attendance register: {full.attendance.daysRecorded} day{full.attendance.daysRecorded === 1 ? '' : 's'}
-                                {full.payBasis === 'daily' ? `, ${full.attendance.days_worked} days` : `, ${full.attendance.ordinary_hours} h`}
-                                {full.attendance.overtime_hours ? ` + ${full.attendance.overtime_hours} h overtime` : ''}
-                              </div>
-                            )}
-                            {full?.workHours && full.source !== 'work_module' && (
-                              <div className="text-xs text-muted-foreground">Approved in Work Management: {full.workHours.ordinary} h + {full.workHours.overtime} h overtime</div>
-                            )}
-                            {full?.issues.map((i) => <div key={i.code} className="text-xs text-destructive">{i.message}</div>)}
-                          </TableCell>
-                          <TableCell className="text-right">{cell(r.employeeId, 'ordinaryHours', `Hours worked by ${r.name}`, basis !== 'hourly')}</TableCell>
-                          <TableCell className="text-right">{cell(r.employeeId, 'daysWorked', `Days worked by ${r.name}`, basis !== 'daily')}</TableCell>
-                          <TableCell className="text-right">{cell(r.employeeId, 'overtimeHours', `Overtime hours for ${r.name}`)}</TableCell>
-                          <TableCell className="text-right">{cell(r.employeeId, 'sundayHours', `Sunday hours for ${r.name}`)}</TableCell>
-                          <TableCell className="text-right">{cell(r.employeeId, 'publicHolidayHours', `Public holiday hours for ${r.name}`)}</TableCell>
-                          <TableCell className="text-right">
-                            {cell(r.employeeId, 'publicHolidayDaysPaid', `Public holidays paid to ${r.name}`, basis === 'salaried')}
-                            {full && full.suggestedPublicHolidays.length > 0 && (
-                              <div className="text-xs text-muted-foreground">{full.suggestedPublicHolidays.length} on working days: {full.suggestedPublicHolidays.join(', ')}</div>
-                            )}
-                          </TableCell>
-                          <TableCell className="text-right font-mono">{full ? formatCurrency(full.estimatedPay) : '—'}</TableCell>
-                        </TableRow>
-                      );
-                    })}
-                  </TableBody>
-                </Table>
-              </div>
-            )}
-            {rows.length > 0 && (
-              <Button onClick={() => save.mutate()} disabled={save.isPending || data.run.status !== 'draft'} data-testid="save-timesheet">
-                <Save className="mr-1 h-4 w-4" />{save.isPending ? 'Saving…' : 'Save timesheet'}
+                  ))}
+                </TableBody>
+                <TableFooter>
+                  <TableRow>
+                    <TableCell colSpan={3}>Total</TableCell>
+                    <TableCell className="text-right font-mono" data-testid="timesheet-grand-total">{formatCurrency(round2(total))}</TableCell>
+                  </TableRow>
+                </TableFooter>
+              </Table>
+            </div>
+            {draft && (
+              <Button onClick={() => save.mutate()} disabled={busy || changedRows.length === 0} data-testid="save-timesheet">
+                <Save className="mr-1 h-4 w-4" />{save.isPending ? 'Saving…' : 'Save and update payslips'}
               </Button>
             )}
-            <p className="text-xs text-muted-foreground">
-              Estimates use the saved timesheet; the payslip is worked out when payslips are generated. UIF is not deducted for anyone working under 24 hours in the month.
-            </p>
           </>
         )}
       </CardContent>

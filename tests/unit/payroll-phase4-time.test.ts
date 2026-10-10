@@ -1,87 +1,71 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import {
-  dailyWage,
-  hourlyWage,
+  attendanceTotals,
   hoursPerDay,
-  ordinaryHoursWorked,
+  hoursWorked,
+  quantityWorked,
   salariedMonthlyHours,
-  timePayLines,
+  timePay,
+  timePayDescription,
   timesheetIssues,
-  totalHoursWorked,
   uifExemptForHours,
-  weeksInPeriod,
   type TimeEmployee,
 } from '@/lib/payrollRulesEngine/timePay';
 import { payrollRunWarnings } from '@/lib/payrollRulesEngine/runWarnings';
 import { RULE_SET_2026_2027 } from '../../supabase/functions/_shared/statutoryPayrollEngine/registry/taxYears';
 import { executeStatutoryPipeline } from '../../supabase/functions/_shared/statutoryPayrollEngine/pipeline';
-import { publicHolidaysOnWorkingDays } from '../../supabase/functions/payroll/time';
 
-const hourly: TimeEmployee = { pay_basis: 'hourly', pay_rate: 50, ordinary_hours_per_week: 40, work_days_per_week: 5 };
+const hourly: TimeEmployee = { pay_basis: 'hourly', pay_rate: 50 };
+const daily: TimeEmployee = { pay_basis: 'daily', pay_rate: 250 };
 
-describe('wages under BCEA s35', () => {
-  it('a salaried employee: weekly wage ÷ ordinary weekly hours (monthly = 4⅓ × weekly)', () => {
-    expect(hourlyWage({ pay_basis: 'salaried', salary_amount: 19_500, salary_period: 'monthly', ordinary_hours_per_week: null })).toBe(100);
-    expect(hourlyWage({ pay_basis: 'salaried', salary_amount: 4_000, salary_period: 'weekly', ordinary_hours_per_week: 40 })).toBe(100);
-    expect(hourlyWage({ pay_basis: 'salaried', salary_amount: 8_000, salary_period: 'fortnightly', ordinary_hours_per_week: 40 })).toBe(100);
+describe('pay for time worked: quantity × rate, nothing else', () => {
+  it('daily-paid: days × daily rate (2 days at R250 = R500)', () => {
+    expect(timePay(daily, { days_worked: 2 })).toBe(500);
+    expect(timePay(daily, { days_worked: 2.5 })).toBe(625);
+    expect(timePayDescription(daily, { days_worked: 2 })).toBe('Days worked (2 × R250.00)');
   });
-  it('a day is the weekly hours ÷ working days, at most 9 (or 7.5 on a 6-day week)', () => {
-    expect(hoursPerDay({ ordinary_hours_per_week: 40, work_days_per_week: 5 })).toBe(8);
-    expect(hoursPerDay({ ordinary_hours_per_week: null, work_days_per_week: 5 })).toBe(9);
-    expect(hoursPerDay({ ordinary_hours_per_week: 45, work_days_per_week: 6 })).toBe(7.5);
+  it('hourly-paid: hours × hourly rate', () => {
+    expect(timePay(hourly, { ordinary_hours: 24 })).toBe(1200);
+    expect(timePayDescription(hourly, { ordinary_hours: 24 })).toBe('Hours worked (24 × R50.00)');
   });
-  it('a daily-paid employee: the day rate over the hours in a day', () => {
-    const daily: TimeEmployee = { pay_basis: 'daily', pay_rate: 900, ordinary_hours_per_week: 45, work_days_per_week: 5 };
-    expect(hourlyWage(daily)).toBe(100);
-    expect(dailyWage(daily)).toBe(900);
-    expect(dailyWage(hourly)).toBe(400);
+  it("only the employee's own quantity counts (days for daily, hours for hourly)", () => {
+    expect(quantityWorked(daily, { days_worked: 3, ordinary_hours: 40 })).toBe(3);
+    expect(quantityWorked(hourly, { days_worked: 3, ordinary_hours: 40 })).toBe(40);
+    expect(timePay({ pay_basis: 'salaried' }, { days_worked: 3, ordinary_hours: 40 })).toBe(0);
+    expect(timePay(daily, null)).toBe(0);
+  });
+  it("a day is the employee's ordinary hours a day, or 8 when not captured (ETI, UIF 24-hour test)", () => {
+    expect(hoursPerDay({})).toBe(8);
+    expect(hoursPerDay({ ordinary_hours_per_week: 45, work_days_per_week: 5 })).toBe(9);
+    expect(hoursWorked(daily, { days_worked: 2 })).toBe(16);
+    expect(hoursWorked(hourly, { ordinary_hours: 10 })).toBe(10);
   });
 });
 
-describe('pay for time worked', () => {
-  it('hourly: ordinary hours, overtime 1.5×, Sunday 2×, public holiday 2×, public holiday not worked at the daily wage', () => {
-    const pay = timePayLines(hourly, { ordinary_hours: 40, overtime_hours: 5, sunday_hours: 4, public_holiday_hours: 8, public_holiday_days_paid: 1 });
-    expect(pay.ordinaryPay).toBe(2000);
-    expect(pay.lines.map((l) => [l.code, l.amount, l.irp5Code])).toEqual([
-      ['time_public_holiday_paid', 400, '3601'],
-      ['time_overtime', 375, '3607'],
-      ['time_sunday', 400, '3601'],
-      ['time_public_holiday_worked', 800, '3601'],
-    ]);
-  });
-  it('an employee who ordinarily works Sundays gets 1.5× (s16)', () => {
-    const pay = timePayLines({ ...hourly, works_sundays: true }, { sunday_hours: 4 });
-    expect(pay.lines[0]).toMatchObject({ code: 'time_sunday', multiplier: 1.5, amount: 300 });
-  });
-  it('daily-paid: days × the day rate', () => {
-    const daily: TimeEmployee = { pay_basis: 'daily', pay_rate: 400, ordinary_hours_per_week: 40, work_days_per_week: 5 };
-    expect(timePayLines(daily, { days_worked: 3 }).ordinaryPay).toBe(1200);
-    expect(ordinaryHoursWorked(daily, { days_worked: 3 })).toBe(24);
-  });
-  it('salaried: only the premiums (the salary pays ordinary time and public holidays)', () => {
-    const salaried: TimeEmployee = { pay_basis: 'salaried', salary_amount: 19_500, salary_period: 'monthly', ordinary_hours_per_week: 45 };
-    const pay = timePayLines(salaried, { overtime_hours: 2, public_holiday_days_paid: 1, ordinary_hours: 10 });
-    expect(pay.ordinaryPay).toBe(0);
-    expect(pay.lines).toEqual([expect.objectContaining({ code: 'time_overtime', amount: 300 })]);
-  });
-  it('hours worked count every kind of hour', () => {
-    expect(totalHoursWorked(hourly, { ordinary_hours: 10, overtime_hours: 2, sunday_hours: 3, public_holiday_hours: 1 })).toBe(16);
-    expect(timePayLines(hourly, null)).toEqual({ ordinaryPay: 0, lines: [] });
+describe('the national minimum wage is advice', () => {
+  it('flags a rate below it (R30.23 an hour from March 2026)', () => {
+    expect(timesheetIssues({ ...hourly, pay_rate: 29 }, '2026-11-08').map((i) => i.code)).toEqual(['BELOW_MINIMUM_WAGE']);
+    expect(timesheetIssues({ ...hourly, pay_rate: 29 }, '2025-11-09')).toEqual([]);
+    expect(timesheetIssues(daily, '2026-11-08')).toEqual([]);
+    expect(timesheetIssues({ ...daily, pay_rate: 200 }, '2026-11-08')[0].message).toMatch(/8-hour day \(R241\.84\)/);
+    expect(timesheetIssues({ pay_basis: 'daily', pay_rate: null }, '2026-11-08').map((i) => i.code)).toEqual(['NO_RATE']);
   });
 });
 
-describe('BCEA limits and the national minimum wage', () => {
-  it('flags overtime over 10 hours a week and ordinary time over 45', () => {
-    expect(weeksInPeriod('2026-11-02', '2026-11-08')).toBe(1);
-    const issues = timesheetIssues(hourly, { ordinary_hours: 50, overtime_hours: 12 }, '2026-11-02', '2026-11-08').map((i) => i.code);
-    expect(issues).toEqual(['OVERTIME_LIMIT', 'ORDINARY_HOURS_LIMIT']);
-    expect(timesheetIssues(hourly, { ordinary_hours: 80, overtime_hours: 20 }, '2026-11-02', '2026-11-15')).toEqual([]);
+describe('attendance totals', () => {
+  it('daily-paid: ticked days, any day of the week (Saturday, Sunday or a public holiday is still a day)', () => {
+    expect(attendanceTotals(daily, [
+      { date: '2026-10-10', days: 1 }, { date: '2026-10-11', days: 1 }, { date: '2026-12-16', days: 0.5 },
+    ])).toEqual({ days_worked: 2.5, ordinary_hours: 0, daysRecorded: 3 });
   });
-  it('flags a rate below the national minimum wage (R30.23 from March 2026)', () => {
-    expect(timesheetIssues({ ...hourly, pay_rate: 29 }, null, '2026-11-02', '2026-11-08').map((i) => i.code)).toEqual(['BELOW_MINIMUM_WAGE']);
-    expect(timesheetIssues({ ...hourly, pay_rate: 29 }, null, '2025-11-03', '2025-11-09')).toEqual([]);
-    expect(timesheetIssues({ pay_basis: 'daily', pay_rate: null }, null, '2026-11-02', '2026-11-08').map((i) => i.code)).toEqual(['NO_RATE']);
+  it('daily-paid days recorded in hours before ticks count as full days', () => {
+    expect(attendanceTotals(daily, [{ date: '2026-10-10', hours: 8 }, { date: '2026-10-11', hours: 24 }]).days_worked).toBe(2);
+  });
+  it('hourly-paid: the hours, nothing split or topped up', () => {
+    expect(attendanceTotals(hourly, [
+      { date: '2026-12-14', hours: 10 }, { date: '2026-12-15', hours: 3 }, { date: '2026-12-16', hours: 8 }, { date: '2026-12-20', hours: 5 },
+    ])).toEqual({ days_worked: 0, ordinary_hours: 26, daysRecorded: 4 });
   });
 });
 
@@ -129,15 +113,6 @@ describe('run warnings for hourly and daily-paid employees', () => {
   });
 });
 
-describe('public holidays on working days', () => {
-  it('only holidays on the employee\'s working days, within employment', () => {
-    // 16 December 2026 is a Wednesday; 25 and 26 December are Friday and Saturday.
-    expect(publicHolidaysOnWorkingDays({ start_date: '2020-01-01', work_days_per_week: 5 }, '2026-12-14', '2026-12-27')).toEqual(['2026-12-16', '2026-12-25']);
-    expect(publicHolidaysOnWorkingDays({ start_date: '2020-01-01', work_days_per_week: 6 }, '2026-12-14', '2026-12-27')).toEqual(['2026-12-16', '2026-12-25', '2026-12-26']);
-    expect(publicHolidaysOnWorkingDays({ start_date: '2026-12-20', work_days_per_week: 5 }, '2026-12-14', '2026-12-27')).toEqual(['2026-12-25']);
-  });
-});
-
 describe('client and server copies', () => {
   it('are identical apart from Deno import extensions', () => {
     for (const file of ['payrollRulesEngine/timePay.ts', 'payrollRulesEngine/runWarnings.ts', 'statutoryPayrollEngine/types.ts']) {
@@ -161,48 +136,5 @@ describe('a reversed payroll run paid nobody', () => {
     expect(isRunInEffect(refinalised)).toBe(true);
     expect(isRunInEffect({ status: 'draft', output_metadata: {} })).toBe(false);
     expect(isRunInEffect({ status: 'paid', output_metadata: { cancelled: true } })).toBe(false);
-  });
-});
-
-describe('attendance register totals (per day)', () => {
-  const week = [
-    { date: '2026-12-14', hours: 10 }, // Monday: 8 ordinary + 2 overtime
-    { date: '2026-12-15', hours: 3 },  // Tuesday: under the 4-hour minimum shift
-    { date: '2026-12-16', hours: 8 },  // Wednesday: Day of Reconciliation
-    { date: '2026-12-20', hours: 5 },  // Sunday
-  ];
-  it('hourly: ordinary up to the ordinary day, the rest overtime; Sunday and public holiday hours apart; short shifts topped up', async () => {
-    const { attendanceTotals } = await import('@/lib/payrollRulesEngine/timePay');
-    expect(attendanceTotals(hourly, week)).toMatchObject({
-      ordinary_hours: 12, overtime_hours: 2, sunday_hours: 5, public_holiday_hours: 8, days_worked: 0, shiftTopUpHours: 1, daysRecorded: 4,
-    });
-  });
-  it('the minimum shift can be switched off', async () => {
-    const { attendanceTotals, BCEA_TIME_POLICY } = await import('@/lib/payrollRulesEngine/timePay');
-    expect(attendanceTotals(hourly, week, { ...BCEA_TIME_POLICY, minimumShiftHours: 0 })).toMatchObject({ ordinary_hours: 11, shiftTopUpHours: 0 });
-  });
-  it('daily-paid: a full ordinary day is 1, half a day 0.5, extra hours overtime', async () => {
-    const { attendanceTotals } = await import('@/lib/payrollRulesEngine/timePay');
-    const daily: TimeEmployee = { pay_basis: 'daily', pay_rate: 400, ordinary_hours_per_week: 40, work_days_per_week: 5 };
-    expect(attendanceTotals(daily, [
-      { date: '2026-12-14', hours: 8 }, { date: '2026-12-15', hours: 4 }, { date: '2026-12-17', hours: 10 },
-    ])).toMatchObject({ days_worked: 2.5, overtime_hours: 2, ordinary_hours: 0 });
-  });
-  it('salaried: only overtime, Sunday and public holiday hours', async () => {
-    const { attendanceTotals } = await import('@/lib/payrollRulesEngine/timePay');
-    const salaried: TimeEmployee = { pay_basis: 'salaried', salary_amount: 19_500, salary_period: 'monthly', ordinary_hours_per_week: 40, work_days_per_week: 5 };
-    expect(attendanceTotals(salaried, week)).toMatchObject({ ordinary_hours: 0, days_worked: 0, overtime_hours: 2, sunday_hours: 5, public_holiday_hours: 8, shiftTopUpHours: 0 });
-  });
-});
-
-describe('company pay rules', () => {
-  it('the company multipliers are used; rules below the BCEA are advice, not refused', async () => {
-    const { timePayLines, timePolicyFrom, policyBelowBcea, BCEA_TIME_POLICY } = await import('@/lib/payrollRulesEngine/timePay');
-    const policy = timePolicyFrom({ overtime_multiplier: 2, sunday_multiplier: 1.5, public_holiday_multiplier: 3 });
-    const pay = timePayLines(hourly, { overtime_hours: 2, sunday_hours: 2, public_holiday_hours: 1 }, policy);
-    expect(pay.lines.map((l) => [l.code, l.amount])).toEqual([['time_overtime', 200], ['time_sunday', 150], ['time_public_holiday_worked', 150]]);
-    expect(policyBelowBcea(policy)).toEqual(['Sunday work below 2× (BCEA s16)']);
-    expect(policyBelowBcea(BCEA_TIME_POLICY)).toEqual([]);
-    expect(timePolicyFrom(null)).toEqual(BCEA_TIME_POLICY);
   });
 });

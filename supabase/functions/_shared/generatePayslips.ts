@@ -30,13 +30,12 @@ import { FINALIZED_RUN_STATUSES, isRunInEffect } from './payrollRunState.ts';
 import { loadLeaveContext, payslipLeaveBalances, unpaidLeaveForPayslip, leaveEmployee, toLeaveEntry } from './leaveRegister.ts';
 import { dailyRate, leaveBalance } from './payrollRulesEngine/leave.ts';
 import {
-  ordinaryHoursWorked,
+  hoursWorked,
   payBasisOf,
   timesheetIssues,
   salariedMonthlyHours,
-  timePayLines,
-  timePolicyFrom,
-  totalHoursWorked,
+  timePay as timePayFor,
+  timePayDescription,
   uifExemptForHours,
 } from './payrollRulesEngine/timePay.ts';
 import {
@@ -235,20 +234,14 @@ export async function loadPayrollRulesContext(supabaseAdmin, companyId, run) {
   const ytdPayslips = prior.payslips;
   // Unpaid leave reduces salary; balances are printed on the payslip.
   const leaveContext = await loadLeaveContext(supabaseAdmin, companyId, activeEmployees.map((e) => e.id));
-  // Hours and days worked on this run (hourly and daily-paid employees, overtime).
+  // Hours and days worked on this run (hourly and daily-paid employees).
   const { data: timesheetRows, error: timesheetError } = await supabaseAdmin
     .from('payroll_timesheets').select('*').eq('company_id', companyId).eq('payroll_run_id', run.id);
   if (timesheetError) throw timesheetError;
   const timesheets = new Map((timesheetRows ?? []).map((t) => [t.employee_id, t]));
-  // The company's pay rules for overtime, Sunday and public holiday work (BCEA by default).
-  const { data: policyRow, error: policyError } = await supabaseAdmin
-    .from('company_payroll_policies').select('*').eq('company_id', companyId).maybeSingle();
-  if (policyError) throw policyError;
-  const timePolicy = timePolicyFrom(policyRow);
   const currentPeriodEstimatedGross = activeEmployees.reduce((sum, employee) => {
     if (payBasisOf(employee) !== 'salaried') {
-      const time = timePayLines(employee, timesheets.get(employee.id) ?? null, timePolicy);
-      return sum + time.ordinaryPay + time.lines.reduce((s, l) => s + l.amount, 0);
+      return sum + timePayFor(employee, timesheets.get(employee.id) ?? null);
     }
     if (!employee.salary_amount) return sum;
     const factor = employmentProRataFactor(employee, periodStart, periodEnd, proRataMethod);
@@ -288,7 +281,6 @@ export async function loadPayrollRulesContext(supabaseAdmin, companyId, run) {
     proRataMethod,
     leaveContext,
     timesheets,
-    timePolicy,
   };
 }
 
@@ -356,13 +348,13 @@ export async function loadRunWarnings(supabaseAdmin, companyId, run, paidEmploye
       });
     }
   }
-  // Timesheets checked against the BCEA limits and the national minimum wage.
+  // Advice on time-paid employees on the timesheet (national minimum wage).
   const timeWarnings = [];
   for (const sheet of timesheets) {
     const e = allEmployees.find((x) => x.id === sheet.employee_id);
     if (!e) continue;
     const name = [e.first_name, e.last_name].filter(Boolean).join(' ') || e.id;
-    for (const issue of timesheetIssues(e, sheet, run.pay_period_start, run.pay_period_end)) {
+    for (const issue of timesheetIssues(e, run.pay_period_end)) {
       if (issue.code === 'NO_RATE') continue;
       timeWarnings.push({ code: 'TIMESHEET_CHECK' as const, category: 'pay' as const, employee_id: e.id, employee_name: name, message: `${name}: ${issue.message}.` });
     }
@@ -406,10 +398,10 @@ export async function generatePayslipsWithRulesEngine(supabaseAdmin, {
     // on the run's timesheet (no timesheet, no pay: the run warns about it).
     const payBasis = payBasisOf(employee);
     const timesheet = ctx.timesheets?.get(employee.id) ?? null;
-    const timePay = timePayLines(employee, timesheet, ctx.timePolicy);
+    const timePay = timePayFor(employee, timesheet);
     if (payBasis === 'salaried') {
       if (!employee.salary_amount) continue;
-    } else if (!Number(employee.pay_rate) || timePay.ordinaryPay + timePay.lines.reduce((s, l) => s + l.amount, 0) <= 0) {
+    } else if (!Number(employee.pay_rate) || timePay <= 0) {
       continue;
     }
 
@@ -430,9 +422,9 @@ export async function generatePayslipsWithRulesEngine(supabaseAdmin, {
     const unpaidLeave = unpaidLeaveForPayslip(employee, ctx.leaveContext, run.pay_period_start, run.pay_period_end, proRataFactor);
     const proRatedSalaryAmount = payBasis === 'salaried'
       ? applyProRata(Number(employee.salary_amount), unpaidLeave.paidShare)
-      : timePay.ordinaryPay;
+      : timePay;
     // UI Act s3: no UIF for fewer than 24 hours worked for the employer in the month.
-    const hoursThisPeriod = payBasis === 'salaried' ? null : totalHoursWorked(employee, timesheet);
+    const hoursThisPeriod = payBasis === 'salaried' ? null : hoursWorked(employee, timesheet);
     const hoursInMonth = payBasis === 'salaried'
       ? salariedMonthlyHours(employee)
       : Math.round((hoursWorkedMonthToDate(ctx.ytdPayslips ?? [], employee.id, run.pay_date) + (hoursThisPeriod ?? 0)) * 100) / 100;
@@ -494,13 +486,6 @@ export async function generatePayslipsWithRulesEngine(supabaseAdmin, {
     } catch (err) {
       const name = [employee.first_name, employee.last_name].filter(Boolean).join(' ') || employee.id;
       throw new Error(`${name}: ${err instanceof Error ? err.message : String(err)}`);
-    }
-    // Overtime, Sunday and public holiday pay from the timesheet: remuneration, taxed with the period's pay.
-    for (const line of timePay.lines) {
-      assembly.lines.push({ description: line.description, type: 'earning', amount: line.amount, componentCode: line.code, irp5Code: line.irp5Code });
-      assembly.cashGross = roundCurrency(assembly.cashGross + line.amount);
-      assembly.taxableBaseAddition = roundCurrency(assembly.taxableBaseAddition + line.amount);
-      assembly.remunerationAddition = roundCurrency(assembly.remunerationAddition + line.amount);
     }
     // Pension and provident fund contributions from the rule lines: the retirement engine
     // gives the section 11F tax relief on them (it adds no payslip line of its own).
@@ -589,7 +574,7 @@ export async function generatePayslipsWithRulesEngine(supabaseAdmin, {
       ordinary_hours_per_week: employee.ordinary_hours_per_week ?? null,
       ordinary_hours: payBasis === 'salaried'
         ? payslipOrdinaryHours(employee.ordinary_hours_per_week, ctx.periodsPerYear, unpaidLeave.paidShare)
-        : ordinaryHoursWorked(employee, timesheet),
+        : hoursWorked(employee, timesheet),
       pay_basis: payBasis,
       hours_worked: hoursThisPeriod,
       hours_worked_in_month: hoursInMonth,
@@ -617,7 +602,12 @@ export async function generatePayslipsWithRulesEngine(supabaseAdmin, {
     const isDirector = employee.employment_type === 'director' || employee.nature_of_person === 'C';
     const nonStatutoryItems = calculation.lineItems
       .filter((item) => !STATUTORY_RULE_IDS.has(item.ruleId))
-      .map((item) => ({ ...item, irp5Code: irp5CodeForRuleLine(item.ruleId, { isDirector }) }));
+      .map((item) => ({
+        ...item,
+        // Daily and hourly pay reads as what it is: days or hours × rate.
+        description: item.ruleId === 'basic_salary' && payBasis !== 'salaried' ? timePayDescription(employee, timesheet) : item.description,
+        irp5Code: irp5CodeForRuleLine(item.ruleId, { isDirector }),
+      }));
     const statutoryItems = statutoryResult.payslipLines.map((line) => ({
       ruleId: line.engineId,
       description: line.description,

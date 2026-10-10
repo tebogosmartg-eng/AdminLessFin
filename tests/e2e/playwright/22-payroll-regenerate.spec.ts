@@ -389,8 +389,9 @@ test('leave: BCEA balances, an employee register and recording leave', async ({ 
   await expect(page.getByText('BCEA s22: 6 weeks per 36 months')).toBeVisible();
 });
 
-test('hourly and casual workers: employee tabs and the run timesheet', async ({ page }) => {
-  // Relies on tests/e2e/run-payroll-time-live.ts having created weekly "Time …" employees for December 2026.
+test('hourly and casual workers: employee tabs and the run timesheet (days or hours × rate)', async ({ page }) => {
+  // Relies on tests/e2e/run-payroll-time-live.ts having created weekly "Time …" employees for
+  // December 2026 and recorded the week of 21 December on the attendance register.
   const env = loadE2EEnv();
   const sb = createClient(env.supabaseUrl, env.supabaseAnonKey, { auth: { persistSession: false } });
   await sb.auth.signInWithPassword({ email: env.email, password: env.password });
@@ -415,21 +416,39 @@ test('hourly and casual workers: employee tabs and the run timesheet', async ({ 
     await waitForRouteSettled(page);
     const panel = page.getByTestId('timesheet-panel');
     await expect(panel).toBeVisible({ timeout: 30_000 });
-    const hoursInput = panel.getByLabel(/^Hours worked by Hourly Time/).first();
-    await expect(hoursInput).toBeVisible({ timeout: 30_000 });
-    await expect(panel).toContainText('2026-12-25'); // Christmas Day on a working day
-    await hoursInput.fill('24');
-    await panel.getByLabel(/^Overtime hours for Hourly Time/).first().fill('2');
+    await expect(panel.getByRole('columnheader', { name: 'Days / hours' })).toBeVisible({ timeout: 30_000 });
+    await expect(panel.getByText(/Overtime|Sunday|Public holiday/)).toHaveCount(0);
+
+    // Fill from attendance: the latest daily test worker has 3.5 days that week (R250 a day).
+    await panel.getByTestId('fill-from-attendance').click();
+    await expect(page.getByText(/Filled from attendance/)).toBeVisible({ timeout: 60_000 });
+    const dailyRow = panel.getByRole('row').filter({ has: page.locator('input[aria-label^="Days worked by Daily Time"][value="3.5"]') }).first();
+    const dailyInput = dailyRow.locator('input[aria-label^="Days worked by Daily Time"]');
+    await expect(dailyInput).toBeVisible({ timeout: 30_000 });
+    await expect(dailyRow).toContainText(/875[,.]00/);
+    // The same run's hourly worker (R50 an hour): the total is its hours × R50.
+    const suffix = (await dailyInput.getAttribute('aria-label'))!.replace('Days worked by Daily Time ', '');
+    const hoursInput = panel.getByLabel(`Hours worked by Hourly Time ${suffix}`);
+    const hourlyRow = panel.getByRole('row').filter({ has: page.getByLabel(`Hours worked by Hourly Time ${suffix}`) });
+    const hours = Number(await hoursInput.inputValue());
+    expect(hours).toBeGreaterThan(0);
+    await expect(hourlyRow).toContainText(new Intl.NumberFormat('en-ZA', { minimumFractionDigits: 2 }).format(hours * 50).replace(/\s/g, '').slice(-6));
+
+    // Typing a figure shows the total at once; saving updates the payslips.
+    await hourlyRow.getByLabel(/^Hours worked by Hourly Time/).fill('24');
+    await expect(hourlyRow).toContainText(/1[\s ]?200[,.]00/);
     await panel.getByTestId('save-timesheet').click();
-    await expect(page.getByText(/Timesheet saved/)).toBeVisible({ timeout: 20_000 });
-    await expect(panel.getByText('R 1 350,00').or(panel.getByText('R1,350.00')).first()).toBeVisible({ timeout: 20_000 });
+    await expect(page.getByText(/Timesheet saved and payslips updated/)).toBeVisible({ timeout: 60_000 });
+    // The payslip list shows the new pay without pressing "Regenerate".
+    const payslipRow = page.getByRole('row').filter({ hasText: `Hourly Time ${suffix}` }).filter({ hasText: 'Certification' });
+    await expect(payslipRow).toContainText(/1[\s ]?200[,.]00/, { timeout: 30_000 });
     await shot(page, '12-timesheet');
   } finally {
     await call(sb, { method: 'DISCARD_RUN', company_id: companyId, runId: run.id }).catch(() => undefined);
   }
 });
 
-test('attendance register and company pay rules', async ({ page }) => {
+test('attendance: ticked days for daily-paid, hours for hourly-paid; payroll rules', async ({ page }) => {
   // Relies on tests/e2e/run-payroll-time-live.ts having recorded the week of 21 December 2026.
   await page.goto('/');
   await waitForRouteSettled(page);
@@ -440,8 +459,22 @@ test('attendance register and company pay rules', async ({ page }) => {
   await page.getByLabel('Week of').fill('2026-12-21');
   const grid = page.getByTestId('attendance-grid');
   await expect(grid).toContainText('Public holiday', { timeout: 30_000 });
-  // Christmas Day: 6 hours recorded for the hourly test worker.
+  // Christmas Day: 6 hours for the hourly worker; a half day and a Saturday for the daily worker.
   await expect(grid.locator('input[aria-label^="Hourly Time"][aria-label$="hours on 2026-12-25"][value="6"]').first()).toBeVisible({ timeout: 30_000 });
+  await expect(grid.getByRole('button', { name: /^Daily Time \w+ on 2026-12-22: half day$/ }).first()).toBeVisible();
+  await expect(grid.getByRole('button', { name: /^Daily Time \w+ on 2026-12-26: full day$/ }).first()).toBeVisible();
+  const dailyRow = grid.getByRole('row').filter({ has: page.getByRole('button', { name: /^Daily Time \w+ on 2026-12-22: half day$/ }) }).first();
+  await expect(dailyRow).toContainText('3.5 days');
+  await expect(dailyRow).toContainText(/875[,.]00/);
+  // A click cycles a day: not worked → full day → half day → not worked.
+  const wednesday = dailyRow.getByRole('button', { name: /on 2026-12-23: not worked$/ });
+  await wednesday.click();
+  await expect(dailyRow.getByRole('button', { name: /on 2026-12-23: full day$/ })).toBeVisible();
+  await expect(dailyRow).toContainText('4.5 days');
+  await expect(page.getByTestId('save-attendance')).toContainText('(1)');
+  await dailyRow.getByRole('button', { name: /on 2026-12-23: full day$/ }).click();
+  await dailyRow.getByRole('button', { name: /on 2026-12-23: half day$/ }).click();
+  await expect(page.getByTestId('save-attendance')).toBeDisabled();
   await shot(page, '13-attendance');
 
   await page.goto('/settings');
@@ -449,10 +482,8 @@ test('attendance register and company pay rules', async ({ page }) => {
   await page.getByRole('tab', { name: /payroll/i }).click();
   const rules = page.getByTestId('pay-rules');
   await expect(rules).toBeVisible({ timeout: 30_000 });
-  await rules.getByLabel('Overtime').fill('1.25');
-  await expect(rules.getByText(/Below the BCEA minimum/)).toBeVisible();
-  await rules.getByLabel('Overtime').fill('1.5');
-  await expect(rules.getByText(/Below the BCEA minimum/)).toHaveCount(0);
+  await expect(rules).toContainText('days × daily rate');
+  await expect(rules.getByLabel('Overtime')).toHaveCount(0);
 });
 
 test('bank payment files, UIF declaration and COIDA return of earnings', async ({ page }) => {

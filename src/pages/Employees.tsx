@@ -76,7 +76,6 @@ export type Employee = {
   work_days_per_week?: number | null;
   pay_basis?: 'salaried' | 'hourly' | 'daily' | null;
   pay_rate?: number | null;
-  works_sundays?: boolean | null;
   tax_method?: 'tables' | 'non_standard' | null;
   deemed_standard_declaration_on?: string | null;
   annual_leave_days_per_cycle?: number | null;

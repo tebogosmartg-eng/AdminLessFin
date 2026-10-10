@@ -102,7 +102,6 @@ const employeeSchema = z.object({
   salary_period: z.enum(['monthly', 'weekly', 'fortnightly']).optional().nullable(),
   pay_basis: z.enum(['salaried', 'hourly', 'daily']).default('salaried'),
   pay_rate: optionalNumber(0.01, 99_999, 'Enter the rate per hour or per day.'),
-  works_sundays: z.boolean().default(false),
   tax_method: z.enum(['tables', 'non_standard']).default('tables'),
   deemed_standard_declaration_on: z.string().optional(),
   residential_unit_number: z.string().optional(),
@@ -173,7 +172,6 @@ const EmployeeForm = ({ isOpen, setIsOpen, employee }: EmployeeFormProps) => {
         salary_period: employee.salary_period || undefined,
         pay_basis: employee.pay_basis ?? 'salaried',
         pay_rate: employee.pay_rate != null ? String(employee.pay_rate) : '',
-        works_sundays: employee.works_sundays === true,
         tax_method: employee.tax_method ?? 'tables',
         deemed_standard_declaration_on: employee.deemed_standard_declaration_on || '',
         ...Object.fromEntries(SARS_TEXT_FIELDS.map((key) => [key, employee[key] || ''])),
@@ -212,7 +210,6 @@ const EmployeeForm = ({ isOpen, setIsOpen, employee }: EmployeeFormProps) => {
         salary_period: undefined,
         pay_basis: 'salaried',
         pay_rate: '',
-        works_sundays: false,
         tax_method: 'tables',
         deemed_standard_declaration_on: '',
         ...Object.fromEntries(SARS_TEXT_FIELDS.map((key) => [key, ''])),
@@ -250,7 +247,6 @@ const EmployeeForm = ({ isOpen, setIsOpen, employee }: EmployeeFormProps) => {
         salary_period: values.salary_period || null,
         pay_basis: values.pay_basis,
         pay_rate: values.pay_basis !== 'salaried' && values.pay_rate?.trim() ? Number(values.pay_rate) : null,
-        works_sundays: values.works_sundays,
         tax_method: values.tax_method,
         deemed_standard_declaration_on: values.deemed_standard_declaration_on || null,
         ...Object.fromEntries(SARS_TEXT_FIELDS.map((key) => [key, values[key]?.trim() || null])),
@@ -535,8 +531,8 @@ const EmployeeForm = ({ isOpen, setIsOpen, employee }: EmployeeFormProps) => {
                     <FormControl><SelectTrigger aria-label="Paid by"><SelectValue /></SelectTrigger></FormControl>
                     <SelectContent>
                       <SelectItem value="salaried">Salary</SelectItem>
-                      <SelectItem value="hourly">The hour (hours on the run's timesheet)</SelectItem>
-                      <SelectItem value="daily">The day (days on the run's timesheet)</SelectItem>
+                      <SelectItem value="daily">The day (days worked × daily rate)</SelectItem>
+                      <SelectItem value="hourly">The hour (hours worked × hourly rate)</SelectItem>
                     </SelectContent>
                   </Select>
                   <FormDescription>Casual and part-time workers are usually paid by the hour or the day on weekly runs.</FormDescription>
@@ -551,7 +547,7 @@ const EmployeeForm = ({ isOpen, setIsOpen, employee }: EmployeeFormProps) => {
                 <FormField control={form.control} name="pay_rate" render={({ field }) => (
                   <FormItem><FormLabel>{payBasis === 'hourly' ? 'Rate per Hour' : 'Rate per Day'}</FormLabel>
                     <FormControl><Input {...field} type="number" step="0.01" min="0" placeholder={payBasis === 'hourly' ? 'e.g. 45.00' : 'e.g. 400.00'} /></FormControl>
-                    <FormDescription>Overtime, Sunday and public holiday pay are worked out from this (BCEA).</FormDescription><FormMessage /></FormItem>
+                    <FormDescription>{payBasis === 'hourly' ? 'Pay = hours worked × this rate.' : 'Pay = days worked × this rate.'}</FormDescription><FormMessage /></FormItem>
                 )} />
               )}
               <FormField control={form.control} name="salary_period" render={({ field }) => (
@@ -565,12 +561,6 @@ const EmployeeForm = ({ isOpen, setIsOpen, employee }: EmployeeFormProps) => {
                           </SelectContent>
                       </Select><FormMessage />
                   </FormItem>
-              )} />
-              <FormField control={form.control} name="works_sundays" render={({ field }) => (
-                <FormItem className="flex items-center gap-2 space-y-0">
-                  <FormControl><Checkbox checked={field.value} onCheckedChange={(checked) => field.onChange(checked === true)} /></FormControl>
-                  <FormLabel className="font-normal">Ordinarily works on Sundays (Sunday work at 1.5× instead of 2×)</FormLabel>
-                </FormItem>
               )} />
               <FormField control={form.control} name="tax_method" render={({ field }) => (
                 <FormItem><FormLabel>Employees' Tax</FormLabel>
