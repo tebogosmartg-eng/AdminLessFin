@@ -22,7 +22,9 @@ export type PayrollAccountRole =
   | 'sdl_control'
   | 'retirement_fund_control'
   | 'medical_aid_control'
-  | 'employee_deductions';
+  | 'employee_deductions'
+  | 'leave_pay_expense'
+  | 'leave_provision';
 
 export type PayrollAccountSpec = {
   role: PayrollAccountRole;
@@ -87,6 +89,16 @@ export const PAYROLL_ACCOUNTS: PayrollAccountSpec[] = [
     role: 'employee_deductions', label: 'Other payroll deductions payable', help: 'Any other deduction (union fees, garnishee orders).',
     type: 'Liability', category: 'Current Liabilities', subcategory: 'Trade and Other Payables',
     template: { number: 2163, name: 'Other Payroll Deductions Payable' },
+  },
+  {
+    role: 'leave_pay_expense', label: 'Leave pay (year-end accrual)', help: 'The cost of leave earned and not yet taken.',
+    type: 'Expense', category: 'Operating Expenses', subcategory: 'Employee Costs',
+    template: { number: 6085, name: 'Leave Pay' },
+  },
+  {
+    role: 'leave_provision', label: 'Accrued leave pay', help: 'What the company owes for leave not yet taken.',
+    type: 'Liability', category: 'Current Liabilities', subcategory: 'Trade and Other Payables',
+    template: { number: 2164, name: 'Accrued Leave Pay' },
   },
 ];
 

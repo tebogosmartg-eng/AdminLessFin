@@ -11,14 +11,136 @@ import {
   classificationAdvice,
   suggestAccount,
 } from '../_shared/payrollRulesEngine/payrollAccounts.ts'
+import { leaveAccrual } from '../_shared/payrollRulesEngine/leaveAccrual.ts'
+import { loadLeaveRows, toLeaveEntry } from '../_shared/leaveRegister.ts'
 
-export const ACCOUNT_METHODS = new Set(['GET_PAYROLL_ACCOUNTS', 'SAVE_PAYROLL_ACCOUNTS', 'SET_UP_PAYROLL_ACCOUNTS', 'PREVIEW_RUN_POSTING']);
+const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
+const round2 = (n) => Math.round((n + Number.EPSILON) * 100) / 100;
+
+/**
+ * The leave pay accrual at a date, the accrued leave pay account's balance then,
+ * and the journal that brings one to the other (ADR-0009).
+ */
+async function prepareLeaveAccrual(admin, companyId, asOf, Err) {
+  if (!ISO_DATE.test(String(asOf ?? ''))) {
+    throw new Err({ stage: 'validation', code: 'ACCRUAL_DATE', message: 'Choose the date to accrue leave pay at (usually the financial year end).', recovery: 'Pick a date.' });
+  }
+  const [{ data: employees, error: empError }, { data: types, error: typeError }, mappings] = await Promise.all([
+    admin.from('employees').select('*').eq('company_id', companyId),
+    admin.from('company_leave_types').select('id, accrual, active').eq('company_id', companyId),
+    loadMappings(admin, companyId),
+  ]);
+  if (empError) throw empError;
+  if (typeError) throw typeError;
+  const annual = (types ?? []).find((t) => t.accrual === 'bcea_annual' && t.active);
+  const rows = annual ? await loadLeaveRows(admin, companyId) : [];
+  const accrual = leaveAccrual(asOf, employees ?? [], (id) =>
+    rows.filter((r) => r.employee_id === id && r.leave_type_id === annual?.id).map(toLeaveEntry));
+
+  const account = (role) => mappings.find((m) => m.account_role === role && m.is_active)?.account_id ?? null;
+  const expenseId = account('leave_pay_expense');
+  const liabilityId = account('leave_provision');
+  let ledgerBalance = 0;
+  if (liabilityId) {
+    for (let offset = 0; ; offset += 1000) {
+      const { data: lines, error } = await admin.from('journal_entry_items')
+        .select('type, amount, journal_entries!inner(company_id, entry_date)')
+        .eq('account_id', liabilityId).eq('journal_entries.company_id', companyId).lte('journal_entries.entry_date', asOf)
+        .order('id').range(offset, offset + 999);
+      if (error) throw error;
+      for (const l of lines ?? []) ledgerBalance += (l.type === 'credit' ? 1 : -1) * Number(l.amount || 0);
+      if (!lines || lines.length < 1000) break;
+    }
+  }
+  const chart = await loadChart(admin, companyId);
+  const name = (id) => chart.find((a) => a.id === id)?.name ?? null;
+  ledgerBalance = round2(ledgerBalance);
+  return {
+    ...accrual,
+    annualLeaveTracked: !!annual,
+    ledgerBalance,
+    adjustment: round2(accrual.total - ledgerBalance),
+    accounts: { expense: expenseId ? { id: expenseId, name: name(expenseId) } : null, liability: liabilityId ? { id: liabilityId, name: name(liabilityId) } : null },
+  };
+}
+
+export const ACCOUNT_METHODS = new Set([
+  'GET_PAYROLL_ACCOUNTS', 'SAVE_PAYROLL_ACCOUNTS', 'SET_UP_PAYROLL_ACCOUNTS', 'PREVIEW_RUN_POSTING', 'RECLASSIFY_PAYROLL_ACCOUNT',
+  'PREPARE_LEAVE_ACCRUAL', 'POST_LEAVE_ACCRUAL',
+]);
+
+/** The classification a journal line's role needs (older runs record the single liability roles). */
+const SPEC_FOR_ROLE = {
+  salary_expense: 'salary_expense',
+  employer_expense: 'salary_expense',
+  uif_employer_expense: 'uif_employer_expense',
+  sdl_expense: 'sdl_expense',
+  bank: 'bank',
+  // The single payroll liability held PAYE, UIF and SDL together: statutory payables.
+  payroll_liability: 'paye_control',
+  employer_contributions: 'paye_control',
+  paye_control: 'paye_control',
+  uif_control: 'uif_control',
+  sdl_control: 'sdl_control',
+  retirement_fund_control: 'retirement_fund_control',
+  medical_aid_control: 'medical_aid_control',
+  employee_deductions: 'employee_deductions',
+};
+/** Ledger roles a payroll account may carry and still be reclassified for payroll. */
+const PAYROLL_LEDGER_ROLES = new Set(['', 'payroll_clearing', 'bank']);
+
+/** Whether payroll may reclassify this account, and why not when it may not. */
+function reclassifyBlock(account) {
+  const role = String(account.account_role ?? '');
+  if (account.system_account) return `${account.name} is a system account; its classification is fixed.`;
+  if (!PAYROLL_LEDGER_ROLES.has(role)) {
+    return `${account.name} is also your ${role.replace(/_/g, ' ')} account, so it cannot be reclassified for payroll. Set up payroll accounts so new runs post to their own accounts, and move what payroll posted here with a journal.`;
+  }
+  return null;
+}
+
+/** The accounts payroll journals have posted to, and what to change about each. */
+async function postedAccounts(admin, companyId, chart) {
+  const { data: runs, error } = await admin.from('payroll_runs').select('journal_entry_id').eq('company_id', companyId).not('journal_entry_id', 'is', null);
+  if (error) throw error;
+  const ids = [...new Set((runs ?? []).map((r) => r.journal_entry_id))];
+  const roles = new Map();
+  for (let i = 0; i < ids.length; i += 100) {
+    const { data: lines, error: lineError } = await admin.from('journal_entry_items').select('account_id, dimensions').in('journal_entry_id', ids.slice(i, i + 100));
+    if (lineError) throw lineError;
+    for (const l of lines ?? []) {
+      const role = l.dimensions?.account_role;
+      if (!role || !SPEC_FOR_ROLE[role]) continue;
+      if (!roles.has(l.account_id)) roles.set(l.account_id, new Set());
+      roles.get(l.account_id).add(role);
+    }
+  }
+  const byId = new Map(chart.map((a) => [a.id, a]));
+  const out = [];
+  for (const [accountId, used] of roles) {
+    const account = byId.get(accountId);
+    if (!account) continue;
+    const spec = PAYROLL_ACCOUNTS.find((x) => x.role === SPEC_FOR_ROLE[[...used][0]]);
+    const advice = classificationAdvice(spec, account);
+    if (!advice) continue;
+    const blocked = reclassifyBlock(account);
+    out.push({
+      accountId, name: account.name, code: account.account_code, usedFor: [...used],
+      category: account.category, subcategory: account.subcategory,
+      target: { category: spec.category, subcategory: spec.subcategory },
+      role: spec.role,
+      advice: blocked ?? advice,
+      canReclassify: !blocked && String(account.type) === spec.type,
+    });
+  }
+  return out.sort((a, b) => a.name.localeCompare(b.name));
+}
 
 const ROLES = new Set(PAYROLL_ACCOUNTS.map((s) => s.role));
 
 async function loadChart(admin, companyId) {
   const { data, error } = await admin.from('chart_of_accounts')
-    .select('id, name, type, category, subcategory, account_number, account_code, account_role, tax_treatment, is_active')
+    .select('id, name, type, category, subcategory, account_number, account_code, account_role, tax_treatment, is_active, system_account, control_account')
     .eq('company_id', companyId);
   if (error) throw error;
   return data ?? [];
@@ -47,14 +169,17 @@ async function accountsView(admin, companyId) {
       expects: { type: spec.type, category: spec.category, subcategory: spec.subcategory },
       account: account ? { id: account.id, name: account.name, code: account.account_code, category: account.category, subcategory: account.subcategory } : null,
       suggested: suggested ? { id: suggested.id, name: suggested.name, code: suggested.account_code } : null,
-      advice: account ? classificationAdvice(spec, account) : null,
+      advice: account ? (classificationAdvice(spec, account) ? (reclassifyBlock(account) ?? classificationAdvice(spec, account)) : null) : null,
+      canReclassify: !!account && !!classificationAdvice(spec, account) && !reclassifyBlock(account) && String(account.type) === spec.type,
     };
   });
+  const posted = await postedAccounts(admin, companyId, chart);
   // The old single liability account is still honoured for anything unmapped.
   const legacy = mappings.find((m) => m.account_role === 'payroll_liability' && m.is_active);
   return {
     roles,
     legacyLiability: legacy ? (byId.get(legacy.account_id)?.name ?? null) : null,
+    posted,
     configured: roles.filter((r) => r.required).every((r) => !!r.account),
     accounts: chart.filter((a) => a.is_active !== false).map((a) => ({ id: a.id, name: a.name, code: a.account_code, type: a.type, category: a.category, subcategory: a.subcategory })),
   };
@@ -181,6 +306,72 @@ export async function handleAccountMethod(method, ctx) {
     }
     await logPayrollAudit(admin, { company_id, event_type: 'payroll_accounts_set_up', event_data: { created, mapped }, created_by: user.id });
     return { ...(await accountsView(admin, company_id)), created, mapped };
+  }
+
+  if (method === 'RECLASSIFY_PAYROLL_ACCOUNT') {
+    // One account, on the user's say-so: classified as the statements need it
+    // for the payroll role it carries. Amounts and journals are not touched.
+    const spec = PAYROLL_ACCOUNTS.find((x) => x.role === body.role);
+    if (!spec) throw new Err({ stage: 'validation', code: 'PAYROLL_ACCOUNT_ROLE', message: 'Unknown payroll account role.', recovery: 'Refresh the page.' });
+    const chart = await loadChart(admin, company_id);
+    const account = chart.find((a) => a.id === body.accountId);
+    if (!account) throw new Err({ stage: 'validation', code: 'PAYROLL_ACCOUNT_NOT_FOUND', message: 'That account is not in this company.', recovery: 'Refresh the page.' });
+    const blocked = reclassifyBlock(account);
+    if (blocked) throw new Err({ stage: 'validation', code: 'PAYROLL_ACCOUNT_SHARED', message: blocked, recovery: 'Set up payroll accounts instead.' });
+    if (String(account.type) !== spec.type) {
+      throw new Err({ stage: 'validation', code: 'PAYROLL_ACCOUNT_TYPE', message: `${account.name} is ${account.type ?? 'unclassified'}; ${spec.label.toLowerCase()} needs a ${spec.type.toLowerCase()} account.`, recovery: 'Choose another account.' });
+    }
+    const before = { category: account.category, subcategory: account.subcategory };
+    const { error } = await admin.from('chart_of_accounts').update({ category: spec.category, subcategory: spec.subcategory })
+      .eq('id', account.id).eq('company_id', company_id);
+    if (error) throw error;
+    await logPayrollAudit(admin, { company_id, event_type: 'payroll_account_reclassified', event_data: { account_id: account.id, name: account.name, before, after: { category: spec.category, subcategory: spec.subcategory } }, created_by: user.id });
+    return accountsView(admin, company_id);
+  }
+
+  if (method === 'PREPARE_LEAVE_ACCRUAL') return prepareLeaveAccrual(admin, company_id, body.asOf, Err);
+
+  if (method === 'POST_LEAVE_ACCRUAL') {
+    // Posted only when the user accepts it: the difference between what is owed
+    // for leave and what the accrued leave pay account holds at the date.
+    const prepared = await prepareLeaveAccrual(admin, company_id, body.asOf, Err);
+    if (!prepared.accounts.expense || !prepared.accounts.liability) {
+      throw new Err({
+        stage: 'validation', code: 'ACCRUAL_ACCOUNTS',
+        message: 'Choose the leave pay and accrued leave pay accounts first.',
+        recovery: 'Settings → Payroll → Payroll accounts ("Set up payroll accounts" adds them).',
+      });
+    }
+    if (Math.abs(prepared.adjustment) < 0.01) return { ...prepared, posted: false };
+    if (body.expectedAdjustment != null && Math.abs(Number(body.expectedAdjustment) - prepared.adjustment) >= 0.01) {
+      throw new Err({ stage: 'state_transition', code: 'ACCRUAL_CHANGED', message: 'The leave figures changed since you prepared the accrual.', recovery: 'Prepare it again and check the new amount.', status: 409 });
+    }
+    const up = prepared.adjustment > 0;
+    const amount = Math.abs(prepared.adjustment);
+    const documentId = crypto.randomUUID();
+    const { data: posted, error } = await admin.rpc('posting_engine_submit', {
+      p_request: {
+        company_id,
+        posting_date: prepared.asOf,
+        module: 'payroll',
+        document_type: 'leave_accrual',
+        document_id: documentId,
+        reference: `LEAVE-${prepared.asOf}`,
+        description: `Leave pay accrual at ${prepared.asOf}`,
+        currency: 'ZAR',
+        source: 'payroll_leave_accrual',
+        created_by: user.id,
+        idempotency_key: `payroll:leave_accrual:${prepared.asOf}:${prepared.ledgerBalance.toFixed(2)}:${prepared.total.toFixed(2)}`,
+        lines: [
+          { account_id: prepared.accounts.expense.id, debit: up ? amount : 0, credit: up ? 0 : amount, description: up ? 'Leave pay accrued' : 'Leave pay accrual released', dimensions: { account_role: 'leave_pay_expense' } },
+          { account_id: prepared.accounts.liability.id, debit: up ? 0 : amount, credit: up ? amount : 0, description: 'Accrued leave pay', dimensions: { account_role: 'leave_provision' } },
+        ],
+      },
+      p_mode: 'commit',
+    });
+    if (error) throw error;
+    await logPayrollAudit(admin, { company_id, event_type: 'leave_accrual_posted', event_data: { as_of: prepared.asOf, total: prepared.total, ledger_before: prepared.ledgerBalance, adjustment: prepared.adjustment, journal_id: posted?.journal_id, document_id: documentId }, created_by: user.id });
+    return { ...(await prepareLeaveAccrual(admin, company_id, prepared.asOf, Err)), posted: true, journalNumber: posted?.journal_number ?? null };
   }
 
   if (method === 'PREVIEW_RUN_POSTING') {

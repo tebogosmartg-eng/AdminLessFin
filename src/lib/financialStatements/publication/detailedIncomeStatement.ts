@@ -8,7 +8,7 @@
  * comprehensive income states — gross profit, operating profit, finance costs,
  * profit before taxation, taxation, profit for the year. It is supplementary
  * information: it prints behind its own disclaimer and is never part of the
- * annual financial statements.
+ * annual financial statements. Employee costs are one line; their note analyses them.
  *
  * The page band names the years, so the schedule carries no year row of its
  * own; its first row is an empty column header that the renderer recognises.
@@ -51,9 +51,20 @@ export function buildDetailedIncomeStatement(
   const costOfSales = expenses.filter((r) => cat(r) === 'Cost of Sales').sort(byName);
   const finance = expenses.filter((r) => cat(r) === 'Finance Costs').sort(byName);
   const taxation = expenses.filter((r) => cat(r) === 'Taxation').sort(byName);
-  const operating = expenses
-    .filter((r) => !['Cost of Sales', 'Finance Costs', 'Taxation'].includes(cat(r)))
-    .sort(byName);
+  const operatingAccounts = expenses.filter((r) => !['Cost of Sales', 'Finance Costs', 'Taxation'].includes(cat(r)));
+  // Employee costs read as one line, as a published schedule states them; the
+  // employee costs note analyses them.
+  const employee = operatingAccounts.filter((r) => String(r.subcategory || '') === 'Employee Costs');
+  const employeeLine: Row[] = employee.length
+    ? [{
+        ...employee[0],
+        id: 'employee-costs',
+        name: 'Employee costs',
+        activity: employee.reduce((s, r) => s + r.activity, 0),
+        priorActivity: employee.reduce((s, r) => s + r.priorActivity, 0),
+      }]
+    : [];
+  const operating = [...operatingAccounts.filter((r) => !employee.includes(r)), ...employeeLine].sort(byName);
 
   const sum = (rows: Row[], of: (r: Row) => number) => rows.reduce((acc, r) => acc + of(r), 0);
   const cur = (r: Row) => r.activity;

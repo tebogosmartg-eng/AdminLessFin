@@ -19,6 +19,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '../components/ui/sheet';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { invokePayroll } from '../lib/payrollOperations';
+import LeaveAccrualPanel from '../components/payroll/LeaveAccrualPanel';
 import { formatCurrency } from '../lib/utils';
 import { showError, showSuccess } from '../utils/toast';
 import { leaveWorkingDays, type LeaveAccrual, type LeaveBalance } from '../lib/payrollRulesEngine/leave';
@@ -410,6 +411,7 @@ export default function Leave() {
           <TabsList>
             <TabsTrigger value="balances">Balances</TabsTrigger>
             <TabsTrigger value="types">Leave types</TabsTrigger>
+            <TabsTrigger value="accrual">Year-end accrual</TabsTrigger>
           </TabsList>
           <TabsContent value="balances" className="mt-4">
             <Card>
@@ -458,6 +460,9 @@ export default function Leave() {
                 )}
               </CardContent>
             </Card>
+          </TabsContent>
+          <TabsContent value="accrual" className="mt-4">
+            <LeaveAccrualPanel />
           </TabsContent>
           <TabsContent value="types" className="mt-4">
             <Card>

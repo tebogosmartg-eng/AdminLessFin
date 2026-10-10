@@ -22,6 +22,13 @@ export type PayrollAccountsView = {
     account: { id: string; name: string; code: string | null; category: string | null; subcategory: string | null } | null;
     suggested: { id: string; name: string; code: string | null } | null;
     advice: string | null;
+    canReclassify: boolean;
+  }>;
+  /** Accounts payroll journals posted to that the statements would present elsewhere. */
+  posted: Array<{
+    accountId: string; name: string; code: string | null; usedFor: string[]; role: string;
+    category: string | null; subcategory: string | null; target: { category: string; subcategory: string };
+    advice: string; canReclassify: boolean;
   }>;
   legacyLiability: string | null;
   configured: boolean;
@@ -72,6 +79,22 @@ export default function PayrollAccountsCard() {
     },
     onError: (e: Error) => showError(e.message),
   });
+
+  const reclassify = useMutation({
+    mutationFn: (v: { accountId: string; role: string }) => invokePayroll<PayrollAccountsView>({ method: 'RECLASSIFY_PAYROLL_ACCOUNT', company_id: companyId, ...v }),
+    onSuccess: (view) => {
+      done(view);
+      queryClient.invalidateQueries({ queryKey: ['chart-of-accounts'] });
+      showSuccess('Account classified. Update the financial statements from accounting to show it.');
+    },
+    onError: (e: Error) => showError(e.message),
+  });
+  const fixButton = (accountId: string, role: string, target: string, testId: string) => (
+    <Button size="sm" variant="outline" className="mt-1" disabled={reclassify.isPending} data-testid={testId}
+      onClick={() => reclassify.mutate({ accountId, role })}>
+      Classify as {target}
+    </Button>
+  );
 
   if (error) return <Alert variant="destructive"><AlertDescription>Payroll accounts could not be loaded: {(error as Error).message}</AlertDescription></Alert>;
   if (isLoading || !data) return <Skeleton className="h-64 w-full" />;
@@ -124,6 +147,7 @@ export default function PayrollAccountsCard() {
                       </Select>
                       {!r.account && r.suggested && <div className="mt-1 text-xs text-muted-foreground">Suggested: {r.suggested.name}</div>}
                       {r.advice && <div className="mt-1 text-xs text-amber-600 dark:text-amber-400">{r.advice}</div>}
+                      {r.account && r.canReclassify && fixButton(r.account.id, r.role, `${r.expects.category} › ${r.expects.subcategory}`, `reclassify-${r.role}`)}
                     </TableCell>
                   </TableRow>
                 );
@@ -131,6 +155,22 @@ export default function PayrollAccountsCard() {
             </TableBody>
           </Table>
         </div>
+        {data.posted.length > 0 && (
+          <div className="space-y-2 rounded-md border p-3" data-testid="payroll-posted-accounts">
+            <p className="text-sm font-medium">Accounts earlier payroll runs posted to</p>
+            <p className="text-xs text-muted-foreground">
+              The financial statements present these elsewhere than payroll belongs. Classifying one changes how it is presented, not its amounts;
+              statements already finalised keep their figures until updated from accounting.
+            </p>
+            {data.posted.map((a) => (
+              <div key={a.accountId} className="border-t pt-2 text-sm" data-testid={`posted-account-${a.accountId}`}>
+                <div className="font-medium">{a.code ? `${a.code} ` : ''}{a.name}</div>
+                <div className="text-xs text-amber-600 dark:text-amber-400">{a.advice}</div>
+                {a.canReclassify && fixButton(a.accountId, a.role, `${a.target.category} › ${a.target.subcategory}`, `reclassify-posted-${a.accountId}`)}
+              </div>
+            ))}
+          </div>
+        )}
         <Button variant="outline" onClick={() => save.mutate()} disabled={save.isPending || changed.length === 0} data-testid="save-payroll-accounts">
           {save.isPending ? 'Saving…' : `Save${changed.length ? ` (${changed.length})` : ''}`}
         </Button>

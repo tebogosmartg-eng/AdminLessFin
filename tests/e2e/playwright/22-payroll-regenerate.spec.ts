@@ -563,3 +563,21 @@ test('payroll accounts: each journal line has its account, classified for the st
   await expect(card.getByTestId('save-payroll-accounts')).toBeDisabled();
   await shot(page, '17-payroll-accounts');
 });
+
+test('leave: the year-end accrual is valued and its journal offered for acceptance', async ({ page }) => {
+  // Relies on tests/e2e/run-payroll-afs-live.ts having accepted the accrual at 31 October 2026.
+  await page.goto('/');
+  await waitForRouteSettled(page);
+  await ensureReadyCompany(page);
+  await page.goto('/leave');
+  await waitForRouteSettled(page);
+  await expectNoErrorBoundary(page);
+  await page.getByRole('tab', { name: 'Year-end accrual' }).click();
+  const panel = page.getByTestId('leave-accrual');
+  await panel.getByLabel('As at').fill('2026-10-31');
+  await panel.getByTestId('prepare-leave-accrual').click();
+  await expect(panel.getByTestId('leave-accrual-lines')).toBeVisible({ timeout: 60_000 });
+  await expect(panel.getByTestId('leave-accrual-total')).not.toHaveText(/R\s?0[,.]00/);
+  await expect(panel.getByTestId('leave-accrual-journal')).toContainText(/holds .* on 2026-10-31/i);
+  await shot(page, '18-leave-accrual');
+});

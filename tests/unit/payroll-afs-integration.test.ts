@@ -180,3 +180,43 @@ describe('payroll accounts', () => {
     }
   });
 });
+
+describe('leave pay accrual', () => {
+  it('annual leave owing × the daily rate, by pay basis; leavers and nil balances left out', async () => {
+    const { leaveAccrual, leaveDayRate } = await import('@/lib/payrollRulesEngine/leaveAccrual');
+    expect(leaveDayRate({ id: 's', salary_amount: 21_666.67, salary_period: 'monthly', work_days_per_week: 5 })).toBe(1000);
+    expect(leaveDayRate({ id: 'd', pay_basis: 'daily', pay_rate: 250 })).toBe(250);
+    expect(leaveDayRate({ id: 'h', pay_basis: 'hourly', pay_rate: 50 })).toBe(400);
+    const accrual = leaveAccrual('2026-02-28', [
+      // A full year from 1 March 2025: 15 days earned, 5 taken → 10 owing.
+      { id: 's', first_name: 'Salaried', start_date: '2025-03-01', salary_amount: 21_666.67, salary_period: 'monthly', work_days_per_week: 5 },
+      { id: 'left', first_name: 'Leaver', start_date: '2025-03-01', end_date: '2025-12-31', salary_amount: 10_000 },
+      { id: 'norate', first_name: 'Norate', start_date: '2025-03-01', pay_basis: 'daily', pay_rate: null },
+    ], (id) => (id === 's' ? [{ leaveTypeId: 'a', entryType: 'taken', startDate: '2025-06-02', endDate: '2025-06-06', effectiveDate: '2025-06-02', days: 5, status: 'approved' }] : []) as never);
+    expect(accrual.lines.map((l) => [l.name, l.days, l.dailyRate, l.amount])).toEqual([['Salaried', 10, 1000, 10000]]);
+    expect(accrual.total).toBe(10000);
+    expect(accrual.unvalued).toEqual(['Norate']);
+  });
+  it('client and server copies are identical', () => {
+    const client = readFileSync('src/lib/payrollRulesEngine/leaveAccrual.ts', 'utf8').replace(/\r\n/g, '\n');
+    const server = readFileSync('supabase/functions/_shared/payrollRulesEngine/leaveAccrual.ts', 'utf8').replace(/\r\n/g, '\n').replace(/(from '\.{1,2}\/[^']+)\.ts'/g, "$1'");
+    expect(server).toBe(client);
+  });
+});
+
+describe('Detailed Income Statement', () => {
+  it('states employee costs as one line among the operating expenses', async () => {
+    const { buildDetailedIncomeStatement } = await import('@/lib/financialStatements/publication/detailedIncomeStatement');
+    const f = facts([
+      account('r', 'Sales', 'Income', 'Revenue', null, 500000),
+      account('w', 'Salaries and Wages', 'Expense', 'Operating Expenses', 'Employee Costs', 161000, 18000),
+      account('s', 'SDL Contribution (Employer)', 'Expense', 'Operating Expenses', 'Employee Costs', 1580, 180),
+      account('aud', 'Audit Fees', 'Expense', 'Operating Expenses', null, 30000, 28000),
+    ], null);
+    const schedule = buildDetailedIncomeStatement(f, { current: '2026', comparative: '2025' } as never)!;
+    const labels = schedule.rows.map((r) => r[0]);
+    expect(labels).toContain('Employee costs');
+    expect(labels).not.toContain('Salaries and Wages');
+    expect(labels.indexOf('Audit Fees')).toBeLessThan(labels.indexOf('Employee costs'));
+  });
+});

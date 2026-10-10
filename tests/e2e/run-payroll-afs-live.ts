@@ -110,6 +110,30 @@ async function main() {
     } finally {
       if (!reversed) await payroll({ method: 'DISCARD_RUN', runId: run.id }).catch(() => undefined);
     }
+
+    // ── Reclassification: never an account that holds something else too ──
+    const coaNow = await invoke<Array<{ id: string; name: string; account_role: string | null }>>(sb, 'chart-of-accounts', { method: 'GET', company_id: companyId });
+    const tradePayables = coaNow.find((a) => a.account_role === 'trade_payable');
+    if (tradePayables) {
+      const shared = await refused(payroll({ method: 'RECLASSIFY_PAYROLL_ACCOUNT', accountId: tradePayables.id, role: 'paye_control' }));
+      check('The trade payables account is not reclassified for payroll (it holds creditors too)', /PAYROLL_ACCOUNT_SHARED/.test(shared), shared.slice(0, 160));
+    }
+    const view = await payroll<AccountsView & { posted: unknown[] }>({ method: 'GET_PAYROLL_ACCOUNTS' });
+    check('The card lists the accounts earlier runs posted to', Array.isArray(view.posted), view.posted);
+
+    // ── Leave pay accrual, accepted by the user ──
+    type Accrual = { total: number; lines: unknown[]; ledgerBalance: number; adjustment: number; posted?: boolean; accounts: { expense: unknown; liability: unknown } };
+    const asOf = '2026-10-31';
+    const accrual = await payroll<Accrual>({ method: 'PREPARE_LEAVE_ACCRUAL', asOf });
+    check('Leave pay owing is valued from the leave register (days × daily rate)', accrual.total > 0 && accrual.lines.length > 0 && !!accrual.accounts.expense && !!accrual.accounts.liability,
+      { total: accrual.total, employees: accrual.lines.length, ledger: accrual.ledgerBalance, adjustment: accrual.adjustment });
+    const stale = await refused(payroll({ method: 'POST_LEAVE_ACCRUAL', asOf, expectedAdjustment: accrual.adjustment + 100 }));
+    check('A stale accrual is not posted', /ACCRUAL_CHANGED/.test(stale) || Math.abs(accrual.adjustment) < 0.01, stale.slice(0, 120));
+    const accepted = await payroll<Accrual>({ method: 'POST_LEAVE_ACCRUAL', asOf, expectedAdjustment: accrual.adjustment });
+    check('Accepted: the accrued leave pay account now holds what is owed', near(accepted.ledgerBalance, accrual.total) && Math.abs(accepted.adjustment) < 0.01,
+      { posted: accepted.posted, ledger: accepted.ledgerBalance, owed: accrual.total });
+    const again = await payroll<Accrual>({ method: 'POST_LEAVE_ACCRUAL', asOf });
+    check('Accepting again posts nothing (the ledger agrees)', again.posted === false);
   } finally {
     await payroll({ method: 'SAVE_PAYROLL_ACCOUNTS', accounts: original }).catch((e) => console.error('restore payroll accounts failed', e));
   }

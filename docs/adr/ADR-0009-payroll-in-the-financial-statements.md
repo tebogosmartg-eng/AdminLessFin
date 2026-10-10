@@ -82,9 +82,25 @@ The annual financial statements took nothing from payroll. Every payroll figure 
      - CERT TX's earlier test reversals still cross years. Its FY2026 statements therefore show the readiness warning and the ledger-based employee costs note.
      - Spaceman's four payroll reversals are each in the same year as their run.
 
-## Not in scope (next)
-
-- **Leave pay accrual:** leave balances × daily rate at year end, offered as a journal for the user to accept.
-- **Reclassifying existing companies' accounts:** a one-click change, approved per company.
-- **Retirement fund contributions by employers:** the payroll engine does not model them. Only employees' deductions exist, and they are posted to the fund payable.
-- **Detailed Income Statement:** employee costs subheading.
+7. **Leave pay accrual, accepted by the user** (Leave → Year-end accrual).
+   - **Calculation:**
+     - Each employee employed on the date contributes their annual leave owing (the BCEA register, never below nil) × daily rate.
+     - Daily rate by pay basis:
+       - salaried: weekly wage ÷ working days;
+       - daily-paid: day rate;
+       - hourly-paid: hourly rate × hours a day.
+     - The accrual is compared with the balance of the accrued leave pay account on that date.
+   - **Posting:** only on "Accept":
+     - the journal is for the difference: Dr Leave pay (Employee Costs), Cr Accrued leave pay (Trade and Other Payables), or the reverse when the accrual falls;
+     - it goes through the posting engine;
+     - it is refused if the figures changed since they were shown;
+     - posting again when the ledger agrees posts nothing.
+   - **Accounts:** `leave_pay_expense` is a new mapping role; `leave_provision` already existed.
+   - **In the statements:** the accrual then appears in the payables note and in employee costs.
+8. **Reclassification on the user's say-so.**
+   - **What the card shows:** the payroll accounts card also lists the accounts earlier runs posted to, wherever the statements would present them outside where payroll belongs.
+   - **"Classify as …":**
+     - changes the account's category and subcategory only, never amounts or journals;
+     - is offered only for an account that holds nothing else: no other ledger role, not a system account.
+   - **Shared accounts, such as trade payables (Spaceman's AP):** reclassifying is refused, with the advice to set up payroll accounts and move the balance with a journal.
+9. **Detailed Income Statement:** employee costs are one line among the operating expenses, as a published schedule states them; the note analyses them.
